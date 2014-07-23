@@ -5,6 +5,17 @@ use Data::Dumper;
 use Valid;
 
 parse_perm();
+
+# возвращает валидаторы или выбрасывает исключение
+sub get_validator {
+	my ($role, $a, $cols) = @_;
+	my $validator = $Valid::{$role}? \&{"Valid::$role"}: undef;
+	my $update = $Valid::{"update_$role"}? \&{"Valid::update_$role"}: undef;
+	my $error = $Valid::{"error_$role"}? \&{"Valid::error_$role"}: undef;
+	die "Не обнаружен валидатор $a = $cols" unless $validator or $update or $error;
+	return ($validator, $update, $error);
+}
+
 # парсим права
 # вида: таблица.роль.права = поля
 #	или таблица.роль = права
@@ -35,10 +46,7 @@ sub parse_perm {
 			$_tab_selfcol{$tab} = [map {my @x=split /\./; [@x==1? ($tab, @x): @x]} @cols], next if $role eq "selfcol"; # список столбцов в таблице
 			# валидаторы
 			unless(grep {/^(?:noauth|user|self)$/} $role) {
-				my $validator = $Valid::{$role}? \&{"Valid::$role"}: undef;
-				my $update = $Valid::{"update_$role"}? \&{"Valid::update_$role"}: undef;
-				my $error = $Valid::{"error_$role"}? \&{"Valid::error_$role"}: undef;
-				die "Не обнаружен валидатор $a = $cols" unless $validator or $update or $error;
+				my ($validator, $update, $error) = get_validator($role, $a, $cols);
 				for my $col (@cols) {
 					push @{$_tab_validator{$tab}{$col}}, $validator if $validator;
 					push @{$_tab_update{$tab}{$col}}, $update if $update;

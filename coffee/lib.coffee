@@ -2133,12 +2133,12 @@ class CWidget
 		line.position this, pos, scale, 'after', 'before', addx, addy
 		line
 
-	edit: (opt = {}) -> @_edit=t=@wrap(if opt.line then "<input>" else "<textarea></textarea>").val(@val()).css(@css 'display font text-align vertical-align border width height padding vertical-align'.split ' ').css('position', 'absolute').css(opt.css || {}).setHandlers('blur').prependTo(this).focus().relative this, 'left top before before'; self = this; t.onblur = (do(self)->-> self.val self.dataType @val(); self._edit = null ; self.send "onEdit"); this
+	edit: (opt = {}) -> @_edit=t=@wrap(if opt.line then "<input>" else "<textarea></textarea>").val(@val()).css(@css 'display font text-align vertical-align border width height padding vertical-align'.split ' ').css('position', 'absolute').css(opt.css || {}).setHandlers('blur').prependTo(this).focus().relative this, 'left top before before'; self = this; t.onblur = (do(self)->-> (return if off == self.send 'onBeforeEdit', this); self.val self.dataType @val(); self._edit = null ; self.send "onEdit"); this
 	
 	type$.all 'edit,arrow,arrow_border'
 	
 	# методы ajax и валидации
-	setValid: (valid) -> @attr 'cvalid', valid
+	setValid: (valid, err) -> (@attr 'cerr', err if err!=undefined); @attr 'cvalid', valid
 	valid: ->
 		if regexp=@attr "cvalid"
 			fn = CValid[regexp] || new RegExp regexp

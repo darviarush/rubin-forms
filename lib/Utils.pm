@@ -608,14 +608,10 @@ sub TemplateStr {
 	
 		$html[$i] =~ s/'/\\'/g;
 	
-		$html[$i] =~ s!([\$#]){((?:"(?:\\"|[^"])*"|\\'(?:\\\\'|[^'])*?\\'|[^\{\}])*)}|([\$#])(\w+(?::\w+(?:\(((?>[^()]+)|(?R))*\)?))*)!
-			if(($1 // $3) eq "#") {
-				if($html[$i] =~ /</) { $& } else {
-					my $x = $2 // $4;
-					$x =~ /^.(\w+)/;
-					'<span id=\' . $id . \'-'.$1.'>'.applyHelper($x).'</span>'
-				}
-			} else { applyHelper($2 // $4) }
+		$html[$i] =~ s!([\$#])(?:{((?:"(?:\\"|[^"])*"|\\'(?:\\\\'|[^'])*?\\'|[^\{\}])*)}|(\w+(?::\w+(?:\(((?>[^()]+)|(?R))*\))?)*))!
+			if($1 eq "#") {
+				if($html[$i] =~ /</) { $& } else { my $x = $2 // $3; '<span id=\', $id, \'-'.$x.'>\', '.applyHelper($x).', \'</span>' }
+			} else { '\', '.applyHelper($2 // $3).', \'' }
 		!ge;
 		$html[$i] =~ s!\$\+!', \$id, '!g;
 		$html[$i] =~ s!\$-(\w+)!', \$id, '-$1!g;
@@ -644,7 +640,7 @@ sub TemplateStr {
 	$pop->() while @T;
 	
 	$x =join "", $code_begin, @html, $code_end;
-	print STDERR $x;
+	#print STDERR $x;
 	$x
 }
 

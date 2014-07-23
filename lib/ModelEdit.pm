@@ -17,7 +17,9 @@ sub model_edit {
 	};
 	
 	if($action eq "valid") {
-		$inject->($_[0], "$tab.$_", $col) for split /,\s*/, $perm;
+		@roles = split /,\s*/, $perm;
+		get_validator($_, "$tab.$_", $col) for @roles; # тестируем, чтобы были такие валидаторы
+		$inject->($_[0], "$tab.$_", $col) for @roles;
 	}
 	elsif($action eq "tab_perm") {
 		$inject->($_[0], "$tab.$role", $perm);
@@ -49,14 +51,24 @@ sub get_install_info {
 					file => $file,
 					order => $order++
 				};
-			} elsif(/^\s*(?:`([^`]*)`|(\w+))\s*/ and SQL_WORD($col = $1 || $2) eq $col) {
-				my $ins = $';
+			} elsif(!$tab) {
+			} elsif(/^\s*(?:`([^`]*)`|(\w+))\s+(\w+)/) {
+				my $ins = $3.$';
 				$ins =~ s/,?\s*$//;
 				$install->{$tab}{cols}{$col} = {package => $package, install => $ins, order => $order++};
+			} elsif(/^\s*(\w+)/) {
+				my $ins = $3.$';
+				$ins =~ s/,?\s*$//;
+				$install->{$tab}{indexes} .= $ins;
+			} elsif(/^\s*\)/) {
+				my $ins = $';
+				$ins =~ s/;?\s*$//;
+				$install->{$tab}{options} = $ins;
+				$tab = undef;
 			} elsif(/^--\s*\[(.*?)\]/) {
 				$package = $1;
 			} else {
-				
+				die "что-то нераспознанное $_";
 			}
 		}
 		close f;

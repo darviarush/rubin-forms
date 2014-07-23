@@ -21,7 +21,7 @@ function ping(td, opt) {
 		tab: tbody.attr('tab'),
 		col: tr.attr('col'),
 		role: td.attr('role'),
-		perm: td.text()
+		perm: td.down().grep(function() { return this.element.nodeType === 3 }).text()
 	}, opt))
 }
 
@@ -32,8 +32,9 @@ CListen.setListen.call(function(e) {
 			ping(td)
 		} else if(role == 'valid') {
 			td.edit({line: 1})
-			td.onEdit = function() {
+			td.onBeforeEdit = function() {
 				ping(this, {action: "valid", method: "save", onLoad: function() {} })
+				return false
 			};
 		}
 	}

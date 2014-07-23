@@ -94,9 +94,6 @@ $fn = Utils::Template("
 $html = $fn->({val1=> 'val-1', val2=> 'val-2'}, 'id-test');
 	
 like $html, qr/val-1/;
-
-exit;
-
 like $html, qr/val-2/;
 like $html, qr/id='id-test'/;
 	

@@ -284,7 +284,7 @@ CTest.extend({
 		document.write( CTest.manual(manual) )
 		document.write("</div>")
 		
-		document.write("<div class=ph><a href='#' onclick='CTest.addComments(this.parentNode, \""+this.name+"\"); return false'>комментарии</a></div>")
+		document.write("<div class=comm>Добавить комментарий</div>")
 
 		if(css) document.write('<style type=text/css>\n'+css+'\n</style>\n')
 		document.write(html)
@@ -338,28 +338,6 @@ CTest.manual = function(manual) {
 	
 	return manual
 }
-
-
-CTest.addComments = function(element, id) {
-	name = 'comment-'+id
-	var iframe = document.getElementById(name)
-	if(iframe) {
-		iframe.style.display = iframe.style.display == ''? 'none': ''
-		try {
-			frames[name].Cackle.reinit();
-		} catch(e) { if(window.console) console.log(e) }
-	} else {
-		var iframe = document.createElement('iframe')
-		iframe.name = iframe.id = name
-		iframe.src = location.pathname.replace(/\/[\w\.]+$/, '')+'comment.html?'+id
-		iframe.frameborder = 'no'
-		iframe.style.border = 'none'
-		iframe.style.width = '95%'
-		iframe.style.height = '400px'
-		element.appendChild(iframe)
-	}
-}
-
 
 CTest.js_coffee_check = function(a) {
 	var coffee = a.parentNode.nextSibling
