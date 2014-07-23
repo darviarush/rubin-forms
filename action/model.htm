@@ -1,0 +1,121 @@
+<meta layout=index_>
+<meta name=title value="Модель">
+
+<script>
+function ping(td, opt) {
+	if(!opt) opt = {}
+	var x = CRoot.wrap('<img ctype=loader src="img/intersection.gif">').css('position', 'absolute').prependTo(td)
+	td._loader = x
+	td.onComplete = function(r) { this._loader.free() }
+	td.onLoad = (opt.onLoad || function(r) { this.toggleClass('is', 'no') })
+	td.onError = opt.onError
+	delete opt.onLoad
+	delete opt.onError
+	
+	var tr = td.up()
+	var tbody = tr.up()
+	var is_tab = !tbody.id()
+	td.ping(extend({
+		method: td.hasClass("no")? 'save': 'erase',
+		action: (is_tab? 'tab_perm': 'perm'),
+		tab: tbody.attr('tab'),
+		col: tr.attr('col'),
+		role: td.attr('role'),
+		perm: td.text()
+	}, opt))
+}
+
+CListen.setListen.call(function(e) {
+	var td = e.target(), role = td.attr("role")
+	if(role) {
+		if(/\b(?:noauth|user|self)\b/.test(role)) {
+			ping(td)
+		} else if(role == 'valid') {
+			td.edit({line: 1})
+			td.onEdit = function() {
+				ping(this, {action: "valid", method: "save", onLoad: function() {} })
+			};
+		}
+	}
+}, "click", "document")
+
+CListen.setListen.call(function(e) {
+	var td = e.target(), com
+	if(/^td|th$/i.test(td.tag()) && (com = td.down(0)).tag() == "#comment") {
+		td.tooltip({html: com.free().text(), append: 'prepend', open: 1, pos: 'bottom'})
+	}
+}, "mouseover", "document")
+
+</script>
+
+<style>
+table {border-collapse: collapse; }
+.tab { margin-bottom: 150px }
+.tab td, .tab th { border: solid 1px grey; text-align: center; cursor: default }
+.green { background: ForestGreen; font-waight: 700; color: white }
+.yellow { background: Orange; font-waight: 700; color: white }
+.red { background: IndianRed; font-waight: 700; color: white }
+.grey { background: lavender }
+.w { width: 132px }
+.is { background: Honeydew; }
+.no { background: Bisque; }
+
+.is_odd { background: GhostWhite }
+.no_odd { background: lavender }
+
+.click { cursor: pointer !important }
+
+.c-tip { background: Cornsilk; border: solid 1px grey; padding: 4px }
+</style>
+
+<center>
+
+<table id=$*tables class=tab>
+<tbody tab="$name">
+	<tr><th rowspan=3 class="$is_install:bool($is_sql:bool('is', 'no'), 'no')">$name<th colspan=12>Права<th rowspan=3 class=w>Валидаторы<th rowspan=2 class=w>Пакет
+	<tr><th class="w red" colspan=4>noauth
+		<th class="w yellow" colspan=4>user
+		<th class="w click $selfcol:bool('green', 'red')" colspan=4>self$selfcol:bool(": ")$selfcol:raw
+	<tr>
+		<td role="noauth" class="click $noauth_view:bool('is', 'no')">view
+		<td role="noauth" class="click $noauth_add:bool('is', 'no')">add
+		<td role="noauth" class="click $noauth_edit:bool('is', 'no')">edit
+		<td role="noauth" class="click $noauth_rm:bool('is', 'no')">rm
+		<td role="user" class="click $user_view:bool('is', 'no')">view
+		<td role="user" class="click $user_add:bool('is', 'no')">add
+		<td role="user" class="click $user_edit:bool('is', 'no')">edit
+		<td role="user" class="click $user_rm:bool('is', 'no')">rm
+		<td role="self" class="click $self_view:bool('is', 'no')">view
+		<td role="self" class="click $self_add:bool('is', 'no')">add
+		<td role="self" class="click $self_edit:bool('is', 'no')">edit
+		<td role="self" class="click $self_rm:bool('is', 'no')">rm
+		
+		<td class="click $package:bool('is', 'no')">$package
+</tbody>
+
+<tbody id=$*col tab="$name">
+	<tr col="$name">
+		<td class="$is_install:bool($is_sql:bool('is', 'no'), 'no')"><!--
+			<table>
+			<tr><th>в файле<td>$install
+			<tr><th>в базе<td>$sql:bool("", "нет")$sql
+			</table>
+		-->$name
+		<td class="click $noauth_view:bool('is', 'no')" role="noauth">view
+		<td class="click $noauth_add:bool('is', 'no')" role="noauth">add
+		<td class="click $noauth_edit:bool('is', 'no')" role="noauth">edit
+		<td class="grey">rm
+		<td class="click $user_view:bool('is', 'no')" role="user">view
+		<td class="click $user_add:bool('is', 'no')" role="user">add
+		<td class="click $user_edit:bool('is', 'no')" role="user">edit
+		<td class="grey">rm
+		<td class="click $self_view:bool('is', 'no')" role="self">view
+		<td class="click $self_add:bool('is', 'no')" role="self">add
+		<td class="click $self_edit:bool('is', 'no')" role="self">edit
+		<td class="grey">rm
+		<td class="click is" role="valid">$valid:join(", ")
+		<td class="click $package:bool('is', 'no')">$package
+</tbody>
+</table>
+
+</center>

@@ -1,0 +1,16 @@
+
+
+$email = $param->{email};
+$pass = $param->{pass};
+
+$user_id = query "user", "id", {email=>$email, pass=>$pass};
+if( $user_id ) {
+	$sess = Utils::unic_id(20);
+	header "Set-Cookie", "sess=$sess; path=/";
+	erase "sess", {user_id=>$user_id};
+	add "sess", {id=>$sess, user_id=>$user_id};
+	{sess=>$sess}
+} else {
+	{}
+}
+

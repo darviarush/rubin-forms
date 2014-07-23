@@ -1,0 +1,75 @@
+.w-1, .w-2, .w-3, .w-4, .w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11, .w-12,
+.w1, .w2, .w3, .w4, .w5, .w6, .w7, .w8, .w9, .w10, .w11, .w12 { float: left; }
+.w-12 { width: 100% }
+.w-11 { width: 91.66666667% }
+.w-10 { width: 83.33333333% }
+.w-9 { width: 75% }
+.w-8 { width: 66.66666667% }
+.w-7 { width: 58.33333333% }
+.w-6 { width: 50% }
+.w-5 { width: 41.66666667% }
+.w-4 { width: 33.33333333% }
+.w-3 { width: 25% }
+.w-2 { width: 16.66666667% }
+.w-1 { width: 8.33333333% }
+.pull-12 { right: 100% }
+.pull-11 { right: 91.66666667% }
+.pull-10 { right: 83.33333333% }
+.pull-9 { right: 75% }
+.pull-8 { right: 66.66666667% }
+.pull-7 { right: 58.33333333% }
+.pull-6 { right: 50% }
+.pull-5 { right: 41.66666667% }
+.pull-4 { right: 33.33333333% }
+.pull-3 { right: 25% }
+.pull-2 { right: 16.66666667% }
+.pull-1 { right: 8.33333333% }
+.pull-0 { right: auto }
+.push-12 { left: 100% }
+.push-11 { left: 91.66666667% }
+.push-10 { left: 83.33333333% }
+.push-9 { left: 75% }
+.push-8 { left: 66.66666667% }
+.push-7 { left: 58.33333333% }
+.push-6 { left: 50% }
+.push-5 { left: 41.66666667% }
+.push-4 { left: 33.33333333% }
+.push-3 { left: 25% }
+.push-2 { left: 16.66666667% }
+.push-1 { left: 8.33333333% }
+.push-0 { left: auto }
+.offset-12 { margin-left: 100% }
+.offset-11 { margin-left: 91.66666667% }
+.offset-10 { margin-left: 83.33333333% }
+.offset-9 { margin-left: 75% }
+.offset-8 { margin-left: 66.66666667% }
+.offset-7 { margin-left: 58.33333333% }
+.offset-6 { margin-left: 50% }
+.offset-5 { margin-left: 41.66666667% }
+.offset-4 { margin-left: 33.33333333% }
+.offset-3 { margin-left: 25% }
+.offset-2 { margin-left: 16.66666667% }
+.offset-1 { margin-left: 8.33333333% }
+.offset-0 { margin-left: 0 }
+
+
+.w1 { width: 100% }
+.w2 { width: 50% }
+
+.w11-12 { width: 91.66666667% }
+.w1-6 { width: 83.33333333% }
+.w1-4 { width: 75% }
+.w1-3 { width: 66.66666667% }
+.w1-12 { width: 58.33333333% }
+.w2-12 { width: 41.66666667% }
+
+.w3 { width: 33.33333333% }
+.w4 { width: 25% }
+.w6 { width: 16.66666667% }
+.w12 { width: 8.33333333% }
+
+
+.lb-1 { width: 100% }
+.lb-2 { width: 75% }
+.lb-3 { width: 50% }
+.lb-4 { width: 25% }

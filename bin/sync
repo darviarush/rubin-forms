@@ -1,0 +1,9 @@
+#!/bin/bash
+
+app=/cygdrive/c/rea/emls/html/app
+
+if [ -d $app/coffee ]; then
+	find $app/coffee -exec [ -f  ] && cp -f {}  \;
+fi
+if [ -d $app/css ]; then cp -rf $app/css public; fi
+if [ -d $app/js ]; then cp -rf $app/js public; fi

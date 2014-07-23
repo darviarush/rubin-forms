@@ -1,0 +1,16 @@
+# получает параметр many в формате json - массива ассоциативных массивов.
+# например: [{a:"view", tab:"html"}, ...]
+# выполняет указанные в нём запросы и возвращает их результаты в виде массива json
+
+$many = Utils::from_json($param->{many});
+die $@ if $@;
+
+@ret = ();
+
+for $param (@$many) {
+	$ret = do "$HOME/pages/$param->{a}.pl";
+	die $@ // $! if $@ // $!;
+	push @ret, $ret;
+}
+
+\@ret

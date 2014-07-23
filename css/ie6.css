@@ -1,0 +1,164 @@
+/*
+ * © 2007 http://www.markup.programica.ru/
+ * Author - Kornilov Pavel
+ */
+
+@import url(ie.css);
+
+/*IE6 Background Flicker*/
+html { filter: expression(runtimeStyle.filter = '',document.execCommand('BackgroundImageCache', false, true));}
+
+label /* fast */
+{
+	scrollbar-face-color	: expression( runtimeStyle.scrollbarFaceColor = '#fff', (this['for'] == null && firstChild && runtimeStyle.behavior == '') ?
+									onclick = function () {
+										var input = this.getElementsByTagName('input')[0]
+										if (this.getElementsByTagName('input')[0])
+										{
+											try { input.click() || input.focus() }
+											catch (ex) {}
+										}
+										else if (this.getElementsByTagName('textarea')[0])
+										{
+											this.getElementsByTagName('textarea')[0].focus()			
+										}
+									} : '' )
+}
+label /* attachEvent, Beta */
+{
+	scrollbar-face-color	: expression( runtimeStyle.scrollbarFaceColor = '#fff', (this['for'] == null && firstChild) ?
+									attachEvent('onclick', function () {
+										var input = event.srcElement.getElementsByTagName('input')[0]
+										if (input)
+										{
+											try { input.click() || input.focus() }
+											catch (ex) {}
+										}
+										else if (event.srcElement.getElementsByTagName('textarea')[0])
+										{
+											event.srcElement.getElementsByTagName('textarea')[0].focus()			
+										}
+									}) : '' )
+}
+/* png fix */
+.bg-png-crop
+{
+	filter	: expression(
+		(runtimeStyle.filter == '') ? runtimeStyle.filter = 'progid:DXImageTransform.Microsoft.AlphaImageLoader(src='+currentStyle.backgroundImage.split('\"')[1]+', sizingMethod=crop)' : runtimeStyle.filter,
+		runtimeStyle.backgroundImage = 'none');
+}
+.bg-png-scale
+{
+	filter	: expression(
+		(runtimeStyle.backgroundImage != 'none') ? runtimeStyle.filter = 'progid:DXImageTransform.Microsoft.AlphaImageLoader(src='+currentStyle.backgroundImage.split('\"')[1]+', sizingMethod=scale)' : runtimeStyle.filter,
+		runtimeStyle.backgroundImage = 'none');
+}
+/* Нужен прозрачный гиф */
+img.this-src-png
+{
+	width: expression(width);
+	filter: expression( (runtimeStyle.filter == '') ? runtimeStyle.filter="progid:DXImageTransform.Microsoft.AlphaImageLoader(src='"+src+"', sizingMethod='image')" : '',
+						src = '/i/0.gif');
+}
+/* Не нужен прозрачный гиф. Плохо протестирована */
+img.this-src-png
+{
+	filter	: expression((runtimeStyle.filter==''&&className!='ie')?(h = this.insertAdjacentHTML('afterEnd', '<span style="filter:progid:DXImageTransform.Microsoft.AlphaImageLoader(src='+src+',sizingMethod=scale);zoom:1"><img width="'+width+'" height="'+height+'" src="'+src+'" alt="" style="visibility:hidden;display:block" class="ie"/></span>'), style.display = 'none') : '',
+	            runtimeStyle.filter = 'none'
+	            );
+}
+/*
+Берем позицию у бэкграунда
+innerHTML "expression Object required" при innerHTML
+*/
+.izvrat-plus-div
+{
+	behavior		: expression(
+						(runtimeStyle.behavior==''&&currentStyle.backgroundImage!='none') ?
+							insertAdjacentHTML('afterBegin', '<div class="ie"" style="height:1;width:1;position:absolute;'
+								+((currentStyle.backgroundPositionX!='100%'&&currentStyle.backgroundPositionX!='right') ? 'left:'+((currentStyle.backgroundPositionX == 'left') ? 0 : currentStyle.backgroundPositionX ) : 'right:0')+';'
+								+((currentStyle.backgroundPositionY!='100%'&&currentStyle.backgroundPositionY!='bottom') ? ';top:'+((currentStyle.backgroundPositionY == 'top') ? 0 : currentStyle.backgroundPositionY ) : 'bottom:0')
+								+';filter:progid:DXImageTransform.Microsoft.AlphaImageLoader(src='+currentStyle.backgroundImage.split('\"')[1]+', sizingMethod=crop)">'+'<img src="'+currentStyle.backgroundImage.split('\"')[1]+'" alt="" style="visibility:hidden" /></div>') : '',
+						runtimeStyle.backgroundImage = 'none',
+						runtimeStyle.behavior = 'none'
+					);
+}
+
+/*Обычно приятно сделать заодно hasLayout */
+.content-before
+{
+	zoom	: expression(runtimeStyle.zoom = 1,
+				insertAdjacentHTML('beforeEnd', '<div class="hr"></div>')
+}
+
+/*
+position: fixed; top: 0
+doctype xhtml
+Выполняется все время
+*/
+html { background-attachment: fixed; }
+.position-fixed
+{
+	position		: absolute;
+	top				: expression(eval(document.documentElement.scrollTop) + 'px');
+}
+
+/* position: fixed; bottom: 0 */
+.position-fixed
+{
+	position	: absolute;
+	top			: expression(eval(document.documentElement.scrollTop+document.documentElement.clientHeight-clientHeight-6) + "px");/*border-width*/
+}
+
+
+/*
+	[type="text(или что угодно)"]. Приходится копировать все стили в css для ie6 или дублировать стилевое описание в основном файле.
+	<input type="text" class="red type-text"/>
+	<input type="text" class="type-text"/>
+*/
+input
+{
+	scrollbar-face-color: expression(runtimeStyle.scrollbarFaceColor = '#fff', className = (className) ? ' type-'+type : 'type-'+type)
+}
+
+.add-hover-class-for-any-elements
+{
+	scrollbar-face-color: expression(runtimeStyle.scrollbarFaceColor = '#fff',
+					onmouseover = function() {this.className += ' hover'},
+					onmouseout = function() {this.className = this.className.replace(/ hover/g, '')}
+				);
+}
+
+.max-width { width : expression(document.body.clientWidth > 920 ? "92em" : "auto"); }
+.height-100-percantage { height: expression(document.body.clientHeight+'px'); }
+.border-color-transparent
+{
+	filter			: chroma(color=cyan);
+	border-color	: cyan;
+}
+
+
+/*Обычно — бесполезно*/
+.img-for-em
+{
+	height		: expression(runtimeStyle.height = (height/10)+'em');
+	width		: expression(runtimeStyle.width = (width/10)+'em');
+}
+
+.wrapper-vertical-align-middle
+{
+	margin-top: expression(
+						((parentNode.offsetHeight/2-offsetHeight)/2) < 0 ? '0' :
+						(parentNode.offsetHeight/2-offsetHeight/2) +'px'
+					);
+}
+
+.first-child
+{
+	scrollbar-face-color: expression(runtimeStyle.scrollbarFaceColor = '#fff', (this == parentNode.firstChild) ? className += ' first-child' : '' )
+}
+
+.inherit
+{
+	background-color: expression( runtimeStyle.backgroundColor = parentNode.currentStyle.backgroundColor);
+}

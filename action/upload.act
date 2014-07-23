@@ -1,0 +1,10 @@
+
+#msg $param;
+
+# $path = Utils::img_path($param->{id});
+# Utils::mkpath($path);
+# while(my $file = $param->{"file".$i++}) {
+#	Utils::write($path, @$file);
+# }
+
+undef

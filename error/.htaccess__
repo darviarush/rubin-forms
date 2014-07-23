@@ -1,0 +1,8 @@
+
+
+RewriteEngine on
+Options +FollowSymlinks
+RewriteBase /
+
+RewriteRule ^(works\.\w+)$ $1 [QSA,L]
+RewriteRule ^(.*)$ works.html [R=503]

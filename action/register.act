@@ -1,0 +1,26 @@
+
+use Mailer;
+
+$email = $param->{email};
+if($email) {
+	$mailer = Mailer->new;
+
+	$user = replace("user", {email=>$email});
+	$user_id = $user->{id};
+
+	$sess = Utils::unic_id(20);
+	erase("sess", {user_id=>$user_id, new_pass=>1});
+	add("sess", {id=>$sess, user_id=>$user_id, new_pass=>1});
+
+	$mailer->send_email("register", {To=>$email}, {id=>$sess});
+
+	return {};
+}
+
+
+$id = $param->{id};
+$new_pass = query("sess", "new_pass", {id=>$id});
+
+if($new_pass) {
+	push @_HEAD, "Set-Cookie: sess=$id";
+} else { redirect "register_fail" }
