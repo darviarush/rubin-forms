@@ -284,7 +284,7 @@ CTest.extend({
 		document.write( CTest.manual(manual) )
 		document.write("</div>")
 		
-		document.write("<div class=comm>Добавить комментарий</div>")
+		document.write("<div class=comm>Комментариев: </div>")
 
 		if(css) document.write('<style type=text/css>\n'+css+'\n</style>\n')
 		document.write(html)

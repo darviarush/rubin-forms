@@ -16,7 +16,7 @@ sub bool { $_[0]? ($_[1] // '+'): $_[2] }
 
 sub dump { "<pre>".Utils::escapeHTML(Dumper($_[0]))."</pre>" }
 
-sub join { Utils::escapeHTML(join $_[1], @{$_[0]}, @_[2..$#_]) }
+sub join { Utils::escapeHTML(join ($_[1] // ", "), @{$_[0]}, @_[2..$#_]) }
 
 sub at { $_[0]->{ $_[1] } }
 

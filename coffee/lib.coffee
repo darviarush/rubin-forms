@@ -91,7 +91,7 @@ IE = if '\v'=='v' or document.documentMode?
 	else 5
 
 
-CTraceback = -> f = arguments.callee; i=0; [f.name || '<anonimous function>' while (f = f.caller && i++ < 10)].reverse().join(' → ')
+CTraceback = -> f = arguments.callee; i=0 ; [f.name || '<anonimous function>' while (f = f.caller && i++ < 10)].reverse().join(' → ')
 
 say = (args...) -> console.log(args...); args[args.length-1]
 escapeHTML = (s) -> String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/\'/g, '&#39;')
@@ -768,20 +768,40 @@ class CIoLoadRepository extends CIoRepository
 	
 	
 CTemplate =
+	applyHelper: (a) ->
+		say 'a', a
+		b = a = a.replace ///\\(["'\\])///g, "$1";
+		a = a.split ///([:,\(\)]|"(?:\\"|[^"])*"|'(?:\\'|[^'])*')///
+		ab = []
+		for x in a then x = x.replace ///^\s*(.*?)\s*$///, "$1"; (if x != "" then (x="(" if x=="{"); (x=")" if x=="}"); ab.push x.replace ///\$(\w+)///g, "$data->{'$1'}")
+		ab[0] = "data['#{a[0]}']";
+		return "escapeHTML(#{ab[0]})" if ab.length == 1
+
+		ab.push ")"
+		T = []; S = []
+		for a in ab
+			if a == ")"
+				while "(" != (a = T.pop()) and a?
+					if a == "," then a = S.pop(); S.push S.pop()+", "+a
+					else if a == ":" then S.push "CHelper."+S.pop()+"("+S.pop()+")"
+					else throw "Неизвестный оператор `$a` в хелпере"
+				if (a = T.pop())?
+					throw "не `:`" if a != ":"
+					a = S.pop()
+					S.push "CHelper."+S.pop()+"("+S.pop()+", #{a})"
+			else if /^[:,\(]$/.test a then T.push a
+			else S.push a
+
+		throw "Ошибка синтаксиса хелпера: ${#{b}} S " + S.join("|") + " T " + T.join("|") if S.length != 1
+		throw "Остались операторы в стеке хелпера: ${#{b}} " + S.join("|") + " T " + T.join("|") if T.length != 0
+
+		return S[0]
+
+
 	compile: (html) ->
 
-		html=html.split /// (<[^<>]+>) ///
-		tag$ = ""
-		for x, i in html
-			html[i] = x.replace( ///\#(\w+)///g, (a, b) -> '<span id=$-'+b+'>$'+b+'</span>') if not ///^<///.test x and not ///^<(?:style|script)\b///i.test tag$
-			tag$ = x
-
-		html = escapeJS html.join ""
-		orig = html.split /// (<[^<>]+>) ///
-		html = html.replace /// \$(\w+) ///g, "', escapeHTML(data['$1']), '"
-		html = html.replace /// \$\+ ///g, "', id, '"
-		html = html.replace /// \$-(\w+) ///g, "', id, '-$1"
-		
+		html=html.split /// (<script\b.*?</script\s*>|<style/b.*?</style\s*>|<[\/\w](?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|[^<>])*>) ///
+		orig = (for i in html then i)
 		
 		code_begin = """function(dataset, id1) {
 	var number_id = dataset instanceof Array
@@ -806,10 +826,8 @@ CTemplate =
 			tr: ///^(?:table|tbody|tfoot|thead)$///
 			option: ///^select$///
 			li: ///^(?:ol|ul)$///
-		
-		html=html.split /// (<[^<>]+>) ///
 
-		T = []; i = 0
+		T = []; i = 0 ; applyHelper = CTemplate.applyHelper
 		pop = ->
 			tag = T.pop()
 			if tag.length > 1
@@ -820,6 +838,29 @@ CTemplate =
 			tag[0]
 		
 		while i < html.length
+			say i, html[i]
+		
+			s = escapeJS html[i]
+			ok = []; last_idx = 0
+			re = if /^</.test s then ///(\$)(?:{((?:"(?:\\"|[^"])*"|\\'(?:\\\\'|[^'])*?\\'|[^\{\}])*)}|(\w+(?::\w+(\()?)?))///g
+			else ///([\$#])(?:{((?:"(?:\\"|[^"])*"|\\'(?:\\\\'|[^'])*?\\'|[^\{\}])*)}|(\w+(?::\w+(\()?)?))///g
+			while r = re.exec s
+				ok.push s.slice last_idx, re.lastIndex - r[0].length
+				if r[4]
+					rs = /// [()] ///g
+					k = rs.lastIndex = re.lastIndex
+					j = 1
+					while res = rs.exec s
+						if res[0] == "(" then j++ else (break if --j == 0)
+					x = s.slice k, last_idx = rs.lastIndex
+				else x = r[2] || r[3]; last_idx = re.lastIndex
+				ok.push if r[1] == "#" then '<span id=\', id, \'-'+x+'>\', '+applyHelper(x)+', \'</span>' else '\', '+applyHelper(x)+', \''
+			ok.push s.slice last_idx
+			s = ok.join ""
+			
+			s = s.replace /// \$\+ ///g, "', id, '"
+			html[i] = s.replace /// \$-(\w+) ///g, "', id, '-$1"
+		
 			if match=html[i].match ///<([\w:-]+)///
 				tag = match[1]
 				if re = tags[tag.toLowerCase()]
@@ -830,6 +871,7 @@ CTemplate =
 					orig.splice i+1, 0, ""
 					html.splice i+1, 0, "', (#{code_begin}"
 					T.push [tag, ret, i, /\scinit[\s>]/i.test html[i]]
+					i++
 				else
 					T.push [tag]
 			else if match = html[i].match ///</([\w:-]+)///
@@ -852,7 +894,7 @@ CTemplate =
 		id = element.id ||= CMath.uniqid()
 		cview = CView[element.getAttribute "cview"]
 		if v=cview[2]
-			if c=v.class then element.className += " "+c
+			if c=v.class then element.className += " " + c
 			if element.tagName != c=v.tag then if w = element.widget then w.tag c else (new CWidget element).tag(c).unwrap()
 		html = cview[1]
 		content=element.innerHTML
@@ -869,6 +911,20 @@ CTemplate =
 	color: (n=parseInt(Math.random()*CTemplate._color.length)) -> CTemplate._color[n]
 
 
+CHelper =
+	json: toJSON
+	raw: (x) -> x
+	html: escapeHTML
+	nbsp: (x) -> if x? and x!="" then "&nbsp;" else escapeHTML x
+	bool: (x, a, b) -> if x then (if a? then a else "+") else (if b? then b else "-")
+	dump: toJSON
+	join: (x, sep=", ", args...) -> x.concat(args).join sep
+	at: (x, i) -> x[i]
+	odd: (x, a='odd', b='') -> if x % 2 then a else b
+	even: (x, a='even', b='') -> if x % 2==0 then a else b
+	oddeven: (x, a='odd', b='even') -> if x % 2 then a else b
+	
+	
 CValid =
 	int: /^-?\d+$/
 	uint: /^\d+$/
@@ -1323,11 +1379,22 @@ class CWidget
 	unless qs$ = document.querySelector && IE!=8 then CInit.require "lib/nwmatcher-1.2.5"
 	# https://github.com/jquery/sizzle/wiki/Sizzle-Documentation
 	
-	byXYAll$ = (x, y) -> widget = @byXY x, y; body=@body(); e=[]; c=[]; (while widget != body then e.push widget.element; c.push widget.css 'z-index'; widget.css 'z-index', -1000 ; widget = @byXY x, y); (for z, i in c then e[i].widget.css 'z-index', z); new CWidgets e
+	byXYAll$ = (x, y) -> k = -1000 ; self = widget = @$0$ x, y; c=[]; e=[]; (while widget then e.push z=widget.element; c.push [z.style.zIndex, z.style.position]; widget.css 'z-index': k--, position: 'relative'; widget = @$0$ x, y; (break if self==widget)); (for z, i in c then e[i].widget.css 'z-index': z[0], position: z[1]); new CWidgets e
 	
 	byId: (id, parent) -> @wrap @document().getElementById(id), parent
-	byViewXY: (x, y) -> @wrap @document().elementFromPoint x, y
-	byXY: (x, y) -> @byViewXY x - @viewLeft(), y - @viewTop()
+	byXY: (x, y) ->
+		vl=@viewLeft(); vt=@viewTop()
+		@wrap if not(vl <= x <= @viewRight()) or not(vt <= y <= @viewBottom())
+			v=@viewport(); vx = v.vscroll(); vy = v.hscroll()
+			x -= vl; y -= vt
+			@window().scrollTo x, y
+			x += vx - v.vscroll(); y += vy - v.hscroll()
+			e = @document().elementFromPoint x, y
+			v.vscroll vx; v.hscroll vy
+			e
+		else
+			@document().elementFromPoint x - vl, y - vt
+	byViewXY: (x, y) -> @byXY x + @viewLeft(), y + @viewTop()
 	byXYAll: byXYAll$.inline 'byXYAll', 'byXY'
 	byViewXYAll: byXYAll$.inline 'byViewXYAll', 'byViewXY'
 	byTag: if tn$=(document.getElementsByTagName && IE!=5) then (name) -> @wrap @element.getElementsByTagName(name)[0] else (name) -> @wrap NW.Dom.byTag(name, @element)[0]
@@ -1910,6 +1977,9 @@ class CWidget
 
 	viewTop: -> @window().pageYOffset
 	viewLeft: -> @window().pageXOffset
+	
+	viewRight: -> @viewLeft() + @viewWidth()
+	viewBottom: -> @viewTop() + @viewHeight()
 	
 	viewWidth: -> @window().innerWidth
 	viewHeight: -> @window().innerHeight

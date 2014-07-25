@@ -169,12 +169,12 @@ like $html, qr/x4/;
 like $html, qr/<!--/;
 like $html, qr/<!!-- who\? --!>/;
 
-$fn = Utils::Template('- $x:bool($y:bool("*", "Да"), "Нет"):raw(1) -');
+$fn = Utils::Template('- \$x:bool($y:bool("*", \'Да\n\'), "Нет"):raw(1) -');
 $html = $fn->({x => 1}, "");
-is $html, "- Да -";
+is $html, "- \\Да\n -";
 
 $html = $fn->({x => 0}, "");
-is $html, "- Нет -";
+is $html, "- \\Нет -";
 
 $r = <<'END';
 ${ x : bool( $y : bool('\''), 10 ) : raw }
