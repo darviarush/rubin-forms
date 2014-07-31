@@ -1,5 +1,5 @@
 use Data::Dumper;
-use Test::More tests => 51;
+use Test::More tests => 52;
 
 use Msg;
 require_ok 'Utils';
@@ -92,11 +92,12 @@ $fn = Utils::Template("
 	</div>
 ");
 $html = $fn->({val1=> 'val-1', val2=> 'val-2'}, 'id-test');
-	
+
 like $html, qr/val-1/;
 like $html, qr/val-2/;
+like $html, qr/id=id-test-val1/;
 like $html, qr/id='id-test'/;
-	
+
 $fn = Utils::Template(<<'END');
 <div id='$+' ctype=test_class1>
 	#val1
@@ -111,7 +112,7 @@ $fn = Utils::Template(<<'END');
 </div>
 END
 $html = $fn->({"val1"=> 'val-1', "val2"=> 'val-2', "ls"=> [{"val1"=> 'val-1-0', "val2"=> 'val-2-0', "ls"=> []}, {"val1"=> 'val-1-1', "val2"=> 'val-2-1', "ls"=> [{"val1"=> 'val-1-ls-0'}]}]}, 'id-test');
-	
+
 like $html, qr/val-1/;
 like $html, qr/val-2/;
 like $html, qr/id='id-test' ctype=test_class1/;
@@ -177,7 +178,7 @@ $html = $fn->({x => 0}, "");
 is $html, "- \\Нет -";
 
 $r = <<'END';
-${ x : bool( $y : bool('\''), 10 ) : raw }
+${x:bool($y:bool('\''), 10):raw}
 END
 $fn = Utils::Template($r);
 $html = $fn->({x=>1, y=>1});

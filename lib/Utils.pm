@@ -524,53 +524,9 @@ sub to_rows ($) {
 	return {fields => $fields, rows => $ret->[0]};
 }
 
-# вспомогательная функция для TemplateStr. Парсер хелперов
-sub applyHelper {
-	local ($_, $`, $', $1, $2);
-	my ($a) = @_;
-	$a =~ s/\\(['\\])/$1/g;
-	#my %amp = qw(amp & lt < gt >);
-	#$a =~ s/&(\w+);?/$amp{$1}/ge;
-	my $b = $a;
-	my @a = split /([:,\(\)]|"(?:\\"|[^"])*"|'(?:\\'|[^'])*')/, $a;
-	@a = map { s/^\s*(.*?)\s*$/$1/;  s/\$(\w+)/\$data->{'$1'}/g; $_ eq ""? (): $_ eq "{"? "(": $_ eq "}"? "": $_ } @a;
-	$a[0] = "\$data->{'$a[0]'}";
-	return "Utils::escapeHTML($a[0])" if @a == 1;
-
-	@a = map { s!^'(.*)'$! $_=$1; s/\\'/'/g; s/"/\\"/g; "\"$_\"" !se; $_ } @a;
-	
-	push @a, ")";
-	my (@T, @S);
-	for $a (@a) {
-		if($a eq ")") {
-			while("(" ne ($a = pop @T) and defined $a) {
-				if($a eq ",") {	$a = pop @S; push @S, pop(@S).", ".$a; }
-				elsif($a eq ":") { push @S, "Helper::".pop(@S)."(".pop(@S).")"; }
-				else { die "Неизвестный оператор `$a` в хелпере"; }
-			}
-			if(defined($a = pop @T)) {
-				die "не `:`" if $a ne ":";
-				$a = pop @S;
-				push @S, "Helper::".pop(@S)."(".pop(@S).", $a)";
-			}
-		}
-		elsif($a =~ /^[:,\(]$/) { push @T, $a; }
-		else { push @S, $a }
-	}
-
-	die "Ошибка синтаксиса хелпера: \${$b} S " . join("|", @S) . " T " . join("|", @T) if @S != 1;
-	die "Остались операторы в стеке хелпера: \${$b} " . join("|", @S) . " T " . join("|", @T) if @T != 0;
-
-	return $S[0];
-}
 
 # темплейт, аналогичный из js-библиотеки CTemplate::compile. Возвращает текст функции
 sub TemplateStr {
-	local ($_, $`, $');
-	($_) = @_;
-	my $re_tag = qr!(<script\b.*?</script\s*>|<style/b.*?</style\s*>|<[\/\w](?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|[^<>])*>)!is;
-	my @html = split $re_tag;
-	my @orig = @html;
 	
 	my $code_begin = 'sub {
 	my ($dataset, $id1) = @_;
@@ -594,56 +550,78 @@ sub TemplateStr {
 		option => qr/^select$/,
 		li => qr/^(?:ol|ul)$/,
 	);
+
+	local ($_, $&, $`, $', $1, $2, $3, $4, $5);
+	($_) = @_;
 	
-	my (@T, $i);
+	my ($orig, $pos, $open_tag, @html, @T) = $_;
 	
 	my $pop = sub {
 		my $tag = pop @T;
-		if(@$tag > 1) {
-			my $ret = $tag->[1];
-			$html[$tag->[2]] .= $tag->[3]? do { my $x = join "", @orig[$tag->[2]..$i-1]; $x=~s/!/!!/g; $x=~s/-->/--!>/g; "<!--$x-->" }: "";
-			splice @orig, $i, 0, "";
-			splice @html, $i++, 0, "$code_end)->(\$data".($ret? "->{'$ret'}": "").", \$id".($ret? ".'-$ret'": "")."), '";
+		if(@$tag > 2) {
+			local ($&, $`, $');
+			my ($name, $begin, $ret, $cinit, $idx) = @$tag;
+			if($cinit) { my $x = substr $_, $begin, $pos-$begin; $x=~s/!/!!/g; $x=~s/-->/--!>/g; $html[$idx] .= "<!--$x-->" }
+			push @html, "$code_end)->(\$data".($ret? "->{'$ret'}": "").", \$id".($ret? ".'-$ret'": "")."), '";
 		}
 		$tag->[0];
 	};
 	
-	for($i=0; $i<@html; $i++) {
-	
-		$html[$i] =~ s/[\\']/\\$&/g;
-		my $f = $html[$i] =~ /^</? qr/\$/: qr/[\$#]/;
-		$html[$i] =~ s!($f)(?:{((?:"(?:\\"|[^"])*"|\\'(?:\\\\'|[^'])*?\\'|[^\{\}])*)}|(\w+(?::\w+(?:\(((?>[^()]+)|(?R))*\))?)*))!
-			if($1 eq "#") {	my $x = $2 // $3; '<span id=\', $id, \'-'.$x.'>\', '.applyHelper($x).', \'</span>' }
-			else { '\', '.applyHelper($2 // $3).', \'' }
-		!ge;
-		$html[$i] =~ s!\$\+!', \$id, '!g;
-		$html[$i] =~ s!\$-(\w+)!', \$id, '-$1!g;
-	
-		if($html[$i] =~ m!<([\w:-]+)!) {
-			my $tag = $1;
-			if(my $re = $tags{lc $tag}) {
-				$pop->() while @T and $T[$#T]->[0] !~ $re;
-			}
-			if($html[$i] =~ /\$\*(?:\w+)?/) {
-				my $ret = undef;
-				$html[$i] =~ s!\$\*(\w+)?! $ret = $1; "', \$id, '".($1? "-$1": "") !e;
-				splice @orig, $i+1, 0, "";
-				splice @html, $i+1, 0, "', ($code_begin";
-				push @T, [$tag, $ret, $i, $html[$i] =~ /\scinit[\s>]/i];
-				$i++;
-			} else {
-				push @T, [$tag];
-			}
-		} elsif($html[$i] =~ m!</([\w:-]+)!) {
-			my $tag = $1;
-			while(@T and $pop->() ne $tag) {}
-		}
-	}
+	for(;;) {
 		
+		pos() = $pos;
+
+		push @html,
+		m!\G<(\w+)!? do { $open_tag = $1; if(my $re = $tags{lc $open_tag}) { $pop->() while @T and $T[$#T]->[0] !~ $re; } $& }:
+		m!\G>!? do { my @ret; if($T) { local($&, $`, $'); $T = [$open_tag, $pos+1, $T->[0], $m=/\bcinit[^<]*\G/i, scalar @html]; @ret=(">", "', ($code_begin") } else { $T = [$open_tag]; @ret = ">" } push @T, $T; $T = $open_tag = undef; @ret }:
+		m!\G</(\w+)\s*>!? do { my ($tag) = ($1); while(@T and $pop->() ne $tag) {}; $& }:
+		m!\G\$\+!? do { "', \$id, '" }:
+		m!\G\$-(\w+)!? do { "', \$id, '-$1" }:
+		m!\G(?:\$|(#))(\{\s*)?(\w+)!? do {
+			my $open_span = $1;
+			if($open_span && $open_tag) { $& }
+			else {
+				$pos += length $&;
+				my $open_braket = !!$2;
+				my $braket = 0;
+				push @html, "<span id=', \$id, '-$3>" if $open_span;
+				push @html, "', ", "\$data->{'$3'}";
+				my ($fn_idx, @fn_idx) = ($#html, $#html);
+				for(;;) {
+					pos() = $pos;
+
+					push @html, (
+					m!\G:(\w+)(\()?!? do { $html[$fn_idx] = "Helper::$1(".$html[$fn_idx]; if($2) {++$braket; ", "} else { ")" } }:
+					m!\G"(?:\\"|[^"])*"!? $&:
+					m!\G'((?:\\'|[^'])*)'!? do { local $&; my $x=$1; $x=~s/"/\\"/g; "\"$x\"" }:
+					m!\G-?\d+(?:\.\d+)?(?:E[+-]\d+)?!? $&:
+					m!\G,\s*!? $&:
+					m!\G\$(\w+)!? do { push @fn_idx, $fn_idx; $fn_idx = scalar @html; "\$data->{'$1'}" }:
+					m!\G\)!? do { --$braket; $fn_idx = pop @fn_idx; ")" }:
+					m!\G\}!? do { die "нет `{` для `}`" unless $open_braket; $pos++; last; }:
+					last);
+					$pos += length $&;
+				}
+				die "не закрыта `}`" if $open_braket and not m!\G\}!;
+				die "не закрыты скобки ($braket)" if $braket; 
+
+				push @html, ", '".($open_span? "</span>": "");
+				next;
+			}
+		}:
+		$open_tag && m!\G\$\*(\w+)?!? do { $T = [$1]; "', \$id, '".($1? "-$1": "") }:
+		m!\G[\\']!? "\\$&":
+		m!\G.!s? $&:
+		last;
+		
+		$pos += length $&;
+	}
+
 	$pop->() while @T;
 	
-	$x =join "", $code_begin, @html, $code_end;
-	#print STDERR $x;
+	my $x = join "", 'sub { my ($data, $id) = @_; return join "", \'', @html, '\' }';
+	#our $rem++;
+	#Utils::write("$rem.pl", $x);
 	$x
 }
 

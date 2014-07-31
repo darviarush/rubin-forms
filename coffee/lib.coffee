@@ -768,41 +768,11 @@ class CIoLoadRepository extends CIoRepository
 	
 	
 CTemplate =
-	applyHelper: (a) ->
-		say 'a', a
-		b = a = a.replace ///\\(["'\\])///g, "$1";
-		a = a.split ///([:,\(\)]|"(?:\\"|[^"])*"|'(?:\\'|[^'])*')///
-		ab = []
-		for x in a then x = x.replace ///^\s*(.*?)\s*$///, "$1"; (if x != "" then (x="(" if x=="{"); (x=")" if x=="}"); ab.push x.replace ///\$(\w+)///g, "$data->{'$1'}")
-		ab[0] = "data['#{a[0]}']";
-		return "escapeHTML(#{ab[0]})" if ab.length == 1
-
-		ab.push ")"
-		T = []; S = []
-		for a in ab
-			if a == ")"
-				while "(" != (a = T.pop()) and a?
-					if a == "," then a = S.pop(); S.push S.pop()+", "+a
-					else if a == ":" then S.push "CHelper."+S.pop()+"("+S.pop()+")"
-					else throw "Неизвестный оператор `$a` в хелпере"
-				if (a = T.pop())?
-					throw "не `:`" if a != ":"
-					a = S.pop()
-					S.push "CHelper."+S.pop()+"("+S.pop()+", #{a})"
-			else if /^[:,\(]$/.test a then T.push a
-			else S.push a
-
-		throw "Ошибка синтаксиса хелпера: ${#{b}} S " + S.join("|") + " T " + T.join("|") if S.length != 1
-		throw "Остались операторы в стеке хелпера: ${#{b}} " + S.join("|") + " T " + T.join("|") if T.length != 0
-
-		return S[0]
 
 
-	compile: (html) ->
 
-		html=html.split /// (<script\b.*?</script\s*>|<style/b.*?</style\s*>|<[\/\w](?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|[^<>])*>) ///
-		orig = (for i in html then i)
-		
+	compile: (r) ->
+
 		code_begin = """function(dataset, id1) {
 	var number_id = dataset instanceof Array
 	if(!number_id) dataset = [dataset]
@@ -826,6 +796,72 @@ CTemplate =
 			tr: ///^(?:table|tbody|tfoot|thead)$///
 			option: ///^select$///
 			li: ///^(?:ol|ul)$///
+		
+		
+		T = []; html = []; pos = 0
+		pop = ->
+			tag = T.pop()
+			if tag.length > 2
+				[name, begin, ret, cinit, idx] = tag
+				if cinit then html[idx] .= ["<!--", r.slice(begin, pos).replace(/!/g, '!!').replace(/-->/g, '--!>'), "-->"].join ""
+				html.push [code_end, ")(data", (if ret then "['#{ret}']" else ""), ", id", (if ret then "+'-#{ret}'" else ""), "), '"].join ""
+			tag[0]
+		
+		while 1
+			pos() = $pos;
+
+			push @html,
+			m!\G<(\w+)!? do { $open_tag = $1; if(my $re = $tags{lc $open_tag}) { $pop->() while @T and $T[$#T]->[0] !~ $re; } $& }:
+			m!\G>!? do { my @ret; if($T) { local($&, $`, $'); $T = [$open_tag, $pos+1, $T->[0], $m=/\bcinit[^<]*\G/i, scalar @html]; @ret=(">", "', ($code_begin") } else { $T = [$open_tag]; @ret = ">" } push @T, $T; $T = $open_tag = undef; @ret }:
+			m!\G</(\w+)\s*>!? do { my ($tag) = ($1); while(@T and $pop->() ne $tag) {}; $& }:
+			m!\G\$\+!? do { "', \$id, '" }:
+			m!\G\$-(\w+)!? do { "', \$id, '-$1" }:
+			m!\G(?:\$|(#))(\{\s*)?(\w+)!? do {
+				my $open_span = $1;
+				if($open_span && $open_tag) { $& }
+				else {
+					$pos += length $&;
+					my $open_braket = !!$2;
+					my $braket = 0;
+					push @html, "<span id=', \$id, '-$3>" if $open_span;
+					push @html, "', ", "\$data->{'$3'}";
+					my ($fn_idx, @fn_idx) = ($#html, $#html);
+					for(;;) {
+						pos() = $pos;
+
+						push @html, (
+						m!\G:(\w+)(\()?!? do { $html[$fn_idx] = "Helper::$1(".$html[$fn_idx]; if($2) {++$braket; ", "} else { ")" } }:
+						m!\G"(?:\\"|[^"])*"!? $&:
+						m!\G'((?:\\'|[^'])*)'!? do { local $&; my $x=$1; $x=~s/"/\\"/g; "\"$x\"" }:
+						m!\G-?\d+(?:\.\d+)?(?:E[+-]\d+)?!? $&:
+						m!\G,\s*!? $&:
+						m!\G\$(\w+)!? do { push @fn_idx, $fn_idx; $fn_idx = scalar @html; "\$data->{'$1'}" }:
+						m!\G\)!? do { --$braket; $fn_idx = pop @fn_idx; ")" }:
+						m!\G\}!? do { die "нет `{` для `}`" unless $open_braket; $pos++; last; }:
+						last);
+						$pos += length $&;
+					}
+					die "не закрыта `}`" if $open_braket and not m!\G\}!;
+					die "не закрыты скобки ($braket)" if $braket; 
+
+					push @html, ", '".($open_span? "</span>": "");
+					next;
+				}
+			}:
+			$open_tag && m!\G\$\*(\w+)?!? do { $T = [$1]; "', \$id, '".($1? "-$1": "") }:
+			m!\G[\\']!? "\\$&":
+			m!\G.!s? $&:
+			last;
+			
+			$pos += length $&;
+		}
+
+		$pop->() while @T;
+	
+		code = join "", 'sub { my ($data, $id) = @_; return join "", \'', @html, '\' }';
+		$x
+
+	
 
 		T = []; i = 0 ; applyHelper = CTemplate.applyHelper
 		pop = ->
