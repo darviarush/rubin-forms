@@ -85,6 +85,9 @@
 # -----------------------
 # 48. сделать в CInit параметр для создания стилей .w\d+ и .mobile, .pad, .computer
 # 49. @submit - как в обычной форме. Предусмотреть target=id
+#- 50. предусмотреть изменение при изменении формы и url-а
+# 60. Локализация (перевод) на другие языки
+# 61. accept в div-ах
 
 # Ссылки:
 # http://habrahabr.ru/post/174987/ - редактор http://ace.c9.io
@@ -801,8 +804,6 @@ class CIoLoadRepository extends CIoRepository
 	
 	
 CTemplate =
-
-
 
 	compile: (i_html) ->
 
@@ -2239,8 +2240,9 @@ class CWidget
 	onInvalid: -> @tooltip(escapeHTML(@attr("cerr") || "Ошибка - невалидное значение")).tooltip().open(); off
 	dataType: (val) -> val
 	param: -> x={}; x[@name() || 'val'] = @val(); x
-	load: (param, args...) -> @loader()._load 'load', param, this, args
-	submit: (param, args...) -> if @valid() then @loader()._load 'submit', extend(@param(), param || {}), this, args
+	buildQuery: -> [(p=@parent())._tab || p.name(), @name(), p.data?.id || p.$id?.val()]
+	load: (param, args...) -> param.q = @buildQuery(); @loader()._load 'load', param, this, args
+	submit: (param, args...) -> if @valid() then param.q = @buildQuery(); @loader()._load 'submit', extend(@param(), param || {}), this, args
 	save: (param, args...) -> if @valid() then @loader()._load 'save', extend(@param(), param || {}), this, args 
 	ping: (param, args...) -> @loader()._load 'ping', param, this, args
 	erase: (param, args...) -> @loader()._load 'erase', param, this, args
@@ -2422,6 +2424,14 @@ class CFormWidget extends CWidget
 		for name in @_elements when not (x=this[name]).attr 'nodata' then param[name] = x.val()
 		param
 		
+	buildQuery: ->
+		view = []
+		join = []
+		for name in @_elements
+			if (e=@["$"+name]) instanceof CFormWidget then join.push ['LEFT_JOIN', e.buildQuery()...]
+			else view.push name
+		[@_tab || @name(), view, id: (if id=p.$id then id.val$i() else @data?.id), join...]
+		
 	update: (val) ->
 		if val instanceof Array then val = val[0]
 		if off != @send 'onBeforeUpdate', val then @val val; @send 'onUpdate', val
@@ -2449,8 +2459,6 @@ class CTemplateWidget extends CFormWidget
 			html = (if (d=down(0))?.element.nodeType == 8 then d else down 1).html().replace ///!(!)|!///g, "$1"
 		else
 			html = @html()
-			#@element.innerHTML = ["<!--\n", html.replace(/// ! ///g, "!!").replace(/// --> ///g, "\n--!>"), "\n-->"].join ""
-			#@attr 'cinit', ""
 		@_template = CTemplate.compile html
 		this
 	
@@ -2464,7 +2472,10 @@ class CTemplateWidget extends CFormWidget
 			do @setValid
 		else @param()
 		
-
+	buildQuery: -> q = extend {}, @_query; q
+		
+		
+		
 
 class CListWidget extends CTemplateWidget
 	_tag_frame_add: "ctype=form"
@@ -2482,16 +2493,15 @@ class CListWidget extends CTemplateWidget
 	setValid: -> # специально оставлена пустой. Т.к. списки не имеют элементов
 	detach: (name) -> (if @frame == name || @frame == this[name] then delete @frame); super
 		
-
 	valid: -> @child().reduce "and", "valid"
 
 	param: -> CRows.to (for ch in @child().items() then ch.val())
-
+	
 	val: (data) ->
 		if arguments.length then @element.innerHTML = @_template @data=@dataType(data), @element.id; @child().setValid data.valid || @data.valid; @removeClass "c-novid"; do @setHandlersOnElements
 		else for ch in @child().items() when ch.parent() == this then ch.val()
 
-	upload: (param, args...) -> @loader()._load('upload', param, this, args);	this
+	upload: (param, args...) -> param.q = @buildQuery(); @loader()._load('upload', param, this, args);	this
 	add: (data) ->
 		if off isnt @send 'onBeforeAdd', data
 			last = @last()
