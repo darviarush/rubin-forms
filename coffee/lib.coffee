@@ -828,8 +828,8 @@ CTemplate =
 			tr: ///^(?:table|tbody|tfoot|thead)$///
 			option: ///^select$///
 			li: ///^(?:ol|ul)$///
-		
-		
+
+
 		T = []; html = []; pos = 0 ; s = i_html
 		pop = ->
 			tag = T.pop()
@@ -1552,9 +1552,20 @@ class CWidget
 
 	before: insert$.inline "before", ""
 	after: insert$.inline "after", "e=e.nextSibling"
-	insertBefore: (val) -> val=@wrap(val).before this ; this
+	insertBefore: (val) -> @wrap(val).before this ; this
 	insertAfter: (val) -> @wrap(val).after this ; this
-	append: (val) -> e=@element; (for v in @wrap(val).all() then e.appendChild v); this
+	append: (val, timeout, listen) ->
+		val = @wrap val
+		if timeout
+			for i in val.items()
+				i.before i1=@wrap("<div></div>").css(visibility: 'hidden').css(x=i.css 'width,height,float,position,display'.split /,/).animate width: 0, height: 0, timeout
+				say x
+				delete x.width, x.height
+				@append i2=@wrap("<div></div>").css(visibility: 'hidden', width:0, height:0).css(x).animate width: @width(), height: @height(), timeout
+				save = i.css ['position']
+				i.css(position: 'absolute').animate left: i2.left(), top: i2.top(), timeout, do(i1, i2, i) => => @append i.css save; i1.union(i2).free(); if listen then if typeof listen == 'string' then @send listen else listen.call this
+		else e=@element; (for v in val.all() then e.appendChild v)
+		this
 	appendTo: (val) -> @wrap(val).append this ; this
 	prepend: (val) -> f=(e=@element).firstChild; (for v in @wrap(val).all() then e.insertBefore v, f); this
 	prependTo: (val) -> @wrap(val).prepend this ; this
