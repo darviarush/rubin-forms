@@ -3067,8 +3067,6 @@ class CRouterWidget extends CLoaderWidget
 				@load act: url.pathname, $Ajax: if url.pathname in @_templates then 'ajax' else 'ajax+'
 		this
 	
-	mask: () -> 
-	
 	loaded: ->
 		@request.request.responseText
 		@request.customer = @byId 
