@@ -3048,6 +3048,31 @@ class CStatusWidget extends CLoaderWidget
 		@error.show()
 
 		
+class CRouterWidget extends CLoaderWidget
+	constructor: ->
+		super
+		@defineHandlers() unless @constructor.handlers
+		@setListens()
+		@_templates = {}	# path: text
+		
+	onclick_document: (e) -> 
+		if (a=e.target()).tag() == "A"
+			url = CURL.parse a.attr "href"
+			if url.host == a.document().location.host
+				e.cancel()
+				if @byId  
+				@load act: url.pathname, $Ajax: if url.pathname in @_templates then 'ajax' else 'ajax+'
+		this
+	
+	mask: () -> 
+	
+	loaded: ->
+		@request.request.responseText
+		@request.customer = @byId 
+		super
+		
+	
+		
 class CIncludeWidget extends CWidget
 	constructor: ->
 		super
