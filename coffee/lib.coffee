@@ -312,10 +312,13 @@ CRadix =
 
 		return x
 
+CUrl =
+	from: (uri) -> m=uri.match ///^ (?: (?:(\w+):)? // ([^/]+) )? (?: / ([^\?#]*) )? (?: \?([^#]*) )? $///; href: uri, protocol: m[1], host: m[2], port: m[3], pathname: m[4], search: m[5], host: m[6]
+	to: (a) -> (if p=a.protocol then p+":" else "") + "//" + a.host + (if p=a.port then ":" + p else "") + (if p=a.pathname then "/"+p else "") + (if p=a.search then "?"+p else "") + (if p=a.hash then "#"+p else "")
 
 CParam =
 	get: (url=document.location) -> if match = String(url).match /// \?(.*) /// then CParam.from(match[1]) else {}
-	add: (url, param) -> url + (if /\?/.test url then "&" else "?") + CParam.to(param)
+	add: (url, param) -> url + (if /\?/.test url then "&" else "?") + CParam.to param
 	to: (param) -> if param instanceof Object then ([escape(key), escape(if val instanceof Object then toJSON val else String(val))].join("=") for key, val of param when val?).join "&" else param
 	from: (param) -> x={}; (for i in param.split("&") then a=i.match /// ([^=]+)=?(.*) ///; x[a[1]]=unescape a[2]); x
 
@@ -3060,7 +3063,7 @@ class CRouterWidget extends CLoaderWidget
 			url = CURL.parse a.attr "href"
 			if url.host == a.document().location.host
 				e.cancel()
-				if @byId  
+				#if @byId  
 				@load act: url.pathname, $Ajax: if url.pathname in @_templates then 'ajax' else 'ajax+'
 		this
 	
