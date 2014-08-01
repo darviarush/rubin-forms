@@ -8,8 +8,11 @@
 # 7. CTabsWidget
 # 8.* byClass
 # 9.* byQuery
+
+# -----------------------
 # 10. CMenuWidget - подключить др. элемент и получить CLoadTabsWidget
 # 11. drag&drop on CListWidget
+
 #- 12. CSend всегда возвращает false. Другое значение можно передать по event.ret - в coffeescript всё равно нужно следить за возвратом после массива
 # act='onclick: load; onkeydown: submit; onmousemove: save' - отправляет хандлер на любую функцию
 #- inject и create - не соотвествуют философии
@@ -18,49 +21,76 @@
 #* 15. Консоль для IE
 #* 16. @fire - @send? - @fire - для listen
 
+# -----------------------
 # 17. objectinspector for old browser
 # 18. lint - ваше приложение может работать под браузерами: IE6+, FF1+, ...
+
 #* 19. tagName -> ctype
 #* 20. parent сделать функцией и смотреть по id
+
+# -----------------------
 # 20.а. При изменении parent изменять и обработчики событий на нём
+
 #* 21. css - key - проверять на существование функции, если есть - запустить
 #* 22. css - rgb, rgba. css цвета возвращает в hex. @rgba 'background-color' - в массиве 
+
+# -----------------------
 # 23. shapes
-# 24. load - информация с модели данных сервера о валидации и типе данных - html или text
-#		
+
+#* 24. load - информация с модели данных сервера о валидации и типе данных - html или text
 #* 25. формат загрузки страниц через ajax: json \f page1 \f page2 ... . json = {pages: [{данные1}, ["menu", {данные}], ["layout", {данные}]]}
 #		данные1 - для первой страницы. Ключи данных - id виджетов, значения - данные для метода .update такого виджета
 #		"menu", "layout" - id элемента без "$" которому производится update: $menu, $layout
 #		тег meta заменяется update-ом на page
 #* 26. ошибки серверной валидации
 #* 27. загрузка страниц с форм - CIncludeWidget и CApplicationWidget
+
+# -----------------------
 # 27. загрузка и отображение фотографий
-# 28. шаблонизатор - вложенность виджетов + шаблон в комментариях. А include byId сделать по url
+
+#* 28. шаблонизатор - вложенность виджетов + шаблон в комментариях. А include byId сделать по url
 #* 29. слайсы для статики
 #* 30. автозагрузка класса, если есть указанный id через ready - метод класса init
+
+# -----------------------
 # 31. Добавить model в любой json-ответ
 # 32. autocompleter
+
 #* 33. переделать link-и для инклудов на обычные, иначе поисковики индексировать не смогут. Установить onclick на body и перехватывать от <a>. -Для этого устанавливать обработчики всех событий на body и делать event.target().send и event.target().parent?().send
 #* 34. history
+
+# -----------------------
 # 35. Разбить на мелкие файлы библиотеку и сделать сборщик по запросу js/CWidget+CApplicationWidget+CInit.js. 
 #	Не так: файлы разбить на мелкие. Затем вывести дерево разбора coffee, взять из него функции и классы и подключить их модули
 # 36. animate на after, before, append, prepend 
+
 #- 37. убрать upper: заменить на up - нарушит работу swap
 #- 38. Ввести ret-методы - есть last и first. Может какое-то ret-свойство в котором остаётся значение операции. @append(1).$.text 2
+
+# -----------------------
 # 39. WebSocket и longpull-socket. Заменить FCGI на http
 # 40. Модель через IoRepository - чтобы была соединена с базой
 # 41. RPC (?) - а нужна ли?
-# 42. Ввести для тестов пакеты
+
+#- 42. Ввести для тестов пакеты - отказ в связи с 
+
+# -----------------------
 # 43. Плагины
 # 44. Сделать плагин для комментариев
 # 45. Разместить на heroku test
-# 46. В темплейт добавить хелперы
-# 47. Переделать send - вызывать обработчики для всех уровней. Обработчики вызываются начиная от верхнего parent-а. Если нужно остановить - то предосмотреть метод. @stop или @exit. Значение от предыдущего обработчика передаётся в @return
+
+#* 46. В темплейт добавить хелперы
+#* 47. Переделать send - вызывать обработчики для всех уровней. Обработчики вызываются начиная от верхнего parent-а. Если нужно остановить - то @stopHandlersQueue = on. Значение от предыдущего обработчика передаётся в @return - не сделано, т.к. зачем?
+
+# -----------------------
+# 48. сделать в CInit параметр для создания стилей .w\d+ и .mobile, .pad, .computer
+# 49. @submit - как в обычной форме. Предусмотреть target=id
 
 # Ссылки:
 # http://habrahabr.ru/post/174987/ - редактор http://ace.c9.io
 # http://rubaxa.github.io/Sortable/ - библиотечка для сортировки, внизу другие ссылки: http://rubaxa.github.io/Pilot/, http://mailru.github.io/FileAPI/ и т.д.
 # http://experiment.net.ru/dirs.php.html - подробная документация по DOM, js, css2, html4
+# http://msdn.microsoft.com/ru-ru/library/htbw4ywd(v=vs.94).aspx - докуметация по объектам javascript в IE
 # http://frontender.info/customelements/ - о html5 document.register
 # http://learn.javascript.ru/pre-coding - справочники
 # http://www.html5rocks.com/ru/tutorials/dnd/basics/ - руководства html5. Перетаскивание
@@ -771,18 +801,16 @@ CTemplate =
 
 
 
-	compile: (r) ->
+	compile: (i_html) ->
 
 		code_begin = """function(dataset, id1) {
-	var number_id = dataset instanceof Array
+	var res = [], number_id = dataset instanceof Array
 	if(!number_id) dataset = [dataset]
-	var res = []
 	for(var i=0, n=dataset.length; i<n; i++) {
-		var data = dataset[i]
-		var id
+		var id, data = dataset[i]
 		if(number_id) { id=id1+'-'+i; data['_NUMBER']=i; data['_NUMBER1']=i+1 }
 		else id=id1
-		res.splice(res.length, 0, '"""
+		res.push('"""
 		
 		code_end = """')
 	}
@@ -798,128 +826,76 @@ CTemplate =
 			li: ///^(?:ol|ul)$///
 		
 		
-		T = []; html = []; pos = 0
+		T = []; html = []; pos = 0 ; s = i_html
 		pop = ->
 			tag = T.pop()
 			if tag.length > 2
 				[name, begin, ret, cinit, idx] = tag
-				if cinit then html[idx] .= ["<!--", r.slice(begin, pos).replace(/!/g, '!!').replace(/-->/g, '--!>'), "-->"].join ""
+				if cinit then html[idx] += ["<!--", i_html.slice(begin, pos).replace(/!/g, '!!').replace(/-->/g, '--!>'), "-->"].join ""
 				html.push [code_end, ")(data", (if ret then "['#{ret}']" else ""), ", id", (if ret then "+'-#{ret}'" else ""), "), '"].join ""
 			tag[0]
 		
 		while 1
-			pos() = $pos;
 
-			push @html,
-			m!\G<(\w+)!? do { $open_tag = $1; if(my $re = $tags{lc $open_tag}) { $pop->() while @T and $T[$#T]->[0] !~ $re; } $& }:
-			m!\G>!? do { my @ret; if($T) { local($&, $`, $'); $T = [$open_tag, $pos+1, $T->[0], $m=/\bcinit[^<]*\G/i, scalar @html]; @ret=(">", "', ($code_begin") } else { $T = [$open_tag]; @ret = ">" } push @T, $T; $T = $open_tag = undef; @ret }:
-			m!\G</(\w+)\s*>!? do { my ($tag) = ($1); while(@T and $pop->() ne $tag) {}; $& }:
-			m!\G\$\+!? do { "', \$id, '" }:
-			m!\G\$-(\w+)!? do { "', \$id, '-$1" }:
-			m!\G(?:\$|(#))(\{\s*)?(\w+)!? do {
-				my $open_span = $1;
-				if($open_span && $open_tag) { $& }
-				else {
-					$pos += length $&;
-					my $open_braket = !!$2;
-					my $braket = 0;
-					push @html, "<span id=', \$id, '-$3>" if $open_span;
-					push @html, "', ", "\$data->{'$3'}";
-					my ($fn_idx, @fn_idx) = ($#html, $#html);
-					for(;;) {
-						pos() = $pos;
-
-						push @html, (
-						m!\G:(\w+)(\()?!? do { $html[$fn_idx] = "Helper::$1(".$html[$fn_idx]; if($2) {++$braket; ", "} else { ")" } }:
-						m!\G"(?:\\"|[^"])*"!? $&:
-						m!\G'((?:\\'|[^'])*)'!? do { local $&; my $x=$1; $x=~s/"/\\"/g; "\"$x\"" }:
-						m!\G-?\d+(?:\.\d+)?(?:E[+-]\d+)?!? $&:
-						m!\G,\s*!? $&:
-						m!\G\$(\w+)!? do { push @fn_idx, $fn_idx; $fn_idx = scalar @html; "\$data->{'$1'}" }:
-						m!\G\)!? do { --$braket; $fn_idx = pop @fn_idx; ")" }:
-						m!\G\}!? do { die "нет `{` для `}`" unless $open_braket; $pos++; last; }:
-						last);
-						$pos += length $&;
-					}
-					die "не закрыта `}`" if $open_braket and not m!\G\}!;
-					die "не закрыты скобки ($braket)" if $braket; 
-
-					push @html, ", '".($open_span? "</span>": "");
-					next;
-				}
-			}:
-			$open_tag && m!\G\$\*(\w+)?!? do { $T = [$1]; "', \$id, '".($1? "-$1": "") }:
-			m!\G[\\']!? "\\$&":
-			m!\G.!s? $&:
-			last;
-			
-			$pos += length $&;
-		}
-
-		$pop->() while @T;
-	
-		code = join "", 'sub { my ($data, $id) = @_; return join "", \'', @html, '\' }';
-		$x
-
-	
-
-		T = []; i = 0 ; applyHelper = CTemplate.applyHelper
-		pop = ->
-			tag = T.pop()
-			if tag.length > 1
-				ret = tag[1]
-				html[tag[2]] += if tag[3] then ["<!--", orig.slice(tag[2], i).join("").replace(/!/g, '!!').replace(/-->/g, '--!>'), "-->"].join "" else ""
-				orig.splice i, 0, ""
-				html.splice i++, 0, [code_end, ")(data", (if ret then "['#{ret}']" else ""), ", id", (if ret then "+'-#{ret}'" else ""), "), '"].join ""
-			tag[0]
-		
-		while i < html.length
-			say i, html[i]
-		
-			s = escapeJS html[i]
-			ok = []; last_idx = 0
-			re = if /^</.test s then ///(\$)(?:{((?:"(?:\\"|[^"])*"|\\'(?:\\\\'|[^'])*?\\'|[^\{\}])*)}|(\w+(?::\w+(\()?)?))///g
-			else ///([\$#])(?:{((?:"(?:\\"|[^"])*"|\\'(?:\\\\'|[^'])*?\\'|[^\{\}])*)}|(\w+(?::\w+(\()?)?))///g
-			while r = re.exec s
-				ok.push s.slice last_idx, re.lastIndex - r[0].length
-				if r[4]
-					rs = /// [()] ///g
-					k = rs.lastIndex = re.lastIndex
-					j = 1
-					while res = rs.exec s
-						if res[0] == "(" then j++ else (break if --j == 0)
-					x = s.slice k, last_idx = rs.lastIndex
-				else x = r[2] || r[3]; last_idx = re.lastIndex
-				ok.push if r[1] == "#" then '<span id=\', id, \'-'+x+'>\', '+applyHelper(x)+', \'</span>' else '\', '+applyHelper(x)+', \''
-			ok.push s.slice last_idx
-			s = ok.join ""
-			
-			s = s.replace /// \$\+ ///g, "', id, '"
-			html[i] = s.replace /// \$-(\w+) ///g, "', id, '-$1"
-		
-			if match=html[i].match ///<([\w:-]+)///
-				tag = match[1]
-				if re = tags[tag.toLowerCase()]
-					pop() while T.length and not re.test T[T.length-1][0]
-				if html[i].match ///\$\*(?:\w+)?///
-					ret = undefined
-					html[i] = html[i].replace ///\$\*(\w+)?///, (a, b) -> ret = b; "', id, '" + (if b then "-"+b else "")
-					orig.splice i+1, 0, ""
-					html.splice i+1, 0, "', (#{code_begin}"
-					T.push [tag, ret, i, /\scinit[\s>]/i.test html[i]]
-					i++
+			if m = s.match ///^<(\w+)///
+				open_pos = pos
+				open_tag = m[1]
+				if re = tags[open_tag.toLowerCase()]
+					pop() while T.length and not re.test T[T.length-1][0] 
+				html.push m[0]
+			else if m = s.match ///^>///
+				if t then t = [open_tag, pos+1, t[0], ///\bcinit\b///i.test(i_html.slice open_pos, pos), html.length]; html.push ">", "', (" + code_begin
+				else t = [open_tag]; html.push ">"
+				T.push t; t = open_tag = undefined
+			else if m = s.match ///^</(\w+)\s*>/// then tag = m[1]; (while T.length and pop() != tag then null); html.push m[0]
+			else if m = s.match ///^\$\+/// then html.push "', id, '"
+			else if m = s.match ///^\$-(\w+)/// then html.push "', id, '-" + m[1]
+			else if m = s.match ///^(?:\$|(#))(\{\s*)?(\w+)///
+				open_span = m[1]
+				if open_span and open_tag then html.push m[0]
 				else
-					T.push [tag]
-			else if match = html[i].match ///</([\w:-]+)///
-				tag = match[1]
-				while T.length and pop() != tag then 1
-			i++
+					pos += len = m[0].length
+					s = s.slice len
+					open_braket = !!m[2]
+					braket = 0
+					html.push "<span id=', id, '-#{m[3]}>" if open_span
+					html.push "', ", "data['#{m[3]}']"
+					fn_idx = html.length-1
+					fn_idxs = [fn_idx]
+					while 1
 
+						if m = s.match ///^:(\w+)(\()?///
+							html[fn_idx] = "CHelper.#{m[1]}(" + html[fn_idx]
+							html.push if m[2] then ++braket; ", " else ")"
+						else if m = s.match ///^(?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*')/// then html.push m[0].replace(/\n/g, '\\n').replace /\r/g, '\\r'
+						else if m = s.match ///^(?:-?\d+(?:\.\d+)?(?:E[+-]\d+)?|,\s*)/// then html.push m[0]
+						else if m = s.match ///^\$(\w+)/// then fn_idxs.push fn_idx; fn_idx = html.length; html.push "data['#{m[1]}']"
+						else if m = s.match ///^\)/// then --braket; fn_idx = fn_idxs.pop(); html.push ")"
+						else if m = s.match ///^\}/// then (throw "нет `{` для `}`" unless open_braket); open_braket = 0 ; pos++; s = s.slice 1 ; break
+						else break
+						pos += len = m[0].length
+						s = s.slice len
+
+					throw "не закрыта `}`" if open_braket
+					throw "не закрыты скобки (#{braket})" if braket
+
+					html.push ", '" + (if open_span then "</span>" else "")
+					continue
+
+			else if open_tag and m = s.match ///^\$\*(\w+)?/// then t = [m[1]]; html.push "', id, '" + (if m[1] then "-" + m[1] else "")
+			else if m = s.match ///^[\\']/// then html.push "\\"+m[0]
+			else if m = s.match ///^\n/// then html.push "\\n"
+			else if m = s.match ///^\r/// then html.push "\\r"
+			else if s.length then html.push s[0]; m = [s[0]]
+			else break
+			
+			s = s.slice len = m[0].length
+			pos += len
+			
 		pop() while T.length
-		
-		html.splice 0, 0, "fn=", code_begin
-		html.splice html.length, 0, code_end
-		
+	
+		html.unshift "fn=function(data, id) { return ['"
+		html.push '\'].join("") }'
 		code = html.join ""
 		fn = null
 		eval code
@@ -1026,7 +1002,7 @@ CSend = (element, event) ->
 	if ret2? then ret2 else if ret3? then ret3 else ret1
 
 extend CSend,
-	send: (e, widget) -> widget._tooltip?['on'+e.type+'_parent']? e; widget.send 'on'+e.type, e
+	send: (e, widget) -> widget._tooltip?.send 'on'+e.type+'_parent', e; widget.send 'on'+e.type, e
 	setHandler: (element, type) ->
 		element.setAttribute 'on'+(CSend[type+'_type'] || type), "return CSend(this, event)"
 		this
@@ -1282,13 +1258,20 @@ class CWidget
 		
 	cookdef: (name, def) -> if typeof name == 'string' then (if (x=cookie(name))? then x else def) else y={}; (for i of name then y[i] = (if (x=cookie(i))? then x else name[i])); y
 
+
 	# методы установки обработчиков
 	send: (type, args...) ->
-		path = '_'+type
-		test = off
+		if type of this then action = [[this, type, args]] else action = []
 		self = this
-		while p=self.parent() then (break unless name=self.name()); path = (if /^\d+$/.test name then 'frame' else name)+path; (if p[path] then test = [p, path]); path = '__' + path; self = p
-		if test then test[0][test[1]] args..., this else this[type]? args...
+		path = '_'+type
+		while p = self.parent()
+			break unless name=self.name()
+			path = (if /^\d+$/.test name then 'frame' else name)+path
+			if path of p then action.unshift [p, path, args = args.concat self]
+			path = '__' + path
+			self = p
+		for a in action then ret = (x=a[0])[a[1]] a[2]...; if x.stopHandlersQueue then delete x.stopHandlersQueue; break
+		ret
 	
 	# export_handlers = {'name-name-name': types}
 	defineHandlers: ->
@@ -1538,8 +1521,8 @@ class CWidget
 			if request
 				if request.dopparam.script then @htmlscript val
 				else if ///^text/html\b///i.test request.request.getResponseHeader "Content-Type" then @html val
-				else @text val
-			else @text val
+				else @val val
+			else @val val
 			@send 'onUpdate', val
 		this
 	
@@ -2436,7 +2419,10 @@ class CFormWidget extends CWidget
 		for name in @_elements when not (x=this[name]).attr 'nodata' then param[name] = x.val()
 		param
 		
-	update: (val) -> (if off != @send 'onBeforeUpdate', val then @val val; @send 'onUpdate', val); this
+	update: (val) ->
+		if val instanceof Array then val = val[0]
+		if off != @send 'onBeforeUpdate', val then @val val; @send 'onUpdate', val
+		this
 	
 	val: (val) ->
 		if arguments.length == 0 then @param()
@@ -2953,10 +2939,10 @@ class CLoaderWidget extends CWidget
 	_load: (type, param={}, customer, args) ->
 
 		if @request
-			console.log "Поступил load до того, как закончился предыдущий old_customer:", @request.customer, "new_customer:", customer
+			@warn "Поступил load до того, как закончился предыдущий old_customer:", @request.customer, "new_customer:", customer
 			do @remove_request
 		@request = type: type, param: param, customer: customer, args: args
-		return this if customer.send("onSubmit", param) is off or @ohSubmit(param) is off
+		return this if customer.send("onSubmit", param) is off or off is @ohSubmit param
 
 		request = new XMLHttpRequest()
 
