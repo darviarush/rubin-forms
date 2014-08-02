@@ -828,8 +828,8 @@ CTemplate =
 			tr: ///^(?:table|tbody|tfoot|thead)$///
 			option: ///^select$///
 			li: ///^(?:ol|ul)$///
-		
-		
+
+
 		T = []; html = []; pos = 0 ; s = i_html
 		pop = ->
 			tag = T.pop()
@@ -1552,9 +1552,26 @@ class CWidget
 
 	before: insert$.inline "before", ""
 	after: insert$.inline "after", "e=e.nextSibling"
-	insertBefore: (val) -> val=@wrap(val).before this ; this
+	insertBefore: (val) -> @wrap(val).before this ; this
 	insertAfter: (val) -> @wrap(val).after this ; this
-	append: (val) -> e=@element; (for v in @wrap(val).all() then e.appendChild v); this
+	append: (val, timeout, listen) ->
+		val = @wrap val
+		if timeout?
+			for i in val.items()	# i - путешественник, i1 - убывающий, i2 - прибывающий
+				x = i.css ['float', 'position', 'display', 'margin']
+				i.before i1=@wrap("<div></div>").css(visibility: 'hidden', display: 'none')
+				s1 = i.pos()
+				@append i
+				s2 = i.pos()
+				i.before i2=@wrap("<div></div>").css visibility: 'hidden', width: 0, height: 0
+				i.free()
+				i1.css(x).css(width: s1.width, height: s1.height).css(x).animate width: 0, height: 0, timeout
+				
+				i2.animate width: s2.width, height: s2.height, timeout
+				save = i.saveCss 'position'
+				i.css(position: 'absolute').animate left: s2.left, top: s2.top, timeout, do(i1, i2, i, save) => => @append i.css save; i1.union(i2).free(); if listen then if typeof listen == 'string' then @send listen else listen.call this
+		else e=@element; (for v in val.all() then e.appendChild v)
+		this
 	appendTo: (val) -> @wrap(val).append this ; this
 	prepend: (val) -> f=(e=@element).firstChild; (for v in @wrap(val).all() then e.insertBefore v, f); this
 	prependTo: (val) -> @wrap(val).prepend this ; this
@@ -1718,7 +1735,7 @@ class CWidget
 			else if selector instanceof RegExp then rawstyle_mask_re.call this, selector
 			else selector.parentStyleSheet.deleteRule selector.indexInSheet$; set_styles$.call this
 
-	new_pseudo_element$ = (w, pseudoElement) -> (fn=->); fn.prototype = w.constructor.prototype; o = new fn; extend o, w; o.$pseudoElement = pseudoElement; o
+	new_pseudo_element$ = (w, pseudoElement) -> (fn=->); fn.prototype = w.constructor.prototype; o = new fn; extend o, w; o._pseudoElement = pseudoElement; o
 	ex_uniq$ = (a) -> x={}; z=0 ; (for i in a when not((t=i.selectorText) of x) then x[t] = z++); r=[]; (r[x[k]]=k for k of x); r
 	goal_selector$ = -> (@id id=CMath.uniqid() unless id=@id()); "#"+id
 	goal_rule$ = (pseudoElement) -> rules = @rawstyle selector = goal_selector$.call(this)+(pseudoElement || ''); (unless rules.length then @rawstyle selector, {}; rules = @rawstyle selector); rules
@@ -1784,15 +1801,15 @@ class CWidget
 			else if wdiv$.hasCss old, '1px' then val+='px'; css_px[key] = 1
 			else if wdiv$.hasCss old, '#AAAAAA' then val = CColor.fromNumber val; css_color[key] = 1
 			else css_not_px[key] = 1
-		style = (@$pseudoElement || @element).style
+		style = (@_pseudoElement || @element).style
 		if important then style.setProperty key.lc(), val, "!important" else style[key] = val
 		this
-	getCssStyle: (key, pseudoClass) -> if p=@$pseudoElement then p.style else if @htm().contains this then getComputedStyle @element, pseudoClass else @element.style
+	getCssStyle: (key, pseudoClass) -> if p=@_pseudoElement then p.style else if @htm().contains this then getComputedStyle @element, pseudoClass else @element.style
 	getCssValue: (key, pseudoClass) -> @getCssStyle(key, pseudoClass).getPropertyCSSValue toCssCase key
 	getCss: (key, pseudoClass) ->
 		if (fn=css_get_fn[key]) and off != ret=fn.call this, key, pseudoClass then return ret
 		@getCssStyle(key, pseudoClass)[toCssCase key]
-		
+	saveCss: -> if @_pseudoElement? then @css.apply this, arguments else @_pseudoElement = @element; ret = @css.apply this, arguments; delete @_pseudoElement; ret
 		
 	css: (name, val, important) -> if arguments.length==0 then r={}; (for k in @element.style then r[k = toCssCase k] = @getCss k); r else if name instanceof Array then r={}; (for k in name then r[k]=@getCss k); r else if name instanceof Object then (for k of name then @setCss k, name[k], val); this else if arguments.length >= 2 and val != null then @setCss name, val, important; this else @getCss name
 	extend @::css,
