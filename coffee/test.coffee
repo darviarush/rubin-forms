@@ -790,9 +790,41 @@ new CTest 'obj-CWidget-insertAfter', """
 
 	
 new CTest 'obj-CWidget-append', """
-`append content` - вставляет content в конец виджета
+`append content, [timeout], [listen]` - вставляет content в конец виджета
+""", """
+#%name-c1, #%name-c2, #%name-c3 { padding: 4px; background: lavender; border: solid 1px orange }
+#%name-c2, #%name-c3 {position: absolute; margin: -20px 0 0 400px }
+#%name-c3 { margin: -20px 0 0 800px !important }
+#%name-1, #%name-2 { background: LightSlateGray }
+""", """
+<div id=%name-c1>
+	
+</div>
+
+<div id=%name-c2>
+	старт путешественника 1
+	<div id=%name-1>путешественник 1</div>
+</div>
+
+<div id=%name-c3>
+	<div id=%name-2>путешественник 2</div>
+	старт путешественника 2
+</div>
+
+<a id=%name-b1 href="#">Обратно</a>
+
+
 """, ->
+	@count 2
+
 	@is $("<i>1</i>").append("3").outer(), "<i>13</i>"
+	self = this
+	(c1=@w("c1")).append (i1=@w("1")).union(i2=@w("2")), "fast", -> self.is i1.up().name(), "c1"
+	c2 = @w("c2")
+	c3 = @w("c3")
+	@w("b1").setHandlers("click").onclick = -> (if i1.up().name() == 'c1' then c2.append i1, "fast"; c3.append i2, "fast" else c1.append i1.union(i2), "fast"); off
+	
+	
 
 
 new CTest 'obj-CWidget-appendTo', """
@@ -2321,24 +2353,24 @@ new CTest 'key-CTemplate-compile', """
 	@like html, /<!--/
 	@like html, /<!!-- who\? --!>/
 	
-	fn = CTemplate.compile '- \$x:bool($y:bool("*", \'Да\\n\'), "Нет"):raw(1) -'
+	fn = CTemplate.compile '- \\$x:bool($y:bool("*", \'Да\\n\'), "Нет"):raw(1) -'
 	html = fn {x: 1}, ""
 	@is html, "- \\Да\n -"
 
 	html = fn {x: 0}, ""
 	@is html, "- \\Нет -"
 
-	r = "${x:bool($y:bool('\''), 10):raw}"
+	r = "${x:bool($y:bool('\\''), 10):raw}\n"
 	fn = CTemplate.compile r
 	html = fn x: 1, y: 1
 	@is html, "'\n"
 
-	html = $fn x: 0, y: 1
+	html = fn x: 0, y: 1
 	@is html, "10\n"
 
 	fn = CTemplate.compile '$xyz:raw'
 	html = fn xyz:10
-	@is html, 10
+	@is html, "10"
 
 
 	

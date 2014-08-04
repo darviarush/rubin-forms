@@ -26,18 +26,18 @@ if(!window.console) {
 	window.onerror = document.onerror = function(msg, url, line) { console.log('error: '+url+':'+line, msg, arguments.callee.caller) }
 }
 
-function CTest(name, manual, css, write, fn) {
+function CTest(name, manual, css, html, fn) {
 	
 	var hash = location.hash
 	if(hash && hash != "#" && "#CTest-"+name !== hash) return;
 
-	if(typeof css === 'function') { fn = css; css = ''; write = ''; }
-	else if(typeof write === 'function') { fn = write; write = css; css = '' }
+	if(typeof css === 'function') { fn = css; css = ''; html = ''; }
+	else if(typeof html === 'function') { fn = html; html = css; css = '' }
 
 	this.name = name
 	this.manual = manual
 	this.css = css
-	this.write = write
+	this.html = html
 	this.fn = fn
 	this._count = 0
 	this._counter = 0
@@ -54,8 +54,14 @@ function CTest(name, manual, css, write, fn) {
 
 
 CTest.runtime = function() {
-	var x = CTest.res_queue.splice(0, 1)
-	if(x.length) x[0].run(); else CTest.stop()
+	for(;;) {
+		var x = CTest.res_queue.splice(0, 1)
+		if(x.length) x[0].run(); else {
+			CTest.stop()
+			if(location.hash.slice(1) === "") scrollTo(0, 0);
+			break;
+		}
+	}
 }
 CTest.stop = function() { clearInterval(CTest.interval) }
 
@@ -75,7 +81,7 @@ CTest.toggleCategory = function(self) {
 	self.firstChild.innerHTML = ch
 }
 
-CTest.queue = []
+/*CTest.queue = []
 CTest.queue_idx = 0
 CTest.old_name = ""
 CTest.old_test = null
@@ -90,11 +96,11 @@ CTest.ajax = function(fn) {
 	return CTest
 }
 CTest.open = function(name, url) {
-	/*var a = document.createElement("a")
+	/--var a = document.createElement("a")
 	a.setAttribute('href', url)
 	a.setAttribute('target', name)
 	document.body.appendChild(a)
-	a.click()*/
+	a.click()--/
 	
 	var win = window.open('', name)
 	if(!win || win.location == 'about:blank') throw 'Не открыто окно '+name
@@ -130,11 +136,10 @@ CTest.loop = function() {
 			throw "Неизвестный queue: "+test.name
 		}
 	}
-}
+}*/
 
 CTest.extend({
-	run: function() {	
-		console.log(this.name)
+	run: function() {
 	
 		this.color('DeepSkyBlue')
 		
@@ -158,7 +163,7 @@ CTest.extend({
 			var fn = this.fn
 			if(Function.prototype.rename) fn = fn.rename(name.replace(/-/g, "_"));
 			
-			this.print(manual, repl(this.write), repl(this.css), fn)
+			this.write(this.manual, repl(this.html), repl(this.css), fn)
 		}
 		
 		if(!console.notFound) { this.retValue = fn.call(this); this.end() }
@@ -176,7 +181,9 @@ CTest.extend({
 	},
 	print: function(x) {
 		CTest.div.innerHTML = x
-		for(var i=CTest.div.firstChild; i; i=i.nextSibling) CTest.body.appendChild(i)
+		var e = []
+		for(var i=CTest.div.firstChild; i; i=i.nextSibling) e.push(i)
+		for(var i=0, n=e.length; i<n; i++) CTest.body.appendChild(e[i])
 	},
 	add_to_category: function() {
 	
@@ -474,17 +481,5 @@ CTest.win = {};
 		CTest.cls[i] = r = {}
 		for(var j in p) r[j] = 1
 	}
-	
-	if(location.hash.slice(1) === "") {
-		var fn = function() { scrollTo(0, 0); } //: function() { console.log('location='+location.hash); location.href = location.hash };
-		
-		var fnx = function() {
-			setTimeout(fn, 100);
-		}
-		
-		if(document.addEventListener) document.addEventListener("DOMContentLoaded", fnx, false)
-		else document.body.attachEvent("onload", fnx)
-	}
-	
 })();
 

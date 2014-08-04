@@ -1,6 +1,15 @@
+<!doctype html>
+<html lang="ru">
+<head>
+	<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
+	<title>CLib Tests</title>
+</head>
+<body>
+	
 
-<meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
-<title>CLib Tests</title>
+
+
+
 
 
 <style>
@@ -93,13 +102,13 @@ border-radius: 10px;
 
 <script id=_app_ src="js/lib.js" type="text/javascript"></script>
 
-<script>
+<!--script>
 //window.mcSite = '2285';
 window.mcSize = '100';
 window.mcAvatarSize = '32';
 window.mcTextSize = '40';
 window.mcTitleSize = '15';
-</script>
+</script-->
 
 <div id="menu">
 
@@ -109,15 +118,15 @@ window.mcTitleSize = '15';
 			<br>
 			<a id='menu-showcomment' href="#" onclick="cookie_model.change('tab'); return false">оглавление</a>
 		</div>
-		<h1><span onclick="CRoot.body().animate({hscroll: 0}, 'fast', function() { CRoot.navigate(location.pathname) })">&#9650;</span> <span id=menu-ogl>Комментарии</span></h1>
+		<h1><span style="cursor:pointer" onclick="CRoot.body().animate({hscroll: 0}, 'fast', function() { CRoot.navigate(location.pathname) })">&#9650;</span> <span id=menu-ogl>Комментарии</span></h1>
 	</div>
 	
 	<div class="main">
 		<div id="CTest-category" style="display:none"></div>
 		<div id=menu-comment>
-			<div style="float:right; padding: 4px"><a href="#" onclick="Cackle.reinit(); return false">обновить</a></div>
+			<!--div style="float:right; padding: 4px"><a href="#" onclick="Cackle.reinit(); return false">обновить</a></div>
 			<div id="mc-last"></div>
-			<a href="http://cackle.me" id="mc-link">система комментирования <b style="color:#4FA3DA">CACKL</b><b style="color:#F65077">E</b></a>
+			<a href="http://cackle.me" id="mc-link">система комментирования <b style="color:#4FA3DA">CACKL</b><b style="color:#F65077">E</b></a-->
 		</div>
 	</div>
 
@@ -126,7 +135,7 @@ window.mcTitleSize = '15';
 <!--script src="http://cackle.me/mc.last-min.js" async="async" type='text/javascript'></script-->
 
 <script>
-if(window.mcSite) {
+/*if(window.mcSite) {
 	var mc = document.createElement('script')
 	mc.type = 'text/javascript'
 	mc.async = true
@@ -150,6 +159,7 @@ if(window.mcSite) {
 } else {
 	
 }
+*/
 
 function menu_main_head() {
 	var menu = document.getElementById('menu');
@@ -264,11 +274,11 @@ $( /#dialog/ ).close()`
 var v = document.getElementById('vvedenie1')
 if(location.hash.slice(1) === '') v.innerHTML = CTest.manual(v.innerHTML); else v.style.display = 'none'
 
-CTest.start("test.coffee")
+CTest.start("coffee/test.coffee")
 </script>
 
 
-<div style='display:none'>
+<!--div style='display:none'>
 	<div id=mc-container></div>
 	<a id=mc-link href="http://cackle.me">powered by <b style="color:#4FA3DA">CACKL</b><b style="color:#F65077">E</b></a>
 </div>
@@ -281,7 +291,10 @@ mc.src = '//cackle.me/mc.widget-min.js';
 (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(mc);
 </script>
 
-<!--script src="//cackle.me/mc.widget-min.js" type="text/javascript"></script-->
-<div class=ph><a href='#' onclick='CTest.addComments(this.parentNode, "main"); return false'>комментарии</a></div>
+<script src="//cackle.me/mc.widget-min.js" type="text/javascript"></script>
+<div class=ph><a href='#' onclick='CTest.addComments(this.parentNode, "main"); return false'>комментарии</a></div-->
 
 <script src="js/test.js" type="text/javascript"></script>
+
+</body>
+</html>
