@@ -949,6 +949,9 @@ CValid =
 	email: /@/
 
 
+CEffect = {}
+
+
 CListen =
 	listens:
 		document:
@@ -1280,6 +1283,8 @@ class CWidget
 		for a in action then ret = (x=a[0])[a[1]] a[2]...; if x.stopHandlersQueue then delete x.stopHandlersQueue; break
 		ret
 	
+	on: (type, listen) -> (if typeof type == 'object' then (for k of type then @setHandlers k; @['on'+k] = type[k]) else @setHandlers type; @['on'+type] = listen); this
+	
 	# export_handlers = {'name-name-name': types}
 	defineHandlers: ->
 		handlers = {}
@@ -1565,7 +1570,8 @@ class CWidget
 			[x, i1, s1, s2] = its[k]
 			i.before i2=@wrap("<div></div>").css visibility: 'hidden', width: 0, height: 0
 			save = i.saveCss ['position', 'margin', 'left', 'top']
-			i.css(position: 'absolute', margin: 0, left: s1.left, top: s1.top).animate left: s2.left, top: s2.top, timeout, do(i1, i2, i, save, listen) => => i.css save; i1.union(i2).free(); if listen and --counter == 0 then @send listen
+			{left, top} = i.css(position: 'absolute', margin: 0, left: 0, top: 0).pos()
+			i.css(left: s1.left - left, top: s1.top - top).animate left: s2.left - left, top: s2.top - top, timeout, do(i1, i2, i, save, listen) => => i.css save; i1.union(i2).free(); if listen and --counter == 0 then @send listen
 			i1.css(x).css(width: s1.width, height: s1.height).css(x).animate width: 0, height: 0, timeout
 			i2.animate width: s2.width, height: s2.height, timeout
 
@@ -1947,7 +1953,10 @@ class CWidget
 		this
 	toggleClass: (names...) -> x=names[0]; (for name in names when @hasClass name then @removeClass name; (return unless (x=names[(1+names.indexOf name) % names.length])?); break); @addClass x; this
 
-	show: -> @element.style.display = ''; this
+	show: (timeout, listen) ->
+		if timeout? then @show(); @animate(width: 'toggle', height: 'toggle', 'font-size': 'toggle', timeout, do(listen)->-> @send listen).css overflow: 'hidden'
+		else @element.style.display = ''
+		this
 	hide: -> @element.style.display = 'none'; this
 
 	vid: -> @element.style.visibility = ''; this
