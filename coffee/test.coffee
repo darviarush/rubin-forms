@@ -777,26 +777,68 @@ new CTest 'obj-CWidget-insertBefore', """
 
 
 new CTest 'obj-CWidget-after', """
-`after content` - вставляет content после виджета
+`after content, [timeout], [listen]` - вставляет content после виджета
+
+#append
 """, ->
 	@is $("<i><b>1</b><b>2</b></i>").child(-1).after("3").up().outer(), "<i><b>1</b><b>2</b>3</i>"
 
 	
 new CTest 'obj-CWidget-insertAfter', """
-`insertAfter content` - вставляет виджет после content-а
+`insertAfter content, [timeout], [listen]` - вставляет виджет после content-а
+
+#append
 """, ->
 	$("<i>2</i>").insertAfter (w=$("<i>1<u>3</u></i>")).down(0)
 	@is w.outer(), "<i>1<i>2</i><u>3</u></i>"
 
 	
 new CTest 'obj-CWidget-append', """
-`append content` - вставляет content в конец виджета
+`append content, [timeout], [listen]` - вставляет content в конец виджета
+
+* timeout - время за которое будет осуществляться перемещение
+* listen - функция, которая сработает после перемещения. Если timeout не указан, то он станет 'norm'
+
+""", """
+#%name-c1, #%name-c2, #%name-c3 { padding: 4px; background: lavender; border: solid 1px orange }
+#%name-c2, #%name-c3 {position: absolute; margin: -20px 0 0 400px }
+#%name-c3 { margin: -20px 0 0 800px !important }
+#%name-1, #%name-2 { background: LightSlateGray }
+""", """
+<div id=%name-c1>
+	
+</div>
+
+<div id=%name-c2>
+	старт путешественника 1
+	<div id=%name-1>путешественник 1</div>
+</div>
+
+<div id=%name-c3>
+	<div id=%name-2>путешественник 2</div>
+	старт путешественника 2
+</div>
+
+<a id=%name-b1 href="#">Обратно</a>
+
+
 """, ->
+	@count 2
+
 	@is $("<i>1</i>").append("3").outer(), "<i>13</i>"
+	self = this
+	(c1=@w("c1")).append (i1=@w("1")).union(i2=@w("2")), "fast", -> self.is i1.up().name(), "c1"
+	c2 = @w("c2")
+	c3 = @w("c3")
+	@w("b1").on "click", -> (if i1.up().name() == 'c1' then c2.append i1, "fast"; c3.append i2, "fast" else c1.append i1.union(i2), "fast"); off
+	
+	
 
 
 new CTest 'obj-CWidget-appendTo', """
-`append content` - вставляет виджет в конец content-а
+`appendTo content, [timeout], [listen]` - вставляет виджет в конец content-а
+
+См. #append
 """, ->
 	$("<i>1</i>").appendTo w=$("<em>2</em>")
 	@is w.html(), "2<i>1</i>"
@@ -2321,24 +2363,24 @@ new CTest 'key-CTemplate-compile', """
 	@like html, /<!--/
 	@like html, /<!!-- who\? --!>/
 	
-	fn = CTemplate.compile '- \$x:bool($y:bool("*", \'Да\\n\'), "Нет"):raw(1) -'
+	fn = CTemplate.compile '- \\$x:bool($y:bool("*", \'Да\\n\'), "Нет"):raw(1) -'
 	html = fn {x: 1}, ""
 	@is html, "- \\Да\n -"
 
 	html = fn {x: 0}, ""
 	@is html, "- \\Нет -"
 
-	r = "${x:bool($y:bool('\''), 10):raw}"
+	r = "${x:bool($y:bool('\\''), 10):raw}\n"
 	fn = CTemplate.compile r
 	html = fn x: 1, y: 1
 	@is html, "'\n"
 
-	html = $fn x: 0, y: 1
+	html = fn x: 0, y: 1
 	@is html, "10\n"
 
 	fn = CTemplate.compile '$xyz:raw'
 	html = fn xyz:10
-	@is html, 10
+	@is html, "10"
 
 
 	

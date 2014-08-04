@@ -949,6 +949,9 @@ CValid =
 	email: /@/
 
 
+CEffect = {}
+
+
 CListen =
 	listens:
 		document:
@@ -1265,6 +1268,9 @@ class CWidget
 
 	# методы установки обработчиков
 	send: (type, args...) ->
+		return unless type?
+		if typeof type == 'function' then return type.call this, args...
+	
 		if type of this then action = [[this, type, args]] else action = []
 		self = this
 		path = '_'+type
@@ -1276,6 +1282,8 @@ class CWidget
 			self = p
 		for a in action then ret = (x=a[0])[a[1]] a[2]...; if x.stopHandlersQueue then delete x.stopHandlersQueue; break
 		ret
+	
+	on: (type, listen) -> (if typeof type == 'object' then (for k of type then @setHandlers k; @['on'+k] = type[k]) else @setHandlers type; @['on'+type] = listen); this
 	
 	# export_handlers = {'name-name-name': types}
 	defineHandlers: ->
@@ -1548,45 +1556,61 @@ class CWidget
 			this
 		else (div = document.createElement 'div').appendChild @element.cloneNode true ; div.innerHTML
 
-	insert$ = (val) -> p=(e=@element).parentNode; a = @wrap(val).all(); (if p then $0$; (for v in a then p.insertBefore v, e) else (for v in a when p=v.parentNode then p.removeChild v)); this
+	append_anim$ = (method, val, timeout, listen) ->
+		its = []
+		if typeof timeout == 'function' then listen = timeout; timeout = 'norm'
+		for i in items=val.items()	# i - путешественник, i1 - убывающий, i2 - прибывающий
+			x = i.css ['float', 'position', 'display', 'margin']
+			i.before i1=@wrap("<div></div>").css(visibility: 'hidden', display: 'none')
+			its.push [x, i1, i.pos()]
+		this[method] val
+		for i, k in items then its[k][3] = i.pos()
+		counter = items.length
+		for i, k in items
+			[x, i1, s1, s2] = its[k]
+			i.before i2=@wrap("<div></div>").css visibility: 'hidden', width: 0, height: 0
+			save = i.saveCss ['position', 'margin', 'left', 'top']
+			{left, top} = i.css(position: 'absolute', margin: 0, left: 0, top: 0).pos()
+			i.css(left: s1.left - left, top: s1.top - top).animate left: s2.left - left, top: s2.top - top, timeout, do(i1, i2, i, save, listen) => => i.css save; i1.union(i2).free(); if listen and --counter == 0 then @send listen
+			i1.css(x).css(width: s1.width, height: s1.height).css(x).animate width: 0, height: 0, timeout
+			i2.animate width: s2.width, height: s2.height, timeout
 
-	before: insert$.inline "before", ""
-	after: insert$.inline "after", "e=e.nextSibling"
-	insertBefore: (val) -> @wrap(val).before this ; this
-	insertAfter: (val) -> @wrap(val).after this ; this
+	insert$ = (val, timeout, listen) ->
+		val = @wrap val
+		if timeout? then append_anim$.call this, $0$, val, timeout, listen
+		else p=(e=@element).parentNode; a = val.all(); (if p then $1$; (for v in a then p.insertBefore v, e) else (for v in a when p=v.parentNode then p.removeChild v))
+		this
+
+	before: insert$.inline "before", "'before'", ""
+	after: insert$.inline "after", "'after'", "e=e.nextSibling"
+	insertBefore: (val, args...) -> @wrap(val).before this, args...; this
+	insertAfter: (val, args...) -> @wrap(val).after this, args...; this
 	append: (val, timeout, listen) ->
 		val = @wrap val
-		if timeout?
-			for i in val.items()	# i - путешественник, i1 - убывающий, i2 - прибывающий
-				x = i.css ['float', 'position', 'display', 'margin']
-				i.before i1=@wrap("<div></div>").css(visibility: 'hidden', display: 'none')
-				s1 = i.pos()
-				@append i
-				s2 = i.pos()
-				i.before i2=@wrap("<div></div>").css visibility: 'hidden', width: 0, height: 0
-				i.free()
-				i1.css(x).css(width: s1.width, height: s1.height).css(x).animate width: 0, height: 0, timeout
-				
-				i2.animate width: s2.width, height: s2.height, timeout
-				save = i.saveCss 'position'
-				i.css(position: 'absolute').animate left: s2.left, top: s2.top, timeout, do(i1, i2, i, save) => => @append i.css save; i1.union(i2).free(); if listen then if typeof listen == 'string' then @send listen else listen.call this
+		if timeout? then append_anim$.call this, 'append', val, timeout, listen
 		else e=@element; (for v in val.all() then e.appendChild v)
 		this
-	appendTo: (val) -> @wrap(val).append this ; this
-	prepend: (val) -> f=(e=@element).firstChild; (for v in @wrap(val).all() then e.insertBefore v, f); this
-	prependTo: (val) -> @wrap(val).prepend this ; this
+	appendTo: (val, args...) -> @wrap(val).append this, args...; this
+	prepend: (val, timeout, listen) ->
+		val = @wrap val
+		if timeout? then append_anim$.call this, 'prepend', val, timeout, listen
+		else f=(e=@element).firstChild; (for v in val.all() then e.insertBefore v, f)
+		this
+	prependTo: (val, args...) -> @wrap(val).prepend this, args...; this
 	wrapIn: (val) -> @before val=@wrap val; (while r=val.child 0 then val=r); val.content this
 	wrapInAll: @::wrapIn.inline('wrapInAll')
 	swap_arr$ = ['prevnode', 'nextnode', 'up']
 	swap_append$ = prevnode: 'after', nextnode: 'before', up: 'append'
-	swap: (val) ->
-		if @nextnode() == val=@wrap val then @before val
-		else if @prevnode() == val then @after val
+	swap: (val, timeout, listen) ->
+		if @nextnode() == val=@wrap val then @before val, timeout, listen
+		else if @prevnode() == val then @after val, timeout, listen
 		else
+			counter = 0
+			fn = if timeout? then do(listen)->-> if listen and --counter == 0 then @send listen
 			ex = [this, val]; em = [val, this]
 			er = for k, j in ex then p = null ; (for i in swap_arr$ when p=k[i]() then break); [k, em[j], i, p]
-			for k in ex when k.up() then k.free()
-			for [k, m, i, p] in er when p then (if m.contains p then ch=m.down(); m.append k.down(); k.content ch);	p[swap_append$[i]] m
+			for k in ex when k.up() then counter++; k.free timeout, fn
+			for [k, m, i, p] in er when p then (if m.contains p then counter++; ch=m.down(); m.append k.down(), timeout, fn; k.content ch); counter++; p[swap_append$[i]] m, timeout, fn
 		this
 	
 
@@ -1625,7 +1649,7 @@ class CWidget
 	down: (i) -> if arguments.length then @wrap @element.childNodes[if i<0 then @element.childNodes.length+i else i] else new CWidgets @element.childNodes
 	
 	remove: -> @send 'onDestroy', 'remove'; e = @element; @unwrap(); e.parentNode.removeChild e; new CWidgets []
-	free: -> @element.parentNode.removeChild @element; this
+	free: (timeout, listen) -> (if timeout? then @hide timeout, do(listen)->-> @free(); @send listen else @element.parentNode.removeChild @element); this
 	
 	focus: -> @element.focus(); this
 	hasFocus: -> @document().activeElement == @element
@@ -1929,7 +1953,10 @@ class CWidget
 		this
 	toggleClass: (names...) -> x=names[0]; (for name in names when @hasClass name then @removeClass name; (return unless (x=names[(1+names.indexOf name) % names.length])?); break); @addClass x; this
 
-	show: -> @element.style.display = ''; this
+	show: (timeout, listen) ->
+		if timeout? then @show(); @animate(width: 'toggle', height: 'toggle', 'font-size': 'toggle', timeout, do(listen)->-> @send listen).css overflow: 'hidden'
+		else @element.style.display = ''
+		this
 	hide: -> @element.style.display = 'none'; this
 
 	vid: -> @element.style.visibility = ''; this
@@ -2106,7 +2133,7 @@ class CWidget
 			@_animprev = anim
 			@_animqueue.splice 0, 1
 			next_animate$.call this
-			if typeof (listen = anim.listen) == 'function' then listen.call this else if listen then @send listen
+			@send anim.listen
 		else
 			anim.call this, anim.start, anim.i / anim.timeout
 			anim.i += anim.step
