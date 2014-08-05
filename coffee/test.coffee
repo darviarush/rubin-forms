@@ -1584,11 +1584,10 @@ new CTest 'obj-CWidget-prop', """
 new CTest 'obj-CWidget-show', """
 `show [timeout], [listen]` - показывает элемент, устанавливая его свойство css _display_ в !''
 """, """
-<div class=square onclick="$(this).toggle('fast')"></div>
+<div class=test-square>тест show / hide</div>
+<a id=$name href="#" onclick="p=$(this).prev(); if(p.element.style.display == 'none') p.show('fast'); else p.hide('fast'); return false">скрыть / показать</a>
 """, ->
 	@is $('<div style="display: none"></div>').show().css('display'), ''
-	
-
 
 new CTest 'obj-CWidget-hide', """
 `show` - скрывает элемент, устанавливая его свойство css _display_ в !'none'
@@ -1921,6 +1920,7 @@ new CTest 'obj-CWidget-morph', """
 `morph param` - анимирует виджет. В отличие от #animate принимает набор параметров
 
 Параметры:
+- effect - название эффекта из CEffect - расширяет им параметры
 - from - начальные значения для анимации
 - to - конечные значения для анимации
 - timeout - время отпущенное на анимацию в миллисекундах или строка fast=600, slow=200, norm=400 или объект. В последнем случае параметры будут расширены этим объектом

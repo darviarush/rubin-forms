@@ -949,7 +949,17 @@ CValid =
 	email: /@/
 
 
-CEffect = {}
+CEffect =
+	show:
+		save: 1
+		begincss: { display: '' }
+		css: {overflow: 'hidden'}
+		from: {width: 0, height: 0, 'font-size': 0}
+	hide:
+		save: 1
+		css: {overflow: 'hidden'}
+		to: {width: 0, height: 0, 'font-size': 0}
+		endcss: { display: 'none' }
 
 
 CListen =
@@ -1954,32 +1964,25 @@ class CWidget
 	toggleClass: (names...) -> x=names[0]; (for name in names when @hasClass name then @removeClass name; (return unless (x=names[(1+names.indexOf name) % names.length])?); break); @addClass x; this
 
 	show: (timeout, listen) ->
-		if timeout?
-			@show().morph
-				save: 'all'
-				css: {overflow: 'hidden'}
-				from: {width: 0, height: 0, 'font-size': 0}
-				timeout: timeout
-				end: listen
+		if timeout? then @morph effect: 'show', timeout: timeout, end: listen
 		else @element.style.display = ''
 		this
 	hide: (timeout, listen) -> 
-		if timeout?
-			@morph
-				save: ['width', 'height', 'font-size', 'overflow']
-				begincss: {overflow: 'hidden'}
-				from: {width: 0, height: 0, 'font-size': 0}
-				timeout: timeout
-				end: -> @hide()
-				end1: listen
-		else @element.style.display = 'none'; this
+		if timeout? then @morph effect: 'hide', timeout: timeout, end: listen
+		else @element.style.display = 'none'
+		this
 
-	vid: -> @element.style.visibility = ''; this
-	novid: -> @element.style.visibility = 'hidden'; this
-	toggleVid: -> if @element.style.visibility == 'hidden' then @vid() else @novid()
+	vid: (timeout, listen) -> 
+		if timeout? then @morph save: 1, from: {opacity: 0}, begincss: { visibility: '' }, timeout: timeout, end: listen
+		else @element.style.visibility = ''
+		this
+	novid: (timeout, listen) ->
+		if timeout? then @morph save: 1, to: {opacity: 0}, endcss: { visibility: 'hidden' }, timeout: timeout, end: listen
+		else @element.style.visibility = 'hidden'
+		this
+	toggleVid: (args...) -> if @element.style.visibility == 'hidden' then @vid args... else @novid args...
 
 	visible: -> !!@element.offsetWidth
-	
 	
 	setAbsolute: -> @saveAbsoluteCss = s = @css ['position', 'display', 'visibility']; (if s.display == 'none' then @css position: 'absolute', visibility: 'hidden', display: 'block'); this
 	unsetAbsolute: -> @css @saveAbsoluteCss; delete @saveAbsoluteCss; this
@@ -2216,12 +2219,13 @@ class CWidget
 	morph: (param) ->
 		if typeof param == "string" then (if param of CEffect then param = CEffect[param] else throw @raise "Нет эффекта #{param}")
 		if typeof param.timeout == 'object' then extend param, param.timeout; (delete param.timeout if typeof param.timeout == 'object')
+		if 'effect' of param then extend_deep_uniq param, CEffect[param.effect]
 		
 		from = param.from || {}
 		to = param.to || {}
 		
-		save = if param.save? then (if param.save == 'all' then Object.keys(from).push Object.keys(to)... else param.save) else []
-		if param.css? then save.push Object.keys(css)...
+		save = if param.save? then (if param.save == 1 then (x=Object.keys(from)).push Object.keys(to)...; x else param.save) else []
+		if param.css? then save.push Object.keys(param.css)...
 		save = if save.length then @saveCss save else {}
 		@css param.css if param.css?
 		
@@ -2231,7 +2235,7 @@ class CWidget
 		for i of to then (unless i of from then from[i] = @getCss i)
 		@css param.begincss if param.begincss?
 		@css from
-
+		
 		listen = do(param, save)->-> @css save; (@css param.endcss if param.endcss?); @send param.end, param; @send param.end1, param
 		anim = @animation to, param.timeout, param.fps, listen, param.progress
 		anim.param = param
@@ -2316,7 +2320,7 @@ class CWidget
 		line.position this, pos, scale, 'after', 'before', addx, addy
 		line
 
-	edit: (opt = {}) -> self = this ; @_edit=t=@wrap(if opt.line then "<input>" else "<textarea></textarea>").val(@val()).css(@css 'display font text-align vertical-align border width height padding vertical-align'.split ' ').css('position', 'absolute').css(opt.css || {}).on('blur', (do(self)->-> (return if off == self.send 'onBeforeEdit', this); self.val self.dataType @val(); @free(); self._edit = null ; self.send "onEdit")).prependTo(this).focus().relative this, 'left top before before'; this
+	edit: (opt = {}) -> self = this ; @_edit=@wrap(if opt.line then "<input>" else "<textarea></textarea>").val(@val()).css(@css 'display font text-align vertical-align border width height padding vertical-align'.split ' ').css('position', 'absolute').css(opt.css || {}).on('blur', (do(self)->-> (return if off == self.send 'onBeforeEdit', this); self.val self.dataType @val(); self._edit = null ; self.send "onEdit")).prependTo(this).focus().relative this, 'left top before before'; this
 	
 	type$.all 'edit,arrow,arrow_border'
 	
