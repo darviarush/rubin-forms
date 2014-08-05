@@ -307,8 +307,9 @@ new CTest 'obj-CWidget-setListens', """
 	@count 1
 	ok = => @ok 1
 	class window.Ex extends CWidget
-		onready_dom: ok
-	$("<div ctype=Ex></div>").defineHandlers().setListens()
+		onresize_window: ok
+	w = $("<div ctype=Ex></div>").defineHandlers().setListens()
+	$(w.window()).fire 'resize'
 
 
 new CTest 'obj-CWidget-observe', """
@@ -1335,7 +1336,7 @@ new CTest 'obj-CWidget-css', """
 new CTest 'obj-CWidget-px', """ 
 `px style` - возвращает значение стиля в пикселах
 
-Также см.: #style, #hasCss, #css, #em
+Также см.: #style, #hasCss, #css, #em, #rgba
 """, """
 
 <div style="padding:10px; border: solid 1px gray">
@@ -1365,6 +1366,14 @@ new CTest 'obj-CWidget-px', """
 	log.append "in=" + w.in('width') + "=" + w.px('150in') + '<br>'
 	
 	@is w.px('width'), 150
+
+
+new CTest 'obj-CWidget-rgba', """
+`rgba style` - возвращает объект CColor, который затем можно преобразовать в любой из представления цвета
+
+Также см.: #style, #hasCss, #css, #px
+""", ->
+	@is CRoot.rgba('#4169E1').name(), 'royalblue'
 
 	
 
@@ -1573,9 +1582,12 @@ new CTest 'obj-CWidget-prop', """
 
 
 new CTest 'obj-CWidget-show', """
-`show` - показывает элемент, устанавливая его свойство css _display_ в !''
+`show [timeout], [listen]` - показывает элемент, устанавливая его свойство css _display_ в !''
+""", """
+<div class=square onclick="$(this).toggle('fast')"></div>
 """, ->
 	@is $('<div style="display: none"></div>').show().css('display'), ''
+	
 
 
 new CTest 'obj-CWidget-hide', """
@@ -1849,12 +1861,13 @@ new CTest 'obj-CWidget-clear', """
 
 
 new CTest 'obj-CWidget-animate', """
-`animate param, [timeout], [fps], [listener]` - изменяет с течением времени заданные css-параметры
+`animate param, [timeout], [fps], [listener], [progress]` - изменяет с течением времени заданные css-параметры
 
 - param - объект с параметрами css
 - timeout - интервал в миллисекундах или строка fast=600, slow=200, norm=400 за который происходит анимация. Если не указана - берётся norm
 - fps - частота кадров в секунду с которой будет происходить анимация. По умолчанию - 100. Это значит, что раз в 10 миллисекунд будут изменяться параметры css
 - listener - название метода или функция, которая будет вызвана по звершению. По умолчанию посылается метод onAnimate
+- progress [start, k, progress] - функция или имя метода - запускается на каждом шаге анимации
 
 значения 'param' должны быть в формате:
 [+=|-=] значение_css [in|out|io] [функция]
@@ -1902,6 +1915,36 @@ new CTest 'obj-CWidget-animate', """
 		self.is 'red', @rgba('border-color').name()
 		
 	@w("plus").css('margin-left', 10).animate 'margin-left': "+=100pt", 1000, 100, -> self.is$f @pt("10px") + 100, @pt('margin-left'), 0.01
+
+
+new CTest 'obj-CWidget-morph', """
+`morph param` - анимирует виджет. В отличие от #animate принимает набор параметров
+
+Параметры:
+- from - начальные значения для анимации
+- to - конечные значения для анимации
+- timeout - время отпущенное на анимацию в миллисекундах или строка fast=600, slow=200, norm=400 или объект. В последнем случае параметры будут расширены этим объектом
+- fps - частота кадров в секунду
+- css - стили устанавливаются на период анимации, а затем - восстанавливаются
+- save - массив имён стилей. Сохраняет, а после анимации - восстанавливает стили на элементе (@element.style). Либо строка "all" - тогда все изменённые параметры в from и to будут восстановлены после анимации
+- begincss - css устанавливается до начала анимации, после сохранения
+- endcss - css устанавливается после окончания анимации и после восстановления сохранённых стилей
+- begin - функция или имя метода - запускается до начала анимации
+- end [param] - функция или имя метода - запускается в конце анимации
+- end1 [param] - функция или имя метода - запускается в конце анимации, после end
+- progress [start, k, progress] - функция или имя метода - запускается на каждом шаге анимации
+
+Из progress можно получить созданную для анимации функцию anim через arguments.caller
+
+Если стиля из from нет в to, а из to нет в from, то to или from дополняется вычесленным текущим стилем
+
+См. #animate
+""", """
+<div class=test-square id=$name onclick="$(this).animate('toggle')"></div>
+""", ->
+	@count 1
+	self = this
+	@w().morph to: { 'background-color': 'gainsboro' }, end: -> self.is @rgba('background-color').name(), 'gainsboro'
 	
 	
 new CTest 'obj-CWidget-shape', """
@@ -2122,7 +2165,39 @@ new CTest 'obj-CWidget-arrow', """
 	@is$f w._arrow.pos().right, w.pos().right + 10
 
 
-CTest.category "методы ajax и валидации"
+new CTest 'obj-CWidget-line', """
+line pos = 'right', scale = 0, len = 30, className = '', addx = 0, addy = 0
+
+Создаёт красную линию из div-а. Линия может быть только вертикальной или горизонтальной. Она сразу вставляется в body и выравнивается на 
+""", """
+<div id="$name" class=test-square></div>
+""", ->
+	line = @w().line()
+	@is line.rgba("background").name(), "red"
+
+	
+new CTest 'obj-CWidget-edit', """
+edit opt - делает элемент редактируемым (на самом деле просто выводит над ним input или textarea)
+
+Опции:
+- line - определяет, будет ли элемент редактироваться в одну строку
+- css - дополнительные стили для элемента-редактора
+
+Посылает событие onBeforeEdit до того, как изменит редактируемый элемент. И onEdit после того как изменит.
+Для вставки в элемент данных используется метод dataType
+
+""", """
+<div id="$name" class=test-square></div>
+""", ->
+	@count 3
+	w=@w().edit()
+	w.onBeforeEdit = (edit) => edit.val "123"; @ok CRoot.contains edit
+	w.onEdit = (edit) => @is w.val(), "123"; @ok not CRoot.contains edit
+	w.fire "blur"
+	
+
+	
+CTest.category "методы ajax"
 
 new CTest 'obj-CWidget-dataType', """
 `dataType text` - преобразует text в данные. Используется при загрузке методами #load и #submit
@@ -2264,6 +2339,45 @@ new CTest 'obj-CWidget-onInvalid', """
 """, ->
 	@ok not (w=$("<div cerr='Ошибка' cvalid=int>1.1</div>")).valid()
 	@is w.tooltip().text(), 'Ошибка'
+
+	
+
+CTest.category "методы конфигурирования виджета"
+
+
+new CTest 'obj-CWidget-conf', """
+`conf conf` - расширяет @config
+
+См. #cconf
+""", ->
+	class Ex extends CWidget
+		config: {width: 1}
+
+	class Ex1 extends Ex
+		config: {width: 2}
+		
+	ex = new Ex1 document.createElement 'div'
+	ex.conf width: 3
+	
+	@is ex.config.width, 3
+	@is ex.constructor.prototype.config.width, 2
+
+
+new CTest 'obj-CWidget-cconf', """
+`сconf conf` - расширяет @::config
+
+См. #conf
+""", ->
+	class Ex extends CWidget
+		config: {width: 1}
+
+	class Ex1 extends Ex
+		config: {width: 2}
+		
+	ex = new Ex1 document.createElement 'div'
+	ex.cconf width: 3
+	@is ex.config.width, 3
+	@is ex.constructor::config.width, 3
 
 
 CTest.category "Утилиты"
