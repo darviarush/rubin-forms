@@ -26,69 +26,49 @@ if(!window.console) {
 	window.onerror = document.onerror = function(msg, url, line) { console.log('error: '+url+':'+line, msg, arguments.callee.caller) }
 }
 
-
-//if(location.host === 'darviarush.narod.ru') document.body.firstChild.style.display = 'none'
-
-function CTest(name, manual, css, write, fn) {
+function CTest(name, manual, css, html, fn) {
 	
 	var hash = location.hash
 	if(hash && hash != "#" && "#CTest-"+name !== hash) return;
-	
-	//if(CTest.stop) return;
-	//CTest.stop = 1
 
-	if(typeof css === 'function') { fn = css; css = ''; write = ''; }
-	else if(typeof write === 'function') { fn = write; write = css; css = '' }
+	if(typeof css === 'function') { fn = css; css = ''; html = ''; }
+	else if(typeof html === 'function') { fn = html; html = css; css = '' }
 
 	this.name = name
+	this.manual = manual
+	this.css = css
+	this.html = html
+	this.fn = fn
 	this._count = 0
 	this._counter = 0
 	this.isFail = false
 	this.indicator = document.getElementById('fortest-'+name)
 	if(!this.indicator) this.indicator = CTest.add_indicator(name, document.getElementById('CTest-container-no-ind'))
 
-	if(name in CTest.is_test) { console.log("Тест "+name+" уже существует"); this.color("red", "Тест уже существует"); return }
+	if(name in CTest.is_test) { console.error("Тест "+name+" уже существует"); this.color("red", "Тест уже существует"); return }
 	CTest.is_test[name] = this
 	
-	this.color('DeepSkyBlue')
-	
-	if(!CTest.is_functional) {
-		var match = name.match(/^(cls|obj|var|key)-([$\w]+)(?:-([$\w]+))?/)
-		if(!match) throw new Error("new CTest(name, ...) - name не подходит под шаблон "+name)
-		var type = match[1]
-		var cls = match[2]
-		var method = match[3] || ''
-		
-		this.max_name = cls+(type=='cls'? '::': type=='var'? '': '.')+method
-		this.add_to_category()
-
-		if(!document.getElementById('h1-'+cls)) document.write('<h1 id=h1-'+cls+'>'+cls+'</h1>')
-		
-		document.writeln('<h3><a id="CTest-'+name+'" name="CTest-'+name+'" href="#CTest-'+name+'"><i># </i>'+this.max_name+'</a></h3>')
-		
-		var repl = function(s) { return s.replace(/[\$%](name\b|\{name\})/g, name) }
-		
-		if(Function.prototype.rename) fn = fn.rename(name.replace(/-/g, "_"));
-		
-		this.write(manual, repl(write), repl(css), fn)
-	}
-	
-	if(!console.notFound) { this.retValue = fn.call(this); this.end() }
-	else
-	
-	try {
-		this.retValue = fn.call(this)
-		this.end()
-	} catch(e) {
-		if(e.stack) console.log(e, e.stack)
-		else console.log(e)
-		this.color('red', e.message)
-		//this.fail(e)
-	}
-	
+	CTest.res_queue.push(this)
+	if(CTest.res_queue.length == 1) CTest.interval = setInterval(CTest.runtime, 0);
 }
 
+
+CTest.runtime = function() {
+	for(;;) {
+		var x = CTest.res_queue.splice(0, 1)
+		if(x.length) x[0].run(); else {
+			CTest.stop()
+			if(location.hash.slice(1) === "") scrollTo(0, 0);
+			break;
+		}
+	}
+}
+CTest.stop = function() { clearInterval(CTest.interval) }
+
 CTest.is_test = {}
+CTest.div = document.createElement('div')
+CTest.body = document.body || document.getElementsByTagName('body')[0]
+CTest.res_queue = []
 CTest.extend = function(b) { var a = CTest.prototype; for(var i in b) a[i]=b[i] }
 
 CTest.Goto = "onclick='location = this.href'"
@@ -101,7 +81,7 @@ CTest.toggleCategory = function(self) {
 	self.firstChild.innerHTML = ch
 }
 
-CTest.queue = []
+/*CTest.queue = []
 CTest.queue_idx = 0
 CTest.old_name = ""
 CTest.old_test = null
@@ -116,11 +96,11 @@ CTest.ajax = function(fn) {
 	return CTest
 }
 CTest.open = function(name, url) {
-	/*var a = document.createElement("a")
+	/--var a = document.createElement("a")
 	a.setAttribute('href', url)
 	a.setAttribute('target', name)
 	document.body.appendChild(a)
-	a.click()*/
+	a.click()--/
 	
 	var win = window.open('', name)
 	if(!win || win.location == 'about:blank') throw 'Не открыто окно '+name
@@ -156,15 +136,61 @@ CTest.loop = function() {
 			throw "Неизвестный queue: "+test.name
 		}
 	}
-}
+}*/
 
 CTest.extend({
+	run: function() {
+	
+		this.color('DeepSkyBlue')
+		
+		name = this.name
+		
+		if(!CTest.is_functional) {
+			var match = name.match(/^(cls|obj|var|key)-([$\w]+)(?:-([$\w]+))?/)
+			if(!match) throw new Error("new CTest(name, ...) - name не подходит под шаблон "+name)
+			var type = match[1]
+			var cls = match[2]
+			var method = match[3] || ''
+			
+			this.max_name = cls+(type=='cls'? '::': type=='var'? '': '.')+method
+			this.add_to_category()
+
+			if(!document.getElementById('h1-'+cls)) this.print('<h1 id=h1-'+cls+'>'+cls+'</h1>')
+			
+			this.print('<h3><a id="CTest-'+name+'" name="CTest-'+name+'" href="#CTest-'+name+'"><i># </i>'+this.max_name+'</a></h3>')
+			
+			var repl = function(s) { return s.replace(/[\$%](name\b|\{name\})/g, name) }
+			var fn = this.fn
+			if(Function.prototype.rename) fn = fn.rename(name.replace(/-/g, "_"));
+			
+			this.write(this.manual, repl(this.html), repl(this.css), fn)
+		}
+		
+		if(!console.notFound) { this.retValue = fn.call(this); this.end() }
+		else
+		
+		try {
+			this.retValue = fn.call(this)
+			this.end()
+		} catch(e) {
+			if(e.stack) console.log(e, e.stack)
+			else console.log(e)
+			this.color('red', e.message)
+			//this.fail(e)
+		}
+	},
+	print: function(x) {
+		CTest.div.innerHTML = x
+		var e = []
+		for(var i=CTest.div.firstChild; i; i=i.nextSibling) e.push(i)
+		for(var i=0, n=e.length; i<n; i++) CTest.body.appendChild(e[i])
+	},
 	add_to_category: function() {
 	
 		var category
 		if(CTest._category) {
 			category = escapeHTML(CTest._category)
-			document.write("<h2><a name=category-"+CTest.category_counter+">"+category+"</a></h2>")
+			this.print("<h2><a name=category-"+CTest.category_counter+">"+category+"</a></h2>")
 
 			var menu = document.getElementById('CTest-category')
 			var div = document.createElement('div')
@@ -269,6 +295,8 @@ CTest.extend({
 	},
 	write: function(manual, html, css, caller) {
 	
+		var print = this.print
+	
 		var match = this.name.match(/^obj-([\$\w]+)-([\$\w]+)$/)
 		if(match) {
 			var cls = window[match[1]], fn
@@ -280,36 +308,36 @@ CTest.extend({
 			manual += fn.type$===0? "\n\n*Используется и для коллекции*": "\n\n*"+(type==='$result'? a: type==='$any'? a+', а если коллекция пуста - то над CRoot': type==='$range'? m+'. Возвращает новую коллекцию из результатов операций': type==='$join'? m+'. Возвращает объединение строк результатов': type==='$all'? m+'. Возвращает себя': type==='$attr'? 'В коллекции, если аргументов меньше двух или первый элемент не массив, то применяется к первому элементу. Иначе применяется ко всем и возвращает себя': 'Неизвестная операция')+". См. [" + type + "](#CTest-obj-CWidget-"+type+")*";
 		}
 	
-		document.write("<div class=markdown>")
-		document.write( CTest.manual(manual) )
-		document.write("</div>")
+		print("<div class=markdown>")
+		print( CTest.manual(manual) )
+		print("</div>")
 		
-		document.write("<div class=comm>Комментариев: </div>")
+		print("<div class=comm>Комментариев: </div>")
 
-		if(css) document.write('<style type=text/css>\n'+css+'\n</style>\n')
-		document.write(html)
+		if(css) print('<style type=text/css>\n'+css+'\n</style>\n')
+		print(html)
 		
 		if(css) {
 			var id='css-code-'+this.name
-			document.write('<pre><code id="'+id+'" class=css>'+escapeHTML(css)+'</code></pre>')
+			print('<pre><code id="'+id+'" class=css>'+escapeHTML(css)+'</code></pre>')
 			hljs.highlightBlock(document.getElementById(id))
 		}
 		
 		if(html) {
 			var id='html-code-'+this.name
-			document.write('<pre><code id="'+id+'" class=html>'+escapeHTML(html)+'</code></pre>')
+			print('<pre><code id="'+id+'" class=html>'+escapeHTML(html)+'</code></pre>')
 			hljs.highlightBlock(document.getElementById(id))
 		}
 		
 		var coffee
 		if(coffee = CTest.coffee[this.name]) {
 			var id = 'coffee-code-'+this.name
-			document.write('<div><a href="#" class="js-coffee-check" onclick="return CTest.js_coffee_check(this)">js</a></div><pre><code id="'+id+'" class=coffeescript>'+escapeHTML(coffee)+'</code></pre>')
+			print('<div><a href="#" class="js-coffee-check" onclick="return CTest.js_coffee_check(this)">js</a></div><pre><code id="'+id+'" class=coffeescript>'+escapeHTML(coffee)+'</code></pre>')
 			hljs.highlightBlock(document.getElementById(id))
 		}
 		
 		id = 'js-code-'+this.name
-		document.write('<pre'+(coffee? ' style="display:none"': '')+'><code id="'+id+'" class=javascript>'+escapeHTML(caller || arguments.callee.caller)+'</code></pre>')
+		print('<pre'+(coffee? ' style="display:none"': '')+'><code id="'+id+'" class=javascript>'+escapeHTML(caller || arguments.callee.caller)+'</code></pre>')
 		hljs.highlightBlock(document.getElementById(id))
 	},
 	w: function(s) {
@@ -453,17 +481,5 @@ CTest.win = {};
 		CTest.cls[i] = r = {}
 		for(var j in p) r[j] = 1
 	}
-	
-	if(location.hash.slice(1) === "") {
-		var fn = function() { scrollTo(0, 0); } //: function() { console.log('location='+location.hash); location.href = location.hash };
-		
-		var fnx = function() {
-			setTimeout(fn, 100);
-		}
-		
-		if(document.addEventListener) document.addEventListener("DOMContentLoaded", fnx, false)
-		else document.body.attachEvent("onload", fnx)
-	}
-	
 })();
 

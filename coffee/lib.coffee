@@ -828,8 +828,8 @@ CTemplate =
 			tr: ///^(?:table|tbody|tfoot|thead)$///
 			option: ///^select$///
 			li: ///^(?:ol|ul)$///
-		
-		
+
+
 		T = []; html = []; pos = 0 ; s = i_html
 		pop = ->
 			tag = T.pop()
@@ -947,6 +947,9 @@ CValid =
 	number: /^-?\d+(\.\d+)?$/
 	unumber: /^\d+(\.\d+)?$/
 	email: /@/
+
+
+CEffect = {}
 
 
 CListen =
@@ -1265,6 +1268,9 @@ class CWidget
 
 	# методы установки обработчиков
 	send: (type, args...) ->
+		return unless type?
+		if typeof type == 'function' then return type.call this, args...
+	
 		if type of this then action = [[this, type, args]] else action = []
 		self = this
 		path = '_'+type
@@ -1276,6 +1282,8 @@ class CWidget
 			self = p
 		for a in action then ret = (x=a[0])[a[1]] a[2]...; if x.stopHandlersQueue then delete x.stopHandlersQueue; break
 		ret
+	
+	on: (type, listen) -> (if typeof type == 'object' then (for k of type then @setHandlers k; @['on'+k] = type[k]) else @setHandlers type; @['on'+type] = listen); this
 	
 	# export_handlers = {'name-name-name': types}
 	defineHandlers: ->
@@ -1548,28 +1556,61 @@ class CWidget
 			this
 		else (div = document.createElement 'div').appendChild @element.cloneNode true ; div.innerHTML
 
-	insert$ = (val) -> p=(e=@element).parentNode; a = @wrap(val).all(); (if p then $0$; (for v in a then p.insertBefore v, e) else (for v in a when p=v.parentNode then p.removeChild v)); this
+	append_anim$ = (method, val, timeout, listen) ->
+		its = []
+		if typeof timeout == 'function' then listen = timeout; timeout = 'norm'
+		for i in items=val.items()	# i - путешественник, i1 - убывающий, i2 - прибывающий
+			x = i.css ['float', 'position', 'display', 'margin']
+			i.before i1=@wrap("<div></div>").css(visibility: 'hidden', display: 'none')
+			its.push [x, i1, i.pos()]
+		this[method] val
+		for i, k in items then its[k][3] = i.pos()
+		counter = items.length
+		for i, k in items
+			[x, i1, s1, s2] = its[k]
+			i.before i2=@wrap("<div></div>").css visibility: 'hidden', width: 0, height: 0
+			save = i.saveCss ['position', 'margin', 'left', 'top']
+			{left, top} = i.css(position: 'absolute', margin: 0, left: 0, top: 0).pos()
+			i.css(left: s1.left - left, top: s1.top - top).animate left: s2.left - left, top: s2.top - top, timeout, do(i1, i2, i, save, listen) => => i.css save; i1.union(i2).free(); if listen and --counter == 0 then @send listen
+			i1.css(x).css(width: s1.width, height: s1.height).css(x).animate width: 0, height: 0, timeout
+			i2.animate width: s2.width, height: s2.height, timeout
 
-	before: insert$.inline "before", ""
-	after: insert$.inline "after", "e=e.nextSibling"
-	insertBefore: (val) -> val=@wrap(val).before this ; this
-	insertAfter: (val) -> @wrap(val).after this ; this
-	append: (val) -> e=@element; (for v in @wrap(val).all() then e.appendChild v); this
-	appendTo: (val) -> @wrap(val).append this ; this
-	prepend: (val) -> f=(e=@element).firstChild; (for v in @wrap(val).all() then e.insertBefore v, f); this
-	prependTo: (val) -> @wrap(val).prepend this ; this
+	insert$ = (val, timeout, listen) ->
+		val = @wrap val
+		if timeout? then append_anim$.call this, $0$, val, timeout, listen
+		else p=(e=@element).parentNode; a = val.all(); (if p then $1$; (for v in a then p.insertBefore v, e) else (for v in a when p=v.parentNode then p.removeChild v))
+		this
+
+	before: insert$.inline "before", "'before'", ""
+	after: insert$.inline "after", "'after'", "e=e.nextSibling"
+	insertBefore: (val, args...) -> @wrap(val).before this, args...; this
+	insertAfter: (val, args...) -> @wrap(val).after this, args...; this
+	append: (val, timeout, listen) ->
+		val = @wrap val
+		if timeout? then append_anim$.call this, 'append', val, timeout, listen
+		else e=@element; (for v in val.all() then e.appendChild v)
+		this
+	appendTo: (val, args...) -> @wrap(val).append this, args...; this
+	prepend: (val, timeout, listen) ->
+		val = @wrap val
+		if timeout? then append_anim$.call this, 'prepend', val, timeout, listen
+		else f=(e=@element).firstChild; (for v in val.all() then e.insertBefore v, f)
+		this
+	prependTo: (val, args...) -> @wrap(val).prepend this, args...; this
 	wrapIn: (val) -> @before val=@wrap val; (while r=val.child 0 then val=r); val.content this
 	wrapInAll: @::wrapIn.inline('wrapInAll')
 	swap_arr$ = ['prevnode', 'nextnode', 'up']
 	swap_append$ = prevnode: 'after', nextnode: 'before', up: 'append'
-	swap: (val) ->
-		if @nextnode() == val=@wrap val then @before val
-		else if @prevnode() == val then @after val
+	swap: (val, timeout, listen) ->
+		if @nextnode() == val=@wrap val then @before val, timeout, listen
+		else if @prevnode() == val then @after val, timeout, listen
 		else
+			counter = 0
+			fn = if timeout? then do(listen)->-> if listen and --counter == 0 then @send listen
 			ex = [this, val]; em = [val, this]
 			er = for k, j in ex then p = null ; (for i in swap_arr$ when p=k[i]() then break); [k, em[j], i, p]
-			for k in ex when k.up() then k.free()
-			for [k, m, i, p] in er when p then (if m.contains p then ch=m.down(); m.append k.down(); k.content ch);	p[swap_append$[i]] m
+			for k in ex when k.up() then counter++; k.free timeout, fn
+			for [k, m, i, p] in er when p then (if m.contains p then counter++; ch=m.down(); m.append k.down(), timeout, fn; k.content ch); counter++; p[swap_append$[i]] m, timeout, fn
 		this
 	
 
@@ -1608,7 +1649,7 @@ class CWidget
 	down: (i) -> if arguments.length then @wrap @element.childNodes[if i<0 then @element.childNodes.length+i else i] else new CWidgets @element.childNodes
 	
 	remove: -> @send 'onDestroy', 'remove'; e = @element; @unwrap(); e.parentNode.removeChild e; new CWidgets []
-	free: -> @element.parentNode.removeChild @element; this
+	free: (timeout, listen) -> (if timeout? then @hide timeout, do(listen)->-> @free(); @send listen else @element.parentNode.removeChild @element); this
 	
 	focus: -> @element.focus(); this
 	hasFocus: -> @document().activeElement == @element
@@ -1718,7 +1759,7 @@ class CWidget
 			else if selector instanceof RegExp then rawstyle_mask_re.call this, selector
 			else selector.parentStyleSheet.deleteRule selector.indexInSheet$; set_styles$.call this
 
-	new_pseudo_element$ = (w, pseudoElement) -> (fn=->); fn.prototype = w.constructor.prototype; o = new fn; extend o, w; o.$pseudoElement = pseudoElement; o
+	new_pseudo_element$ = (w, pseudoElement) -> (fn=->); fn.prototype = w.constructor.prototype; o = new fn; extend o, w; o._pseudoElement = pseudoElement; o
 	ex_uniq$ = (a) -> x={}; z=0 ; (for i in a when not((t=i.selectorText) of x) then x[t] = z++); r=[]; (r[x[k]]=k for k of x); r
 	goal_selector$ = -> (@id id=CMath.uniqid() unless id=@id()); "#"+id
 	goal_rule$ = (pseudoElement) -> rules = @rawstyle selector = goal_selector$.call(this)+(pseudoElement || ''); (unless rules.length then @rawstyle selector, {}; rules = @rawstyle selector); rules
@@ -1784,15 +1825,15 @@ class CWidget
 			else if wdiv$.hasCss old, '1px' then val+='px'; css_px[key] = 1
 			else if wdiv$.hasCss old, '#AAAAAA' then val = CColor.fromNumber val; css_color[key] = 1
 			else css_not_px[key] = 1
-		style = (@$pseudoElement || @element).style
+		style = (@_pseudoElement || @element).style
 		if important then style.setProperty key.lc(), val, "!important" else style[key] = val
 		this
-	getCssStyle: (key, pseudoClass) -> if p=@$pseudoElement then p.style else if @htm().contains this then getComputedStyle @element, pseudoClass else @element.style
+	getCssStyle: (key, pseudoClass) -> if p=@_pseudoElement then p.style else if @htm().contains this then getComputedStyle @element, pseudoClass else @element.style
 	getCssValue: (key, pseudoClass) -> @getCssStyle(key, pseudoClass).getPropertyCSSValue toCssCase key
 	getCss: (key, pseudoClass) ->
 		if (fn=css_get_fn[key]) and off != ret=fn.call this, key, pseudoClass then return ret
 		@getCssStyle(key, pseudoClass)[toCssCase key]
-		
+	saveCss: -> if @_pseudoElement? then @css.apply this, arguments else @_pseudoElement = @element; ret = @css.apply this, arguments; delete @_pseudoElement; ret
 		
 	css: (name, val, important) -> if arguments.length==0 then r={}; (for k in @element.style then r[k = toCssCase k] = @getCss k); r else if name instanceof Array then r={}; (for k in name then r[k]=@getCss k); r else if name instanceof Object then (for k of name then @setCss k, name[k], val); this else if arguments.length >= 2 and val != null then @setCss name, val, important; this else @getCss name
 	extend @::css,
@@ -1809,7 +1850,7 @@ class CWidget
 	
 	rgba$ = (color) ->
 		if color == '' or color == 'transparent' then [0,0,0,0]
-		else if c=CColor.colors[color.toLowerCase()] or ///^#[\dA-F]+$///i.test(c=color) then [parseInt(c.slice(1, 3), 16),  parseInt(c.slice(3, 5), 16), parseInt(c.slice(5), 16), 1]
+		else if (c=CColor.colors[color.toLowerCase()]) or ///^#[\dA-F]+$///i.test(c=color) then [parseInt(c.slice(1, 3), 16),  parseInt(c.slice(3, 5), 16), parseInt(c.slice(5), 16), 1]
 		else if m=color.match /// rgba?\(([^\)]+)\) /// then r=m[1].split /// ,\s+ ///; [parseInt(r[0]), parseInt(r[1]), parseInt(r[2]), if r[3]? then -(-r[3]) else 1]
 		else if m=color.match /// hsla?\(([^\)]+)\) /// then r=m[1].split /// %?,\s+ ///; a=(if r[3]? then -(-r[3]) else 1); r=CColor.hslToRgb parseInt(r[0]), parseInt(r[1]), parseInt r[2]; r[3]=a; r
 	
@@ -1912,8 +1953,26 @@ class CWidget
 		this
 	toggleClass: (names...) -> x=names[0]; (for name in names when @hasClass name then @removeClass name; (return unless (x=names[(1+names.indexOf name) % names.length])?); break); @addClass x; this
 
-	show: -> @element.style.display = ''; this
-	hide: -> @element.style.display = 'none'; this
+	show: (timeout, listen) ->
+		if timeout?
+			@show().morph
+				save: 'all'
+				css: {overflow: 'hidden'}
+				from: {width: 0, height: 0, 'font-size': 0}
+				timeout: timeout
+				end: listen
+		else @element.style.display = ''
+		this
+	hide: (timeout, listen) -> 
+		if timeout?
+			@morph
+				save: ['width', 'height', 'font-size', 'overflow']
+				begincss: {overflow: 'hidden'}
+				from: {width: 0, height: 0, 'font-size': 0}
+				timeout: timeout
+				end: -> @hide()
+				end1: listen
+		else @element.style.display = 'none'; this
 
 	vid: -> @element.style.visibility = ''; this
 	novid: -> @element.style.visibility = 'hidden'; this
@@ -2089,22 +2148,23 @@ class CWidget
 			@_animprev = anim
 			@_animqueue.splice 0, 1
 			next_animate$.call this
-			if typeof (listen = anim.listen) == 'function' then listen.call this else if listen then @send listen
+			@send anim.listen
 		else
-			anim.call this, anim.start, anim.i / anim.timeout
+			anim.call this, anim.start, anim.i / anim.timeout, anim.progress
 			anim.i += anim.step
 			
 	next_animate$ = -> @clear animate$; (if @_animqueue.length then @interval @_animqueue[0].step, animate$); this
 	mod$ = in: 'easeIn', out: 'easeOut', io: 'easeInOut'
 	
-	animation: (param, timeout, fps, listen) ->
-		if typeof timeout == 'function' then listen = timeout; timeout = default_timeout$
-		if typeof fps == 'function' then listen = fps; fps = default_fps$
+	animation: (param, timeout, fps, listen, progress) ->
+		if typeof timeout == 'function' then listen = timeout; progress = fps; timeout = fps = null
+		if typeof fps == 'function' then progress = listen; listen = fps; fps = null
 		timeout = speeds$[timeout] || timeout || default_timeout$
 		fps = default_fps$ unless fps
 		
 		stubs = {}
 		fn = []
+		
 		for key, v of param
 			k = escapeString key
 			[a, step, to, ci, val, mod, formula] = String(v).match /// ( [+-]= )? \s* (?: (-?(?:\d*\.)?\d+(?:[Ee][+-]\d+)?) ([a-z%]+)? | ([a-zA-Z#]\w* (?:\( [^\(\)]+ \))? ) ) (?:\s+ (?:(in|out|io)\s+)? (\w+))? $///
@@ -2133,11 +2193,14 @@ class CWidget
 
 			fn.push 'this.setCss('+k+', '+formula+')'
 			stubs[key] = px
-		eval 'fn=function anim$(start, k){\nvar x,c,f\n'+fn.join('\n')+'\n}'
+		fn.splice 0, 0, 'fn=function anim$(start, k'+(if progress then ', progress' else '')+'){\nvar x,c,f'
+		if typeof progress == 'function' then fn.push 'progress.apply(this, arguments)' else if progress then fn.push 'this.send(progress, start, k, progress)'
+		fn.push '}'
+		eval fn.join '\n'
 		
-		extend fn, stubs: stubs, i: 0, fps: fps, step: 1000 / fps, timeout: timeout, listen: listen
+		extend fn, stubs: stubs, i: 0, fps: fps, step: 1000 / fps, timeout: timeout, listen: listen, progress: progress
 		
-	animate: (param, timeout, fps, listen) ->
+	animate: (param, timeout, fps, listen, progress) ->
 		if (len=arguments.length) == 0 then next_animate$.call this
 		else if param == 'toggle' then param = {}; (for key of (anim = @_animprev).start then param[key] = 'toggle'); @animate param, anim.timeout,anim.fps, timeout
 		else if param == 'clear' then (if len==1 then @_animqueue = []; @clear animate$ else if -1 != idx=@_animqueue.indexOf timeout then @_animqueue.splice idx, 1)
@@ -2145,10 +2208,37 @@ class CWidget
 		else if param == 'active' then return @_timers[animate$]
 		else if param == 'empty' then return not @_animqueue?.length
 		else
-			anim = if typeof param == 'fuction' then param else @animation param, timeout, fps, listen
+			anim = if typeof param == 'function' then param else @animation param, timeout, fps, listen, progress
 			unless @_animqueue then @_animqueue = [anim] else @_animqueue.push anim
 			if @_animqueue.length == 1 then @interval anim.step, animate$
 		this
+		
+	morph: (param) ->
+		if typeof param == "string" then (if param of CEffect then param = CEffect[param] else throw @raise "Нет эффекта #{param}")
+		if typeof param.timeout == 'object' then extend param, param.timeout; (delete param.timeout if typeof param.timeout == 'object')
+		
+		from = param.from || {}
+		to = param.to || {}
+		
+		save = if param.save? then (if param.save == 'all' then Object.keys(from).push Object.keys(to)... else param.save) else []
+		if param.css? then save.push Object.keys(css)...
+		save = if save.length then @saveCss save else {}
+		@css param.css if param.css?
+		
+		@send param.begin
+		
+		for i of from then (unless i of to then to[i] = @getCss i)
+		for i of to then (unless i of from then from[i] = @getCss i)
+		@css param.begincss if param.begincss?
+		@css from
+
+		listen = do(param, save)->-> @css save; (@css param.endcss if param.endcss?); @send param.end, param; @send param.end1, param
+		anim = @animation to, param.timeout, param.fps, listen, param.progress
+		anim.param = param
+		anim.from = from
+		anim.to = to
+		@animate anim
+		
 		
 	#slideUp: (timeout) ->
 	
@@ -2226,7 +2316,7 @@ class CWidget
 		line.position this, pos, scale, 'after', 'before', addx, addy
 		line
 
-	edit: (opt = {}) -> @_edit=t=@wrap(if opt.line then "<input>" else "<textarea></textarea>").val(@val()).css(@css 'display font text-align vertical-align border width height padding vertical-align'.split ' ').css('position', 'absolute').css(opt.css || {}).setHandlers('blur').prependTo(this).focus().relative this, 'left top before before'; self = this; t.onblur = (do(self)->-> (return if off == self.send 'onBeforeEdit', this); self.val self.dataType @val(); self._edit = null ; self.send "onEdit"); this
+	edit: (opt = {}) -> self = this ; @_edit=t=@wrap(if opt.line then "<input>" else "<textarea></textarea>").val(@val()).css(@css 'display font text-align vertical-align border width height padding vertical-align'.split ' ').css('position', 'absolute').css(opt.css || {}).on('blur', (do(self)->-> (return if off == self.send 'onBeforeEdit', this); self.val self.dataType @val(); @free(); self._edit = null ; self.send "onEdit")).prependTo(this).focus().relative this, 'left top before before'; this
 	
 	type$.all 'edit,arrow,arrow_border'
 	
@@ -2258,8 +2348,8 @@ class CWidget
 	loading: -> !!@loader().request
 
 	# методы конфигурирования виджета
-	conf: (conf) -> if arguments.length then (unless @hasOwnProperty '_conf' then extend c = {}, @_conf || {}; @_conf = c); extend_deep @_conf, conf; @send 'onConf'; this else @_conf
-	cconf: (conf) -> c = @prototype._conf; if arguments.length then extend_deep c, conf; @send 'onConf', 1 ; this else c
+	conf: (conf) -> (unless @hasOwnProperty 'config' then extend c = {}, @config || {}; @config = c); extend_deep @config, conf; @send 'onConf'; this
+	cconf: (conf) -> extend_deep @constructor::config, conf; @send 'onConf', 1 ; this
 
 # класс коллекции
 class CWidgets extends CWidget
@@ -2534,7 +2624,7 @@ class CScrollWidget extends CListWidget
 
 		
 class CSelectableWidget extends CListWidget
-	_conf: {class: {active: 'c-active', select: 'c-select', unactive: 'c-unactive'}}
+	config: {class: {active: 'c-active', select: 'c-select', unactive: 'c-unactive'}}
 	
 	frame_onclick: (e, frame) -> 
 	
@@ -2627,7 +2717,7 @@ class CSortableWidget extends CListWidget
 	
 	
 class CMonthWidget extends CWidget
-	_conf:
+	config:
 		firstWeekDay: 1
 		vertical: 0
 	
@@ -2637,7 +2727,7 @@ class CMonthWidget extends CWidget
 		i18n = CDate.i18n
 		
 		cur = new Date year, month, 1
-		k = 1-cur.getDay()-(conf=@_conf).firstWeekDay*6
+		k = 1-cur.getDay()-(conf=@config).firstWeekDay*6
 		
 		matrix = @tab row: 7, col: 7
 		for td, i in matrix[0] then td.html(i18n.day[i]).addClass 'c-week'
@@ -2662,7 +2752,7 @@ class CMonthWidget extends CWidget
 
 
 class CCalendarWidget extends CFormWidget
-	_conf:
+	config:
 		format: 'yyyy-mm-dd'
 		timeFormat: 'yyyy-mm-dd HH:MM:ss'
 		
@@ -2699,11 +2789,11 @@ class CCalendarWidget extends CFormWidget
 		x.onMonth = x.onYear = (date) -> @_calendar.create date; @free(); off
 		this
 	
-	input: (@_input, format) -> @conf format: format if format; @body().append this.create (if isNaN date = CDate.parse @_conf.format, @_input.val() then new Date() else date); @position @_input, 'bottom', 'right'
+	input: (@_input, format) -> @conf format: format if format; @body().append this.create (if isNaN date = CDate.parse @config.format, @_input.val() then new Date() else date); @position @_input, 'bottom', 'right'
 	timeInput: (@_timeInput, format) -> @conf timeFormat: format if format; @input @_timeInput; @_input = null ; this
 	onDate: (date) ->
-		if @_input then @_input.val(CDate.format @_conf.format, date).send 'onDate', date; @free()
-		if @_timeInput then @free(); @_timeInput.val CDate.format @_conf.timeFormat, date; @wrap("<div cview=clock></div>").input(@_timeInput, @_conf.timeFormat)
+		if @_input then @_input.val(CDate.format @config.format, date).send 'onDate', date; @free()
+		if @_timeInput then @free(); @_timeInput.val CDate.format @config.timeFormat, date; @wrap("<div cview=clock></div>").input(@_timeInput, @config.timeFormat)
 		this
 		
 
@@ -2741,7 +2831,7 @@ class CYearsWidget extends CCalendarWidget
 
 
 class CClockWidget extends CFormWidget
-	_conf:
+	config:
 		format: 'd mon yyyy'
 		timeFormat: 'HH:MM:ss'
 		inputFormat: 'yyyy-mm-dd HH:MM:ss'
@@ -2755,11 +2845,11 @@ class CClockWidget extends CFormWidget
 		@$minsec.tab(0, 6).union(@$minsec.tab(1, 6)).addClass 'c-zero'
 		this
 		
-	clock: (date) -> @$clock.html CDate.format @_conf.timeFormat, date ; this
+	clock: (date) -> @$clock.html CDate.format @config.timeFormat, date ; this
 	date: (date) ->
 		if arguments.length
 			@_date = date
-			@$date.html CDate.format @_conf.format, date
+			@$date.html CDate.format @config.format, date
 			@clock date
 			@hours date.getHours()
 			@min date.getMinutes()
@@ -2774,14 +2864,14 @@ class CClockWidget extends CFormWidget
 	min: (min) -> m = @$minsec.byTag 'tr'; if arguments.length then @setUnit min, m else @getUnit m
 	sec: (sec) -> m = @$minsec.byTagAll('tr').item(1); if arguments.length then @setUnit sec, m else @getUnit m
 		
-	date_onclick: -> @wrap("<table cview=calendar></table>").input(@$date, @_conf.format).create @_date
+	date_onclick: -> @wrap("<table cview=calendar></table>").input(@$date, @config.format).create @_date
 	date_onDate: (date) -> @date date
 	getTarget: (e, w) -> t=e.target(); all = t.union(t.upAll())._all; @wrap all[all.indexOf(w.element)-3]
 	hours_onclick: (e) -> (date=@_date).setHours (t=@getTarget e, @$hours).prevAll().length + t.up().prevAll().length*12 ; @hours date.getHours(); @clock date
 	minsec_onclick: (e) -> t=@getTarget e, @$minsec; unit=(if t.up().prev() then 'sec' else 'min'); m=this[unit](); this[unit] n = (if 6 > n = t.prevAll().length then n * 10 + m % 10 else n - 6 + parseInt(m / 10) * 10); @_date['set'+(if unit=='min' then 'Minutes' else 'Seconds')] n; @clock @_date
 	
-	input: (@_input, date, format) -> @$apply.show(); @conf inputFormat: format if format; @body().append @create (if isNaN date = CDate.parse @_conf.inputFormat, @_input.val() then new Date() else date); @position @_input, 'bottom', 'right'
-	apply_onclick: -> @_input.val(CDate.format @_conf.inputFormat, @_date).send 'onDate'; @free(); off
+	input: (@_input, date, format) -> @$apply.show(); @conf inputFormat: format if format; @body().append @create (if isNaN date = CDate.parse @config.inputFormat, @_input.val() then new Date() else date); @position @_input, 'bottom', 'right'
+	apply_onclick: -> @_input.val(CDate.format @config.inputFormat, @_date).send 'onDate'; @free(); off
 	
 
 class CModalWidget extends CFormWidget
@@ -2830,7 +2920,7 @@ class CCenterModalWidget extends CModalWidget
 	
 class CTooltipWidget extends CWidget
 	
-	_conf: { pos: 'top', scale: 'center', scalex: 'after', scaley: 'mid', height: 10, width: 30, corner: 'mid', focus: 1, mouse: 1 }
+	config: { pos: 'top', scale: 'center', scalex: 'after', scaley: 'mid', height: 10, width: 30, corner: 'mid', focus: 1, mouse: 1 }
 	
 	constructor: (args...) ->
 		super args...
@@ -2843,7 +2933,7 @@ class CTooltipWidget extends CWidget
 	
 	conf: (msg = {}) ->
 		super msg
-		p = @_conf
+		p = @config
 		p.scale = @position.normalize p.pos, p.scale
 		p.corner = @position.normalize p.pos, p.corner
 		if msg.text then @text msg.text
@@ -2861,14 +2951,14 @@ class CTooltipWidget extends CWidget
 
 class CTipWidget extends CTooltipWidget
 	initialize: -> @parent().setHandlers 'mouseenter', 'mouseleave'
-	onmouseenter_parent: (e) -> if @_conf.mouse then @open()
-	onmouseleave_parent: (e) -> if @_conf.mouse then @close()
+	onmouseenter_parent: (e) -> if @config.mouse then @open()
+	onmouseleave_parent: (e) -> if @config.mouse then @close()
 
 	
 class CTipFocusWidget extends CTooltipWidget
 	initialize: -> @parent().setHandlers 'focusin', 'focusout'
-	onfocusin_parent: (e) -> if @_conf.focus then @open()
-	onfocusout_parent: (e) -> if @_conf.focus then @close()
+	onfocusin_parent: (e) -> if @config.focus then @open()
+	onfocusout_parent: (e) -> if @config.focus then @close()
 
 
 class CSelectMenuWidget extends CMenuWidget
