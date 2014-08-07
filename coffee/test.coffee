@@ -725,7 +725,13 @@ new CTest 'obj-CWidget-text', """
 	
 
 new CTest 'obj-CWidget-html', """
-`html [html]` - возвращает или устанавливает текст внутри элемента
+`html [html]` - возвращает или устанавливает html внутри элемента
+""", ->
+	@is $('<div>2</div>').html("<b>3</b>").html(), "<b>3</b>"
+
+
+new CTest 'obj-CWidget-htmlscript', """
+`htmlscript [html]` - устанавливает html внутри элемента и выполняет все теги <script>, без тега type или с type=text/javascript
 """, ->
 	@is $('<div>2</div>').html("<b>3</b>").html(), "<b>3</b>"
 
@@ -762,7 +768,7 @@ new CTest 'obj-CWidget-outer', """
 
 
 new CTest 'obj-CWidget-before', """
-`before content` - вставляет content перед виджетом
+`before content, [timeout], [listen]` - вставляет content перед виджетом
 """, ->
 	@is $("<i><b>1</b><b>2</b></i>").child(1).before("3").up().outer(), "<i><b>1</b>3<b>2</b></i>"
 	@is (new CWidgets [$("<i><b>1</b><b>2</b></i>").child(1).element]).before("3").up().outer(), "<i><b>1</b>3<b>2</b></i>"
@@ -771,7 +777,7 @@ new CTest 'obj-CWidget-before', """
 
 
 new CTest 'obj-CWidget-insertBefore', """
-`insertBefore content` - вставляет виджет перед content-ом
+`insertBefore content, [timeout], [listen]` - вставляет виджет перед content-ом
 """, ->
 	$("<i>2</i>").insertBefore (w=$("<i>1<u>3</u></i>")).down(1)
 	@is w.outer(), "<i>1<i>2</i><u>3</u></i>"
@@ -833,8 +839,6 @@ new CTest 'obj-CWidget-append', """
 	c3 = @w("c3")
 	@w("b1").on "click", -> (if i1.up().name() == 'c1' then c2.append i1, "fast"; c3.append i2, "fast" else c1.append i1.union(i2), "fast"); off
 	
-	
-
 
 new CTest 'obj-CWidget-appendTo', """
 `appendTo content, [timeout], [listen]` - вставляет виджет в конец content-а
@@ -846,20 +850,20 @@ new CTest 'obj-CWidget-appendTo', """
 
 
 new CTest 'obj-CWidget-prepend', """
-`prepend content` - вставляет content в начало виджета
+`prepend content, [timeout], [listen]` - вставляет content в начало виджета
 """, ->
 	@is $("<i>1</i>").prepend("3").outer(), "<i>31</i>"
 
 
 new CTest 'obj-CWidget-prependTo', """
-`prepend content` - вставляет виджет в начало content-а
+`prependTo content, [timeout], [listen]` - вставляет виджет в начало content-а
 """, ->
 	$("<i>1</i>").prependTo w=$("<em>2</em>")
 	@is w.html(), "<i>1</i>2"
 
 
 new CTest 'obj-CWidget-swap', """
-`swap content` - меняет элементы в DOM местами
+`swap content, [timeout], [listen]` - меняет элементы в DOM местами
 """, ->
 	w = $ "<i><b>1</b><u>2</u></i>"
 	w.child(0).swap w.child 1
@@ -1192,12 +1196,12 @@ new CTest 'obj-CWidget-tab$f', """
 	@is $('<div></div>').tab$f(0,0), 0
 	
 new CTest 'obj-CWidget-rawstyle', """
-`rawstyle [selector], [name], [val]` - работает с таблицами стилей. После первого же вызова - кеширует их. Кеш нужно сбрасывать вручную через `rawstyle 0`
+`rawstyle [selector], [val], [before]` - работает с таблицами стилей. После первого же вызова - кеширует их. Кеш нужно сбрасывать вручную через `rawstyle 0`
 
 1. `rawstyle` - возвращает все правила, влияющие на элемент. Правила имеют тип CSSStyleRule
 1. `rawstyle 0` - сбрасывает кэш. Необходим, если таблицы стилей были изменены не через rawstyle или style
 1. `rawstyle selector` - возвращает правила с указанным селектором. Селектор может быть как строкой, так и RegExp - в этом случае возвращает все подходящие под регулярку правила
-1. `rawstyle rule` - удаляет правило
+1. `rawstyle rule` - удаляет правило. rule типа CSSStyleRule
 1. `rawstyle selector, {name1: val1...}|text, [beforeRule|styleSheet]` - добавляет правило перед указанным правилом или в конец указанной страницы стилей. Если же ничего не указано - то в конец специальной страницы, создающейся при первом присваивании
 
 Прим. Если необходимо создать страницу стилей, то воспользуйтесь @wrap('<style></style>').appendTo @head(); stylesheet$ = (s=@document().styleSheets)[s.length-1]
@@ -1229,7 +1233,7 @@ new CTest 'obj-CWidget-rawstyle', """
 
 
 new CTest 'obj-CWidget-style', """
-`style #selector, #name, #val` - пропускает стили через css-эмулятор, чего не делает rawstyle
+`style [selector], [name], [val]` - пропускает стили через css-эмулятор, чего не делает rawstyle
 
 1. `style` - возвращает массив селекторов правил стилей в которых участвует элемент
 2. `style selector, name` - возвращает стиль из первого правила с указанным селектором
@@ -1274,6 +1278,31 @@ new CTest 'obj-CWidget-style', """
 	
 	@is w.style().length, 2
 
+	
+new CTest 'obj-CWidget-rule', """
+`rule selector, [styles]` - возвращает объект со стилями для правил с таким селектором или заменяет их указанными стилями
+
+Если требуется вернуть стили, а правила с таким селектором не существует, то возвращается {}
+
+!important не возвращается
+
+См. #rawstyle, #style
+""", """
+.rule-example { background: red /* hi! */ !important; float: left }
+""", """
+<div id=$name></div>
+""", ->
+	rule = @w().rule '.rule-example'
+	@is rule.background, 'red'
+	@is rule.float, 'left'
+	@ok not('color' of rule)
+	
+	@w().rule '.rule-example', color: 'red'
+	rule = @w().rule '.rule-example'
+	@is rule.background, undefined
+	@is rule.float, undefined
+	@is rule.color, 'red'
+	
 
 new CTest 'obj-CWidget-pseudo', """
 `pseudo pseudoElementOrClass` - возвращает объект для псевдокласса или псевдоэлемента, который можно использовать для работы с [css]
@@ -1493,29 +1522,12 @@ new CTest 'obj-CWidget-toggle', """
 	w=$('<div></div>').toggle()
 	@is 'none', w.element.style['display']
 	w.css 'color', 'red'
-	w.toggle 'color', 'blue', 'green', 'red'
+	w.toggle 'color', ['blue', 'green', 'red']
 	@is 'blue', w.element.style['color']
 	
 
 
-CTest.category "методы атрибутов и свойств"
-
-
-new CTest 'obj-CWidget-toggleClass', """
-`toggleClass [class...]` - переключает класс на следующий в списке параметров. Если следующий параметр null - то класс удаляется
-
-См. #toggle, #toggleAttr, #toggleProp
-""", ->
-	w=$('<input class="on">').toggleClass('on', 'off')
-	@ok w.hasClass('off')
-	@ok !w.hasClass('on')
-	w.toggleClass('on', 'off')
-	@ok !w.hasClass('off')
-	@ok w.hasClass('on')
-	w.toggleClass('on', null, 'off')
-	@ok !w.hasClass('off')
-	@ok !w.hasClass('on')
-	
+CTest.category "методы атрибутов и свойств"	
 
 
 new CTest 'obj-CWidget-attr', """
@@ -1549,21 +1561,7 @@ new CTest 'obj-CWidget-toggleAttr', """
 	@is null, w.toggleAttr().attr('disabled')
 	w.attr 'color', 'red'
 	w.toggleAttr 'color', 'blue', 'green', 'red'
-	@is 'blue', w.attr('color')
-
-	
-new CTest 'obj-CWidget-toggleProp', """
-`toggleProp name, [val...]` - переключает атрибут на его следующее значение в списке параметров. Если список не указан - то используется [null, 'disabled']
-
-См. #toggle, #toggleClass
-""", ->
-	w=$('<input type=checkbox>').toggleProp()
-	@is w.prop('checked'), true
-	@is false, w.toggleProp().prop('checked')
-	w.prop 'color', 'red'
-	w.toggleProp 'color', 'blue', 'green', 'red'
-	@is 'blue', w.prop('color')
-	
+	@is 'blue', w.attr('color')	
 
 new CTest 'obj-CWidget-prop', """
 * `prop name, [val]` - устанавливает, возвращает или удаляет атрибут
@@ -1580,36 +1578,92 @@ new CTest 'obj-CWidget-prop', """
 	w.prop "property", "color"
 	@is "color", w.prop "property"
 
+	
+new CTest 'obj-CWidget-toggleProp', """
+`toggleProp name, [val...]` - переключает атрибут на его следующее значение в списке параметров. Если список не указан - то используется [null, 'disabled']
 
+См. #toggle, #toggleClass
+""", ->
+	w=$('<input type=checkbox>').toggleProp()
+	@is w.prop('checked'), true
+	@is false, w.toggleProp().prop('checked')
+	w.prop 'color', 'red'
+	w.toggleProp 'color', 'blue', 'green', 'red'
+	@is 'blue', w.prop('color')
+
+
+new CTest 'obj-CWidget-addClass', """
+`addClass class, [timeout], [listen]` - добавляет один или несколько классов
+
+См. #toggleClass, #removeClass, #hasClass
+""", """
+<div id=$name></div>
+
+<a href="#" onclick="$(this).prev().toggleClass('test-square', 'fast'); return false">удалить / добавить класс</a>
+""", ->
+	w = $("<div></div>").addClass "c1 c2"
+	@is w.element.className, "c1 c2"
+	w.addClass ["c3", "c1"]
+	@is w.element.className, "c1 c2 c3"
+	self = this
+	@w().addClass "test-square", "fast", -> self.ok @hasClass "test-square"; self.ok not @attr 'style'
+	
+
+new CTest 'obj-CWidget-toggleClass', """
+`toggleClass classes, [timeout], [listen]` - переключает класс на следующий в списке classes. Если следующий параметр null - то класс удаляется
+
+См. #toggle, #toggleAttr, #toggleProp
+""", """
+<div id=$name></div>
+
+<a href="#" onclick="$(this).prev().toggleClass('test-square', 'fast'); return false">удалить / добавить класс</a>
+""", ->
+	@count 8
+	w=$('<input class="on">').toggleClass('on off')
+	@ok w.hasClass('off')
+	@ok !w.hasClass('on')
+	w.toggleClass(['on', 'off'])
+	@ok !w.hasClass('off')
+	@ok w.hasClass('on')
+	w.toggleClass(['on', null, 'off'])
+	@ok !w.hasClass('off')
+	@ok !w.hasClass('on')
+	self = this
+	@w().toggleClass "test-square", "fast", -> self.ok @hasClass "test-square"; self.ok not @attr 'style'
+
+	
 new CTest 'obj-CWidget-show', """
 `show [timeout], [listen]` - показывает элемент, устанавливая его свойство css _display_ в !''
 """, """
-<div class=square onclick="$(this).toggle('fast')"></div>
+<div class=test-square>тест show / hide</div>
+<a id=$name href="#" onclick="p=$(this).prev(); if(p.element.style.display == 'none') p.show('fast'); else p.hide('fast'); return false">скрыть / показать</a>
 """, ->
 	@is $('<div style="display: none"></div>').show().css('display'), ''
-	
 
 
 new CTest 'obj-CWidget-hide', """
-`show` - скрывает элемент, устанавливая его свойство css _display_ в !'none'
+`hide [timeout], [listen]` - скрывает элемент, устанавливая его свойство css _display_ в !'none'
 """, ->
 	@is $('<div></div>').hide().css('display'), 'none'
 
 
 new CTest 'obj-CWidget-vid', """
-`vid` - показывает элемент, устанавливая его свойство css _visibility_ в ''
+`vid [timeout], [listen]` - показывает элемент, устанавливая его свойство css _visibility_ в ''
+""", """
+<div class=test-square>тест vid / novid</div>
+<a id=$name href="#" onclick="p=$(this).prev(); if(p.element.style.visibility == 'hidden') p.vid('fast'); else p.novid('fast'); return false">скрыть / показать</a>
 """, ->
 	@is $('<div style="visibility: hidden"></div>').vid().css('visibility'), ''
 
 
 new CTest 'obj-CWidget-novid', """
-`novid` - скрывает элемент, устанавливая его свойство css _visibility в !'hidden'
+`novid [timeout], [listen]` - скрывает элемент, устанавливая его свойство css _visibility в !'hidden'
 """, ->
 	@is $('<div></div>').novid().css('visibility'), 'hidden'
 
 
 new CTest 'obj-CWidget-toggleVid', """
-`toggleVid` - меняет visibility элемента, устанавливая его свойство css _visibility в !'hidden'
+`toggleVid [timeout], [listen]` - меняет visibility элемента, устанавливая его свойство css _visibility в !'hidden'
 """, ->
 	@is $('<div></div>').toggleVid().css('visibility'), 'hidden'
 	@is $('<div style="visibility:hidden"></div>').toggleVid().css('visibility'), ''
@@ -1872,7 +1926,7 @@ new CTest 'obj-CWidget-animate', """
 значения 'param' должны быть в формате:
 [+=|-=] значение_css [in|out|io] [функция]
 
-- значение_css - конечное значение, если не указаны +=|-=, иначе - значение на которое увеличится текущее
+- значение_css - конечное значение, если не указаны +=|-=, иначе - значение на которое увеличится текущее. Может быть: цветом
 - in - #CMath.easeIn - ничего не делает
 - out - #CMath.easeOut - искажает функцию так, что она выполняется как бы с конца
 - io - #CMath.easeInOut
@@ -1921,6 +1975,7 @@ new CTest 'obj-CWidget-morph', """
 `morph param` - анимирует виджет. В отличие от #animate принимает набор параметров
 
 Параметры:
+- effect - название эффекта из CEffect - расширяет им параметры
 - from - начальные значения для анимации
 - to - конечные значения для анимации
 - timeout - время отпущенное на анимацию в миллисекундах или строка fast=600, slow=200, norm=400 или объект. В последнем случае параметры будут расширены этим объектом
@@ -2189,11 +2244,11 @@ edit opt - делает элемент редактируемым (на само
 """, """
 <div id="$name" class=test-square></div>
 """, ->
-	@count 3
+	@count 2
 	w=@w().edit()
 	w.onBeforeEdit = (edit) => edit.val "123"; @ok CRoot.contains edit
-	w.onEdit = (edit) => @is w.val(), "123"; @ok not CRoot.contains edit
-	w.fire "blur"
+	w.onEdit = => @is w.val(), "123"
+	$("<input>").appendTo(/body/).focus().free()
 	
 
 	
@@ -2879,3 +2934,6 @@ new CTest 'obj-CModalWidget-show', """
 	""", ->
 
 ###
+
+
+do CTest.main_loop

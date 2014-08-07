@@ -49,10 +49,13 @@ function CTest(name, manual, css, html, fn) {
 	CTest.is_test[name] = this
 	
 	CTest.res_queue.push(this)
-	if(CTest.res_queue.length == 1) CTest.interval = setInterval(CTest.runtime, 0);
 }
 
 
+CTest.main_loop = function() {
+	CTest.interval = setInterval(CTest.runtime, 0)
+	CTest.runtime()
+}
 CTest.runtime = function() {
 	for(;;) {
 		var x = CTest.res_queue.splice(0, 1)
