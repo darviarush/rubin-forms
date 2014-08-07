@@ -324,6 +324,9 @@ CParam =
 	add: (url, param) -> url + (if /\?/.test url then "&" else "?") + CParam.to param
 	to: (param) -> if param instanceof Object then ([escape(key), escape(if val instanceof Object then toJSON val else String(val))].join("=") for key, val of param when val?).join "&" else param
 	from: (param) -> x={}; (for i in param.split("&") then a=i.match /// ([^=]+)=?(.*) ///; x[a[1]]=unescape a[2]); x
+	
+CNorm =
+	toArray: (names) -> if names instanceof Array then names else String(names).split /\s+/
 
 CDate =
 	i18n:
@@ -960,6 +963,7 @@ CEffect =
 		css: {overflow: 'hidden'}
 		to: {width: 0, height: 0, 'font-size': 0}
 		endcss: { display: 'none' }
+		
 
 
 CListen =
@@ -1797,6 +1801,19 @@ class CWidget
 		else ex_style$.setCss name, val, important
 		this
 		
+	rule: (selector, styles) ->
+		s = @rawstyle selector
+		if arguments.length==2 then @rawstyle selector, styles, s[0]; (for r in s then @rawstyle r); this
+		else
+			res = {}
+			for r in s
+				ex_style$ = new_pseudo_element$ this, r
+				r = r.cssText.replace(/// /\* .*? \*/ ///g, ' ').replace /// ^[^\{\}]+ \{ (.*) \} $ ///, "$1"
+				for i in r.split /;/ when m = i.match ///^\s* ([^:]+?) \s*: ///
+					name = m[1].replace ///^(?:webkit|moz|khtml|ms|O|Apple|icab|epub|wap|Xv|Prince|ro)-///i, ''
+					res[name] = ex_style$.getCss name
+			res
+		
 	
 	# методы стилей (свойства css)
 	isCase$ = typeof div$.style['background-color'] == 'string'
@@ -1926,13 +1943,17 @@ class CWidget
 	pc: (key) -> @px(key) / pc$
 	in: (key) -> @px(key) / in$
 	
+	pxvector: (val, percent_val, ci='px') -> (if /^[a-z]/i.test val then val = @getCss val); for v in val.split /\s+/ then @[ci] v, percent_val
 	
 	#cssText: (text) -> if arguments.length then @element.style.cssText = text else @element.style.cssText
 	
-	toggle: (name, args...) ->	# переключает css-стили
+	toggle$ = (args, s) -> args[if (i=args.indexOf s) != -1 then (i+1) % args.length else 0]
+	
+	toggle: (name, args) ->	# переключает css-стили
+		args = CNorm.toArray args
 		unless arguments.length then name = 'display'; args = ['none', '']
 		else if args.length == 1 then args.push ''
-		@setCss name, args[if (i=args.indexOf @getCss name) != -1 then (i+1) % args.length else 0]
+		@setCss name, toggle$ args, @getCss name
 	
 	type$.all 'setCss'
 	
@@ -1944,24 +1965,54 @@ class CWidget
 	toggleAttr: (name, args...) ->
 		unless arguments.length then name = 'disabled'; args = [null, 'disabled']
 		else if args.length == 1 then args.push null
-		@attr name, args[if (i=args.indexOf @attr name) != -1 then (i+1) % args.length else 0]
+		@attr name, toggle$ args, @attr name
 
 	toggleProp: (name, args...) ->
 		unless arguments.length then name = 'checked'; args = [true, false]
 		else if args.length == 1 then args.push null
-		@prop name, args[if (i=args.indexOf @prop name) != -1 then (i+1) % args.length else 0]
+		@prop name, toggle$ args, @prop name
 	
 	#classList = window.classList
+	get_rules_by_class$ = (names) ->
+		to = {}
+		for s in @style() when new RegExp('(?:^|[\\s\\.#,])(?:'+names.join("|")+')(?:[\\s:\\.#,]|$)').test s then extend to, @rule s
+		to
 	
-	hasClass: (names...) -> cls=@element.className; (for name in names when not new RegExp('(^|\\s)'+name+'(\\s|$)').test cls then return off); on
-	addClass: (names...) -> (for name in names then @element.className += (if @element.className == '' then name else unless new RegExp('(^|\\s)'+name+'(\\s|$)').test @element.className then ' ' + name else '')); this
-	removeClass: (names...) ->
-		cls = @element.className
-		for name in names then cls = cls.replace new RegExp('(^|\\s+)'+name+'(\\s+|$)'), (a, b, c) ->
-			if b and c then ' ' else ''
-		if cls then @element.className = cls else @attr "class", null
+	hasClass: (name) -> new RegExp('(^|\\s)'+name+'(\\s|$)').test @element.className
+	addClass: (names, timeout, listen) ->
+		names = CNorm.toArray names
+		if timeout?
+			@addClass names = (name for name in names when not @hasClass name)
+			to = get_rules_by_class$.call this, names
+			@removeClass names
+			@morph save: 1, to: to, end1: listen, timeout: timeout, end: do(names)->-> @addClass names
+		else (for name in names then @element.className += (if @element.className == '' then name else unless new RegExp('(^|\\s)'+name+'(\\s|$)').test @element.className then ' ' + name else ''))
 		this
-	toggleClass: (names...) -> x=names[0]; (for name in names when @hasClass name then @removeClass name; (return unless (x=names[(1+names.indexOf name) % names.length])?); break); @addClass x; this
+	removeClass: (names, timeout, listen) ->
+		names = CNorm.toArray names
+		if timeout?
+			from = get_rules_by_class$.call this, names
+			@removeClass names
+			@morph save: 1, from: from, timeout: timeout, end: listen
+		else
+			cls = @element.className
+			for name in names then cls = cls.replace new RegExp('(^|\\s+)'+name+'(\\s+|$)'), (a, b, c) ->
+				if b and c then ' ' else ''
+			if cls then @element.className = cls else @attr "class", null
+		this
+	toggleClass: (names, timeout, listen) ->
+		names = CNorm.toArray names
+		if names.length == 1 then names.push null
+		idx = 1
+		for name, i in names when @hasClass name then idx = i; break
+		name = names[idx]
+		new_name = toggle$ names, name
+		if timeout?
+			if name then from = get_rules_by_class$.call this, [name]; @removeClass name else from = {}
+			if new_name then @addClass new_name; to = get_rules_by_class$.call this, [new_name]; @removeClass new_name else to = {}
+			@morph save: 1, from: from, to: to, timeout: timeout, end1: listen, end: (if new_name then do(new_name)->-> @addClass new_name)
+		else @removeClass name if name; @addClass new_name if new_name
+		this
 
 	show: (timeout, listen) ->
 		if timeout? then @morph effect: 'show', timeout: timeout, end: listen
@@ -2006,7 +2057,6 @@ class CWidget
 		###
 
 	type$.all 'toggle, toggleAttr, toggleProp, removeClass, addClass, hide, show, vid, novid, toggleVid'
-	'hasClass'
 	
 	# методы расположения на экране
 	vscroll: (v) ->
@@ -2137,12 +2187,14 @@ class CWidget
 	#http://dev.1c-bitrix.ru/api_help/main/js_lib/animation/easing_prototype_animateprogress.php
 	# width: '[+=|-=]10[em] [[in|io] fn]'
 	
-	speeds$ = slow: 200, fast: 600, norm: 400
-	default_timeout$ = 400
-	default_fps$ = 1000 / 13
+	#class CAnimate
+	#	constructor: (@param) ->
+	#	compile: ->
+	
 	
 	animate$ = ->
 		anim = @_animqueue[0]
+		if anim.this_param then @_animqueue[0] = anim = anim.call this ; next_animate$.call this 
 		unless anim.start
 			anim.start = start = {}
 			for k, ci of anim.stubs then start[k] = this[ci] k
@@ -2155,9 +2207,15 @@ class CWidget
 		else
 			anim.call this, anim.start, anim.i / anim.timeout, anim.progress
 			anim.i += anim.step
-			
-	next_animate$ = -> @clear animate$; (if @_animqueue.length then @interval @_animqueue[0].step, animate$); this
+	
+	next_animate$ = -> @clear animate$; (if @_animqueue.length then @interval @_animqueue[0].step || 0, animate$); this
+	
+	anim_css_set$ = (key, val) -> #(if /// ^border ///.test key then say 'anim set', key, val; @setCss key, val else say 'anim:', key, val); this
+	
 	mod$ = in: 'easeIn', out: 'easeOut', io: 'easeInOut'
+	speeds$ = slow: 200, fast: 600, norm: 400
+	default_timeout$ = 400
+	default_fps$ = 1000 / 13
 	
 	animation: (param, timeout, fps, listen, progress) ->
 		if typeof timeout == 'function' then listen = timeout; progress = fps; timeout = fps = null
@@ -2170,37 +2228,56 @@ class CWidget
 		
 		for key, v of param
 			k = escapeString key
-			[a, step, to, ci, val, mod, formula] = String(v).match /// ( [+-]= )? \s* (?: (-?(?:\d*\.)?\d+(?:[Ee][+-]\d+)?) ([a-z%]+)? | ([a-zA-Z#]\w* (?:\( [^\(\)]+ \))? ) ) (?:\s+ (?:(in|out|io)\s+)? (\w+))? $///
-			color = 0
+			unless s = String(v).match ///^ ( [+-]= )? \s* 
+				(?: ( -?(?:\d*\.)?\d+(?:[Ee][+-]\d+)? (?:[a-z%]+)? (?: \s+ -?(?:\d*\.)?\d+(?:[Ee][+-]\d+)? (?:[a-z%]+)? ) {0,3} )
+				| ( [a-zA-Z#]\w* (?:\( [^\(\)]+ \))? ) )
+				(?:\s+ (?:(in|out|io)\s+)? (\w+))? $/// then anim_css_set$.call this, key, v; continue
+			[a, step, to, color, mod, formula] = s
 			px = undefined
-			unless ci
-				if @hasCss key, '1px' then ci = px = 'px'
-				else if @hasCss key, '#fff' then color = 1 ; (if px = v.match /// ^([a-z]+) \( ///i then px = px[1] else unless px then px = 'rgba' else if px[px.length-1] != 'a' then px+='a')
-				else px = 'px'
-			else px = ci
+			
+			if to
+				to1 = to.split /\s+/
+				if to1.length == 1 and (v1 = @getCss(key).split /\s+/).length > 1 then to1 = [x=to1[0], x, x, x]
+				if to1.length > 1 then to = []; ci = []; (for t, i in to1 then m = t.match ///^(.*?)([a-z%]+)$///; to[i]=m[1]; ci[i]=m[2]); px = 'pxvector'
+				else
+					if ci = to.match ///[a-z%]+$/// then px = ci = ci[0]; to = to.slice 0, to.length-ci.length
+					else if @hasCss key, '1px' then ci = px = 'px'
+					else anim_css_set$.call this, key, v; continue
+			else
+				to = color
+				color = undefined
+				if v == 'toggle' then to = @_animprev.start[key]; px = @_animprev.stubs[key]; (if px == 'rgba' or px == 'hsla' then color = 1)
+				else if @hasCss key, '#fff' then color = 1 ; (if px = to.match /// ^([a-z]+) \( ///i then px = px[1]; (if px.length == 3 then px+='a') else px = 'rgba')
+				else anim_css_set$.call this, key, v; continue
 
-			if v == 'toggle' then to = @_animprev.start[key]; px = @_animprev.stubs[key]
-			else if val then to = wdiv$.setCss(key, val)[px] key
+			#to = wdiv$.setCss(key, val)[px] key
 			
 			formula = if mod then 'CMath.'+mod$[mod]+'(CMath.'+formula+', k)' else if formula then 'CMath.'+formula+'(k)' else 'k'
 			
 			if color
+				to = wdiv$.setCss(key, to)[px] key
 				Px = px.ucFirst()
 				To = 'to'+Px
 				if step then abs = Math.abs; c = @rgba(key)[To](); x = to[To](); to = (if step == '+=' then new CColor c[0]+x[0], c[1]+x[1], c[2]+x[2], c[3]+x[3]  else new CColor abs(c[0]-x[0]), abs(c[1]-x[1]), abs(c[2]-x[2]), abs(c[3]-x[3]))
 				F = if formula == 'k' then 'k' else formula="(f=#{formula})"; 'f'
 				formula = 'CColor.from'+Px+'((x=start['+k+'].'+To+'())[0]+((c=['+to[To]()+'])[0]-x[0])*' + formula + ', x[1]+(c[1]-x[1])*'+F+', x[2]+(c[2]-x[2])*'+F+', x[3]+(c[3]-x[3])*'+F+')'
+			else if px == 'pxvector'
+				f = []
+				for t, i in to
+					if step then r=@pxvector key; to[i] = r[i] - (if step == '+=' then -t else t)
+					f.push (if i==0 then '(x=start['+k+'])' else 'x')+'['+i+']+('+t+'-x)*'+formula+"+'"+ci[i]+"'"
+				formula = ["[", f.join(", "), "].join(' ')"].join ""
 			else
 				if step then to = this[px](key) - (if step == '+=' then -to else to)
 				formula = '(x=start['+k+'])+('+to+'-x)*'+formula+(if ci then "+'"+ci+"'" else '')
 
 			fn.push 'this.setCss('+k+', '+formula+')'
 			stubs[key] = px
-		fn.splice 0, 0, 'fn=function anim$(start, k'+(if progress then ', progress' else '')+'){\nvar x,c,f'
-		if typeof progress == 'function' then fn.push 'progress.apply(this, arguments)' else if progress then fn.push 'this.send(progress, start, k, progress)'
+		fn.splice 0, 0, 'fn=function anim$(start, k){\nvar x,c,f' + if progress then ', e = arguments.callee' else ''
+		if typeof progress == 'function' then fn.push 'e.progress.call(this, k, e)' else if progress then fn.push 'this.send(e.progress, k, e)'
 		fn.push '}'
-		eval fn.join '\n'
-		
+		code = fn.join '\n'
+		eval code
 		extend fn, stubs: stubs, i: 0, fps: fps, step: 1000 / fps, timeout: timeout, listen: listen, progress: progress
 		
 	animate: (param, timeout, fps, listen, progress) ->
@@ -2213,7 +2290,8 @@ class CWidget
 		else
 			anim = if typeof param == 'function' then param else @animation param, timeout, fps, listen, progress
 			unless @_animqueue then @_animqueue = [anim] else @_animqueue.push anim
-			if @_animqueue.length == 1 then @interval anim.step, animate$
+			next_animate$.call this
+			animate$.call this
 		this
 		
 	morph: (param) ->
@@ -2221,30 +2299,31 @@ class CWidget
 		if typeof param.timeout == 'object' then extend param, param.timeout; (delete param.timeout if typeof param.timeout == 'object')
 		if 'effect' of param then extend_deep_uniq param, CEffect[param.effect]
 		
-		from = param.from || {}
-		to = param.to || {}
+		anim = do(param)->->
+			from = param.from || {}
+			to = param.to || {}
+			
+			save = if param.save? then (if param.save == 1 then (x=Object.keys(from)).push Object.keys(to)...; x else param.save) else []
+			if param.css? then save.push Object.keys(param.css)...
+			save = if save.length then @saveCss save else {}
+			@css param.css if param.css?
 		
-		save = if param.save? then (if param.save == 1 then (x=Object.keys(from)).push Object.keys(to)...; x else param.save) else []
-		if param.css? then save.push Object.keys(param.css)...
-		save = if save.length then @saveCss save else {}
-		@css param.css if param.css?
+			@send param.begin
+			
+			for i of from then (unless i of to then to[i] = @getCss i)
+			for i of to then (unless i of from then from[i] = @getCss i)
+			@css param.begincss if param.begincss?
+			@css from
 		
-		@send param.begin
-		
-		for i of from then (unless i of to then to[i] = @getCss i)
-		for i of to then (unless i of from then from[i] = @getCss i)
-		@css param.begincss if param.begincss?
-		@css from
-		
-		listen = do(param, save)->-> @css save; (@css param.endcss if param.endcss?); @send param.end, param; @send param.end1, param
-		anim = @animation to, param.timeout, param.fps, listen, param.progress
-		anim.param = param
-		anim.from = from
-		anim.to = to
+			listen = do(param, save)->-> @css save; (@css param.endcss if param.endcss?); @send param.end, param; @send param.end1, param
+			anim = @animation to, param.timeout, param.fps, listen, param.progress
+			anim.param = param
+			anim.to = to
+			anim.from = from
+			anim
+		anim.this_param = 1
 		@animate anim
-		
-		
-	#slideUp: (timeout) ->
+
 	
 	type$.all 'timeout,interval,clear,animate'
 
