@@ -2244,11 +2244,14 @@ edit opt - делает элемент редактируемым (на само
 """, """
 <div id="$name" class=test-square></div>
 """, ->
-	@count 2
-	w=@w().edit()
+	@count 3
+	w=@w()
 	w.onBeforeEdit = (edit) => edit.val "123"; @ok CRoot.contains edit
 	w.onEdit = => @is w.val(), "123"
-	$("<input>").appendTo(/body/).focus().free()
+	w.edit()
+	@is w._edit.hasFocus(), true
+	w.append("<input>").last().focus()
+	
 	
 
 	
@@ -2473,8 +2476,12 @@ new CTest 'key-CTemplate-compile', """
 			</div>
 			#val2
 		</div>
-	""")
+	""", templates = {})
 	html = fn val1: 'val-1', val2: 'val-2', ls: [{val1: 'val-1-0', val2: 'val-2-0', ls: []}, {val1: 'val-1-1', val2: 'val-2-1', ls: [val1: 'val-1-ls-0']}], 'id-test'
+	
+	@instanceof templates["@"], Function
+	@instanceof templates["ls"]["@"], Function
+	@instanceof templates["ls"]["ls"]["@"], Function
 	
 	@like html, /val-1/
 	@like html, /val-2/
