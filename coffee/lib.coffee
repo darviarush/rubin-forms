@@ -808,15 +808,13 @@ class CIoLoadRepository extends CIoRepository
 	
 CTemplate =
 
-	compile: (i_html) ->
+	compile: (i_html, templates, query) ->
 
 		code_begin = """function(dataset, id1) {
-	var res = [], number_id = dataset instanceof Array
-	if(!number_id) dataset = [dataset]
+	var res = []
 	for(var i=0, n=dataset.length; i<n; i++) {
-		var id, data = dataset[i]
-		if(number_id) { id=id1+'-'+i; data['_NUMBER']=i; data['_NUMBER1']=i+1 }
-		else id=id1
+		var id = id1+'-'+i, data = dataset[i]
+		data['_NUMBER']=i; data['_NUMBER1']=i+1
 		res.push('"""
 		
 		code_end = """')
@@ -825,6 +823,9 @@ CTemplate =
 	return html
 }"""
 
+		code_begin1 = "function(data, id) { return ['"
+		code_end1 = '\'].join("") }'
+
 		tags =
 			th: ///^(?:tr|table|tbody|tfoot|thead)$///
 			td: ///^(?:tr|table|tbody|tfoot|thead)$///
@@ -832,14 +833,17 @@ CTemplate =
 			option: ///^select$///
 			li: ///^(?:ol|ul)$///
 
-
+		path_temp = [["", templates ||= {}]]
+		query = []
+			
 		T = []; html = []; pos = 0 ; s = i_html
 		pop = ->
 			tag = T.pop()
 			if tag.length > 2
-				[name, begin, ret, cinit, idx] = tag
+				[name, begin, ret, type, cinit, idx] = tag
 				if cinit then html[idx] += ["<!--", i_html.slice(begin, pos).replace(/!/g, '!!').replace(/-->/g, '--!>'), "-->"].join ""
-				html.push [code_end, ")(data", (if ret then "['#{ret}']" else ""), ", id", (if ret then "+'-#{ret}'" else ""), "), '"].join ""
+				html.push [(if type then code_end else code_end1), ")(data", (if ret then "['#{ret}']" else ""), ", id", (if ret then "+'-#{ret}'" else ""), "), '"].join ""
+				path_temp.pop()
 			tag[0]
 		
 		while 1
@@ -851,7 +855,11 @@ CTemplate =
 					pop() while T.length and not re.test T[T.length-1][0] 
 				html.push m[0]
 			else if m = s.match ///^>///
-				if t then t = [open_tag, pos+1, t[0], ///\bcinit\b///i.test(i_html.slice open_pos, pos), html.length]; html.push ">", "', (" + code_begin
+				if t
+					t = [open_tag, pos+1, name=t[0], type=t[1], ///\bcinit\b///i.test(i_html.slice open_pos, pos), html.length]
+					path=path_temp[path_temp.length-1]
+					html.push ">", "', (templates"+path[0]+"['#{name}']['@']=" + (if type then code_begin else code_begin1)
+					path_temp.push [path[0]+"['"+name+"']", path[1][name] = {}]
 				else t = [open_tag]; html.push ">"
 				T.push t; t = open_tag = undefined
 			else if m = s.match ///^</(\w+)\s*>/// then tag = m[1]; (while T.length and pop() != tag then null); html.push m[0]
@@ -889,7 +897,7 @@ CTemplate =
 					html.push ", '" + (if open_span then "</span>" else "")
 					continue
 
-			else if open_tag and m = s.match ///^\$\*(\w+)?/// then t = [m[1]]; html.push "', id, '" + (if m[1] then "-" + m[1] else "")
+			else if open_tag and m = s.match ///^\$([*+])(\w+)?/// then t = [m[2], m[1]=='*']; html.push "', id, '" + (if m[2] then "-" + m[2] else "")
 			else if m = s.match ///^[\\']/// then html.push "\\"+m[0]
 			else if m = s.match ///^\n/// then html.push "\\n"
 			else if m = s.match ///^\r/// then html.push "\\r"
@@ -900,9 +908,9 @@ CTemplate =
 			pos += len
 			
 		pop() while T.length
-	
-		html.unshift "fn=function(data, id) { return ['"
-		html.push '\'].join("") }'
+		
+		html.unshift "fn=templates['@']=", code_begin1
+		html.push code_end1
 		code = html.join ""
 		fn = null
 		eval code
@@ -963,6 +971,10 @@ CEffect =
 		css: {overflow: 'hidden'}
 		to: {width: 0, height: 0, 'font-size': 0}
 		endcss: { display: 'none' }
+	slideUp:
+		save: 1
+		css: {overflow: 'hidden'}
+		from: {height: 0}
 		
 
 
@@ -1298,6 +1310,7 @@ class CWidget
 		ret
 	
 	on: (type, listen) -> (if typeof type == 'object' then (for k of type then @setHandlers k; @['on'+k] = type[k]) else @setHandlers type; @['on'+type] = listen); this
+	off: (type) -> (for k in (if typeof type == 'object' then type else [type]) then @attr "on"+k, null); this
 	
 	# export_handlers = {'name-name-name': types}
 	defineHandlers: ->
@@ -2628,11 +2641,12 @@ class CFormWidget extends CWidget
 
 class CTemplateWidget extends CFormWidget
 	initialize: ->
-		if @attr('cinit')?
-			html = (if (d=down(0))?.element.nodeType == 8 then d else down 1).html().replace ///!(!)|!///g, "$1"
+		if t=@parent()?._templates then @_templates = t[@name()]; @_template = @_templates["@"]
 		else
-			html = @html()
-		@_template = CTemplate.compile html
+			if @attr('cinit')?
+				html = (if (d=down(0))?.element.nodeType == 8 then d else down 1).html().replace ///!(!)|!///g, "$1"
+			else html = @html()
+			@_template = CTemplate.compile html, @_templates = {}, @_query = {}
 		this
 	
 	clone: -> super.addClass "c-novid"
@@ -2645,7 +2659,7 @@ class CTemplateWidget extends CFormWidget
 			do @setValid
 		else @param()
 		
-	buildQuery: -> q = extend {}, @_query; q
+	buildQuery: -> extend {}, @_query
 		
 		
 		
