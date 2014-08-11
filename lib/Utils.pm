@@ -530,18 +530,18 @@ sub TemplateStr {
 	
 	my $code_begin = 'sub {
 	my ($dataset, $id1) = @_;
-	my ($number_id, @res) = ref($dataset) eq "ARRAY";
-	$dataset = [$dataset] unless $number_id;
 	for(my $i=0; $i<@$dataset; $i++) {
-		my ($data, $id) = $dataset->[$i];
-		if($number_id) { $id="$id1-$i"; $data->{"_NUMBER"}=$i; $data->{"_NUMBER1"}=$i+1; }
-		else { $id=$id1 }
+		my ($data, $id) = ($dataset->[$i], "$id1-$i");
+		$data->{"_NUMBER"}=$i; $data->{"_NUMBER1"}=$i+1;
 		push @res, \'';
 	
 	my $code_end = '\';
 	}
 	return join "", @res;
 }';
+
+	my $code_begin1 = 'sub { my ($data, $id) = @_; return join "", \'';
+	my $code_end1 = '\' }';
 
 	my %tags = (
 		th => qr/^(?:tr|table|tbody|tfoot|thead)$/,
@@ -560,9 +560,10 @@ sub TemplateStr {
 		my $tag = pop @T;
 		if(@$tag > 2) {
 			local ($&, $`, $');
-			my ($name, $begin, $ret, $cinit, $idx) = @$tag;
+			my ($name, $begin, $ret, $type, $cinit, $idx) = @$tag;
 			if($cinit) { my $x = substr $_, $begin, $pos-$begin; $x=~s/!/!!/g; $x=~s/-->/--!>/g; $html[$idx] .= "<!--$x-->" }
-			push @html, "$code_end)->(\$data".($ret? "->{'$ret'}": "").", \$id".($ret? ".'-$ret'": "")."), '";
+			push @html, ($type? $code_end: $code_end1) . ")->(\$data".($ret? "->{'$ret'}": "").", \$id".($ret? ".'-$ret'": "")."), '";
+			print STDERR "$name, $begin, $ret, $type, $cinit, $idx `" . $html[$#html] . "`\n";
 		}
 		$tag->[0];
 	};
@@ -573,10 +574,10 @@ sub TemplateStr {
 
 		push @html,
 		m!\G<(\w+)!? do { $open_tag = $1; if(my $re = $tags{lc $open_tag}) { $pop->() while @T and $T[$#T]->[0] !~ $re; } $& }:
-		m!\G>!? do { my @ret; if($T) { local($&, $`, $'); $T = [$open_tag, $pos+1, $T->[0], $m=/\bcinit[^<]*\G/i, scalar @html]; @ret=(">", "', ($code_begin") } else { $T = [$open_tag]; @ret = ">" } push @T, $T; $T = $open_tag = undef; @ret }:
+		m!\G>!? do { my (@ret, $type); if($T) { local($&, $`, $'); $T = [$open_tag, $pos+1, $T->[0], $type=$T->[1], $m=/\bcinit[^<]*\G/i, scalar @html]; @ret=(">", "', (" . ($type? $code_begin: $code_begin1)) } else { $T = [$open_tag]; @ret = ">" } push @T, $T; $T = $open_tag = undef; @ret }:
 		m!\G</(\w+)\s*>!? do { my ($tag) = ($1); while(@T and $pop->() ne $tag) {}; $& }:
-		m!\G\$\+!? do { "', \$id, '" }:
 		m!\G\$-(\w+)!? do { "', \$id, '-$1" }:
+		m!\G\$\+!? do { "', \$id, '" }:
 		m!\G(?:\$|(#))(\{\s*)?(\w+)!? do {
 			my $open_span = $1;
 			if($open_span && $open_tag) { $& }
@@ -609,7 +610,7 @@ sub TemplateStr {
 				next;
 			}
 		}:
-		$open_tag && m!\G\$\*(\w+)?!? do { $T = [$1]; "', \$id, '".($1? "-$1": "") }:
+		$open_tag && m!\G\$([+*])(\w+)?!? do { $T = [$2, $1 eq "*"]; "', \$id, '".($2? "-$2": "") }:
 		m!\G[\\']!? "\\$&":
 		m!\G.!s? $&:
 		last;
@@ -619,7 +620,7 @@ sub TemplateStr {
 
 	$pop->() while @T;
 	
-	my $x = join "", 'sub { my ($data, $id) = @_; return join "", \'', @html, '\' }';
+	my $x = join "", $code_begin1, @html, $code_end1;
 	#our $rem++;
 	#Utils::write("$rem.pl", $x);
 	$x
