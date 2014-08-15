@@ -42,3 +42,21 @@ valid_param "view", "main", {'v1'=>1, 'v2'=>1};
 valid_param "view", 'main', {'v1'=>12, 'v2'=>10};
 eval { valid_param "view", 'main', {'v1'=>12, 'v2'=>'xxx'} };
 ok $@;
+
+
+Utils::Template('
+<div id=$+>
+	<div id=$*names>
+		#v1 $v2
+	</div>
+</div>
+
+<div id=$*logo>
+#name
+</div>
+', $form);
+
+warn Dumper($form);
+$query = page_query($form, 'lir');
+warn Dumper($query);
+

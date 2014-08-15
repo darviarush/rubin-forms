@@ -5,6 +5,9 @@ use Data::Dumper;
 # создаёт множество
 sub set { map { $_=>1 } @_ }
 
+# удаляет дубликаты
+sub unique { my %x; map { if(exists $x{$_}) { () } else { $x{$_} = 1; $_ } } @_ }
+
 # разбирает построчный файл. Возвращает массив. Начальные и конечные пробельные символы удаляются
 sub parse_vector {
 	my ($path) = @_;
@@ -397,6 +400,9 @@ sub escapejs {
 # возвращает строку javascript
 sub stringjs { '"'.escapejs($_[0]).'"' }
 
+# парсит из строки
+sub unstring { my ($x, $package) = @_; if($x=~/^["']/) { $x = substr $x, 1, -1; $x=~s/\\([\\'"nrtv])/my $x=$1; $x=~tr!nrtv!\n\r\t\v!; $x/ge; } elsif($x=~/^\$/) { $x = ${"$package$'"} } $x }
+
 # понятно
 sub camelcase {
 	my $s = ucfirst $_[0];
@@ -525,8 +531,16 @@ sub to_rows ($) {
 }
 
 
+# парсит 
+sub parse_frames {
+	my ($param) = @_;
+	map { /=/; $` => $' } split /,/, $param;
+}
+
 # темплейт, аналогичный из js-библиотеки CTemplate::compile. Возвращает текст функции
 sub TemplateStr {
+	
+	my $RE_TYPE = qr/("(?:\\"|[^"]*)"|'(?:\\'|[^'])*'|-?\d+(?:\.\d+)?(?:E[+-]\d+)?)/;
 	
 	my $code_begin = 'sub {
 	my ($dataset, $id1) = @_;
@@ -551,19 +565,24 @@ sub TemplateStr {
 		li => qr/^(?:ol|ul)$/,
 	);
 
+	my $forms = {};	# fields=> {}, lists=> {}, forms=> {}
+	
 	local ($_, $&, $`, $', $1, $2, $3, $4, $5);
 	($_) = @_;
 	
-	my ($orig, $pos, $open_tag, @html, @T) = $_;
+	my ($orig, $pos, $open_tag, $open_id, @html, @T, $form) = $_;
+	my $page = $form = {};
 	
-	my $pop = sub {
+	my $pop = sub {	# закрывается тег
 		my $tag = pop @T;
-		if(@$tag > 2) {
+		if(@$tag > 2) {	# тег список - $* или форма - $+
 			local ($&, $`, $');
-			my ($name, $begin, $ret, $type, $cinit, $idx) = @$tag;
+			my ($open_tag, $begin, $name, $type, $cinit, $idx, $_form) = @$tag;
 			if($cinit) { my $x = substr $_, $begin, $pos-$begin; $x=~s/!/!!/g; $x=~s/-->/--!>/g; $html[$idx] .= "<!--$x-->" }
-			push @html, ($type? $code_end: $code_end1) . ")->(\$data".($ret? "->{'$ret'}": "").", \$id".($ret? ".'-$ret'": "")."), '";
-			print STDERR "$name, $begin, $ret, $type, $cinit, $idx `" . $html[$#html] . "`\n";
+			push @html, ($type? $code_end: $code_end1) . ")->(\$data".($name? "->{'$name'}": "").", \$id".($name? ".'-$name'": "")."), '";
+			push @{$_form->{lists}}, $form if $type;
+			push @{$_form->{forms}}, $form unless $type;
+			$form = $_form;
 		}
 		$tag->[0];
 	};
@@ -574,10 +593,25 @@ sub TemplateStr {
 
 		push @html,
 		m!\G<(\w+)!? do { $open_tag = $1; if(my $re = $tags{lc $open_tag}) { $pop->() while @T and $T[$#T]->[0] !~ $re; } $& }:
-		m!\G>!? do { my (@ret, $type); if($T) { local($&, $`, $'); $T = [$open_tag, $pos+1, $T->[0], $type=$T->[1], $m=/\bcinit[^<]*\G/i, scalar @html]; @ret=(">", "', (" . ($type? $code_begin: $code_begin1)) } else { $T = [$open_tag]; @ret = ">" } push @T, $T; $T = $open_tag = undef; @ret }:
-		m!\G</(\w+)\s*>!? do { my ($tag) = ($1); while(@T and $pop->() ne $tag) {}; $& }:
-		m!\G\$-(\w+)!? do { "', \$id, '-$1" }:
-		m!\G\$\+!? do { "', \$id, '" }:
+		m!\G>!? do { 
+			my (@ret, $type, $name);
+			if($T) {
+				local($&, $`, $');
+				$T = [$open_tag, $pos+1, $name=$T->[0], $type=$T->[1], $m=/\bcinit[^<]*\G/i, scalar(@html), $form];
+				$form = {name => $name, is_list => $type};
+				@ret=(">", "', (" . ($type? $code_begin: $code_begin1))
+			} else { $T = [$open_tag]; @ret = ">" }
+			push @T, $T;
+			$T = $open_tag = undef;
+			@ret 
+		}:
+		m!\G</(\w+)\s*>!? do { $open_id = undef; my ($tag) = ($1); while(@T and $pop->() ne $tag) {}; $& }:
+		$open_tag && m!\G\$-(\w+)?!? do { $open_id = $1; "', \$id, '".(defined($1)? "-$1": "") }:
+		m!\G\$@([/\w]+)!? do { "', include_action(\$data->{'$open_id'}, \"\$id-$open_id\", '$1'), '" }:
+		m!\G\$&!? do { my $x=$1; $x=~s/[\\']/\\$&/g; "', \@_[2..\$#_], '" }:
+		m!\G\{%\s*(\w+)\s*=\s*$RE_TYPE\s*%\}!? do { "', do { \$_HTM_STACK{'$1'} = $2; ()}, '" }:
+		m!\G\{%=\s*(\w+)\s*%\}!? do { "', \$_HTM_STACK{'$1'}, '" }:
+		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { &{"main::$1"}->(unstring($2), unstring($3), unstring($4), unstring($5)); () }:
 		m!\G(?:\$|(#))(\{\s*)?(\w+)!? do {
 			my $open_span = $1;
 			if($open_span && $open_tag) { $& }
@@ -585,8 +619,10 @@ sub TemplateStr {
 				$pos += length $&;
 				my $open_braket = !!$2;
 				my $braket = 0;
-				push @html, "<span id=', \$id, '-$3>" if $open_span;
-				push @html, "', ", "\$data->{'$3'}";
+				my $var = $3;
+				$form->{fields}{$var} = 1 if $var !~ /^_/;
+				push @html, "<span id=', \$id, '-$var>" if $open_span;
+				push @html, "', ", "\$data->{'$var'}";
 				my ($fn_idx, @fn_idx) = ($#html, $#html);
 				for(;;) {
 					pos() = $pos;
@@ -620,6 +656,8 @@ sub TemplateStr {
 
 	$pop->() while @T;
 	
+	$_[1] = $form;
+	
 	my $x = join "", $code_begin1, @html, $code_end1;
 	#our $rem++;
 	#Utils::write("$rem.pl", $x);
@@ -628,7 +666,9 @@ sub TemplateStr {
 
 # возвращает функцию
 sub Template {
-	eval TemplateStr(@_);
+	my $fn = eval TemplateStr(@_);
+	die $@ if $@;
+	$fn;
 }
 
 1;

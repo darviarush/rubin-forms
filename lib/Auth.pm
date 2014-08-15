@@ -182,6 +182,32 @@ sub check_role_view (@) {
 	return ($tab, $view, @av);
 }
 
+# формирует запрос из формата Utils::Template
+sub form_query (@) {
+	my ($form) = @_;
+	local ($_);
+	my %names = map { $_->{name} => 1 } @{$form->{lists}}, @{$form->{forms}};
+	return [
+		$form->{name}, 
+		[grep { not $names{$_} } keys %{$form->{fields}}],
+		map({ form_query($_) } @{$form->{lists}}),
+		map({ form_query($_) } @{$form->{forms}}),
+	];
+}
+
+# формирует запросы со страницы
+sub page_query (@) {
+	my ($form, $name) = @_;
+	local ($_);
+	my $main;
+	my @queries = map { if(defined $_->{name}) { form_query($_) } else { $_->{name} = $name; $main = $_; () } } @{$form->{lists}}, @{$form->{forms}};
+	if($form->{fields}) {
+		if($main) { $main->{fields} = Utils::unique(@{$main->{fields}}, $form->{fields}) }
+		else { $main = {name => $name, fields => $form->{fields}} }
+	}
+	$main = form_query($main) if $main;
+	[$main, @queries];
+}
 
 # экшены
 # выбирает какая акция нужна. Параметров не использует

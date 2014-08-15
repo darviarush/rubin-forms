@@ -794,6 +794,7 @@ class CAjaxRepository extends CRepository
 class CAjaxIoRepository extends CAjaxRepository
 	load: (key) -> (if @$ajax_load then @$ajax_load.push key else @$ajax_load = [key]; setTimeout (=> @widget.ping load: @$ajax_load; @$ajax_load = null), 0); @$[key]
 	
+
 # работает с socket.io
 # пример:
 # socket = io.connect('http://wsidx')
@@ -801,6 +802,7 @@ class CAjaxIoRepository extends CAjaxRepository
 class CIoRepository extends CRepository
 	constructor: (model, fields, @iosocket) -> super model, fields; @iosoket.on 'load', (x) => @model.change x[0], x[1]
 	save: (key, val) -> @iosocket.emit 'save', [key, val]
+
 	
 class CIoLoadRepository extends CIoRepository
 	load: (key) -> @iosocket.emit 'load', key; @$[key]
@@ -833,8 +835,7 @@ CTemplate =
 			option: ///^select$///
 			li: ///^(?:ol|ul)$///
 
-		path_temp = [["", templates ||= {}]]
-		query = []
+		path_temp = [["", templates ||= {}, query = []]]
 			
 		T = []; html = []; pos = 0 ; s = i_html
 		pop = ->
@@ -2327,6 +2328,9 @@ class CWidget
 			for i of to then (unless i of from then from[i] = @getCss i)
 			@css param.begincss if param.begincss?
 			@css from
+		
+			if def=param.def
+				for i of to when not /\s[a-z]\w*$/i.test to[i] then to[i] = to[i] + ' ' + def
 		
 			listen = do(param, save)->-> @css save; (@css param.endcss if param.endcss?); @send param.end, param; @send param.end1, param
 			anim = @animation to, param.timeout, param.fps, listen, param.progress

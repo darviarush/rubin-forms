@@ -55,23 +55,6 @@ sub load_htm($) {
 		"', $eval, '"
 	};
 	
-	# инклуды
-	s!<meta\s+rel=(?:\\'|")?([/\-\w]+)(?:\\'|")?\s*/?>! $htm->($1) !gei;
-	
-	# обернуть в лайоут
-	s!<meta\s+layout=(?:\\'|")?([/\-\w]+)(?:\\'|")?\s*/?>! $_layout{$index} = $1; '' !ei;
-	
-	# куда вставлять блок в лайоуте
-	s!<meta\s+value=(?:\\'|")?layout(?:\\'|")?\s*/?>!', \@_[2..\$#_], '!i;
-	s!<meta\s+value=(?:\\'|")?(\w+)(?:\\'|")?\s*/?>!', \$_HTM_STACK{'$1'}, '!gi;
-	s!<meta\s+name=(?:\\'|")?(\w+)(?:\\'|")?\s+value=(?:\\'|")?(.*?)(?:\\'|")?\s*/?>!'; \$_HTM_STACK{'$1'} = '$2'; push \@res, '!gi;
-	s!<meta\s+value=(?:\\'|")?(.*?)(?:\\'|")?\s+name=(?:\\'|")?(\w+)(?:\\'|")?\s*/?>!'; \$_HTM_STACK{'$1'} = '$2'; push \@res, '!gi;
-
-	#$tmp =~ s!'!\\'!g;
-	#$tmp =~ s{!}{!!}g;
-	#$tmp =~ s{</script>}{<\!/script>}g;
-	#$tmp =~ s{-->}{--!>}g;
-	#s{('[^']+)$}{\n<script id=ctmp-$index type="text/c-tmp"><!--\n$tmp\n--></script>\n$1};
 	my $eval = eval $_;
 	if(my $error = $! || $@) { msg "load_htm `$path`: $error"; $path =~ s/\//_/g; Utils::write("$path.pl", $_); } else { $_action_htm{$index} = $eval }
 }
@@ -100,6 +83,20 @@ for_action \&load_action;
 for my $a (keys(%_tab_rules), keys(%_rules)) {
 	$_action{$a} = \&action_main unless exists $_action{$a};
 }
+
+# вспомогательные функции фреймов
+our %_HTM_STACK;
+our %_frames;
+
+sub include_action ($$) {
+	my ($data, $frame_id, $default_action) = @_;
+	%_frames = Utils::parse_frames($_GET->{frames}) unless %_frames;
+	my $action = $_frames->{$frame_id} // $default_action;
+	my $act;
+	$_action_htm{$action}->(($act=$_action{$action}? $act->($data, $action): $data), $action)
+}
+
+sub layout ($$) { $_layout{$_[0]} = $_[1] }
 
 # пару функций
 sub header ($$) {
