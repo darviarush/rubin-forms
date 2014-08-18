@@ -25,12 +25,15 @@
 	# exit;
 # }
 
-@tests = (@ARGS? map { /^\w+$/? (-e "t/$_.t"? "t/$_.t": "../rubin/t/$_.t"): $_} @ARGS: (<../rubin/t/*.t>, <t/*.t>));
+$verbosity = 1;
+$verbosity = shift @ARGS if $ARGS[0] =~ /^-?\d+$/;
+
+@tests = @ARGS? map { /^\w+$/? (-e "t/$_.t"? "t/$_.t": "../rubin/t/$_.t"): $_} @ARGS: files("t/*.t");
 
 use TAP::Harness;
 my $harness = TAP::Harness->new({
 	color=>1,
-	verbosity => 1,
+	verbosity => $verbosity,
 	lib => ['lib', '../rubin/lib'],
 	failures => 1
 });

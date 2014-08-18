@@ -47,31 +47,10 @@ sub load_htm($) {
 	my $index = $1;
 		
 	my $tmp = $_ = Utils::read($path);
-	$_ = Utils::TemplateStr($_);
+	$_ = Utils::TemplateStr($_, my $forms);
 	
-	my $htm = sub {
-		my $index = $_[0];
-		my $eval = "\$_action_htm{'$index'}->(\$act=\$_action{'$index'}? \$act->(\$data->{'$index'}, '$index'): ())";
-		"', $eval, '"
-	};
+	our %_queries; $_queries{$index} = page_query $forms;
 	
-	# инклуды
-	s!<meta\s+rel=(?:\\'|")?([/\-\w]+)(?:\\'|")?\s*/?>! $htm->($1) !gei;
-	
-	# обернуть в лайоут
-	s!<meta\s+layout=(?:\\'|")?([/\-\w]+)(?:\\'|")?\s*/?>! $_layout{$index} = $1; '' !ei;
-	
-	# куда вставлять блок в лайоуте
-	s!<meta\s+value=(?:\\'|")?layout(?:\\'|")?\s*/?>!', \@_[2..\$#_], '!i;
-	s!<meta\s+value=(?:\\'|")?(\w+)(?:\\'|")?\s*/?>!', \$_HTM_STACK{'$1'}, '!gi;
-	s!<meta\s+name=(?:\\'|")?(\w+)(?:\\'|")?\s+value=(?:\\'|")?(.*?)(?:\\'|")?\s*/?>!'; \$_HTM_STACK{'$1'} = '$2'; push \@res, '!gi;
-	s!<meta\s+value=(?:\\'|")?(.*?)(?:\\'|")?\s+name=(?:\\'|")?(\w+)(?:\\'|")?\s*/?>!'; \$_HTM_STACK{'$1'} = '$2'; push \@res, '!gi;
-
-	#$tmp =~ s!'!\\'!g;
-	#$tmp =~ s{!}{!!}g;
-	#$tmp =~ s{</script>}{<\!/script>}g;
-	#$tmp =~ s{-->}{--!>}g;
-	#s{('[^']+)$}{\n<script id=ctmp-$index type="text/c-tmp"><!--\n$tmp\n--></script>\n$1};
 	my $eval = eval $_;
 	if(my $error = $! || $@) { msg "load_htm `$path`: $error"; $path =~ s/\//_/g; Utils::write("$path.pl", $_); } else { $_action_htm{$index} = $eval }
 }
@@ -93,13 +72,26 @@ sub load_action ($$) {
 	my $code = eval $eval;
 	if(my $error=$! || $@) { msg RED."load_action $_[0]:".RESET." $error" } else { $_action{$_[1]} = $code }
 }
-for_action \&load_action;
+for_action \&load_action;	# грузим экшены
 
 # подгружаем таблицы
 #msg \%_tab_rules, \%_rules;
 for my $a (keys(%_tab_rules), keys(%_rules)) {
 	$_action{$a} = \&action_main unless exists $_action{$a};
 }
+
+# вспомогательные функции фреймов
+our %_HTM_STACK;	# используется в скомпиллированных темплейтах
+
+sub include_action ($$) {
+	my ($data, $frame_id, $default_action) = @_;
+	our %_frames = Utils::parse_frames($param->{frames}) unless %_frames;
+	my $action = $_frames->{$frame_id} // $default_action;
+	my $act;
+	$_action_htm{$action}->(($act=$_action{$action}? $act->($data, $action): $data), $action)
+}
+
+sub layout ($$) { $_layout{$_[0]} = $_[1] }
 
 # пару функций
 sub header ($$) {
@@ -208,6 +200,7 @@ sub lord {
 		my $time = Time::HiRes::time();
 		@_HEAD = ("Content-Type: text/html; charset=utf-8");
 		msg "\n".RED."$ENV{REQUEST_METHOD}".RESET." $ENV{REQUEST_URI} ".CYAN."tid".RESET.": ".threads->tid().CYAN." from ".RESET.join(", ", threads->list());
+		%_frames = ();
 		my @ret = ();
 		our ($_action, $_id) = $ENV{DOCUMENT_URI} =~ m!^/(.*?)(-?\d+)?/?$!;
 		$_action = 'index' if $_action eq "";

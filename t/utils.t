@@ -1,9 +1,12 @@
 use Data::Dumper;
-use Test::More tests => 52;
+use Test::More tests => 56;
 
 use Msg;
 require_ok 'Utils';
 require_ok 'Helper';
+
+
+is_deeply [qw/a c b/], [Utils::unique(qw/a c b c/)];
 
 
 $ret = Utils::from_rows({
@@ -98,7 +101,7 @@ like $html, qr/val-2/;
 like $html, qr/id=id-test-val1/;
 like $html, qr/id='id-test'/;
 
-$fn = Utils::Template(<<'END');
+$fn = Utils::Template(<<'END', $query);
 <div id='$+' ctype=test_class1>
 	#val1
 	<div id="$*ls" ctype=test_class2>
@@ -112,6 +115,10 @@ $fn = Utils::Template(<<'END');
 </div>
 END
 $html = $fn->({"val1"=> 'val-1', "val2"=> 'val-2', "ls"=> [{"val1"=> 'val-1-0', "val2"=> 'val-2-0', "ls"=> []}, {"val1"=> 'val-1-1', "val2"=> 'val-2-1', "ls"=> [{"val1"=> 'val-1-ls-0'}]}]}, 'id-test');
+
+#warn Dumper($query);
+
+#is_deeply $query, {};
 
 like $html, qr/val-1/;
 like $html, qr/val-2/;
@@ -190,6 +197,18 @@ is $html, "10\n";
 $fn = Utils::Template('$xyz:raw');
 $html = $fn->({xyz=>10});
 is $html, 10;
+
+$code = Utils::TemplateStr('<div id=$-frame>$@list/index</div>');
+like $code, qr!, include_action\(\$data->{'frame'}, "\$id-frame", 'list/index'\),!;
+
+$code = Utils::TemplateStr('<div>$&</div>');
+like $code, qr/\@/;
+
+$fn = Utils::Template('{% a = "\"" %} - {%= a %}');
+$html = $fn->();
+is $html, " - \"";
+
+
 
 $ref = "
 [x]

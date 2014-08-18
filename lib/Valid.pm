@@ -25,12 +25,12 @@ sub Valid::image {
 sub Valid::ref {
 	my ($val, $tab, $col, $op) = @_;
 	return valid_param('replace', TAB_ref($col), $val) if ref $val;
-	die "Значение $tab.$col не может быть ссылкой, т.к. оно не число и не HASH" if $val =~ /^-?\d+$/;
+	die "Р—РЅР°С‡РµРЅРёРµ $tab.$col РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ СЃСЃС‹Р»РєРѕР№, С‚.Рє. РѕРЅРѕ РЅРµ С‡РёСЃР»Рѕ Рё РЅРµ HASH" if $val =~ /^-?\d+$/;
 	$val;
 }
 
 
-sub Valid::int { die "не int" if $_[0]!~/^-?\d+$/; $_[0] }
-sub Valid::float { my ($val) = @_; die "не float" if $val !~ /^-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?$/; $val }
+sub Valid::int { die "РЅРµ int ".join(", ", @_) if $_[0]!~/^-?\d+$/; $_[0] }
+sub Valid::float { my ($val) = @_; die "РЅРµ float" if $val !~ /^-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?$/; $val }
 
 1;
