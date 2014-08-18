@@ -1,5 +1,5 @@
 use Data::Dumper;
-use Test::More tests => 56;
+use Test::More tests => 57;
 
 use Msg;
 require_ok 'Utils';
@@ -101,7 +101,7 @@ like $html, qr/val-2/;
 like $html, qr/id=id-test-val1/;
 like $html, qr/id='id-test'/;
 
-$fn = Utils::Template(<<'END', $query);
+$fn = Utils::Template(<<'END');
 <div id='$+' ctype=test_class1>
 	#val1
 	<div id="$*ls" ctype=test_class2>
@@ -116,9 +116,6 @@ $fn = Utils::Template(<<'END', $query);
 END
 $html = $fn->({"val1"=> 'val-1', "val2"=> 'val-2', "ls"=> [{"val1"=> 'val-1-0', "val2"=> 'val-2-0', "ls"=> []}, {"val1"=> 'val-1-1', "val2"=> 'val-2-1', "ls"=> [{"val1"=> 'val-1-ls-0'}]}]}, 'id-test');
 
-#warn Dumper($query);
-
-#is_deeply $query, {};
 
 like $html, qr/val-1/;
 like $html, qr/val-2/;
@@ -207,6 +204,11 @@ like $code, qr/\@/;
 $fn = Utils::Template('{% a = "\"" %} - {%= a %}');
 $html = $fn->();
 is $html, " - \"";
+
+
+$fn = Utils::Template('<tr tab="$abc"><div id="x1">');
+$html = $fn->({abc=>1});
+is $html, '<tr tab="1"><div id="x1">';
 
 
 

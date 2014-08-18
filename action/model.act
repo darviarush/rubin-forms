@@ -6,7 +6,9 @@ return status 401 unless $ini->{site}{test};
 
 
 if($param->{method}) {
+	$_watch{"main.ini"} = mtime();
 	Utils::replace("main.ini", \&model_edit);
+	$_watch{"main.ini"} = mtime();
 	parse_perm();
 	return;
 }

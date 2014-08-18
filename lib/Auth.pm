@@ -172,8 +172,8 @@ sub check_role_view (@) {
 
 	my @av = ($tab, $view);
 	for my $arg (@args) {
-		if($arg->[0] =~ /^(?:LEFT_JOIN|INNER_JOIN)$/) { push @av, \&{"main::".$arg->[0]}->(check_role_view($valid->{$arg->[1]} ||= {}, @$arg[1..$#$arg])); }
-		elsif($arg->[0] eq "WHERE") { check_role 'view', $tab, $arg->[1]; push @av, $arg->[1]; }
+		if(ref $arg eq "HASH") { check_role 'view', $tab, $arg; push @av, $arg }
+		elsif($arg->[0] =~ /^(?:LEFT_JOIN|INNER_JOIN)$/) { push @av, \&{"main::".$arg->[0]}->(check_role_view($valid->{$arg->[1]} ||= {}, @$arg[1..$#$arg])); }
 		elsif($arg->[0] =~ /^(?:GROUP|HAVING|ORDER)$/) { check_role 'view', $tab, $arg->[1]; push @av, \&{"main::".$arg->[0]}->($arg->[1]); }
 		elsif($arg->[0] eq 'LIMIT') { push @av, LIMIT($arg->[1], $arg->[2]) }
 		else { die "Ошибка в параметре `$arg->[0]`" }
@@ -195,19 +195,6 @@ sub form_query (@) {
 	];
 }
 
-# формирует запросы со страницы
-sub page_query (@) {
-	my ($form, $name) = @_;
-	local ($_);
-	my $main;
-	my @queries = map { if(defined $_->{name}) { form_query($_) } else { $_->{name} = $name; $main = $_; () } } @{$form->{lists}}, @{$form->{forms}};
-	if($form->{fields}) {
-		if($main) { $main->{fields} = Utils::unique(@{$main->{fields}}, $form->{fields}) }
-		else { $main = {name => $name, fields => $form->{fields}} }
-	}
-	$main = form_query($main) if $main;
-	[$main, @queries];
-}
 
 # экшены
 # выбирает какая акция нужна. Параметров не использует
@@ -285,15 +272,23 @@ sub action_rm ($$) {
 sub action_view ($$) {
 	my ($action, $param) = @_;
 	my $valid = {};
-	my $queries = $_queries{$action}; # // [$param->{_query}];
-	my $main = shift $queries;
-	$main = [check_role_view $valid, @$main] if $main;
-	$queries = map {[check_role_view $valid->{$_->[0]}, @$_]} @$queries;
-	my $response;
-	$response = Utils::to_rows(quick_rows(@$main)) if $main;
-	for $query (@$queries) {
-		$response->{$query->[0]} = Utils::to_rows(quick_rows(@$query));
+	my $forms = $_formlists{$action}; # // [$param->{_query}];
+	if(@$forms==1) { $response = action_form_view $action, $param }
+	else {
+		for my $form (@$forms) {
+			my $id = $form->{id};
+			$response->{$id} = action_form_view $id, $param->{$id};
+		}
 	}
+	$response
+}
+
+# просмотр содержимого таблицы по заранее сгенерированным из шаблона запросу для формы
+sub action_form_view ($$) {
+	my ($action, $param) = @_;
+	my ($response, $valid);
+	my @query = check_role_view $valid, @{ $_forms{$action}->{query} }, $param;
+	$response = Utils::to_rows(quick_rows(@query));
 	$response->{valid} = $valid;
 	$response
 }

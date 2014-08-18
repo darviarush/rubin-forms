@@ -46,13 +46,20 @@ sub load_htm($) {
 	$path =~ /\baction\/(.*)\.htm$/;
 	my $index = $1;
 		
-	my $tmp = $_ = Utils::read($path);
-	$_ = Utils::TemplateStr($_, my $forms);
+	$_ = Utils::read($path);
+	$_ = Utils::TemplateStr($_, my $forms, my $formlist);
 	
-	our %_queries; $_queries{$index} = page_query $forms;
+	our %_forms; our %_pages;
+	$_formlists{$index} = $formlist;
+	while(my ($id, $form) = each %$forms) {
+		$form->{name} = $index unless defined $form->{name};
+		$form->{id} = $id = $index.$id;
+		$form->{query} = form_query $form;
+		$_forms{$id} = $form;
+	}
 	
 	my $eval = eval $_;
-	if(my $error = $! || $@) { msg "load_htm `$path`: $error"; $path =~ s/\//_/g; Utils::write("$path.pl", $_); } else { $_action_htm{$index} = $eval }
+	if(my $error = $! || $@) { msg "load_htm `$path`: $error"; $path =~ s/\//_/g; msg "`$path.pl`"; Utils::write("$path.pl", $_); } else { $_action_htm{$index} = $eval }
 }
 sub load_action ($$) {
 	return load_htm $_[0] if $_[0] =~ /\.htm$/;
@@ -204,10 +211,9 @@ sub lord {
 		my @ret = ();
 		our ($_action, $_id) = $ENV{DOCUMENT_URI} =~ m!^/(.*?)(-?\d+)?/?$!;
 		$_action = 'index' if $_action eq "";
-		#my $path = substr $ENV{DOCUMENT_URI}, 1;
 		eval {
 			my $action = $_action{$_action};
-			unless($action) {
+			unless($action and exists $_forms{$_action}) {
 				$_STATUS = 404;
 				@ret = "404 Not Found";
 			} else {
@@ -217,7 +223,8 @@ sub lord {
 				our $_POST = $ENV{CONTENT_LENGTH}? Utils::param_from_post($ENV{'REQUEST_BODY_FILE'}? do { my $f; open $f, $ENV{'REQUEST_BODY_FILE'} or die "NOT OPEN REQUEST_BODY_FILE=".$ENV{'REQUEST_BODY_FILE'}." $!"; $f }: \*STDIN, $ENV{'CONTENT_TYPE'}, $ENV{'CONTENT_LENGTH'}): {};
 				our $_COOKIE = Utils::param($ENV{'COOKIE'}, qr/;\s*/);
 				our $param = {%$_POST, %$_GET};
-				@ret = $action->();
+				
+				if($action) { @ret = $action->(); } else { @ret = action_form_view $_action, $param }
 				my $ajax = $ENV{'HTTP_AJAX'};
 				if($ajax !~ /^AJAX$/i and exists $_action_htm{$_action} and $_STATUS == 200) {
 					@ret = $_action_htm{$_action}->($ret[0], $_action);

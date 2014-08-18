@@ -6,7 +6,7 @@ sub stime {
 
 sub for_action (&) {
 	my ($sub) = @_;
-	find({no_chdir=>1, wanted=>sub { $sub->($File::Find::name, $1) if $File::Find::name=~/\baction\/(.*)\.(act|htm)$/; }}, "action", "../rubin/action");
+	find({no_chdir=>1, wanted=>sub { $sub->($File::Find::name, $1) if $File::Find::name=~/\baction\/(.*)\.(act|htm)$/; }}, dirs "action");
 }
 
 for_action {

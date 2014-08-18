@@ -323,7 +323,7 @@ CParam =
 	get: (url=document.location) -> if match = String(url).match /// \?(.*) /// then CParam.from(match[1]) else {}
 	add: (url, param) -> url + (if /\?/.test url then "&" else "?") + CParam.to param
 	to: (param) -> if param instanceof Object then ([escape(key), escape(if val instanceof Object then toJSON val else String(val))].join("=") for key, val of param when val?).join "&" else param
-	from: (param) -> x={}; (for i in param.split("&") then a=i.match /// ([^=]+)=?(.*) ///; x[a[1]]=unescape a[2]); x
+	from: (param, sep="&") -> x={}; (for i in param.split(sep) then a=i.match /// ([^=]+)=?(.*) ///; x[a[1]]=unescape a[2]); x
 	
 CNorm =
 	toArray: (names) -> if names instanceof Array then names else String(names).split /\s+/
@@ -2430,12 +2430,12 @@ class CWidget
 	onInvalid: -> @tooltip(escapeHTML(@attr("cerr") || "Ошибка - невалидное значение")).tooltip().open(); off
 	dataType: (val) -> val
 	param: -> x={}; x[@name() || 'val'] = @val(); x
-	buildQuery: -> [(p=@parent())._tab || p.name(), @name(), p.data?.id || p.$id?.val()]
-	load: (param, args...) -> param.q = @buildQuery(); @loader()._load 'load', param, this, args
-	submit: (param, args...) -> if @valid() then param.q = @buildQuery(); @loader()._load 'submit', extend(@param(), param || {}), this, args
+	#buildQuery: -> [(p=@parent())._tab || p.name(), @name(), p.data?.id || p.$id?.val()]
+	load: (param, args...) -> @loader()._load 'load', extend(@param(), param || {}), this, args
+	submit: (param, args...) -> if @valid() then @loader()._load 'submit', extend(@param(), param || {}), this, args
 	save: (param, args...) -> if @valid() then @loader()._load 'save', extend(@param(), param || {}), this, args 
 	ping: (param, args...) -> @loader()._load 'ping', param, this, args
-	erase: (param, args...) -> @loader()._load 'erase', param, this, args
+	erase: (param, args...) -> @loader()._load 'erase', extend(@param(), param || {}), this, args
 	
 	loader: ->
 		@_loader ||= if cloader = @element.getAttribute "cloader" then @byId cloader
@@ -2614,13 +2614,13 @@ class CFormWidget extends CWidget
 		for name in @_elements when not (x=this[name]).attr 'nodata' then param[name] = x.val()
 		param
 		
-	buildQuery: ->
-		view = []
-		join = []
-		for name in @_elements
-			if (e=@["$"+name]) instanceof CFormWidget then join.push ['LEFT_JOIN', e.buildQuery()...]
-			else view.push name
-		[@_tab || @name(), view, id: (if id=p.$id then id.val$i() else @data?.id), join...]
+	# buildQuery: ->
+		# view = []
+		# join = []
+		# for name in @_elements
+			# if (e=@["$"+name]) instanceof CFormWidget then join.push ['LEFT_JOIN', e.buildQuery()...]
+			# else view.push name
+		# [@_tab || @name(), view, id: (if id=p.$id then id.val$i() else @data?.id), join...]
 		
 	update: (val) ->
 		if val instanceof Array then val = val[0]
@@ -2663,7 +2663,7 @@ class CTemplateWidget extends CFormWidget
 			do @setValid
 		else @param()
 		
-	buildQuery: -> extend {}, @_query
+	#buildQuery: -> extend {}, @_query
 		
 		
 		
@@ -2692,7 +2692,7 @@ class CListWidget extends CTemplateWidget
 		if arguments.length then @element.innerHTML = @_template @data=@dataType(data), @element.id; @child().setValid data.valid || @data.valid; @removeClass "c-novid"; do @setHandlersOnElements
 		else for ch in @child().items() when ch.parent() == this then ch.val()
 
-	upload: (param, args...) -> param.q = @buildQuery(); @loader()._load('upload', param, this, args);	this
+	upload: (param, args...) -> @loader()._load('upload', param, this, args);	this
 	add: (data) ->
 		if off isnt @send 'onBeforeAdd', data
 			last = @last()
@@ -3261,10 +3261,10 @@ class CRouterWidget extends CLoaderWidget
 		
 	onclick_document: (e) -> 
 		if (a=e.target()).tag() == "A"
-			url = CURL.parse a.attr "href"
-			if url.host == a.document().location.host
+			url = CUrl.parse a.attr "href"
+			if not(url.host?) or url.host == a.document().location.host
 				e.cancel()
-				#if @byId  
+				# = CParam.from(url.search).frames
 				@load act: url.pathname, $Ajax: if url.pathname in @_templates then 'ajax' else 'ajax+'
 		this
 	

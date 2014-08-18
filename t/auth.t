@@ -54,9 +54,9 @@ Utils::Template('
 <div id=$*logo>
 #name
 </div>
-', $form);
+', $forms, $formlist);
 
 #warn Dumper($form);
-$query = page_query($form, 'lir');
+$query = form_query($formlist->[0]);
 #warn Dumper($query);
 
