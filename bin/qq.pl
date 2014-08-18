@@ -47,13 +47,9 @@ sub load_htm($) {
 	my $index = $1;
 		
 	my $tmp = $_ = Utils::read($path);
-	$_ = Utils::TemplateStr($_);
+	$_ = Utils::TemplateStr($_, my $forms);
 	
-	my $htm = sub {
-		my $index = $_[0];
-		my $eval = "\$_action_htm{'$index'}->(\$act=\$_action{'$index'}? \$act->(\$data->{'$index'}, '$index'): ())";
-		"', $eval, '"
-	};
+	our %_queries; $_queries{$index} = page_query $forms;
 	
 	my $eval = eval $_;
 	if(my $error = $! || $@) { msg "load_htm `$path`: $error"; $path =~ s/\//_/g; Utils::write("$path.pl", $_); } else { $_action_htm{$index} = $eval }
@@ -76,7 +72,7 @@ sub load_action ($$) {
 	my $code = eval $eval;
 	if(my $error=$! || $@) { msg RED."load_action $_[0]:".RESET." $error" } else { $_action{$_[1]} = $code }
 }
-for_action \&load_action;
+for_action \&load_action;	# грузим экшены
 
 # подгружаем таблицы
 #msg \%_tab_rules, \%_rules;
@@ -85,12 +81,11 @@ for my $a (keys(%_tab_rules), keys(%_rules)) {
 }
 
 # вспомогательные функции фреймов
-our %_HTM_STACK;
-our %_frames;
+our %_HTM_STACK;	# используется в скомпиллированных темплейтах
 
 sub include_action ($$) {
 	my ($data, $frame_id, $default_action) = @_;
-	%_frames = Utils::parse_frames($_GET->{frames}) unless %_frames;
+	our %_frames = Utils::parse_frames($param->{frames}) unless %_frames;
 	my $action = $_frames->{$frame_id} // $default_action;
 	my $act;
 	$_action_htm{$action}->(($act=$_action{$action}? $act->($data, $action): $data), $action)
@@ -205,6 +200,7 @@ sub lord {
 		my $time = Time::HiRes::time();
 		@_HEAD = ("Content-Type: text/html; charset=utf-8");
 		msg "\n".RED."$ENV{REQUEST_METHOD}".RESET." $ENV{REQUEST_URI} ".CYAN."tid".RESET.": ".threads->tid().CYAN." from ".RESET.join(", ", threads->list());
+		%_frames = ();
 		my @ret = ();
 		our ($_action, $_id) = $ENV{DOCUMENT_URI} =~ m!^/(.*?)(-?\d+)?/?$!;
 		$_action = 'index' if $_action eq "";

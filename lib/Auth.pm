@@ -172,14 +172,14 @@ sub check_role_view (@) {
 
 	my @av = ($tab, $view);
 	for my $arg (@args) {
-		if($arg->[0] =~ /^(?:LEFT_JOIN|INNER_JOIN)$/) { push @av, check_role_view($valid->{$arg->[1]} ||= {}, @$arg); }
+		if($arg->[0] =~ /^(?:LEFT_JOIN|INNER_JOIN)$/) { push @av, \&{"main::".$arg->[0]}->(check_role_view($valid->{$arg->[1]} ||= {}, @$arg[1..$#$arg])); }
 		elsif($arg->[0] eq "WHERE") { check_role 'view', $tab, $arg->[1]; push @av, $arg->[1]; }
 		elsif($arg->[0] =~ /^(?:GROUP|HAVING|ORDER)$/) { check_role 'view', $tab, $arg->[1]; push @av, \&{"main::".$arg->[0]}->($arg->[1]); }
 		elsif($arg->[0] eq 'LIMIT') { push @av, LIMIT($arg->[1], $arg->[2]) }
 		else { die "Ошибка в параметре `$arg->[0]`" }
 	}
 		
-	return ($tab, $view, @av);
+	return @av;
 }
 
 # формирует запрос из формата Utils::Template
@@ -190,8 +190,8 @@ sub form_query (@) {
 	return [
 		$form->{name}, 
 		[grep { not $names{$_} } keys %{$form->{fields}}],
-		map({ form_query($_) } @{$form->{lists}}),
-		map({ form_query($_) } @{$form->{forms}}),
+		map({ ('LEFT_JOIN', form_query($_)) } @{$form->{lists}}),
+		map({ ('LEFT_JOIN', form_query($_)) } @{$form->{forms}}),
 	];
 }
 
@@ -281,13 +281,21 @@ sub action_rm ($$) {
 	{action => "rm", count => $count}
 }
 
-# просмотр содержимого таблицы
+# просмотр содержимого таблицы по заранее сгенерированным из шаблона запросам
 sub action_view ($$) {
-	my ($tab, $param) = @_;
+	my ($action, $param) = @_;
 	my $valid = {};
-	my @args = check_role_view $valid, $tab, @{$param->{q}};
-	my $response = Utils::to_rows(quick_rows(@args));
+	my $queries = $_queries{$action}; # // [$param->{_query}];
+	my $main = shift $queries;
+	$main = [check_role_view $valid, @$main] if $main;
+	$queries = map {[check_role_view $valid->{$_->[0]}, @$_]} @$queries;
+	my $response;
+	$response = Utils::to_rows(quick_rows(@$main)) if $main;
+	for $query (@$queries) {
+		$response->{$query->[0]} = Utils::to_rows(quick_rows(@$query));
+	}
 	$response->{valid} = $valid;
+	$response
 }
 
 # удаляет просроченные сессии

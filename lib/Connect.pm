@@ -155,7 +155,7 @@ sub LEFT_JOIN (@) {	JOIN->new('LEFT', @_) }
 sub INNER_JOIN (@) { JOIN->new('INNER', @_) }
 
 # понятно
-sub GROUP (@) { JOIN->new(1, @_) }
+sub GROUP (@) { CONS->new(1, @_) }
 sub HAVING (@) { CONS->new(2, @_) }
 sub ORDER (@) { CONS->new(3, @_) }
 sub LIMIT (@) { CONS->new(4, @_) }

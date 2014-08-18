@@ -56,7 +56,7 @@ Utils::Template('
 </div>
 ', $form);
 
-warn Dumper($form);
+#warn Dumper($form);
 $query = page_query($form, 'lir');
-warn Dumper($query);
+#warn Dumper($query);
 

@@ -116,7 +116,7 @@ $fn = Utils::Template(<<'END', $query);
 END
 $html = $fn->({"val1"=> 'val-1', "val2"=> 'val-2', "ls"=> [{"val1"=> 'val-1-0', "val2"=> 'val-2-0', "ls"=> []}, {"val1"=> 'val-1-1', "val2"=> 'val-2-1', "ls"=> [{"val1"=> 'val-1-ls-0'}]}]}, 'id-test');
 
-warn Dumper($query);
+#warn Dumper($query);
 
 #is_deeply $query, {};
 
