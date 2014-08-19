@@ -201,10 +201,10 @@ like $code, qr!, include_action\(\$data->{'frame'}, "\$id-frame", 'list/index'\)
 $code = Utils::TemplateStr('<div>$&</div>');
 like $code, qr/\@/;
 
-$fn = Utils::Template('{% a = "\"" %} - {%= a %}');
+%Utils::_STASH = (stash => '"');
+$fn = Utils::Template('{% a =%}{%= stash %}{% end %} - {%= a %}');
 $html = $fn->();
 is $html, " - \"";
-
 
 $fn = Utils::Template('<tr tab="$abc"><div id="x1">');
 $html = $fn->({abc=>1});

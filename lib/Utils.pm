@@ -570,7 +570,7 @@ sub TemplateStr {
 	local ($_, $&, $`, $', $1, $2, $3, $4, $5);
 	($_) = @_;
 	
-	my ($orig, $pos, $open_tag, $open_id, @html, @T, $form, $TAG, $NO) = $_;
+	my ($orig, $pos, $open_tag, $open_id, @html, @T, $form, $TAG, $NO, $STASH) = $_;
 	my $form = {};
 	
 	my $pop = sub {	# закрывается тег
@@ -613,8 +613,9 @@ sub TemplateStr {
 		$open_tag && m!\G\$-(\w+)?!? do { $open_id = $1; "', \$id, '".(defined($1)? "-$1": "") }:
 		m!\G\$@([/\w]+)!? do { "', include_action(\$data->{'$open_id'}, \"\$id-$open_id\", '$1'), '" }:
 		m!\G\$&!? do { my $x=$1; $x=~s/[\\']/\\$&/g; "', \@_[2..\$#_], '" }:
-		m!\G\{%\s*(\w+)\s*=\s*$RE_TYPE\s*%\}!? do { "', do { \$_HTM_STACK{'$1'} = $2; ()}, '" }:
-		m!\G\{%=\s*(\w+)\s*%\}!? do { "', \$_HTM_STACK{'$1'}, '" }:
+		m!\G\{%\s*(\w+)\s*=%\}!? do { "', do { my \$key = '$1'; my \@stash = ('" }:
+		m!\G\{%\s*end\s*%\}!? do { "'); \$_STASH{\$key} = join '', \@stash; () }, '" }:
+		m!\G\{%=\s*(\w+)\s*%\}!? do { "', \$_STASH{'$1'}, '" }:
 		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { &{"main::$1"}->(unstring($2), unstring($3), unstring($4), unstring($5)); () }:
 		m!\G(?:\$|(#))(\{\s*)?(\w+)!? do {
 			my $open_span = $1;

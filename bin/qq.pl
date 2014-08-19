@@ -88,8 +88,6 @@ for my $a (keys(%_tab_rules), keys(%_rules)) {
 }
 
 # вспомогательные функции фреймов
-our %_HTM_STACK;	# используется в скомпиллированных темплейтах
-
 sub include_action ($$) {
 	my ($data, $frame_id, $default_action) = @_;
 	our %_frames = Utils::parse_frames($param->{frames}) unless %_frames;
@@ -258,7 +256,7 @@ sub lord {
 		$time = Time::HiRes::time() - $time;
 		msg MAGENTA."sec".RESET." $time";
 		
-		our %_HTM_STACK = ();
+		our %_STASH = ();
 		@ret = ();
 	}
 }
