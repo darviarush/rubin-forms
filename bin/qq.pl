@@ -51,6 +51,13 @@ sub load_htm($) {
 	
 	our %_forms; our %_pages;
 	$_pages{$index} = $page;
+	
+	if(exists $page->{options}) {
+		for my $option (@{$page->{options}}) {
+			if($option->[0] eq 'layout') { $_layout{$index} = $option->[1] }
+			else { die "Неизвестная опция `$option->[0]` на странице `$index.htm`" }
+		}
+	}
 	while(my ($id, $form) = each %$forms) {
 		$form->{name} = $index unless defined $form->{name};
 		$form->{id} = $id = $index.$id;
@@ -96,7 +103,7 @@ sub include_action ($$) {
 	$_action_htm{$action}->(($act=$_action{$action}? $act->($data, $action): $data), $action)
 }
 
-sub layout ($$) { $_layout{$_[0]} = $_[1] }
+sub layout ($) { $_layout{$_index} = $_[1] }
 
 # пару функций
 sub header ($$) {
@@ -208,10 +215,11 @@ sub lord {
 		%_frames = ();
 		my @ret = ();
 		our ($_action, $_id) = $ENV{DOCUMENT_URI} =~ m!^/(.*?)(-?\d+)?/?$!;
+
 		$_action = 'index' if $_action eq "";
 		eval {
-			my $action = $_action{$_action};
-			unless($action and exists $_forms{$_action}) {
+			my ($action, $form, $htm);
+			unless(($action = $_action{$_action}) or ($form = $_forms{$_action}) or exists $_action_htm{$_action} and $ENV{'HTTP_ACCEPT'} !~ /^text\/json\b/i) {
 				$_STATUS = 404;
 				@ret = "404 Not Found";
 			} else {
@@ -222,13 +230,14 @@ sub lord {
 				our $_COOKIE = Utils::param($ENV{'COOKIE'}, qr/;\s*/);
 				our $param = {%$_POST, %$_GET};
 				
-				if($action) { @ret = $action->(); } else { @ret = action_form_view $_action, $param }
+				if($action) { @ret = $action->(); } elsif($form) { @ret = action_form_view $_action, $param }
 				my $accept = $ENV{'HTTP_ACCEPT'};
 				if($accept !~ /^text\/json\b/i and exists $_action_htm{$_action} and $_STATUS == 200) {
 					@ret = $_action_htm{$_action}->($ret[0], $_action);
+					msg \%_layout, $_action;
 					for(; my $_layout = $_layout{$_action} ; $_action = $_layout) {
 						msg "$accept $_layout $_action";
-						my $arg = ($action = $_action{$_layout})? $action->(): undef;
+						my $arg = ($action = $_action{$_layout})? $action->(): {};
 						@ret = $_action_htm{$_layout}->($arg, $_layout, @ret);
 					}
 				}

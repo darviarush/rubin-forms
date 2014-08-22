@@ -410,7 +410,7 @@ sub escapejs {
 sub stringjs { '"'.escapejs($_[0]).'"' }
 
 # парсит из строки
-sub unstring { my ($x, $package) = @_; if($x=~/^["']/) { $x = substr $x, 1, -1; $x=~s/\\([\\'"nrtv])/my $x=$1; $x=~tr!nrtv!\n\r\t\v!; $x/ge; } elsif($x=~/^\$/) { $x = ${"$package$'"} } $x }
+sub unstring { my ($x) = @_; if($x=~/^["']/) { $x = substr $x, 1, -1; $x=~s/\\([\\'"nrtv])/my $x=$1; $x=~tr!nrtv!\n\r\t\v!; $x/ge; } $x }
 
 # понятно
 sub camelcase {
@@ -581,7 +581,7 @@ sub TemplateStr {
 	($_) = @_;
 	
 	my ($orig, $pos, $open_tag, $open_id, @html, @T, $form, $TAG, $NO, $STASH, $layout_id) = $_;
-	my $form = {};
+	my $page = my $form = {};
 	
 	my $pop = sub {	# закрывается тег
 		my $tag = pop @T;
@@ -623,12 +623,12 @@ sub TemplateStr {
 		!$NO && m!\G</(\w+)\s*>!? do { $TAG = $open_id = undef; my ($tag) = ($1); while(@T and $pop->() ne $tag) {}; $& }:
 		$NO && m!\G</$TAG\s*>!? do { $TAG = $open_id = $open_tag = $NO = undef; $& }:
 		$open_tag && m!\G\$-(\w+)?!? do { $open_id = $1; "', \$id, '".(defined($1)? "-$1": "") }:
-		m!\G\$@([/\w]+)!? do { "', include_action(\$data->{'$open_id'}, \"\$id-$open_id\", '$1'), '" }:
-		m!\G\$&!? do { $layout_id = $open_id; "', \@_[2..\$#_], '" }:
+		m!\G\$@([/\w]+)!? do { my $n = $1; my $id = $open_id // /\bid=["']?([\w-]+)[^<]*\G/i && $1; "', include_action(\$data->{'$id'}, \"\$id-$id\", '$n'), '" }:
+		m!\G\$&!? do { $page->{layout_id} = $open_id // /\bid=["']?([\w-]+)[^<]*\G/i && $1; "', \@_[2..\$#_], '" }:
 		m!\G\{%\s*(\w+)\s*=%\}!? do { "', do { \$_STASH{'$1'} = join '', ('" }:
 		m!\G\{%\s*end\s*%\}!? do { "'); () }, '" }:
 		m!\G\{%=\s*(\w+)\s*%\}!? do { "', \$_STASH{'$1'}, '" }:
-		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { &{"main::$1"}->(unstring($2), unstring($3), unstring($4), unstring($5)); () }:
+		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)]; () }:
 		m!\G(?:\$|(#))(\{\s*)?(\w+)!? do {
 			my $open_span = $1;
 			if($open_span && ($open_tag || $TAG =~ /^(?:script|style)$/i)) { $& }
@@ -680,7 +680,6 @@ sub TemplateStr {
 	$_[2] = $form;
 	
 	$form->{template} = $_;
-	$form->{layout_id} = $layout_id;
 	
 	my $x = join "", $code_begin1, @html, $code_end1;
 	#our $rem++;

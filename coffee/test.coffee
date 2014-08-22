@@ -379,12 +379,14 @@ new CTest 'obj-CWidget-detach', """
 `detach name` - отключает элемент от формы
 """, ->
 	w = $("<div id=obj-CWidget-attach-form ctype=form><div id=obj-CWidget-attach-form-lis></div></div>")
-	lis = w.first "#obj-CWidget-attach-form-lis"
+	lis = w.byId "obj-CWidget-attach-form-lis"
 	@is lis.parent(), w
 	@is w._elements[0], 'lis'
 	@is w.lis, lis
 	w.detach 'lis'
-	@is lis.parent(), null
+	@is lis._parent, null
+	@is lis.parent(), w
+	@is lis._parent, w
 	@ok not(lis of w)
 	@is w._elements.length, 0
 	
@@ -2710,9 +2712,9 @@ new CTest 'cls-CListWidget', """
 	@is (w=$("<lo id=e ctype=list class=c-template><li id=$+ ctype=form>$val1</li></lo>")).val([{val1: 1}, {val1: 2}]).html().replace(///['"]///g, ''), '<li id=e-0 ctype=form>1</li><li id=e-1 ctype=form>2</li>'
 	@is w.val([{val1: 1, id: 5}]).html().replace(///['"]///g, ''), '<li id=e-5 ctype=form>1</li>'
 	
-	w = $("<lo id=e ctype=list class=c-template>t: <div id=$*u ctype=list>#val1</div> </lo>").val [{ u: [val1: 6] }]
-	say w.html()
-	@is (u=w.child(0)).child(0).val(), '6'
+	w = $("<lo id=e ctype=list class=c-template><li>t: <div id=$* ctype=list>#val1</div> ;</lo>").val [[val1: 6]]
+	@is w.html().replace(///['"]///g, ''), '<li>t: <div id=e-0 ctype=list><span id=e-0-0-val1>6</span></div> ;</li>'
+	@is (u=w.child(0).child(0)).child(0).val(), '6'
 	@is u.val([val1: 7]).child(0).val(), '7'
 
 	
@@ -2723,7 +2725,7 @@ new CTest 'obj-CSortableWidget-dragover', """
 
 #%name div.sort { }
 """, """
-<div id=$name ctype=SortableEx>
+<div id=$name ctype=SortableEx class="c-ts">
 	$text
 </div>
 """, ->		

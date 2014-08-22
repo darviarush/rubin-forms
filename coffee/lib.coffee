@@ -593,6 +593,32 @@ CMath =
 	elastic: (x, p=1) -> Math.pow(2, 10 * --x) * Math.cos 20 * x * Math.PI * p / 3
 
 	
+CCssF =
+	w: (root, rem = 12) ->
+		sel_w = []; r = ["<style>"]; x1 = []; x2 = []; x3 = []			
+		for j in [1..rem]
+			sel_w.push w = ".w#{j}", push = ".push#{j}", pull = ".pull#{j}", offset = ".offset#{j}"
+			r.push "#{w} { width: " + (100 / j) + "% }"
+			x1.push "#{push} { left: #{k}% }"
+			x2.push "#{pull} { right: #{k}% }"
+			x3.push "#{offset} { margin-left: #{k}% }"
+			for i in [1..j]
+				k = 100 * i / j
+				t = "#{i}_#{j}"
+				sel_w.push w = ".w#{t}", push = ".push#{t}", pull = ".pull#{t}", offset = ".offset#{t}"
+				r.push "#{w} { width: #{k}% }"
+				x1.push "#{push} { left: #{k}% }"
+				x2.push "#{pull} { right: #{k}% }"
+				x3.push "#{offset} { margin-left: #{k}% }"
+		r.push.apply r, x1
+		r.push.apply r, x2
+		r.push.apply r, x3
+		r.push sel_w.join(",") + " { float: left }"
+		r.push "</style>"
+		root.head().append r.join "\n"
+	resize: (root) ->
+		root.window()
+	
 	
 class CInit
 	constructor: (args...) ->
@@ -623,6 +649,7 @@ class CInit
 		if param.name then window.name = param.name
 		if param.post then @post = param.post
 		if param.url then @url = param.url
+		if 'cssf' of param then CCssF.w CRoot
 		if param.css
 			for i in param.css.split(",") then @link i
 		if param.theme == "blueprint"
@@ -1126,7 +1153,7 @@ class CWidget
 	div$ = document.createElement "div"
 	wdiv$ = new CWidget div$
 		
-	_type$ = (type, names) -> (for name in names.split /,\s*/ then CWidget::[name].type$ = type); this
+	_type$ = (type, names) -> (for name in names.split /\s+/ then CWidget::[name].type$ = type); this
 	type$: type$ =
 		nothing: (names) -> _type$ 0, names
 		attr: (names) -> _type$ '$attr', names
@@ -1146,8 +1173,8 @@ class CWidget
 			@_parent = parent
 			this
 		else
-			element = @element
-			if @_parent == undefined
+			unless @_parent
+				element = @element
 				@_parent = if cparent = element.getAttribute "cparent" then @byId cparent
 				else if element.id and match=element.id.match(/^(.+)-\w+$/) then @byId match[1]
 				else null
@@ -1163,8 +1190,8 @@ class CWidget
 	
 	className: if this.name then -> @constructor.name else -> @constructor.getName()
 	
-	type$.nothing 'raise, warn, className'
-	type$.join 'valueOf, toString'
+	type$.nothing 'raise warn className'
+	type$.join 'valueOf toString'
 	type$.attr 'parent'
 	
 	# методы создания елементов и виджетов
@@ -1226,7 +1253,7 @@ class CWidget
 	unwrap: -> @send 'onDestroy', 'unwrap'; @parent()?.detach this ; e=@element; @element = @element.widget = null ; new CWidgets [e]
 	rewrap: (cls) -> p = @parent(); e = @unwrap()._all[0]; w = (if typeof cls == 'function' then new cls e, p else cls.unwrap(); cls.element = e; e.widget = cls; cls.parent p); (if p and p.id()+'-'+w.name() == w.id() then p.attach w); w
 	
-	type$.nothing 'createWidget, ctype, unwrap'
+	type$.nothing 'createWidget ctype unwrap'
 	type$.all 'rewrap'
 	type$.any 'wrap'
 	
@@ -1264,7 +1291,7 @@ class CWidget
 	viewport: if CNavigator.chrome then @::body else @::htm #-> @wrap if (d=@document()).compatMode=="CSS1Compat" then d.documentElement else d.body
 
 	
-	type$.any 'document, window, htm, body, head'
+	type$.any 'document window htm body head'
 	
 	# методы изменения строки url браузера
 	# http://habrahabr.ru/post/123106/
@@ -1459,6 +1486,8 @@ class CWidget
 		for name in elem then @attach name
 		this	
 
+	type$.all 'defineHandlers setHandlers setHandlersOnElements setListens setModel setModelOnElements observe fire listen drop attach detach attachElements'
+		
 	# методы поиска элементов
 	byName: (name) ->
 		widget = @byId id = @element.id+'-'+name, this
@@ -1472,8 +1501,6 @@ class CWidget
 	# https://github.com/jquery/sizzle/wiki/Sizzle-Documentation
 	
 	byXYAll$ = (x, y) -> k = -1000 ; self = widget = @$0$ x, y; c=[]; e=[]; (while widget then e.push z=widget.element; c.push [z.style.zIndex, z.style.position]; widget.css 'z-index': k--, position: 'relative'; widget = @$0$ x, y; (break if self==widget)); (for z, i in c then e[i].widget.css 'z-index': z[0], position: z[1]); new CWidgets e
-	
-	byId: (id, parent) -> @wrap @document().getElementById(id), parent
 	byXY: (x, y) ->
 		vl=@viewLeft(); vt=@viewTop()
 		@wrap if not(vl <= x <= @viewRight()) or not(vt <= y <= @viewBottom())
@@ -1489,12 +1516,17 @@ class CWidget
 	byViewXY: (x, y) -> @byXY x + @viewLeft(), y + @viewTop()
 	byXYAll: byXYAll$.inline 'byXYAll', 'byXY'
 	byViewXYAll: byXYAll$.inline 'byViewXYAll', 'byViewXY'
+	
+	byId: (id) ->
+		if (d=@document()).contains @element then @wrap d.getElementById id
+		else if id == (root=@root()).element.id then root
+		else root.first "[id=#{id}]"
 	byTag: if tn$=(document.getElementsByTagName && IE!=5) then (name) -> @wrap @element.getElementsByTagName(name)[0] else (name) -> @wrap NW.Dom.byTag(name, @element)[0]
 	byTagAll: if tn$ then (name) -> new CWidgets @element.getElementsByTagName(name) else (name) -> new CWidgets NW.Dom.byTag name, @element
 	byClass: if cn$=document.getElementsByClassName then (classes) -> @wrap @element.getElementsByClassName(classes)[0] else (classes) -> @wrap NW.Dom.byClass(classes, @element)[0]
 	byClassAll: if cn$ then (classes) -> new CWidgets @element.getElementsByClassName(classes) else (classes) -> new CWidgets NW.Dom.byClass(classes, @element)
 		
-	first: if qs$ then ((query, parent) -> if query then @wrap @element.querySelector(query), parent else @child 0) else (query, parent) -> if query then @wrap NW.Dom.first(query, @element), parent else @child 0
+	first: if qs$ then ((query) -> if query then @wrap @element.querySelector query else @child 0) else (query) -> if query then @wrap NW.Dom.first query, @element else @child 0
 	find: if qs$ then (query) -> new CWidgets @element.querySelectorAll query else (query) -> new CWidgets NW.Dom.select query, @element
 	last: (query) -> if query then @find(query).item -1 else @child -1
 	
@@ -1502,8 +1534,8 @@ class CWidget
 	
 	match: if matchesSelector$ then (query) -> matchesSelector$.call(@element, query) else (query) -> NW.Dom.match(@element, query)
 	
-	type$.range 'byId, byName, byTag, byClass, first, last'
-	type$.rangeAll 'byTagAll, byClassAll, find'
+	type$.range 'byId byName byTag byClass first last'
+	type$.rangeAll 'byTagAll byClassAll find'
 	
 	# методы коллекции
 	all: -> [@element]
@@ -1537,7 +1569,7 @@ class CWidget
 		all = @_all || [@element]
 		new CWidgets _slice$.call all, sliceW$.call(this, from, all), sliceW$.call(this, to, all)
 		
-	type$.nothing 'all, empty, length, item, items, invoke, map, reduce, result, grep, exists, filter, union, slice, queryIndex'
+	type$.nothing 'all empty length item items invoke map reduce result grep exists filter union slice queryIndex'
 
 	# методы клонирования элемента
 	clone: (id, parent, cls) ->
@@ -1716,11 +1748,11 @@ class CWidget
 	hasFocus: -> @document().activeElement == @element
 	contains: (w) -> a=w.all(); (return off unless a.length); (for e in a when not @element.contains e then return off); on
 	
-	type$.range 'floor, upper, prev, next, up, prevnode, nextnode, child, down, wrapIn'
-	type$.rangeAll 'floorAll, upperAll, nextAll, prevAll, upAll, nextnodeAll, prevnodeAll'
-	type$.all 'inc, dec, content, update, insertAfter, insertBefore, appendTo, prependTo, swap, remove, free'
-	type$.attr 'tag, number, val'
-	type$.join 'outer, html, text'
+	type$.range 'floor upper prev next up prevnode nextnode child down wrapIn'
+	type$.rangeAll 'floorAll upperAll nextAll prevAll upAll nextnodeAll prevnodeAll'
+	type$.all 'inc dec content update insertAfter insertBefore appendTo prependTo swap remove free'
+	type$.attr 'tag number val'
+	type$.join 'outer html text'
 	type$.nothing 'wrapInAll'
 	
 	# методы таблиц и колонок
@@ -1872,8 +1904,8 @@ class CWidget
 		vscroll: (key, val) -> @vscroll val
 		hscroll: (key, val) -> @hscroll val
 	css_get_fn =
-		vscroll: -> @vscroll()
-		hscroll: -> @hscroll()
+		vscroll: -> @vscroll()+"px"
+		hscroll: -> @hscroll()+"px"
 	css_has_fn = {}
 	div$.style.color = 'rgba(1,1,1,.5)'
 	is_rgba$ = !!div$.style.color
@@ -2103,7 +2135,7 @@ class CWidget
 		r
 		###
 
-	type$.all 'toggle, toggleAttr, toggleProp, removeClass, addClass, hide, show, vid, novid, toggleVid'
+	type$.all 'toggle toggleAttr toggleProp removeClass addClass hide show vid novid toggleVid'
 	
 	# методы расположения на экране
 	vscroll: (v) ->
@@ -2375,7 +2407,7 @@ class CWidget
 		@animate anim
 
 	
-	type$.all 'timeout,interval,clear,animate'
+	type$.all 'timeout interval clear animate'
 
 	
 	# методы шейпов
@@ -2451,7 +2483,7 @@ class CWidget
 
 	edit: (opt = {}) -> self = this ; @_edit=@wrap(if opt.line then "<input>" else "<textarea></textarea>").val(@val()).css(@css 'display font text-align vertical-align border width height padding vertical-align'.split ' ').css('position', 'absolute').css(opt.css || {}).on('blur', (do(self)->-> (return if off == self.send 'onBeforeEdit', this); self.val self.dataType @val(); self._edit = null ; self.send "onEdit")).prependTo(this).focus().relative this, 'left top before before'; this
 	
-	type$.all 'edit,arrow,arrow_border'
+	type$.all 'edit arrow arrow_border'
 	
 	# методы ajax и валидации
 	setValid: (valid, err) -> (@attr 'cerr', err if err!=undefined); @attr 'cvalid', valid
@@ -2464,8 +2496,8 @@ class CWidget
 	dataType: (val) -> val
 	param: -> x={}; x[@name() || 'val'] = @val(); x
 	#buildQuery: -> [(p=@parent())._tab || p.name(), @name(), p.data?.id || p.$id?.val()]
-	load: (param, args...) -> @loader()._load 'load', extend(@param(), param || {}), this, args
-	submit: (param, args...) -> if @valid() then @loader()._load 'submit', extend(@param(), param || {}), this, args
+	load: (param, args...) -> @loader()._load 'load', param || {}, this, args
+	submit: (param, args...) -> if @valid() then @loader()._load 'submit', extend(@param(), param || {}), (if t=@attr 'target' then @byId t else this), args
 	save: (param, args...) -> if @valid() then @loader()._load 'save', extend(@param(), param || {}), this, args 
 	ping: (param, args...) -> @loader()._load 'ping', param, this, args
 	erase: (param, args...) -> @loader()._load 'erase', extend(@param(), param || {}), this, args
@@ -2707,14 +2739,17 @@ class CTemplateWidget extends CFormWidget
 		
 
 class CListWidget extends CTemplateWidget
-	#_tag_frame_add: "ctype=form"
+	_tag_frame_add: "ctype=form"
 	
-	#tag_up$ = TABLE: 'tr', TBODY: 'tr', THEAD: 'tr', TFOOT: 'tr' , TR: 'td', SELECT: 'option', UL: 'li', LO: 'li', P: 'span'
+	tag_up$ = TABLE: 'tr', TBODY: 'tr', THEAD: 'tr', TFOOT: 'tr' , TR: 'td', SELECT: 'option', UL: 'li', LO: 'li', P: 'span'
 	
 	initTemplate: ->
-		html = @getTemplate()
-		#tag = tag_up$[@tag()] || 'div'
-		#html = ["<", tag, " id=$+", (if @_tag_frame_add then " "+@_tag_frame_add else ""), ">", html, "</", tag, ">"].join ""
+		if @hasClass('c-ls') or ts = @hasClass('c-ts')
+			@removeClass (if ts then 'c-ts' else 'c-ls')
+			if ts then html=@html(); @html "" else html=@getTemplate()
+			tag = tag_up$[@tag()] || 'div'
+			html = ["<", tag, " id=$+", (if @_tag_frame_add then " "+@_tag_frame_add else ""), ">", html, "</", tag, ">"].join ""
+		else html = @getTemplate()
 		@_template = CTemplate.compile html, @_templates = {}, is_list: 1
 
 	attachElements: -> # специально оставлена пустой. Т.к. только формы должны иметь элементы
@@ -3286,7 +3321,6 @@ class CRouterWidget extends CLoaderWidget
 		super
 		@defineHandlers() unless @constructor.handlers
 		@setListens()
-		@_templates = {}	# path: text
 		
 	onclick_document: (e) -> 
 		if (a=e.target()).tag() == "A"
@@ -3302,90 +3336,6 @@ class CRouterWidget extends CLoaderWidget
 	onLoad: (data) ->
 		for act, page of data when page.id
 			byId = CTemplate.compile(page.template)(page.data, page.act)
-		this
-		
-		
-		
-class CIncludeWidget extends CWidget
-	constructor: ->
-		super
-		@_includes = {}
-		@_includes[url = @window().location.pathname] = @active_page = page = fragment: @content(), url: url, title: @document().title
-		@page_init page
-		#say 'init', page.url, @id(), CRoot.find("#main").length, this == window.xxx, window.xxx?
-	
-	onLoad: (request, page) ->
-		dopparam = request.dopparam
-		if page then @to_page page, fromJSON(request.data), dopparam.replace_state
-		else
-			title = request.data.match /<title>(.*?)<\/title>/
-			title &&= title[1]
-			if title then title = unescapeHTML title
-			@active_page.fragment = @content()
-			x = html = request.data
-			if (cut=dopparam.cut) and (cut=@wrap(["<div>", html, "</div>"].join "").find cut) and cut = cut.all()[0] then html = cut.innerHTML
-			#say 'load', dopparam.cut, html == x
-			@htmlscript html
-			@_includes[request.url] = page = url: request.url, title: title, fragment: @content()
-			@page_init page
-			@update_page page, null, dopparam.replace_state
-		@send "onChangePage"
-		this
-	
-	page_id: (uri) -> uri.replace(/// ^/ ///, "") || "index" 
-	page_init: (page) ->
-		page.id = @page_id page.url
-		regexp = new RegExp "^\\s*CRoot\\.byId\\(['\"]"+page.id+"['\"]\\)\\.update\\("
-		for script in (scripts = @find "script[cdata]").items() when regexp.test script.text() then page.is_data = true
-		#if scripts.free().length then page.fragment = @html()
-		#say 'script_on_page', page
-		this
-	
-	to_page: (page, data, replace_state) ->
-		#say 'to_page', page.url, data, replace_state
-		@content page.fragment
-		@update_page page, data, replace_state
-		this
-		
-	update_page: (page, data, replace_state) ->
-		#say 'update_page', page.url, replace_state
-		@byId(@active_page.id)?.send "onUnLoadPage", this, page
-		if data then @byId(page.id).update data
-		title = page.title || @document().title
-		if replace_state == 1 then @navigate 0, page.url, title
-		else if replace_state == 0 then off
-		else @navigate page.url, title
-		@byId(page.id)?.send "onLoadPage", this, page
-		@active_page = page
-		
-	
-	include: (url, param = {}) ->
-		if (page = @_includes[url]) and not page.is_data then say 'include page', url; @to_page page, null, param._replace_state; @send "onChangePage"
-		else if page
-			say 'include load.ajax', url, param
-			param.act = url
-			@ping param, page
-		else
-			say 'include load.html', url
-			@ping extend_uniq param, act: url, _cut: '#'+@id(), $ajax: @attr('cvary') || 'html'
-		this
-
-
-class CApplicationWidget extends CIncludeWidget
-	constructor: ->
-		super
-		@send "onCreate"
-		@defineHandlers() unless @constructor.handlers
-		@setListens()
-
-	onpopstate_window: ->
-		say 'onpopstate', location.href
-		if -1 != pos = @history location then @window().history.go -(@history(on)-pos); @include location.href, _replace_state: 0
-		#if uri=location.hash.replace ///^#///, '' then state = 1
-		#else unless @_second_popstate then return @_second_popstate = 1
-		#else uri = location.pathname; state = 0
-		#if fn = this["at"+@page_id(uri).ucFirst()] then (if state==1 then @navigate 0, location.pathname); fn.call this
-		#else @include uri, _replace_state: state
 		this
 
 
