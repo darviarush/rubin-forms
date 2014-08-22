@@ -1,5 +1,5 @@
 use Data::Dumper;
-use Test::More tests => 57;
+use Test::More tests => 58;
 
 use Msg;
 require_ok 'Utils';
@@ -101,7 +101,7 @@ like $html, qr/val-2/;
 like $html, qr/id=id-test-val1/;
 like $html, qr/id='id-test'/;
 
-$fn = Utils::Template(<<'END');
+$fn = Utils::Template(<<'END', $forms, $form);
 <div id='$+' ctype=test_class1>
 	#val1
 	<div id="$*ls" ctype=test_class2>
@@ -198,8 +198,9 @@ is $html, 10;
 $code = Utils::TemplateStr('<div id=$-frame>$@list/index</div>');
 like $code, qr!, include_action\(\$data->{'frame'}, "\$id-frame", 'list/index'\),!;
 
-$code = Utils::TemplateStr('<div>$&</div>');
+$code = Utils::TemplateStr('<div id=$-layout>$&</div>', $forms, $page);
 like $code, qr/\@/;
+is $page->{layout_id}, "layout";
 
 %Utils::_STASH = (stash => '"');
 $fn = Utils::Template('{% a =%}{%= stash %}{% end %} - {%= a %}');

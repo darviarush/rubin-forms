@@ -47,10 +47,10 @@ sub load_htm($) {
 	my $index = $1;
 		
 	$_ = Utils::read($path);
-	$_ = Utils::TemplateStr($_, my $forms, my $formlist);
+	$_ = Utils::TemplateStr($_, my $forms, my $page);
 	
 	our %_forms; our %_pages;
-	$_formlists{$index} = $formlist;
+	$_pages{$index} = $page;
 	while(my ($id, $form) = each %$forms) {
 		$form->{name} = $index unless defined $form->{name};
 		$form->{id} = $id = $index.$id;
@@ -59,12 +59,12 @@ sub load_htm($) {
 	}
 	
 	my $eval = eval $_;
-	if(my $error = $! || $@) { msg "load_htm `$path`: $error"; $path =~ s/\//_/g; msg "`$path.pl`"; Utils::write("$path.pl", $_); } else { $_action_htm{$index} = $eval }
+	if(my $error = $! || $@) { msg "load_htm `$path`: $error"; $path =~ s/\//_/g; msg "`$path.pl`"; Utils::write("$path.pl", $_); } else { $_pages{$index}{sub} = $_action_htm{$index} = $eval }
 }
 sub load_action ($$) {
 	return load_htm $_[0] if $_[0] =~ /\.htm$/;
 	my $action = Utils::read($_[0]);
-	my %keys = Utils::set(qw/$_COOKIE $_POST $_GET $param $ini @_ %ENV/);
+	my %keys = Utils::set(qw/$_COOKIE $_POST $_GET $param $ini @_ %ENV $_pages $_forms $_action/);
 	my %local = Utils::set(qw/$_ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9/);
 	my %my = ();
 	while($action =~ /\$(\w+)\s*->\s*(\{|\[)|([\%\$\@]\w+)/g) {
@@ -223,16 +223,13 @@ sub lord {
 				our $param = {%$_POST, %$_GET};
 				
 				if($action) { @ret = $action->(); } else { @ret = action_form_view $_action, $param }
-				my $ajax = $ENV{'HTTP_AJAX'};
-				if($ajax !~ /^AJAX$/i and exists $_action_htm{$_action} and $_STATUS == 200) {
+				my $accept = $ENV{'HTTP_ACCEPT'};
+				if($accept !~ /^text\/json\b/i and exists $_action_htm{$_action} and $_STATUS == 200) {
 					@ret = $_action_htm{$_action}->($ret[0], $_action);
-					if($ajax !~ /^HTML$/i) {
-						for(; my $_layout = $_layout{$_action} ; $_action = $_layout) {
-							msg "$ajax $_layout $_action";
-							last if $ajax eq $_layout;
-							my $arg = ($action = $_action{$_layout})? $action->(): undef;
-							@ret = $_action_htm{$_layout}->($arg, $_layout, @ret);
-						}
+					for(; my $_layout = $_layout{$_action} ; $_action = $_layout) {
+						msg "$accept $_layout $_action";
+						my $arg = ($action = $_action{$_layout})? $action->(): undef;
+						@ret = $_action_htm{$_layout}->($arg, $_layout, @ret);
 					}
 				}
 			}

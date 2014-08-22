@@ -199,7 +199,7 @@ sub form_query (@) {
 # экшены
 # выбирает какая акция нужна. Параметров не использует
 sub action_main {
-	my $method = $ENV{'HTTP_METHOD'};
+	my $method = $ENV{'HTTP_AJAX'};
 	
 	$param->{id} = $_id if defined $_id;
 	
@@ -272,7 +272,7 @@ sub action_rm ($$) {
 sub action_view ($$) {
 	my ($action, $param) = @_;
 	my $valid = {};
-	my $forms = $_formlists{$action}; # // [$param->{_query}];
+	my $forms = $_pages{$action}{forms}; # // [$param->{_query}];
 	if(@$forms==1) { $response = action_form_view $action, $param }
 	else {
 		for my $form (@$forms) {

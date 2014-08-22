@@ -316,14 +316,14 @@ CRadix =
 		return x
 
 CUrl =
-	from: (uri) -> m=uri.match ///^ (?: (?:(\w+):)? // ([^/]+) )? (?: / ([^\?#]*) )? (?: \?([^#]*) )? $///; href: uri, protocol: m[1], host: m[2], port: m[3], pathname: m[4], search: m[5], host: m[6]
+	from: (uri) -> m=uri.match ///^ (?: (?:(\w+):)? // ([^/]+) )? (?: / ([^\?#]*) )? (?: \?([^#]*) )? $///; href: uri, protocol: m[1] || "", host: m[2] || "", port: m[3] || "", pathname: m[4] || "", search: m[5] || "", host: m[6] || ""
 	to: (a) -> (if p=a.protocol then p+":" else "") + "//" + a.host + (if p=a.port then ":" + p else "") + (if p=a.pathname then "/"+p else "") + (if p=a.search then "?"+p else "") + (if p=a.hash then "#"+p else "")
 
 CParam =
 	get: (url=document.location) -> if match = String(url).match /// \?(.*) /// then CParam.from(match[1]) else {}
 	add: (url, param) -> url + (if /\?/.test url then "&" else "?") + CParam.to param
 	to: (param) -> if param instanceof Object then ([escape(key), escape(if val instanceof Object then toJSON val else String(val))].join("=") for key, val of param when val?).join "&" else param
-	from: (param, sep="&") -> x={}; (for i in param.split(sep) then a=i.match /// ([^=]+)=?(.*) ///; x[a[1]]=unescape a[2]); x
+	from: (param, sep="&") -> x={}; (for i in param.split sep then a=i.match /// ([^=]+)=?(.*) ///; x[unescape a[1]]=(if a[2] then unescape a[2] else "")); x
 	
 CNorm =
 	toArray: (names) -> if names instanceof Array then names else String(names).split /\s+/
@@ -810,12 +810,16 @@ class CIoLoadRepository extends CIoRepository
 	
 CTemplate =
 
-	compile: (i_html, templates, query) ->
+	_STASH: {}
 
-		code_begin = """function(dataset, id1) {
+	compile: (i_html, forms = {}, form = {}) ->
+
+		code_begin = """function(dataset, id1, start) {
 	var res = []
+	start = start || 0
 	for(var i=0, n=dataset.length; i<n; i++) {
-		var id = id1+'-'+i, data = dataset[i]
+		var data = dataset[i]
+		var id = id1+'-'+(('id' in data)? data.id: start+i)
 		data['_NUMBER']=i; data['_NUMBER1']=i+1
 		res.push('"""
 		
@@ -827,7 +831,11 @@ CTemplate =
 
 		code_begin1 = "function(data, id) { return ['"
 		code_end1 = '\'].join("") }'
-
+		
+		RE_TYPE = ///("(?:\\"|[^"]*)"|'(?:\\'|[^'])*'|-?\d+(?:\.\d+)?(?:E[+-]\d+)?)///
+		CALL_FN = new RegExp "^{%\s*(\w+)\s+#{RE_TYPE}(?:\s*,\s*#{RE_TYPE})?(?:\s*,\s*#{RE_TYPE})?(?:\s*,\s*#{RE_TYPE})?(?:\s*,\s*#{RE_TYPE})?\s*%\}"
+		
+		_tags = ///(?:input|meta)///i
 		tags =
 			th: ///^(?:tr|table|tbody|tfoot|thead)$///
 			td: ///^(?:tr|table|tbody|tfoot|thead)$///
@@ -835,62 +843,85 @@ CTemplate =
 			option: ///^select$///
 			li: ///^(?:ol|ul)$///
 
-		path_temp = [["", templates ||= {}, query = []]]
+		form.fields = {}
+		form.forms = []
 			
 		T = []; html = []; pos = 0 ; s = i_html
 		pop = ->
 			tag = T.pop()
 			if tag.length > 2
-				[name, begin, ret, type, cinit, idx] = tag
-				if cinit then html[idx] += ["<!--", i_html.slice(begin, pos).replace(/!/g, '!!').replace(/-->/g, '--!>'), "-->"].join ""
-				html.push [(if type then code_end else code_end1), ")(data", (if ret then "['#{ret}']" else ""), ", id", (if ret then "+'-#{ret}'" else ""), "), '"].join ""
-				path_temp.pop()
+				[open_tag, begin, name, type, cinit, idx, _form] = tag
+				template = i_html.slice begin, pos
+				if cinit then html[idx] = [html[idx], "<!--", template.replace(/!/g, '!!').replace(/-->/g, '--!>'), "-->"].join ""
+				html.push (if type then code_end else code_end1)
+				form.template = template
+				#form.code = html.slice(idx+2).join ""
+				_form.forms.push form
+				form = _form
+				html.push ")(data", (if name then "['#{name}']" else ""), ", id", (if name then "+'-#{name}'" else ""), "), '"
 			tag[0]
 		
 		while 1
 
-			if m = s.match ///^<(\w+)///
+			if not NO and m = s.match ///^<(\w+)///
 				open_pos = pos
-				open_tag = m[1]
-				if re = tags[open_tag.toLowerCase()]
+				TAG = open_tag = m[1]
+				open_tag = open_tag.toLowerCase()
+				NO = 1 if /^(?:script|style)$/.test open_tag
+				if re = tags[open_tag]
 					pop() while T.length and not re.test T[T.length-1][0] 
 				html.push m[0]
-			else if m = s.match ///^>///
-				if t
-					t = [open_tag, pos+1, name=t[0], type=t[1], ///\bcinit\b///i.test(i_html.slice open_pos, pos), html.length]
-					path=path_temp[path_temp.length-1]
-					html.push ">", "', (templates"+path[0]+"['#{name}']['@']=" + (if type then code_begin else code_begin1)
-					path_temp.push [path[0]+"['"+name+"']", path[1][name] = {}]
-				else t = [open_tag]; html.push ">"
-				T.push t; t = open_tag = undefined
-			else if m = s.match ///^</(\w+)\s*>/// then tag = m[1]; (while T.length and pop() != tag then null); html.push m[0]
-			else if m = s.match ///^\$\+/// then html.push "', id, '"
-			else if m = s.match ///^\$-(\w+)/// then html.push "', id, '-" + m[1]
+			else if not NO and m = s.match ///^>///
+				if _tags.test TAG then TAG = open_id = undefined ; html.push ">"
+				else
+					if t
+						t = [open_tag, pos+1, name=t[0], type=t[1], ///\bcinit\b///i.test(i_html.slice open_pos, pos), html.length, form]
+						id = if name? then form.id + "-" + name else ''
+						forms[id] = form = id: id, name: name, is_list: type, fields: {}, forms: []
+						html.push ">", "', (", (if type then code_begin else code_begin1)
+					else t = [open_tag]; html.push ">"
+					T.push t; t = open_tag = undefined
+			else if not NO and m = s.match ///^/>/// then TAG = open_id = undefined ; html.push m[0]
+			else if not NO and m = s.match ///^</(\w+)\s*>/// then TAG = open_id = undefined ; tag = m[1]; (while T.length and pop() != tag then null); html.push m[0]
+			else if NO and (m = s.match ///^</(\w+)\s*>///) and m[1] == TAG then TAG = open_id = open_tag = NO = undefined ; html.push m[0]
+			else if open_tag and m = s.match ///^\$-(\w+)/// then open_id = m[1]; html.push "', id, '-" + m[1]
+			
+			else if m = s.match ///^\$@([/\w]+)/// then #[open_id] = m[1]
+			else if m = s.match ///^\$&/// then 
+			else if m = s.match ///^{%\s*(\w+)\s*=%\}/// then html.push "', (function() { CTemplate._STASH.#{m[1]} = ['"
+			else if m = s.match ///^{%\s*end\s*%\}/// then html.push "'].join(''); return '' })(), '"
+			else if m = s.match ///^{%=\s*(\w+)\s*%\}/// then html.push "', CTemplate._STASH.#{m[1]}, '"
+			else if m = s.match CALL_FN then	
 			else if m = s.match ///^(?:\$|(#))(\{\s*)?(\w+)///
 				open_span = m[1]
-				if open_span and open_tag then html.push m[0]
+				if open_span and (open_tag or /^(?:script|style)$/i.test TAG) then html.push m[0]
 				else
 					pos += len = m[0].length
 					s = s.slice len
 					open_braket = !!m[2]
+					_var = m[3]
+					VAR = undefined
+					form.fields[_var] = 1 unless /^_/.test _var
 					braket = 0
-					html.push "<span id=', id, '-#{m[3]}>" if open_span
-					html.push "', ", "data['#{m[3]}']"
+					html.push "<span id=', id, '-#{_var}>" if open_span
+					html.push "', ", "data['#{_var}']"
 					fn_idx = html.length-1
 					fn_idxs = [fn_idx]
 					while 1
 
-						if m = s.match ///^:(\w+)(\()?///
+						if not VAR and m = s.match ///^:(\w+)(\()?///
 							html[fn_idx] = "CHelper.#{m[1]}(" + html[fn_idx]
-							html.push if m[2] then ++braket; ", " else ")"
-						else if m = s.match ///^(?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*')/// then html.push m[0].replace(/\n/g, '\\n').replace /\r/g, '\\r'
-						else if m = s.match ///^(?:-?\d+(?:\.\d+)?(?:E[+-]\d+)?|,\s*)/// then html.push m[0]
-						else if m = s.match ///^\$(\w+)/// then fn_idxs.push fn_idx; fn_idx = html.length; html.push "data['#{m[1]}']"
-						else if m = s.match ///^\)/// then --braket; fn_idx = fn_idxs.pop(); html.push ")"
+							html.push (if m[2] then ++braket; ", " else ")")
+						else if VAR and m = s.match ///^(?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*')/// then html.push m[0].replace(/\n/g, '\\n').replace /\r/g, '\\r'
+						else if VAR and m = s.match ///^-?\d+(?:\.\d+)?(?:E[+-]\d+)?/// then html.push m[0]
+						else if not VAR and m = s.match ///^,\s*/// then html.push m[0]
+						else if VAR and m = s.match ///^\$(\w+)/// then fn_idxs.push fn_idx; fn_idx = html.length; html.push "data['#{m[1]}']"
+						else if m = s.match ///^\)/// then VAR=1 ; --braket; fn_idx = fn_idxs.pop(); html.push ")"
 						else if m = s.match ///^\}/// then (throw "нет `{` для `}`" unless open_braket); open_braket = 0 ; pos++; s = s.slice 1 ; break
 						else break
 						pos += len = m[0].length
 						s = s.slice len
+						VAR = !VAR
 
 					throw "не закрыта `}`" if open_braket
 					throw "не закрыты скобки (#{braket})" if braket
@@ -910,7 +941,8 @@ CTemplate =
 			
 		pop() while T.length
 		
-		html.unshift "fn=templates['@']=", code_begin1
+		if form.is_list then code_begin1 = code_begin; code_end1 = code_end
+		html.unshift "fn=", code_begin1
 		html.push code_end1
 		code = html.join ""
 		fn = null
@@ -1085,8 +1117,9 @@ unless window.$ then $ = (e, parent) -> CRoot.wrap e, parent
 class CWidget
 
 	constructor: (element, @_parent) ->
-		throw @raise "element не HTMLElement", element unless (@element=element) and element.tagName
+		throw @raise "element не HTMLElement", element unless element and element.tagName
 		throw @raise "element уже имеет виджет ", element.widget if element.widget
+		@element = element
 		element.widget = this
 
 	_slice$ = Array::slice
@@ -1143,8 +1176,8 @@ class CWidget
 
 	ctype: (element) ->
 		return CNode if element.nodeType != 1
-		return window['C'+ctype.uc()+'Widget'] || window[ctype] if ctype = element.getAttribute('ctype')
-		return CView[cview][0] if cview = element.getAttribute('cview')
+		return window['C'+ctype.uc()+'Widget'] || window[ctype] if ctype = element.getAttribute 'ctype'
+		return CView[cview][0] if cview = element.getAttribute 'cview'
 		if id = element.id
 			if (a=id.match /// (?:^|-) ([a-z_]\w*) $ ///i) and (a=window[a[1]]) instanceof Function and /^C\w+Widget$/.test CWidget::className.call( constructor: a) then return a
 		if (tag = element.tagName) == "INPUT" and element.type of {button:1, submit:1, reset:1} then CButtonWidget else if (cls=window["C"+tag.toLowerCase().ucFirst()+"Widget"]) instanceof Function and CWidget::className.call( constructor: cls ) then cls else	CWidget
@@ -2495,10 +2528,6 @@ class CNode extends CWidget
 	tag: (tag) -> if arguments.length then throw @raise "Для CNode.tag изменение ноды по имени не определено" else @element.nodeName
 
 
-class CMetaWidget extends CWidget
-	update: (html) -> @after(html).remove()
-
-
 class CInputWidget extends CWidget
 	constructor: ->
 		super
@@ -2595,7 +2624,7 @@ class CFormWidget extends CWidget
 		do @setHandlers
 		do @setListens
 		do @initialize
-		@attr "ctype", @className()
+		#@attr "ctype", @className()
 		@send "onCreate"
 
 	initialize: ->
@@ -2644,18 +2673,27 @@ class CFormWidget extends CWidget
 
 
 class CTemplateWidget extends CFormWidget
-	initialize: ->
-		if t=@parent()?._templates then @_templates = t[@name()]; @_template = @_templates["@"]
+	getTemplate: ->
+		if @hasClass 'c-template' then @removeClass 'c-template'; html = @html(); @html ""
+		else if @attr('cinit')? then html = @down(0).html().replace ///!(!)|!///g, "$1"
 		else
-			if @attr('cinit')?
-				html = (if (d=down(0))?.element.nodeType == 8 then d else down 1).html().replace ///!(!)|!///g, "$1"
-			else html = @html()
-			@_template = CTemplate.compile html, @_templates = {}, @_query = {}
+			p = this ; n = []
+			while p
+				if (t=p._templates) or p.attr('cinit')? and t=p.initTemplate()._templates
+					html = t[if n.length then "-"+n.join "-" else ""].template
+					break
+				unless /^\d+$/.test name = p.name() then n.unshift name
+				p = p.parent()
+		html
+	initTemplate: ->
+		html = @getTemplate()
+		@_template = CTemplate.compile html, @_templates = {}
 		this
 	
 	clone: -> super.addClass "c-novid"
 	val: (data) ->
 		if arguments.length
+			do @initTemplate unless @_template
 			@element.innerHTML = @_template @data=@dataType(data), @element.id
 			@removeClass "c-novid"
 			do @attachElements
@@ -2669,18 +2707,17 @@ class CTemplateWidget extends CFormWidget
 		
 
 class CListWidget extends CTemplateWidget
-	_tag_frame_add: "ctype=form"
+	#_tag_frame_add: "ctype=form"
 	
-	tag_up$ = TABLE: 'tr', TBODY: 'tr', THEAD: 'tr', TFOOT: 'tr' , TR: 'td', SELECT: 'option', UL: 'li', LO: 'li', P: 'span'
+	#tag_up$ = TABLE: 'tr', TBODY: 'tr', THEAD: 'tr', TFOOT: 'tr' , TR: 'td', SELECT: 'option', UL: 'li', LO: 'li', P: 'span'
 	
-	initialize: ->
-		element = @element
-		if element.children.length != 1 or element.children[0].id != '$+'
-			tag = tag_up$[element.tagName] || 'div'
-			element.innerHTML = ["<", tag, " id=$+", (if @_tag_frame_add then " "+@_tag_frame_add else ""), ">", element.innerHTML, "</", tag, ">"].join ""
-		super
+	initTemplate: ->
+		html = @getTemplate()
+		#tag = tag_up$[@tag()] || 'div'
+		#html = ["<", tag, " id=$+", (if @_tag_frame_add then " "+@_tag_frame_add else ""), ">", html, "</", tag, ">"].join ""
+		@_template = CTemplate.compile html, @_templates = {}, is_list: 1
 
-	attachElements: -> # специально оставлена пустой. Т.к. только фреймы должны иметь элементы
+	attachElements: -> # специально оставлена пустой. Т.к. только формы должны иметь элементы
 	setValid: -> # специально оставлена пустой. Т.к. списки не имеют элементов
 	detach: (name) -> (if @frame == name || @frame == this[name] then delete @frame); super
 		
@@ -2689,18 +2726,22 @@ class CListWidget extends CTemplateWidget
 	param: -> CRows.to (for ch in @child().items() then ch.val())
 	
 	val: (data) ->
-		if arguments.length then @element.innerHTML = @_template @data=@dataType(data), @element.id; @child().setValid data.valid || @data.valid; @removeClass "c-novid"; do @setHandlersOnElements
+		if arguments.length
+			do @initTemplate unless @_template
+			@element.innerHTML = @_template @data=@dataType(data), @element.id
+			@child().setValid data.valid || @data.valid
+			do @setHandlersOnElements
 		else for ch in @child().items() when ch.parent() == this then ch.val()
 
 	upload: (param, args...) -> @loader()._load('upload', param, this, args);	this
 	add: (data) ->
 		if off isnt @send 'onBeforeAdd', data
 			last = @last()
-			@append @_template data, @element.id
-			Array::splice.apply (@data || = []), [@data.length, 0].concat data
-			@removeClass "c-novid"
+			d = @data || = []
+			@append @_template data, @element.id, d.length
+			data.push.apply d, data
 			do @setHandlersOnElements add=last.nextAll()
-			add.setValid data.valid || @data.valid
+			add.setValid data.valid || d.valid
 			@send 'onAdd', data, add
 		this
 
@@ -3155,22 +3196,12 @@ class CLoaderWidget extends CWidget
 		timer = setTimeout @_onTimer, @_timeout
 		request.onreadystatechange = @_onReadyStateChange
 		
-		
-		url = if CInit.url=='act'
-			act = param.act
-			delete param.act
-			unless act?
-				if match=(id=customer.id()).match /-(\d+)/
-					act = id.replace /-\d+/, ''
-					acn = match[1]
-				else act = id
-			act || customer.attr("curl") || @attr("curl") || @document().location.pathname
-		else customer.attr("curl") || @attr("curl") || @document().location.pathname 
+		url = param._act || customer.attr("action") || @attr("action") || (if id=customer.id() then (if not param.id and pk=customer.data?.id then param.id = pk); "/"+id else @document().location.pathname)
 		
 		method = param._method || customer._method || customer.attr("cmethod") || @attr("cmethod") || @_method
 		async = if '_async' of param then param._async else on
 		
-		headers = Vary: 'Ajax', Ajax: 'ajax', Method: type
+		headers = Vary: 'Accept', Ajax: type
 		if CInit.post == 'json' then headers['Content-Type'] = 'application/json'
 		dopparam = {}
 		
@@ -3181,7 +3212,6 @@ class CLoaderWidget extends CWidget
 			
 		extend @request, timer: timer, request: request, headers: headers, dopparam: dopparam, url: url
 		
-		#q.setRequestHeader("Content-Type", "application/x-www-form-urlencoded")
 		params = if method != "POST" then (if params then url += "?" + params); null
 		else if CInit.post == 'json' then toJSON param
 		else CParam.to param
@@ -3196,11 +3226,10 @@ class CLoaderWidget extends CWidget
 		try
 			@request.data = data = customer.dataType(request.responseText)
 		catch e
-			e.text = request.responseText
 			return @loaded_error "Ошибка в ответе сервера", e
 		do @ohComplete
 		args = @request.args
-		customer.send "onComplete", @request, args...
+		customer.send "onComplete", data, @request, args...
 		switch @request.type
 			when "load", "submit"
 				customer.update data, @request
@@ -3209,20 +3238,20 @@ class CLoaderWidget extends CWidget
 			when "erase"
 				customer.remove()
 		do @ohLoad
-		customer.send "onLoad", @request, args...
+		customer.send "onLoad", data, @request, args...
 		do @remove_request
 		this
 
-	loaded_error: (message, e) ->
-		@warn "loaded_error", message, e
-		@request.message = message
+	loaded_error: (error, e) ->
+		@warn "loaded_error", error, e
+		@request.error = error
 		@request.exception = e
 		args = @request.args
 		customer = @request.customer
 		do @ohComplete
 		do @ohError
-		customer.send "onComplete", @request, args...
-		customer.send "onError", @request, args...
+		customer.send "onComplete", error, @request, args...
+		customer.send "onError", error, @request, args...
 		do @remove_request
 
 	remove_request: ->
@@ -3262,18 +3291,20 @@ class CRouterWidget extends CLoaderWidget
 	onclick_document: (e) -> 
 		if (a=e.target()).tag() == "A"
 			url = CUrl.parse a.attr "href"
-			if not(url.host?) or url.host == a.document().location.host
+			if not(url.host) or url.host == (loc=a.document().location).host
 				e.cancel()
-				# = CParam.from(url.search).frames
-				@load act: url.pathname, $Ajax: if url.pathname in @_templates then 'ajax' else 'ajax+'
+				layout = if not url.pathname or url.pathname == loc.pathname.replace /-?\d+$/, '' then '' else url.pathname
+				param = CParam.from url.search
+				@_loader = this
+				@ping _act: 'frames', frames: param.frames, layout: layout
 		this
 	
-	loaded: ->
-		@request.request.responseText
-		@request.customer = @byId 
-		super
+	onLoad: (data) ->
+		for act, page of data when page.id
+			byId = CTemplate.compile(page.template)(page.data, page.act)
+		this
 		
-	
+		
 		
 class CIncludeWidget extends CWidget
 	constructor: ->

@@ -195,6 +195,7 @@ sub gen_salt {
 }
 
 # распаковывает данные переданные в виде параметров url
+#	$sep - разделитель параметров. По умолчанию "&". Для кук установить ";\s*"
 sub param {
 	my ($data, $sep) = @_;
 	local ($_, $`, $');
@@ -207,13 +208,21 @@ sub param {
 		my $val = $param->{$key};
 		my $newval = URI::Escape::uri_unescape($');
 		if(defined $val) {
-			if(ref $val) { push @$val, $newval } else { $param->{$key} = [$val, $newval]}
+			if(ref $val eq "ARRAY") { push @$val, $newval } else { $param->{$key} = [$val, $newval]}
 		} else {
 			$param->{$key} = $newval;
 		}
 	}
 	return $param;
 }
+
+# распаковывает данные переданные в виде параметров url
+#	$sep - разделитель параметров. По умолчанию "&". Для кук установить ";\s*"
+#	k=v&e=1,2&x=3,&y={f=6&r=,&z=&m}&z={}, распознаётся как 
+#		{k => "v", e=>[1,2], x => [3], y => {
+#			f => 6, r => [], z => "", m => undef
+#		}, z => [{}]
+# ...
 
 
 # считывает из потока параметры POST
@@ -557,12 +566,13 @@ sub TemplateStr {
 	my $code_begin1 = 'sub { my ($data, $id) = @_; return join "", \'';
 	my $code_end1 = '\' }';
 
+	my $_tags = qr/(?:input|meta)/i;
 	my %tags = (
-		th => qr/^(?:tr|table|tbody|tfoot|thead)$/,
-		td => qr/^(?:tr|table|tbody|tfoot|thead)$/,
-		tr => qr/^(?:table|tbody|tfoot|thead)$/,
-		option => qr/^select$/,
-		li => qr/^(?:ol|ul)$/,
+		th => qr/^(?:tr|table|tbody|tfoot|thead)$/i,
+		td => qr/^(?:tr|table|tbody|tfoot|thead)$/i,
+		tr => qr/^(?:table|tbody|tfoot|thead)$/i,
+		option => qr/^select$/i,
+		li => qr/^(?:ol|ul)$/i,
 	);
 
 	my $forms = {};	# fields=> {}, lists=> {}, forms=> {}
@@ -570,7 +580,7 @@ sub TemplateStr {
 	local ($_, $&, $`, $', $1, $2, $3, $4, $5);
 	($_) = @_;
 	
-	my ($orig, $pos, $open_tag, $open_id, @html, @T, $form, $TAG, $NO, $STASH) = $_;
+	my ($orig, $pos, $open_tag, $open_id, @html, @T, $form, $TAG, $NO, $STASH, $layout_id) = $_;
 	my $form = {};
 	
 	my $pop = sub {	# закрывается тег
@@ -593,28 +603,30 @@ sub TemplateStr {
 		pos() = $pos;
 
 		push @html,
-		!$NO && m!\G<(\w+)!? do { $TAG = $open_tag = $1; $NO=1 if $TAG =~ /^(?:script|style)$/; if(my $re = $tags{lc $open_tag}) { $pop->() while @T and $T[$#T]->[0] !~ $re; } "<$TAG" }:
-		!$NO && m!\G>!? do { 
-			my (@ret, $type, $name);
-			if($T) {
-				local($&, $`, $');
-				$T = [$open_tag, $pos+1, $name=$T->[0], $type=$T->[1], $m=/\bcinit[^<]*\G/i, scalar(@html), $form];
-				my $id = defined($name)? $form->{id} . "-" . $name: undef;
-				$forms->{$id} = $form = {id => $id, name => $name, is_list => $type};
-				@ret=(">", "', (\$_forms{\$id}->{sub} = " . ($type? $code_begin: $code_begin1))
-			} else { $T = [$open_tag]; @ret = ">" }
-			push @T, $T;
-			$T = $open_tag = undef;
-			@ret 
+		!$NO && m!\G<(\w+)!? do { $TAG = $1; $open_tag = lc $TAG; $NO=1 if $TAG =~ /^(?:script|style)$/; if(my $re = $tags{$open_tag}) { $pop->() while @T and $T[$#T]->[0] !~ $re; } "<$TAG" }:
+		!$NO && m!\G>!? do {
+			if($TAG =~ $_tags) { $TAG = $open_id = undef; ">" } else {
+				my (@ret, $type, $name);
+				if($T) {
+					local($&, $`, $');
+					$T = [$open_tag, $pos+1, $name=$T->[0], $type=$T->[1], $m=/\bcinit[^<]*\G/i, scalar(@html), $form];
+					my $id = defined($name)? $form->{id} . "-" . $name: undef;
+					$forms->{$id} = $form = {id => $id, name => $name, is_list => $type};
+					@ret=(">", "', (" . ($type? $code_begin: $code_begin1))
+				} else { $T = [$open_tag]; @ret = ">" }
+				push @T, $T;
+				$T = $open_tag = undef;
+				@ret
+			}
 		}:
 		!$NO && m!\G/>!? do { $TAG = $open_id = undef; $& }:
 		!$NO && m!\G</(\w+)\s*>!? do { $TAG = $open_id = undef; my ($tag) = ($1); while(@T and $pop->() ne $tag) {}; $& }:
 		$NO && m!\G</$TAG\s*>!? do { $TAG = $open_id = $open_tag = $NO = undef; $& }:
 		$open_tag && m!\G\$-(\w+)?!? do { $open_id = $1; "', \$id, '".(defined($1)? "-$1": "") }:
 		m!\G\$@([/\w]+)!? do { "', include_action(\$data->{'$open_id'}, \"\$id-$open_id\", '$1'), '" }:
-		m!\G\$&!? do { my $x=$1; $x=~s/[\\']/\\$&/g; "', \@_[2..\$#_], '" }:
-		m!\G\{%\s*(\w+)\s*=%\}!? do { "', do { my \$key = '$1'; my \@stash = ('" }:
-		m!\G\{%\s*end\s*%\}!? do { "'); \$_STASH{\$key} = join '', \@stash; () }, '" }:
+		m!\G\$&!? do { $layout_id = $open_id; "', \@_[2..\$#_], '" }:
+		m!\G\{%\s*(\w+)\s*=%\}!? do { "', do { \$_STASH{'$1'} = join '', ('" }:
+		m!\G\{%\s*end\s*%\}!? do { "'); () }, '" }:
 		m!\G\{%=\s*(\w+)\s*%\}!? do { "', \$_STASH{'$1'}, '" }:
 		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { &{"main::$1"}->(unstring($2), unstring($3), unstring($4), unstring($5)); () }:
 		m!\G(?:\$|(#))(\{\s*)?(\w+)!? do {
@@ -665,7 +677,10 @@ sub TemplateStr {
 	$pop->() while @T;
 	
 	$_[1] = $forms;
-	$_[2] = $form->{forms};
+	$_[2] = $form;
+	
+	$form->{template} = $_;
+	$form->{layout_id} = $layout_id;
 	
 	my $x = join "", $code_begin1, @html, $code_end1;
 	#our $rem++;
