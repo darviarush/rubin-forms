@@ -1,0 +1,33 @@
+
+$result = {};
+
+$add_res = sub {
+	$result->{$act} = {
+		act => $act,
+		($id ? (id => $id): ()),
+		(exists $_action{$act}? (data => $_action{$act}->()): ()),
+		(exists $_pages{$act}{template}? (template => $_pages{$act}{template}): ()),
+		(exists $_pages{$act}{layout_id}? (layout_id => $_pages{$act}{layout_id}): ()),
+		(exists $_layout{$act}? (layout => $_layout{$act}): ())
+	};
+};
+
+
+
+if($param->{layout}) {
+	$act = $param->{layout};
+	$layout_id = $param->{layout_id};
+	for(; $act; $act = $_layout{$act}) {
+		last if $_pages{$act}{layout_id} eq $layout_id;
+		$add_res->();
+	}
+}
+
+$frames = Utils::param($param->{frames}, qr/,/);
+
+while(($id, $url) = each %$frames) {
+	if($url =~ /\?/) { ($act, $param) = ($`, Utils::param($')) } else { $act = $url; $param = {} }
+	$add_res->();
+}
+
+$result

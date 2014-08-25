@@ -227,7 +227,7 @@ CTest.category "методы установки обработчиков"
 new CTest 'obj-CWidget-send', """
 `send type, args...` - отправляет событие виджетов паренту. Если парента нет - то себе
 
-#Send.setHandlers
+#Send.setHandler
 """, """
 <div id=Ex>
 	<div id=Ex-fld>_</div>
@@ -252,7 +252,7 @@ new CTest 'obj-CWidget-defineHandlers', """
 * формы могут быть вложенными: form2__form3__bt_onclick
 * заканчивающиеся на описатель: onscroll_window, onload_window, onmouseleave_parent
 
-См. #setHandlers, #send, #getHandlersOnElements, #setListens
+См. #setHandler, #send, #getHandlersOnElements, #setListens
 """, ->
 	class window.Ex extends CWidget
 		onclick: ->
@@ -269,15 +269,15 @@ new CTest 'obj-CWidget-defineHandlers', """
 	@is Ex.listens.scroll, "window"
 
 
-new CTest 'obj-CWidget-setHandlers', """
-`setHandlers handlers...` - устанавливает собственные события, переданные списком параметров или найденные defineHandlers
+new CTest 'obj-CWidget-setHandler', """
+`setHandler handlers...` - устанавливает собственные события, переданные списком параметров или найденные defineHandlers
 
 См. #defineHandlers, #send, #getHandlersOnElements, #setListens
 """, ->
-	@like $("<div></div>").setHandlers("click").attr("onclick"), /CSend/
+	@like $("<div></div>").setHandler("click").attr("onclick"), /CSend/
 	class window.Ex extends CWidget
 		onclick: ->
-	@like $("<div ctype=Ex></div>").defineHandlers().setHandlers().attr("onclick"), /CSend/
+	@like $("<div ctype=Ex></div>").defineHandlers().setHandler().attr("onclick"), /CSend/
 	
 
 new CTest 'obj-CWidget-getHandlersOnElements', """
@@ -305,9 +305,9 @@ new CTest 'obj-CWidget-setListens', """
 `setListens` - устанавливает описатели определённые defineHandlers на окно, parent и т.д.
 """, ->
 	@count 1
-	ok = => @ok 1
+	self = this
 	class window.Ex extends CWidget
-		onresize_window: ok
+		onresize_window: -> @onresize_window = (->); self.ok 1 
 	w = $("<div ctype=Ex></div>").defineHandlers().setListens()
 	$(w.window()).fire 'resize'
 
@@ -379,12 +379,14 @@ new CTest 'obj-CWidget-detach', """
 `detach name` - отключает элемент от формы
 """, ->
 	w = $("<div id=obj-CWidget-attach-form ctype=form><div id=obj-CWidget-attach-form-lis></div></div>")
-	lis = w.first "#obj-CWidget-attach-form-lis"
+	lis = w.byId "obj-CWidget-attach-form-lis"
 	@is lis.parent(), w
 	@is w._elements[0], 'lis'
 	@is w.lis, lis
 	w.detach 'lis'
-	@is lis.parent(), null
+	@is lis._parent, null
+	@is lis.parent(), w
+	@is lis._parent, w
 	@ok not(lis of w)
 	@is w._elements.length, 0
 	
@@ -2290,19 +2292,14 @@ new CTest 'obj-CWidget-load', """
 * exception - исключение приведшее к ошибочке в методе #dataType
 
 url, по которому будет осуществлён запрос, выбирается следующим образом:
-- из тега curl виджета this или виджета loader
-- из параметра act, например: `load act: 'my_path'`. Причём к пути прибавляется начальный "/": /my_path
-- используется location.pathname, если `CInit.url=="act"`. 'CInit.url' может быть выставлена при загрузке библиотеки: `<script id=_app_ src="lib.js?url=1"></script>`
+- из параметра _act, например: `load _act: 'my_path'`. Причём к пути прибавляется начальный "/": /my_path
+- из тега action виджета this или виджета loader
 - из атрибута id. Например: `<div id=lod></div>` `CRoot.byId('lod').load()`. Соответственно url = /lod
-
-Добавляемые параметры:
-- act - формируется из id. Удаляется из параметров, если используется в качестве url
-- acn - если id заканчивается на тире и число
+- используется location.pathname
 
 Специальные параметры:
 - _async - должен ли запрос быть асинхронным. На синхронный запрос таймаут не выставляется. По умолчанию все запросы асинхронны
 - _method - указывает метод запроса - POST, GET и т.д. Так же может быть указан через атрибут cmethod или переменную объекта @_method
-- _script - 1 - актуален для div-ов - позволяет выполнять скрипты в подгруженном html
 
 Время таймаута, по которому будет разорвано соедининие указано в переменной @_timeout
 
@@ -2477,12 +2474,12 @@ new CTest 'key-CTemplate-compile', """
 			</div>
 			#val2
 		</div>
-	""", templates = {})
+	""", forms = {}, form = {})
 	html = fn val1: 'val-1', val2: 'val-2', ls: [{val1: 'val-1-0', val2: 'val-2-0', ls: []}, {val1: 'val-1-1', val2: 'val-2-1', ls: [val1: 'val-1-ls-0']}], 'id-test'
 	
-	@instanceof templates["@"], Function
-	@instanceof templates["ls"]["@"], Function
-	@instanceof templates["ls"]["ls"]["@"], Function
+	@instanceof forms[""], Object
+	@instanceof forms["-ls"], Object
+	@instanceof forms["-ls-ls"], Object
 	
 	@like html, /val-1/
 	@like html, /val-2/
@@ -2558,6 +2555,24 @@ new CTest 'key-CTemplate-compile', """
 	fn = CTemplate.compile '$xyz:raw'
 	html = fn xyz:10
 	@is html, "10"
+	
+	#code = CTemplate.compile '<div id=$-frame>$@list/index</div>'
+	#@like String(code), ///, CTemplate.include_action\(\$data->{'frame'}, "\$id-frame", 'list/index'\),///
+
+	#code = CTemplate.compile '<div id=$-layout>$&</div>', forms, page
+	#@like String(code), ///\@///
+	#@is page.layout_id, "layout"
+
+	CTemplate._STASH = stash = stash: '"'
+	fn = CTemplate.compile '{% a =%}{%= stash %}{% end %} - {%= a %}'
+	html = fn 'id'
+	@is html, " - \""
+	@is stash.a, '"'
+
+	fn = CTemplate.compile '<tr tab="$abc"><div id="x1">'
+	html = fn abc: 1
+	@is html, '<tr tab="1"><div id="x1">'
+
 
 
 	
@@ -2669,19 +2684,62 @@ new CTest 'key-CRows-to', """
 	data = CRows.to [{id: "id1", name: "name1", user: [{sess: [{id: 'user.sess.id1'}], id: 'user.id1', name: 'user.name1'}, {id: 'user.id2', name: 'user.name2', sess: [{id: 'user.sess.id2'}]}]}]
 	@is '{"fields":["id","name",["user",["sess","id"],"id","name"]],"rows":[["id1","name1",[[[["user.sess.id1"]],"user.id1","user.name1"],[[["user.sess.id2"]],"user.id2","user.name2"]]]]}', toJSON data
 
-
+	
+new CTest 'key-CUrl-from', """
+`CUrl.from url` - парсит url и возвращает ассоциативный массив c элементами URL
+""", ->
+	url = CUrl.from "abc#123"
+	@is url.pathname, "abc"
+	@is url.hash, "123"
+	
+	
+new CTest 'key-CUrl-to', """
+`CUrl.to url_object` - обращает в url
+""", ->
+	@is "?a=1", CUrl.to search: CParam.to a: 1
+	
+	
 	
 CTest.category "Виджеты"
 	
+new CTest 'cls-CTemplateWidget', """
+`CTemplateWidget` - форма-темплейт. Метод `@val` формирует её содержимое через шаблон
+
+- класс c-template указывает, что шаблон находится в теле элемента
+- атрибут cinit указывает, что шаблон находится в комментарии - первой ноде элемента
+- в остальных случаях пробует получить свой шаблон из шаблона parent-ов
+
+См. #CListWidget, #CFormWidget
+""", ->
+	@is $("<div id=i ctype=template class=c-template>$val1</div>").val(val1: 123).html(), '123'
+	@is (w=$("<div id=x ctype=template cinit><!-- #val1 --><span id=x-val1>345</span></div>")).$val1.val(), '345'
+	@is w.val(val1: 123).$val1.val(), '123'
+
+
+new CTest 'cls-CListWidget', """
+`CListWidget` - темплейт-список. Генерирует на основе своего шаблона последовательность элементов-форм
+
+Имена элементов-форм - порядковые или @data.id
+
+См. #CTemplateWidget, #CFormWidget
+""", ->
+	@is (w=$("<lo id=e ctype=list class=c-template><li id=$+ ctype=form>$val1</li></lo>")).val([{val1: 1}, {val1: 2}]).html().replace(///['"]///g, ''), '<li id=e-0 ctype=form>1</li><li id=e-1 ctype=form>2</li>'
+	@is w.val([{val1: 1, id: 5}]).html().replace(///['"]///g, ''), '<li id=e-5 ctype=form>1</li>'
+	
+	w = $("<lo id=e ctype=list class=c-template><li>t: <div id=$* ctype=list>#val1</div> ;</lo>").val [[val1: 6]]
+	@is w.html().replace(///['"]///g, ''), '<li>t: <div id=e-0 ctype=list><span id=e-0-0-val1>6</span></div> ;</li>'
+	@is (u=w.child(0).child(0)).child(0).val(), '6'
+	@is u.val([val1: 7]).child(0).val(), '7'
+
 	
 new CTest 'obj-CSortableWidget-dragover', """
-`CSortableWidget` - наследует CListWidget. 
+`CSortableWidget` - наследует CListWidget
 """, """
 #%name div { background: blue; border: solid 1px red; color: white; font-waight: bold; width: 400px; height: 20px; text-align: center; text-outline: 40px; margin: 1px }
 
 #%name div.sort { }
 """, """
-<div id=$name ctype=SortableEx>
+<div id=$name ctype=SortableEx class="c-ts">
 	$text
 </div>
 """, ->		
@@ -2875,7 +2933,7 @@ new CTest 'obj-CModalWidget-open', """
 	
 CTest.category "ajax-загрузчики"
 
-
+###
 new CTest 'obj-CIncludeWidget-include', """
 `include url, [param]` - подгружает страницу html в текущий виджет ajax-запросом один раз.
 Если фрагмент уже подгружен, то запрашивает только данные и меняет фрагменты (текущий на скрытый). 
@@ -2890,12 +2948,7 @@ new CTest 'obj-CIncludeWidget-include', """
 
 """, ->
 
-	
-	
-	
-	
-	
-###
+
 new CTest 'obj-CMenuWidget-frame_onclick', """
 [com]
 """, """
@@ -2918,7 +2971,7 @@ new CTest 'obj-CStatusLoader-ohComplete', """
 [com]
 """, """
 	<div id=$name ctype=CStatusLoader cview=status></div>
-	<div id="use-$name" curl="ajax/value.txt" cloader=#{@name}></div>
+	<div id="use-$name" action="ajax/value.txt" cloader=#{@name}></div>
 	""", ->
 	@count(3)
 	use = CWidget::byId "use-"+@name

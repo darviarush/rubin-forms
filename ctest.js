@@ -455,9 +455,9 @@ CTest.start = function(url) {
 
 	CTest.coffee = {}
 	try {
-		var load = CRoot.body().prepend("<div id=CTest-load cloader=CTest-loader curl='"+url+"'></div><div id=CTest-loader cview=status style='position:absolute'></div>").first()
-		load.onLoad = function(request) {
-			var code = request.data, coffee = {}
+		var load = CRoot.body().prepend("<div id=CTest-load cloader=CTest-loader action='"+url+"'></div><div id=CTest-loader cview=status style='position:absolute'></div>").first()
+		load.onLoad = function(code) {
+			var coffee = {}
 			var split = code.split(/^(?:new|CTest.category)\b/m)
 			for(var i=0, n=split.length; i<n; i++) {
 				var match = split[i].match(/['"]([\w\$-]+)['"]/)
@@ -468,7 +468,7 @@ CTest.start = function(url) {
 			}
 			CTest.coffee = coffee
 		}
-		load.ping({act: null, _method: 'GET', _async: false})
+		load.ping({_method: 'GET', _async: false})
 	} catch(e) {}
 }
 
