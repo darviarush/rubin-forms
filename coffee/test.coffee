@@ -227,7 +227,7 @@ CTest.category "методы установки обработчиков"
 new CTest 'obj-CWidget-send', """
 `send type, args...` - отправляет событие виджетов паренту. Если парента нет - то себе
 
-#Send.setHandlers
+#Send.setHandler
 """, """
 <div id=Ex>
 	<div id=Ex-fld>_</div>
@@ -252,7 +252,7 @@ new CTest 'obj-CWidget-defineHandlers', """
 * формы могут быть вложенными: form2__form3__bt_onclick
 * заканчивающиеся на описатель: onscroll_window, onload_window, onmouseleave_parent
 
-См. #setHandlers, #send, #getHandlersOnElements, #setListens
+См. #setHandler, #send, #getHandlersOnElements, #setListens
 """, ->
 	class window.Ex extends CWidget
 		onclick: ->
@@ -269,15 +269,15 @@ new CTest 'obj-CWidget-defineHandlers', """
 	@is Ex.listens.scroll, "window"
 
 
-new CTest 'obj-CWidget-setHandlers', """
-`setHandlers handlers...` - устанавливает собственные события, переданные списком параметров или найденные defineHandlers
+new CTest 'obj-CWidget-setHandler', """
+`setHandler handlers...` - устанавливает собственные события, переданные списком параметров или найденные defineHandlers
 
 См. #defineHandlers, #send, #getHandlersOnElements, #setListens
 """, ->
-	@like $("<div></div>").setHandlers("click").attr("onclick"), /CSend/
+	@like $("<div></div>").setHandler("click").attr("onclick"), /CSend/
 	class window.Ex extends CWidget
 		onclick: ->
-	@like $("<div ctype=Ex></div>").defineHandlers().setHandlers().attr("onclick"), /CSend/
+	@like $("<div ctype=Ex></div>").defineHandlers().setHandler().attr("onclick"), /CSend/
 	
 
 new CTest 'obj-CWidget-getHandlersOnElements', """
@@ -2684,7 +2684,21 @@ new CTest 'key-CRows-to', """
 	data = CRows.to [{id: "id1", name: "name1", user: [{sess: [{id: 'user.sess.id1'}], id: 'user.id1', name: 'user.name1'}, {id: 'user.id2', name: 'user.name2', sess: [{id: 'user.sess.id2'}]}]}]
 	@is '{"fields":["id","name",["user",["sess","id"],"id","name"]],"rows":[["id1","name1",[[[["user.sess.id1"]],"user.id1","user.name1"],[[["user.sess.id2"]],"user.id2","user.name2"]]]]}', toJSON data
 
-
+	
+new CTest 'key-CUrl-from', """
+`CUrl.from url` - парсит url и возвращает ассоциативный массив c элементами URL
+""", ->
+	url = CUrl.from "abc#123"
+	@is url.pathname, "abc"
+	@is url.hash, "123"
+	
+	
+new CTest 'key-CUrl-to', """
+`CUrl.to url_object` - обращает в url
+""", ->
+	@is "?a=1", CUrl.to search: CParam.to a: 1
+	
+	
 	
 CTest.category "Виджеты"
 	
@@ -2919,7 +2933,7 @@ new CTest 'obj-CModalWidget-open', """
 	
 CTest.category "ajax-загрузчики"
 
-
+###
 new CTest 'obj-CIncludeWidget-include', """
 `include url, [param]` - подгружает страницу html в текущий виджет ajax-запросом один раз.
 Если фрагмент уже подгружен, то запрашивает только данные и меняет фрагменты (текущий на скрытый). 
@@ -2934,12 +2948,7 @@ new CTest 'obj-CIncludeWidget-include', """
 
 """, ->
 
-	
-	
-	
-	
-	
-###
+
 new CTest 'obj-CMenuWidget-frame_onclick', """
 [com]
 """, """

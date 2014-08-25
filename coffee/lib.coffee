@@ -316,8 +316,13 @@ CRadix =
 		return x
 
 CUrl =
-	from: (uri) -> m=uri.match ///^ (?: (?:(\w+):)? // ([^/]+) )? (?: / ([^\?#]*) )? (?: \?([^#]*) )? $///; href: uri, protocol: m[1] || "", host: m[2] || "", port: m[3] || "", pathname: m[4] || "", search: m[5] || "", host: m[6] || ""
-	to: (a) -> (if p=a.protocol then p+":" else "") + "//" + a.host + (if p=a.port then ":" + p else "") + (if p=a.pathname then "/"+p else "") + (if p=a.search then "?"+p else "") + (if p=a.hash then "#"+p else "")
+	from: (uri) -> if m=uri.match ///^ (?: (?:(\w+):)? // ([^/:]+) (?::(\d+)) )? (?: ([^\?#]*) )? (?: \?([^#]*) )? (?: \#(.*) )? $/// then href: uri, protocol: m[1] || "", host: m[2] || "", port: m[3] || "", pathname: m[4] || "", search: m[5] || "", hash: m[6] || "" else null
+	to: (a) -> 
+		s = if a.host then (if p=a.protocol then p+":" else "") + "//" + a.host + (if p=a.port then ":" + p else "") else ""
+		if p=a.pathname then s = (if s then s+"/"+p else p) 
+		if p=a.search then s+="?"+p
+		if p=a.hash then s+="#"+p
+		s
 
 CParam =
 	get: (url=document.location) -> if match = String(url).match /// \?(.*) /// then CParam.from(match[1]) else {}
@@ -595,25 +600,25 @@ CMath =
 	
 CCssF =
 	w: (root, rem = 12) ->
-		sel_w = []; r = ["<style>"]; x1 = []; x2 = []; x3 = []			
+		sel_w = []; r = ["<style>"]; x1 = []; x2 = []; x3 = []	
 		for j in [1..rem]
 			sel_w.push w = ".w#{j}", push = ".push#{j}", pull = ".pull#{j}", offset = ".offset#{j}"
 			r.push "#{w} { width: " + (100 / j) + "% }"
-			x1.push "#{push} { left: #{k}% }"
-			x2.push "#{pull} { right: #{k}% }"
-			x3.push "#{offset} { margin-left: #{k}% }"
+			x1.push "#{push} {left: #{k}%}"
+			x2.push "#{pull} {right: #{k}%}"
+			x3.push "#{offset} {margin-left: #{k}%}"
 			for i in [1..j]
 				k = 100 * i / j
 				t = "#{i}_#{j}"
 				sel_w.push w = ".w#{t}", push = ".push#{t}", pull = ".pull#{t}", offset = ".offset#{t}"
-				r.push "#{w} { width: #{k}% }"
-				x1.push "#{push} { left: #{k}% }"
-				x2.push "#{pull} { right: #{k}% }"
-				x3.push "#{offset} { margin-left: #{k}% }"
+				r.push "#{w} {width: #{k}%}"
+				x1.push "#{push} {left: #{k}%}"
+				x2.push "#{pull} {right: #{k}%}"
+				x3.push "#{offset} {margin-left: #{k}%}"
 		r.push.apply r, x1
 		r.push.apply r, x2
 		r.push.apply r, x3
-		r.push sel_w.join(",") + " { float: left }"
+		r.push sel_w.join(",") + "{float:left}"
 		r.push "</style>"
 		root.head().append r.join "\n"
 	resize: (root) ->
@@ -1370,7 +1375,7 @@ class CWidget
 		for a in action then ret = (x=a[0])[a[1]] a[2]...; if x.stopHandlersQueue then delete x.stopHandlersQueue; break
 		ret
 	
-	on: (type, listen) -> (if typeof type == 'object' then (for k of type then @setHandlers k; @['on'+k] = type[k]) else @setHandlers type; @['on'+type] = listen); this
+	on: (type, listen) -> (if typeof type == 'object' then (for k of type then @setHandler k; @['on'+k] = type[k]) else @setHandler type; @['on'+type] = listen); this
 	off: (type) -> (for k in (if typeof type == 'object' then type else [type]) then @attr "on"+k, null); this
 	
 	# export_handlers = {'name-name-name': types}
@@ -1392,7 +1397,7 @@ class CWidget
 		this
 		
 	# http://forum.vingrad.ru/forum/topic-32350.html
-	setHandlers: (handlers...) -> (for type in (if handlers.length then handlers else @constructor.selfHandlers) then CSend.setHandler.call this, @element, type); this
+	setHandler: (handlers...) -> (for type in (if handlers.length then handlers else @constructor.selfHandlers) then CSend.setHandler.call this, @element, type); this
 	getHandlersOnElements: ->
 		handlers = {}
 		r = []
@@ -1408,7 +1413,7 @@ class CWidget
 	setHandlersOnElements: (list) ->
 		for name, handlers of @getHandlersOnElements()
 			widget = if name == 'frame' then list || @child() else @byName name
-			for type in handlers then widget.setHandlers type
+			for type in handlers then widget.setHandler type
 		this			
 
 	setListens: -> setListen = CListen.setListen; (for type, who of @constructor.listens then setListen.call this, type, who); this
@@ -1486,7 +1491,7 @@ class CWidget
 		for name in elem then @attach name
 		this	
 
-	type$.all 'defineHandlers setHandlers setHandlersOnElements setListens setModel setModelOnElements observe fire listen drop attach detach attachElements'
+	type$.all 'defineHandlers setHandler setHandlersOnElements setListens setModel setModelOnElements observe fire listen drop attach detach attachElements'
 		
 	# методы поиска элементов
 	byName: (name) ->
@@ -2497,8 +2502,11 @@ class CWidget
 	param: -> x={}; x[@name() || 'val'] = @val(); x
 	#buildQuery: -> [(p=@parent())._tab || p.name(), @name(), p.data?.id || p.$id?.val()]
 	load: (param, args...) -> @loader()._load 'load', param || {}, this, args
-	submit: (param, args...) -> if @valid() then @loader()._load 'submit', extend(@param(), param || {}), (if t=@attr 'target' then @byId t else this), args
-	save: (param, args...) -> if @valid() then @loader()._load 'save', extend(@param(), param || {}), this, args 
+	submit: (param, args...) ->
+		if @valid()
+			@loader()._load 'submit', extend(@param(), param || {}), this, args
+		this
+	save: (param, args...) -> if @valid() then @loader()._load 'save', extend(@param(), param || {}), this, args else this
 	ping: (param, args...) -> @loader()._load 'ping', param, this, args
 	erase: (param, args...) -> @loader()._load 'erase', extend(@param(), param || {}), this, args
 	
@@ -2563,8 +2571,8 @@ class CNode extends CWidget
 class CInputWidget extends CWidget
 	constructor: ->
 		super
-		if @attr "cplaceholder" then @setHandlers 'blur', 'focus'; @send 'onblur'
-		if valid = @attr "cvalid" then @setHandlers 'keyup'
+		if @attr "cplaceholder" then @setHandler 'blur', 'focus'; @send 'onblur'
+		if valid = @attr "cvalid" then @setHandler 'keyup'
 
 	val_: (val) -> if arguments.length then @element.value = val; this else @element.value
 	val: (args...) -> if @_save_type then (if arguments.length then @onfocus(); @val_ args...; @onblur() else "") else @val_ args...
@@ -2577,21 +2585,22 @@ class CInputWidget extends CWidget
 
 	
 class CButtonWidget extends CWidget
+	constructor: -> super ; @setHandler "click"
 	val: -> null
-	onclick: -> (if act=@attr 'act' then this[act]()); off
+	onclick: (e) -> (if act=@attr 'act' then this[act]()); e.stop(); off
 
 class CSubmitWidget extends CButtonWidget
-	onclick: -> @parent().submit(); off
+	onclick: (e) -> @parent().submit(); e.stop(); off
 class CLoadWidget extends CButtonWidget
-	onclick: -> @parent().load(); off
+	onclick: (e) -> @parent().load(); e.stop(); off
 class CUploadWidget extends CButtonWidget
-	onclick: -> @parent().upload(); off
+	onclick: (e) -> @parent().upload(); e.stop(); off
 class CSaveWidget extends CButtonWidget
-	onclick: -> @parent().save(); off
+	onclick: (e) -> @parent().save(); e.stop(); off
 class CEraseWidget extends CButtonWidget
-	onclick: -> @parent().erase(); off
+	onclick: (e) -> @parent().erase(); e.stop(); off
 class CPingWidget extends CButtonWidget
-	onclick: -> @parent().ping(); off
+	onclick: (e) -> @parent().ping(); e.stop(); off
 
 
 class CAWidget extends CButtonWidget
@@ -2653,7 +2662,7 @@ class CFormWidget extends CWidget
 		if arguments.length == 0 then super document.getElementById((cn=@className()).lc()) || document.getElementById cn else super
 		do @defineHandlers unless @constructor.handlers
 		@send "onBeforeCreate"
-		do @setHandlers
+		do @setHandler
 		do @setListens
 		do @initialize
 		#@attr "ctype", @className()
@@ -3054,7 +3063,6 @@ class CClockWidget extends CFormWidget
 class CModalWidget extends CFormWidget
 	zIndex = 1500000
 	_modals: []
-	fog: CRoot.append("<div style='background: black; display: none'></div>").last()
 	opacity: 0.5
 	_toTop: 1
 	
@@ -3068,6 +3076,7 @@ class CModalWidget extends CFormWidget
 			zIndex+=2
 			(prev=@get_prev_modal()).css 'overflow', 'hidden'
 			@css position: 'absolute', left: @viewLeft(), top: @viewTop(), overflow: 'auto', width: '100%', height: '100%', 'z-index': zIndex
+			@constructor::fog = @body().append("<div style='background: black; display: none'></div>").last() unless @fog
 			@fog.css position: 'fixed', width: '100%', height: '100%', top: 0, left: 0, 'z-index': zIndex-1, opacity: @opacity, display: 'block'
 			if @_toTop then @vscroll 0 ; @hscroll 0 
 			@show()
@@ -3127,13 +3136,13 @@ class CTooltipWidget extends CWidget
 
 
 class CTipWidget extends CTooltipWidget
-	initialize: -> @parent().setHandlers 'mouseenter', 'mouseleave'
+	initialize: -> @parent().setHandler 'mouseenter', 'mouseleave'
 	onmouseenter_parent: (e) -> if @config.mouse then @open()
 	onmouseleave_parent: (e) -> if @config.mouse then @close()
 
 	
 class CTipFocusWidget extends CTooltipWidget
-	initialize: -> @parent().setHandlers 'focusin', 'focusout'
+	initialize: -> @parent().setHandler 'focusin', 'focusout'
 	onfocusin_parent: (e) -> if @config.focus then @open()
 	onfocusout_parent: (e) -> if @config.focus then @close()
 
@@ -3221,7 +3230,7 @@ class CLoaderWidget extends CWidget
 		if @request
 			@warn "Поступил load до того, как закончился предыдущий old_customer:", @request.customer, "new_customer:", customer
 			do @remove_request
-		@request = type: type, param: param, customer: customer, args: args
+		@request = type: type, param: param, args: args
 		return this if customer.send("onSubmit", param) is off or off is @ohSubmit param
 
 		request = new XMLHttpRequest()
@@ -3245,7 +3254,7 @@ class CLoaderWidget extends CWidget
 			who[key.slice 1] = param[key]
 			delete param[key]
 			
-		extend @request, timer: timer, request: request, headers: headers, dopparam: dopparam, url: url
+		extend @request, timer: timer, request: request, headers: headers, dopparam: dopparam, url: url, customer: (if t = customer.attr 'target' then @byId t else customer)
 		
 		params = if method != "POST" then (if params then url += "?" + params); null
 		else if CInit.post == 'json' then toJSON param
@@ -3324,14 +3333,17 @@ class CRouterWidget extends CLoaderWidget
 		
 	onclick_document: (e) -> 
 		if (a=e.target()).tag() == "A"
-			url = CUrl.parse a.attr "href"
-			if not(url.host) or url.host == (loc=a.document().location).host
-				e.cancel()
-				layout = if not url.pathname or url.pathname == loc.pathname.replace /-?\d+$/, '' then '' else url.pathname
-				param = CParam.from url.search
-				@_loader = this
-				@ping _act: 'frames', frames: param.frames, layout: layout
+			url = CUrl.from a.attr "href"
+			if not url.host or url.host == a.document().location.host then @reload url
 		this
+		
+	reload: (url) ->
+		url = CUrl.from url if typeof url == 'string'
+		layout = if not url.pathname or url.pathname == @document().location.pathname then '' else url.pathname
+		param = CParam.from url.search
+		@_loader = this
+		@ping _act: 'frames', frames: param.frames, layout: layout
+		
 	
 	onLoad: (data) ->
 		for act, page of data when page.id
