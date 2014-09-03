@@ -428,7 +428,7 @@ CTest.build_indicators = function() {
 				x[i] = {cls: pcls, obj: pobj}
 			} else if(cls instanceof Object) {
 				var pcls={}
-				for(j in cls) if(cls.hasOwnProperty(j) && cls[j] instanceof Function) { r(cls, j, pcls); add_indicator('key-'+i+'-'+j) }
+				for(j in cls) if(cls.hasOwnProperty(j)/* && cls[j] instanceof Function*/) { r(cls, j, pcls); add_indicator('key-'+i+'-'+j) }
 				x[i] = { key: pcls }
 			} else {
 				x[i] = 1

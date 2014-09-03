@@ -18,6 +18,94 @@ new CTest 'key-CFunction-implements', """
 	@ok not ex.wrap
 
 
+new CTest 'key-CEffect-fadeIn', """
+`fadeIn` - эффект проявления элемента
+
+Основан на прозрачности. Используется как: `@morph 'fadeIn'`
+
+См. #fadeOut
+""", """
+<div id=$name class=test-square></div>
+""", ->
+	@count 1
+	@w().on 'click', -> @morph effect: 'fadeIn', timeout: 'fast'
+	@w().morph effect: 'fadeIn', timeout: 'fast', end: => @ok 1
+
+
+new CTest 'key-CEffect-fadeOut', """
+`fadeOut` - эффект затухания элемента
+
+Основан на прозрачности. Используется как: `@morph 'fadeOut'`
+
+См. #fadeOut
+""", """
+<div id=$name class=test-square></div>
+""", ->
+	@count 1
+	self = this
+	@w().on 'click', -> @morph effect: 'fadeOut', timeout: 'fast', end: -> @show()
+	@w().morph effect: 'fadeOut', timeout: 'fast', end: -> @show(); self.ok 1
+
+
+new CTest 'key-CEffect-show', """
+`show` - эффект появления элемента
+
+Основан на размере шрифта и ширине. Используется как: `@morph 'show'`
+
+См. #fadeOut
+""", """
+<div id=$name class=test-square>Show is very</div>
+""", ->
+	@count 1
+	@w().on 'click', -> @morph effect: 'show', timeout: 'fast'
+	@w().morph effect: 'show', timeout: 'fast', end: => @ok 1
+
+
+new CTest 'key-CEffect-hide', """
+`hide` - эффект ищезания элемента
+
+Основан на прозрачности. Используется как: `@morph 'hide'`
+
+См. #fadeOut
+""", """
+<div id=$name class=test-square>Hide is very</div>
+""", ->
+	@count 1
+	self = this
+	@w().on 'click', -> @morph effect: 'hide', timeout: 'fast', end: -> @show()
+	@w().morph effect: 'hide', timeout: 'fast', end: -> @show(); self.ok 1
+
+
+	
+new CTest 'key-CEffect-slideUp', """
+`slideUp` - эффект развёртывания элемента
+
+Основан на высоте. Используется как: `@morph 'slideUp'`
+
+См. #fadeOut
+""", """
+<div id=$name class=test-square>slideUp is very</div>
+""", ->
+	@count 1
+	@w().on 'click', -> @morph effect: 'slideUp', timeout: 'fast'
+	@w().morph effect: 'slideUp', timeout: 'fast', end: => @ok 1
+
+
+new CTest 'key-CEffect-slideDown', """
+`slideDown` - эффект свёртывания элемента
+
+Основан на высоте. Используется как: `@morph 'slideDown'`
+
+См. #fadeOut
+""", """
+<div id=$name class=test-square>slideDown is very</div>
+""", ->
+	@count 1
+	self = this
+	@w().on 'click', -> @morph effect: 'slideDown', timeout: 'fast', end: -> @timeout 500, -> @show()
+	@w().morph effect: 'slideDown', timeout: 'fast', end: -> self.ok 1 ; @timeout 500, -> @show()
+
+	
 
 CTest.category "служебные методы"
 
@@ -1984,13 +2072,15 @@ new CTest 'obj-CWidget-morph', """
 - timeout - время отпущенное на анимацию в миллисекундах или строка fast=600, slow=200, norm=400 или объект. В последнем случае параметры будут расширены этим объектом
 - fps - частота кадров в секунду
 - css - стили устанавливаются на период анимации, а затем - восстанавливаются
-- save - массив имён стилей. Сохраняет, а после анимации - восстанавливает стили на элементе (@element.style). Либо строка "all" - тогда все изменённые параметры в from и to будут восстановлены после анимации
+- save - 1 - from и to будут восстановлены после анимации (по умолчанию), 0 - не будут восстановлены
 - begincss - css устанавливается до начала анимации, после сохранения
 - endcss - css устанавливается после окончания анимации и после восстановления сохранённых стилей
+- queue - очередь параметров для morph, которая будет установлена после поставки в очередь анимаций текущей
 - begin - функция или имя метода - запускается до начала анимации
 - end [param] - функция или имя метода - запускается в конце анимации
 - end1 [param] - функция или имя метода - запускается в конце анимации, после end
 - progress [start, k, progress] - функция или имя метода - запускается на каждом шаге анимации
+
 
 Из progress можно получить созданную для анимации функцию anim через arguments.caller
 
@@ -2002,7 +2092,7 @@ new CTest 'obj-CWidget-morph', """
 """, ->
 	@count 1
 	self = this
-	@w().morph to: { 'background-color': 'gainsboro' }, end: -> self.is @rgba('background-color').name(), 'gainsboro'
+	@w().morph save: 0, to: { 'background-color': 'gainsboro' }, end: -> self.is @rgba('background-color').name(), 'gainsboro'
 	
 	
 new CTest 'obj-CWidget-shape', """

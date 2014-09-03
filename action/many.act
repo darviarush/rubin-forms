@@ -2,8 +2,7 @@
 # например: [{a:"view", tab:"html"}, ...]
 # выполняет указанные в нём запросы и возвращает их результаты в виде массива json
 
-$many = Utils::from_json($param->{many});
-die $@ if $@;
+$many = $param->{many};
 
 @ret = ();
 

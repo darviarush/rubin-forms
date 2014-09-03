@@ -126,6 +126,7 @@ IE = if '\v'=='v' or document.documentMode?
 
 CTraceback = -> f = arguments.callee; i=0 ; [f.name || '<anonimous function>' while (f = f.caller && i++ < 10)].reverse().join(' → ')
 
+$A = (names) -> if names instanceof Array then names else String(names).split /\s+/
 say = (args...) -> console.log(args...); args[args.length-1]
 escapeHTML = (s) -> String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/\'/g, '&#39;')
 unescapeHTML = if (escapeHTML.div$ = document.createElement 'div').textContent? then (s) -> (div=escapeHTML.div$).innerHTML = s; x=div.textContent; div.innerHTML = ''; x else (s) -> (div=escapeHTML.div$).innerHTML = s; x=div.innerText; div.innerHTML = ''; x
@@ -329,9 +330,6 @@ CParam =
 	add: (url, param) -> url + (if /\?/.test url then "&" else "?") + CParam.to param
 	to: (param) -> if param instanceof Object then ([escape(key), escape(if val instanceof Object then toJSON val else String(val))].join("=") for key, val of param when val?).join "&" else param
 	from: (param, sep="&") -> x={}; (for i in param.split sep then a=i.match /// ([^=]+)=?(.*) ///; x[unescape a[1]]=(if a[2] then unescape a[2] else "")); x
-	
-CNorm =
-	toArray: (names) -> if names instanceof Array then names else String(names).split /\s+/
 
 CDate =
 	i18n:
@@ -1027,20 +1025,27 @@ CValid =
 
 CEffect =
 	show:
-		save: 1
-		begincss: { display: '' }
 		css: {overflow: 'hidden'}
 		from: {width: 0, height: 0, 'font-size': 0}
+		begincss: { display: '' }
 	hide:
-		save: 1
 		css: {overflow: 'hidden'}
 		to: {width: 0, height: 0, 'font-size': 0}
 		endcss: { display: 'none' }
 	slideUp:
-		save: 1
 		css: {overflow: 'hidden'}
 		from: {height: 0}
-		
+		begincss: { display: '' }
+	slideDown:
+		css: {overflow: 'hidden'}
+		to: {height: 0}
+		endcss: { display: 'none' }
+	fadeIn:
+		from: {opacity: 0}
+		begincss: { display: '' }
+	fadeOut:
+		to: {opacity: 0}
+		endcss: { display: 'none' }
 
 
 CListen =
@@ -2034,7 +2039,7 @@ class CWidget
 	toggle$ = (args, s) -> args[if (i=args.indexOf s) != -1 then (i+1) % args.length else 0]
 	
 	toggle: (name, args) ->	# переключает css-стили
-		args = CNorm.toArray args
+		args = $A args
 		unless arguments.length then name = 'display'; args = ['none', '']
 		else if args.length == 1 then args.push ''
 		@setCss name, toggle$ args, @getCss name
@@ -2064,7 +2069,7 @@ class CWidget
 	
 	hasClass: (name) -> new RegExp('(^|\\s)'+name+'(\\s|$)').test @element.className
 	addClass: (names, timeout, listen) ->
-		names = CNorm.toArray names
+		names = $A names
 		if timeout?
 			@addClass names = (name for name in names when not @hasClass name)
 			to = get_rules_by_class$.call this, names
@@ -2073,7 +2078,7 @@ class CWidget
 		else (for name in names then @element.className += (if @element.className == '' then name else unless new RegExp('(^|\\s)'+name+'(\\s|$)').test @element.className then ' ' + name else ''))
 		this
 	removeClass: (names, timeout, listen) ->
-		names = CNorm.toArray names
+		names = $A names
 		if timeout?
 			from = get_rules_by_class$.call this, names
 			@removeClass names
@@ -2085,7 +2090,7 @@ class CWidget
 			if cls then @element.className = cls else @attr "class", null
 		this
 	toggleClass: (names, timeout, listen) ->
-		names = CNorm.toArray names
+		names = $A names
 		if names.length == 1 then names.push null
 		idx = 1
 		for name, i in names when @hasClass name then idx = i; break
@@ -2211,7 +2216,7 @@ class CWidget
 	relativing: (w) -> r = @positioning.apply this, arguments; m = @absolute(); left: r.left - m.left, top: r.top - m.top
 	relative: (w) -> (w.prepend this unless w.contains this); @css position: 'absolute', 'margin-left': 0, 'margin-top': 0 ; r = @relativing.apply this, arguments; @css 'margin-left': r.left, 'margin-top': r.top
 	position: -> @css 'position', 'absolute'; @css @positioning.apply this, arguments
-	extend @::position, position =
+	extend @::position, position$ =
 		invert: {top: 'bottom', bottom: 'top', left: 'right', right: 'left'}
 		rotate: {left: 'top', top: 'right', right: 'bottom', bottom: 'left'}
 		rotate_back: {left: 'bottom', bottom: 'right', right: 'top', top: 'left'}
@@ -2219,14 +2224,14 @@ class CWidget
 		scaley: {top: 0, bottom: 1, mid: 0.5}
 		scalexy: {left: 'top', right: 'bottom', center: 'mid', top: 'left', bottom: 'right', mid: 'center'}
 		scale: {before: 0, after: 1, center: 0.5, mid: 0.5}
-		normalize: (pos, scale) -> p = position; if pos of p.scalex and scale of p.scalex or pos of p.scaley and scale of p.scaley then p.scalexy[scale] else scale
+		normalize: (pos, scale) -> p = position$; if pos of p.scalex and scale of p.scalex or pos of p.scaley and scale of p.scaley then p.scalexy[scale] else scale
 		wh: (pos, width, height) -> if pos == 'top' or pos == 'bottom' then [width, height] else [height, width]
 				
 	
 	# scalexy - 0..1|(x:left|right|center)|(y:top|bottom|mid), scalexyself - 0..1|before|after|mid
 	positioning: (widget, scalex=0.5, scaley=0.5, scalexself=1, scaleyself=1, addx=0, addy=0) ->
 	
-		scaleyparam = position.scaley
+		scaleyparam = position$.scaley
 	
 		if typeof scalex == 'string'
 			if /\s/.test scalex
@@ -2235,11 +2240,11 @@ class CWidget
 				for x, i in a when /^[^a-z]/.test x then a[i] = parseFloat x
 				scalex = a[0]; scaley = a[1]; scalexself = a[2]; scaleyself = a[3]; addx = a[4]; addy = a[5]
 			if scalex of scaleyparam then [scalex, scaley, scalexself, scaleyself, addx, addy] = [scaley, scalex, scaleyself, scalexself, addy, addx]
-			if typeof scalex == 'string' then scalex = position.scalex[scalex]
+			if typeof scalex == 'string' then scalex = position$.scalex[scalex]
 		if typeof scaley == 'string' then scaley = scaleyparam[scaley]
 		
-		if typeof scalexself == 'string' then scalexself = position.scale[scalexself]
-		if typeof scaleyself == 'string' then scaleyself = position.scale[scaleyself]
+		if typeof scalexself == 'string' then scalexself = position$.scale[scalexself]
+		if typeof scaleyself == 'string' then scaleyself = position$.scale[scaleyself]
 
 		{left, right, top, bottom} = widget.absolute()
 		{width, height} = @absolute()
@@ -2326,6 +2331,7 @@ class CWidget
 				else
 					if ci = to.match ///[a-z%]+$/// then px = ci = ci[0]; to = to.slice 0, to.length-ci.length
 					else if @hasCss key, '1px' then ci = px = 'px'
+					else if @hasCss key, '1' then ci = ''; px = 'px'
 					else anim_css_set$.call this, key, v; continue
 			else
 				to = color
@@ -2381,13 +2387,13 @@ class CWidget
 	morph: (param) ->
 		if typeof param == "string" then (if param of CEffect then param = CEffect[param] else throw @raise "Нет эффекта #{param}")
 		if typeof param.timeout == 'object' then extend param, param.timeout; (delete param.timeout if typeof param.timeout == 'object')
-		if 'effect' of param then extend_deep_uniq param, CEffect[param.effect]
+		if 'effect' of param then extend_deep_uniq param, CEffect[param.effect] || throw @raise "Нет эффекта #{param.effect}"
 		
 		anim = do(param)->->
 			from = param.from || {}
 			to = param.to || {}
 			
-			save = if param.save? then (if param.save == 1 then (x=Object.keys(from)).push Object.keys(to)...; x else param.save) else []
+			save = if not('save' of param) or param.save == 1 then (x=Object.keys(from)).push Object.keys(to)...; x else param.save
 			if param.css? then save.push Object.keys(param.css)...
 			save = if save.length then @saveCss save else {}
 			@css param.css if param.css?
@@ -2409,7 +2415,10 @@ class CWidget
 			anim.from = from
 			anim
 		anim.this_param = 1
-		@animate anim
+		anim = @animate anim
+		if param.queue
+			for q in param.queue then @morph q
+		anim
 
 	
 	type$.all 'timeout interval clear animate'
@@ -2434,7 +2443,7 @@ class CWidget
 				if msg.append then @[msg.append] t
 				else if /^TBODY|TFOOT|THEAD$/.test tag=@tag() then @up().before t
 				else if tag == 'TR' then @up().up().before t
-				else if this instanceof CNode or /^INPUT|TEXTAREA|SELECT|META|OL|UL|TABLE|BR|HR$/.test tag then @before t
+				else if this instanceof CNode or /^INPUT|TEXTAREA|SELECT|META|OL|UL|TABLE|BR|HR|IMG$/.test tag then @before t
 				else @prepend t
 			@_tooltip.conf msg
 			this
@@ -2521,8 +2530,15 @@ class CWidget
 	loading: -> !!@loader().request
 
 	# методы конфигурирования виджета
-	conf: (conf) -> (unless @hasOwnProperty 'config' then extend c = {}, @config || {}; @config = c); extend_deep @config, conf; @send 'onConf'; this
+	#conf: (conf) -> (unless @hasOwnProperty 'config' then extend c = {}, @config || {}; @config = c); extend_deep @config, conf; @send 'onConf'; this
 	cconf: (conf) -> extend_deep @constructor::config, conf; @send 'onConf', 1 ; this
+	conf: (conf) ->
+		unless @hasOwnProperty 'config'
+			A_config = ->
+			A_config.prototype = @config
+			@config = new A_config
+		extend_deep @config, conf; @send 'onConf'; this
+
 
 # класс коллекции
 class CWidgets extends CWidget
@@ -2586,7 +2602,7 @@ class CInputWidget extends CWidget
 	
 class CButtonWidget extends CWidget
 	constructor: -> super ; @setHandler "click"
-	val: -> null
+	val: -> undefined
 	onclick: (e) -> (if act=@attr 'act' then this[act]()); e.stop(); off
 
 class CSubmitWidget extends CButtonWidget
@@ -3106,11 +3122,12 @@ class CCenterModalWidget extends CModalWidget
 	
 class CTooltipWidget extends CWidget
 	
-	config: { pos: 'top', scale: 'center', scalex: 'after', scaley: 'mid', height: 10, width: 30, corner: 'mid', focus: 1, mouse: 1 }
+	config: { pos: 'top', scale: 'center', scalex: 'after', scaley: 'mid', height: 10, width: 30, corner: 'mid', focus: 1, mouse: 1, open: 'fadeIn', close: 'fadeOut', class: 'c-tip' }
 	
-	constructor: (args...) ->
-		super args...
-		@addClass 'c-tip'
+	constructor: ->
+		super
+		@addClass @config.class if @config.class
+		@css 'overflow', 'visible'
 		do @initialize
 		#say CTemplate.fromArgs @attr 'cstyle'
 		#do @conf say CTemplate.fromArgs @attr 'cstyle'
@@ -3118,21 +3135,26 @@ class CTooltipWidget extends CWidget
 	initialize: ->
 	
 	conf: (msg = {}) ->
+		if msg.display == 1 then display = 1 ; delete msg.display
+		if msg.open == 1 then open = 1 ; delete msg.open
 		super msg
 		p = @config
 		p.scale = @position.normalize p.pos, p.scale
 		p.corner = @position.normalize p.pos, p.corner
 		if msg.text then @text msg.text
 		if msg.html then @content msg.html
-		{pos, scale, height, width, scalex, scaley, corner, set}=p
-		if (parent=@parent()).contains this then @relative parent, pos, scale, scalex, scaley, height
-		else @position parent, pos, scale, scalex, scaley, height
+		{pos, scale, height, width, scalex, scaley, corner}=p
+		position = if (parent=@parent()).contains this then 'relative' else 'position'
+		@[position] parent, pos, scale, scalex, scaley, height
 		@arrow @position.invert[pos], corner, height, width
-		if p.open then @open()
+		do @display if display
+		do @open if open
 		this
-		
-	open: -> @show()
-	close: -> @hide()
+	
+	open: -> @morph @config.open
+	close: -> @morph @config.close
+	display: -> @show()
+	#onAnimate: -> @timeout @config.timeout, 'close' if @config.timeout
 
 
 class CTipWidget extends CTooltipWidget
@@ -3223,7 +3245,7 @@ class CLoaderWidget extends CWidget
 
 	_onTimer: =>
 		@request.request.abort()
-		@loaded_error "Закончилось время ожидания ответа запроса `"+@request.url+"`: "+@_timeout
+		@loaded_error "Закончилось время ожидания ответа запроса `#{@request.url}`"
 
 	_load: (type, param={}, customer, args) ->
 
@@ -3250,7 +3272,7 @@ class CLoaderWidget extends CWidget
 		dopparam = {}
 		
 		for key of param
-			if key[0] == '$' then who=headers else if key[0] == '_' then who=dopparam else continue
+			if key[0] == '$' then who=headers else if key[0] == '_' then who=dopparam else if param[key] == undefined then delete param[key]; continue else continue
 			who[key.slice 1] = param[key]
 			delete param[key]
 			
@@ -3305,8 +3327,8 @@ class CLoaderWidget extends CWidget
 
 	ohSubmit: -> @vid()
 	ohComplete: -> @novid()
-	ohLoad: -> @request.customer.tooltip(null)
-	ohError: -> @request.customer.tooltip(@request.message).tooltip().open()
+	ohLoad: -> @request.customer.tooltip null
+	ohError: -> @request.customer.tooltip html: "<div class='fl ico-rb ico-ajax-error'></div><h3>Ошибка ajax</h3>"+escapeHTML(@request.error), open: 1, timeout: 5000, class: 'c-error'
 
 
 class CStatusWidget extends CLoaderWidget
@@ -3320,11 +3342,11 @@ class CStatusWidget extends CLoaderWidget
 	ohComplete: -> @preloader.hide()
 	ohLoad: -> @sucess.show()
 	ohError: ->
-		@error.element.title = @request.message
-		@error_msg.text @request.message
+		@error.element.title = @request.error
+		@error_msg.text @request.error
 		@error.show()
 
-		
+
 class CRouterWidget extends CLoaderWidget
 	constructor: ->
 		super
@@ -3340,14 +3362,26 @@ class CRouterWidget extends CLoaderWidget
 	reload: (url) ->
 		url = CUrl.from url if typeof url == 'string'
 		layout = if not url.pathname or url.pathname == @document().location.pathname then '' else url.pathname
-		param = CParam.from url.search
+		say url, layout
+		param = if url.search then CParam.from url.search else {}
 		@_loader = this
-		@ping _act: 'frames', frames: param.frames, layout: layout
-		
+		p = {}
+		p.frames = param.frames if param.frames
+		p.layout = layout if layout
+		p.layout_id = url.hash if url.hash
+		@ping _act: 'frames', p
 	
 	onLoad: (data) ->
-		for act, page of data when page.id
-			byId = CTemplate.compile(page.template)(page.data, page.act)
+		data = fromJSON data if typeof data == 'string'
+		say 'onLoad', data
+		if layout = data['@layout']
+			for i in [1...layout.length]
+				layout_id = layout[i-1].layout_id
+				page = data[act = layout[i]]
+				@byId(layout_id).html CTemplate.compile(page.template)(page.data, page.act)
+				delete data[act]
+		for act, page of data
+			@byId(page.id).html CTemplate.compile(page.template)(page.data, page.act)
 		this
 
 

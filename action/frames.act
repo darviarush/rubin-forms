@@ -1,3 +1,4 @@
+# фреймы - механизм лайоутов и таргетов форм
 
 $result = {};
 
@@ -18,9 +19,12 @@ if($param->{layout}) {
 	$act = $param->{layout};
 	$layout_id = $param->{layout_id};
 	for(; $act; $act = $_layout{$act}) {
-		last if $_pages{$act}{layout_id} eq $layout_id;
+		last if defined($layout_id) and $_pages{$act}{layout_id} eq $layout_id;
 		$add_res->();
+		unshift @$layout, $act;
 	}
+	$result->{"\@layout"} = $layout;
+	$result->{$act=$layout->[0]{act}} = { act => $act, layout_id => $result->{$act}{layout_id} };
 }
 
 $frames = Utils::param($param->{frames}, qr/,/);

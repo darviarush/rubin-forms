@@ -31,6 +31,7 @@ $_test = $_site->{test};
 $_port = $_site->{port};
 $_watch = $_site->{watch};
 $_lords = $_site->{lords};
+$_req = $ini->{req};
 
 
 # Открываем сокет
@@ -212,6 +213,8 @@ sub lord {
 		my $time = Time::HiRes::time();
 		@_HEAD = ("Content-Type: text/html; charset=utf-8");
 		msg "\n".RED."$ENV{REQUEST_METHOD}".RESET." $ENV{REQUEST_URI} ".CYAN."tid".RESET.": ".threads->tid().CYAN." from ".RESET.join(", ", threads->list());
+		if($_req > 0) { msg MAGENTA.$_.RESET.": ".CYAN.$ENV{$_}.RESET for grep { /^HTTP/ } keys %ENV }
+		
 		%_frames = ();
 		my @ret = ();
 		our ($_action, $_id) = $ENV{DOCUMENT_URI} =~ m!^/(.*?)(-?\d+)?/?$!;
@@ -225,7 +228,6 @@ sub lord {
 			} else {
 				$_STATUS = 200;
 				our $_GET = Utils::param($ENV{'QUERY_STRING'}, qr/&/);
-				#msg \%ENV;
 				our $_POST = $ENV{CONTENT_LENGTH}? Utils::param_from_post($ENV{'REQUEST_BODY_FILE'}? do { my $f; open $f, $ENV{'REQUEST_BODY_FILE'} or die "NOT OPEN REQUEST_BODY_FILE=".$ENV{'REQUEST_BODY_FILE'}." $!"; $f }: \*STDIN, $ENV{'CONTENT_TYPE'}, $ENV{'CONTENT_LENGTH'}): {};
 				our $_COOKIE = Utils::param($ENV{'COOKIE'}, qr/;\s*/);
 				our $param = {%$_POST, %$_GET};
@@ -234,9 +236,7 @@ sub lord {
 				my $accept = $ENV{'HTTP_ACCEPT'};
 				if($accept !~ /^text\/json\b/i and exists $_action_htm{$_action} and $_STATUS == 200) {
 					@ret = $_action_htm{$_action}->($ret[0], $_action);
-					msg \%_layout, $_action;
 					for(; my $_layout = $_layout{$_action} ; $_action = $_layout) {
-						msg "$accept $_layout $_action";
 						my $arg = ($action = $_action{$_layout})? $action->(): {};
 						@ret = $_action_htm{$_layout}->($arg, $_layout, @ret);
 					}
@@ -259,6 +259,7 @@ sub lord {
 		print for @ret;
 		
 		/: /, msg GREEN."$`".RESET.": ".YELLOW."$'".RESET for @_HEAD;
+		if($_req > 1) { msg $_ for @ret }
 		$time = Time::HiRes::time() - $time;
 		msg MAGENTA."sec".RESET." $time";
 		

@@ -22,11 +22,15 @@ if($ini) {
 	require Connect;
 }
 
-@ARGV = "qq" unless @ARGV;
-my $path = "bin/$ARGV[0].pl";
-if(-e $path) { do $path; }
-elsif(-e "$framework_dir/$path") { do "$framework_dir/$path"; }
+my @av = @ARGV;
+_START_:
+@av = "qq" unless @av;
+my $path = "bin/$av[0].pl";
+my $ret;
+if(-e $path) { $ret = do $path; }
+elsif(-e "$framework_dir/$path") { $ret = do "$framework_dir/$path"; }
 else { die "Команда `$path` не найдена" }
-die $@//$! if $@//$!;
+
+if(ref $ret ne "ARRAY") { return 1; } else { @av = @$ret; goto _START_; }
 
 1;
