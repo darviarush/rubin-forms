@@ -1,5 +1,8 @@
 #> сервер - реализует протокол FastCGI
 
+#use strict;
+#use warnings;
+
 use FCGI;
 #use CGI;
 use File::Find;
@@ -26,12 +29,22 @@ sub end_server {
 	FCGI::CloseSocket($_socket);
 }
 
-$_site = $ini->{site};
-$_test = $_site->{test};
-$_port = $_site->{port};
-$_watch = $_site->{watch};
-$_lords = $_site->{lords};
-$_req = $ini->{req};
+our (
+	$ini, %_action, $_action, $_id, $_user_id, %_frames, %_forms, %_pages, %_layout,
+	%_tab_rules, %_rules, $dbh, $_info,
+	$param, $_COOKIE, $_GET, $POST, $_STATUS, %_STATUS, %_STASH
+	);
+	
+my (
+	@_HEAD
+	);
+
+my $_site = $ini->{site};
+my $_test = $_site->{test};
+my $_port = $_site->{port};
+my $_watch = $_site->{watch};
+my $_lords = $_site->{lords};
+my $_req = $ini->{req};
 
 
 # Открываем сокет
@@ -72,18 +85,17 @@ sub load_htm($) {
 sub load_action ($$) {
 	return load_htm $_[0] if $_[0] =~ /\.htm$/;
 	my $action = Utils::read($_[0]);
-	my %keys = Utils::set(qw/$_COOKIE $_POST $_GET $param $ini @_ %ENV $_pages $_forms $_action/);
-	my %local = Utils::set(qw/$_ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9/);
+	my %keys = Utils::set(qw/$_COOKIE $_POST $_GET $param $ini @_ %ENV %_pages %_forms %_action %_layout %_STASH/);
+	my %local = Utils::set(qw/$_ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9 $a $b/);
 	my %my = ();
-	while($action =~ /\$(\w+)\s*->\s*(\{|\[)|([\%\$\@]\w+)/g) {
+	while($action =~ /\$(\w+)\s*(\{|\[)|([\%\$\@]\w+)/g) {
 		$my{$3} = 1 if $3;
 		$my{($2 eq "{"? "%": "@").$1} = 1 if $1;
 	}
 	my @my = keys %my;
 	my @local = grep { exists $local{$_} } @my;
 	@my = grep { not exists $keys{$_} and not exists $local{$_} } @my;
-	
-	my $eval = join("", "sub{" , (@local? ("\nlocal(", join(", ", @local), ");"): ()), (@my? ("\nmy(", join(", ", @my), ");"): ()), "\n", $action, "\n}");
+	my $eval = join("", "sub{ use strict; use warnings; " , (@local? ("\nlocal(", join(", ", @local), ");"): ()), (@my? ("\nmy(", join(", ", @my), ");"): ()), "\n", $action, "\n}");
 	my $code = eval $eval;
 	if(my $error=$! || $@) { msg RED."load_action $_[0]:".RESET." $error" } else { $_action{$_[1]} = $code }
 }
@@ -98,8 +110,8 @@ for my $a (keys(%_tab_rules), keys(%_rules)) {
 # вспомогательные функции фреймов
 sub include_action ($$) {
 	my ($data, $frame_id, $default_action) = @_;
-	our %_frames = Utils::parse_frames($param->{frames}) unless %_frames;
-	my $action = $_frames->{$frame_id} // $default_action;
+	%_frames = Utils::parse_frames($param->{frames}) unless %_frames;
+	my $action = $_frames{$frame_id} // $default_action;
 	my $act;
 	$_action_htm{$action}->(($act=$_action{$action}? $act->($data, $action): $data), $action)
 }
@@ -217,23 +229,23 @@ sub lord {
 		
 		%_frames = ();
 		my @ret = ();
-		our ($_action, $_id) = $ENV{DOCUMENT_URI} =~ m!^/(.*?)(-?\d+)?/?$!;
+		($_action, $_id) = $ENV{DOCUMENT_URI} =~ m!^/(.*?)(-?\d+)?/?$!;
 
 		$_action = 'index' if $_action eq "";
 		eval {
 			my ($action, $form, $htm);
-			unless(($action = $_action{$_action}) or ($form = $_forms{$_action}) or exists $_action_htm{$_action} and $ENV{'HTTP_ACCEPT'} !~ /^text\/json\b/i) {
+			my $accept = $ENV{'HTTP_ACCEPT'};
+			unless(($action = $_action{$_action}) or (exists $_info->{$_action} and $form = $_forms{$_action}) or exists $_action_htm{$_action} and $accept !~ /^text\/json\b/i) {
 				$_STATUS = 404;
 				@ret = "404 Not Found";
 			} else {
 				$_STATUS = 200;
-				our $_GET = Utils::param($ENV{'QUERY_STRING'}, qr/&/);
-				our $_POST = $ENV{CONTENT_LENGTH}? Utils::param_from_post($ENV{'REQUEST_BODY_FILE'}? do { my $f; open $f, $ENV{'REQUEST_BODY_FILE'} or die "NOT OPEN REQUEST_BODY_FILE=".$ENV{'REQUEST_BODY_FILE'}." $!"; $f }: \*STDIN, $ENV{'CONTENT_TYPE'}, $ENV{'CONTENT_LENGTH'}): {};
-				our $_COOKIE = Utils::param($ENV{'COOKIE'}, qr/;\s*/);
-				our $param = {%$_POST, %$_GET};
-				
-				if($action) { @ret = $action->(); } elsif($form) { @ret = action_form_view $_action, $param }
-				my $accept = $ENV{'HTTP_ACCEPT'};
+				$_GET = Utils::param($ENV{'QUERY_STRING'}, qr/&/);
+				$_POST = $ENV{CONTENT_LENGTH}? Utils::param_from_post($ENV{'REQUEST_BODY_FILE'}? do { my $f; open $f, $ENV{'REQUEST_BODY_FILE'} or die "NOT OPEN REQUEST_BODY_FILE=".$ENV{'REQUEST_BODY_FILE'}." $!"; $f }: \*STDIN, $ENV{'CONTENT_TYPE'}, $ENV{'CONTENT_LENGTH'}): {};
+				$_COOKIE = Utils::param($ENV{'HTTP_COOKIE'}, qr/;\s*/);
+				$param = {%$_POST, %$_GET};
+				auth();
+				if($action) { @ret = $action->(); } elsif($form) { @ret = action_view $_action, $param }
 				if($accept !~ /^text\/json\b/i and exists $_action_htm{$_action} and $_STATUS == 200) {
 					@ret = $_action_htm{$_action}->($ret[0], $_action);
 					for(; my $_layout = $_layout{$_action} ; $_action = $_layout) {
@@ -258,12 +270,12 @@ sub lord {
 		print "\r\n";
 		print for @ret;
 		
-		/: /, msg GREEN."$`".RESET.": ".YELLOW."$'".RESET for @_HEAD;
+		/: /, msg GREEN.$`.RESET.": ".YELLOW.$'.RESET for @_HEAD;
 		if($_req > 1) { msg $_ for @ret }
 		$time = Time::HiRes::time() - $time;
 		msg MAGENTA."sec".RESET." $time";
 		
-		our %_STASH = ();
+		%_STASH = ();
 		@ret = ();
 	}
 }

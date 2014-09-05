@@ -549,7 +549,7 @@ sub parse_frames {
 # темплейт, аналогичный из js-библиотеки CTemplate::compile. Возвращает текст функции
 sub TemplateStr {
 	
-	my $RE_TYPE = qr/("(?:\\"|[^"]*)"|'(?:\\'|[^'])*'|-?\d+(?:\.\d+)?(?:E[+-]\d+)?)/;
+	my $RE_TYPE = qr/("(?:\\"|[^"])*"|'(?:\\'|[^'])*'|-?\d+(?:\.\d+)?(?:E[+-]\d+)?)/;
 	
 	my $code_begin = 'sub {
 	my ($dataset, $id1) = @_;

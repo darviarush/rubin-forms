@@ -57,6 +57,6 @@ Utils::Template('
 ', $forms, $formlist);
 
 #warn Dumper($form);
-$query = form_query($formlist->[0]);
+#$query = form_query($formlist->[0]);
 #warn Dumper($query);
 

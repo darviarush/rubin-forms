@@ -87,11 +87,11 @@ sub get_ini_info {
 sub auth (@) {
 	my ($fld) = @_;
 	return $_user_id if $_user_id and not $fld;
-	my $sess = $COOKIE->{sess};
+	my $sess = $_COOKIE->{sess};
 	return unless $sess;
 	my @res = $dbh->selectrow_array("SELECT user_id$fld FROM sess WHERE id=?", undef, $sess);
-	update("sess", {now=>strftime("%F %T", localtime())}, {id=>$sess}) if $_user_id = $res[0];
-	return $fld? @res: $res[0];
+	update("sess", {now=>strftime("%F %T", localtime())}, {id=>$sess}) if $_STASH{_user_id} = $_user_id = $res[0];
+	return $fld? @res: $_user_id;
 }
 
 # проверяет валидацию параметров

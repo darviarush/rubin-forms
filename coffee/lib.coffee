@@ -317,10 +317,10 @@ CRadix =
 		return x
 
 CUrl =
-	from: (uri) -> if m=uri.match ///^ (?: (?:(\w+):)? // ([^/:]+) (?::(\d+)) )? (?: ([^\?#]*) )? (?: \?([^#]*) )? (?: \#(.*) )? $/// then href: uri, protocol: m[1] || "", host: m[2] || "", port: m[3] || "", pathname: m[4] || "", search: m[5] || "", hash: m[6] || "" else null
+	from: (uri) -> if m=uri.match ///^ (?: (?:(\w+):)? // ([^/:?#]+) (?::(\d+))? )? (?: ([^\?#]*) )? (?: \?([^#]*) )? (?: \#(.*) )? $/// then href: uri, protocol: m[1] || "", host: m[2] || "", port: m[3] || "", pathname: m[4] || "", search: m[5] || "", hash: m[6] || "" else null
 	to: (a) -> 
 		s = if a.host then (if p=a.protocol then p+":" else "") + "//" + a.host + (if p=a.port then ":" + p else "") else ""
-		if p=a.pathname then s = (if s then s+"/"+p else p) 
+		if p=a.pathname then s = (if s then s+(if p[0]!="/" then "/" else "")+p else p) 
 		if p=a.search then s+="?"+p
 		if p=a.hash then s+="#"+p
 		s
@@ -862,8 +862,8 @@ CTemplate =
 		code_begin1 = "function(data, id) { return ['"
 		code_end1 = '\'].join("") }'
 		
-		RE_TYPE = ///("(?:\\"|[^"]*)"|'(?:\\'|[^'])*'|-?\d+(?:\.\d+)?(?:E[+-]\d+)?)///
-		CALL_FN = new RegExp "^{%\s*(\w+)\s+#{RE_TYPE}(?:\s*,\s*#{RE_TYPE})?(?:\s*,\s*#{RE_TYPE})?(?:\s*,\s*#{RE_TYPE})?(?:\s*,\s*#{RE_TYPE})?\s*%\}"
+		RE_TYPE = "(\"(?:\\\"|[^\"])*\"|'(?:\\'|[^'])*'|-?\\d+(?:\\.\\d+)?(?:E[+-]\\d+)?)"
+		CALL_FN = new RegExp "^\\{%\\s*(\\w+)\\s+#{RE_TYPE}(?:\\s*,\\s*#{RE_TYPE})?(?:\\s*,\\s*#{RE_TYPE})?(?:\\s*,\\s*#{RE_TYPE})?(?:\\s*,\\s*#{RE_TYPE})?\\s*%\\}"
 		
 		_tags = ///(?:input|meta)///i
 		tags =
@@ -1528,7 +1528,8 @@ class CWidget
 	byViewXYAll: byXYAll$.inline 'byViewXYAll', 'byViewXY'
 	
 	byId: (id) ->
-		if (d=@document()).contains @element then @wrap d.getElementById id
+		if e=(d=@document()).getElementById id then @createWidget e
+		else if d.contains @element then null
 		else if id == (root=@root()).element.id then root
 		else root.first "[id=#{id}]"
 	byTag: if tn$=(document.getElementsByTagName && IE!=5) then (name) -> @wrap @element.getElementsByTagName(name)[0] else (name) -> @wrap NW.Dom.byTag(name, @element)[0]
@@ -2584,22 +2585,6 @@ class CNode extends CWidget
 	tag: (tag) -> if arguments.length then throw @raise "Для CNode.tag изменение ноды по имени не определено" else @element.nodeName
 
 
-class CInputWidget extends CWidget
-	constructor: ->
-		super
-		if @attr "cplaceholder" then @setHandler 'blur', 'focus'; @send 'onblur'
-		if valid = @attr "cvalid" then @setHandler 'keyup'
-
-	val_: (val) -> if arguments.length then @element.value = val; this else @element.value
-	val: (args...) -> if @_save_type then (if arguments.length then @onfocus(); @val_ args...; @onblur() else "") else @val_ args...
-		
-	onblur: -> if @val_() == "" then @_save_type = @attr "type"; @attr "type", "text"; @val_ @attr "cplaceholder"; @addClass 'c-placeholder'
-	onfocus: -> if @_save_type then @attr "type", @_save_type; @removeClass 'c-placeholder'; @_save_type = null ; @val_ ""
-	onkeyup: -> (if m=@_model then m.model[m.slot] @val()); @onfocus(); v=@valid(); if v then @clear 'onInvalid'; @tooltip null else @timeout 1500, 'onInvalid'
-	
-	setModel: -> @setHandler 'onkeyup'; super
-
-	
 class CButtonWidget extends CWidget
 	constructor: -> super ; @setHandler "click"
 	val: -> undefined
@@ -2618,18 +2603,32 @@ class CEraseWidget extends CButtonWidget
 class CPingWidget extends CButtonWidget
 	onclick: (e) -> @parent().ping(); e.stop(); off
 
+	
+class CInputWidget extends CWidget
+	constructor: ->
+		super
+		if @attr "cplaceholder" then @setHandler 'blur', 'focus'; @send 'onblur'
+		if valid = @attr "cvalid" then @setHandler 'keyup'
 
-class CAWidget extends CButtonWidget
+	val_: (val) -> if arguments.length then @element.value = val; this else @element.value
+	val: (args...) -> if @_save_type then (if arguments.length then @onfocus(); @val_ args...; @onblur() else "") else @val_ args...
+		
+	onblur: -> if @val_() == "" then @_save_type = @attr "type"; @attr "type", "text"; @val_ @attr "cplaceholder"; @addClass 'c-placeholder'
+	onfocus: -> if @_save_type then @attr "type", @_save_type; @removeClass 'c-placeholder'; @_save_type = null ; @val_ ""
+	onkeyup: -> (if m=@_model then m.model[m.slot] @val()); @onfocus(); v=@valid(); if v then @clear 'onInvalid'; @tooltip null else @timeout 1500, 'onInvalid'
+	
+	setModel: -> @setHandler 'onkeyup'; super
 
 
 class CSelectWidget extends CInputWidget
 	#text: (text) -> if arguments.length then @element.options[@element.selectedIndex].text = text else @element.options[@element.selectedIndex].text
 
+
 class CTextareaWidget extends CInputWidget
 
 
 class CImgWidget extends CInputWidget
-	val: (val) -> null
+	val: (val) -> undefined
 	src: (val) -> if arguments.length then @element.src = val; this else @element.src
 
 
@@ -3287,6 +3286,7 @@ class CLoaderWidget extends CWidget
 		this
 
 	loaded: ->
+		do @remove_timer
 		request = @request.request
 		customer = @request.customer
 		try
@@ -3309,6 +3309,7 @@ class CLoaderWidget extends CWidget
 		this
 
 	loaded_error: (error, e) ->
+		do @remove_timer
 		@warn "loaded_error", error, e
 		@request.error = error
 		@request.exception = e
@@ -3320,15 +3321,16 @@ class CLoaderWidget extends CWidget
 		customer.send "onError", error, @request, args...
 		do @remove_request
 
+	remove_timer: -> (if timer = @request.timer then clearTimeout timer; @request.timer = null); this
 	remove_request: ->
 		@request.request.onreadystatechange = null
-		clearTimeout @request.timer
+		do @remove_timer
 		@request = null
 
 	ohSubmit: -> @vid()
 	ohComplete: -> @novid()
 	ohLoad: -> @request.customer.tooltip null
-	ohError: -> @request.customer.tooltip html: "<div class='fl ico-rb ico-ajax-error'></div><h3>Ошибка ajax</h3>"+escapeHTML(@request.error), open: 1, timeout: 5000, class: 'c-error'
+	ohError: -> @request.customer.tooltip html: "<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка ajax</h3>"+escapeHTML(@request.error), open: 1, timeout: 5000, class: 'c-error'
 
 
 class CStatusWidget extends CLoaderWidget
@@ -3356,33 +3358,49 @@ class CRouterWidget extends CLoaderWidget
 	onclick_document: (e) -> 
 		if (a=e.target()).tag() == "A"
 			url = CUrl.from a.attr "href"
-			if not url.host or url.host == a.document().location.host then @reload url
+			if not url.host or url.host == a.document().location.host then @reload url, 1
 		this
 		
-	reload: (url) ->
-		url = CUrl.from url if typeof url == 'string'
-		layout = if not url.pathname or url.pathname == @document().location.pathname then '' else url.pathname
-		say url, layout
+	reload: (url, not_lay) ->
+		say url = CUrl.from url if typeof url == 'string'
+		layout = if not url.pathname or not_lay and url.pathname == @document().location.pathname then '' else url.pathname
 		param = if url.search then CParam.from url.search else {}
 		@_loader = this
 		p = {}
-		p.frames = param.frames if param.frames
+		p.frames = CParam.to param.frames, "," if param.frames
 		p.layout = layout if layout
 		p.layout_id = url.hash if url.hash
-		@ping _act: 'frames', p
+		p._act = 'frames'
+		@ping p, p.frames, url
 	
-	onLoad: (data) ->
+	onLoad: (data, request, frames, url) ->
 		data = fromJSON data if typeof data == 'string'
-		say 'onLoad', data
+		if stash = data['@stash'] then extend CTemplate._STASH, stash
 		if layout = data['@layout']
 			for i in [1...layout.length]
-				layout_id = layout[i-1].layout_id
+				layout_id = data[layout[i-1]].layout_id
 				page = data[act = layout[i]]
-				@byId(layout_id).html CTemplate.compile(page.template)(page.data, page.act)
-				delete data[act]
-		for act, page of data
-			@byId(page.id).html CTemplate.compile(page.template)(page.data, page.act)
+				@byId(layout_id).html CTemplate.compile(page.template)(page.data || {}, page.act)
+			title = CTemplate._STASH.title
+			
+		if frames
+			for act, id of frames
+				page = data[act]
+				@byId(page.id).html CTemplate.compile(page.template)(page.data, page.act)
+		
+		CRoot.onready_dom()
+		
+		url = CUrl.to url
+		@navigate url, title || @document().title, data
 		this
+	
+	pop$ = ->
+		#say 'popstate', arguments, location, window.history_pos$, window.history$
+		href = @window().location.href
+		@reload href
+
+	onhashchange_window: pop$
+	onpopstate_window: pop$
 
 
 CView =

@@ -17,6 +17,7 @@ new CTest 'key-CFunction-implements', """
 	@ok ex.text
 	@ok not ex.wrap
 
+CTest.category "эффекты"
 
 new CTest 'key-CEffect-fadeIn', """
 `fadeIn` - эффект проявления элемента
@@ -105,7 +106,6 @@ new CTest 'key-CEffect-slideDown', """
 	@w().on 'click', -> @morph effect: 'slideDown', timeout: 'fast', end: -> @timeout 500, -> @show()
 	@w().morph effect: 'slideDown', timeout: 'fast', end: -> self.ok 1 ; @timeout 500, -> @show()
 
-	
 
 CTest.category "служебные методы"
 
@@ -2782,11 +2782,20 @@ new CTest 'key-CUrl-from', """
 	@is url.pathname, "abc"
 	@is url.hash, "123"
 	
+	url = CUrl.from 'http://rubin/'
+	@is url.protocol, 'http'
+	@is url.host, 'rubin'
+	@is url.pathname, '/'
+	
 	
 new CTest 'key-CUrl-to', """
 `CUrl.to url_object` - обращает в url
 """, ->
 	@is "?a=1", CUrl.to search: CParam.to a: 1
+	@is "//rubin", CUrl.to host: 'rubin'
+	@is "//rubin/", CUrl.to host: 'rubin', pathname: "/"
+	@is "//rubin/abc", CUrl.to host: 'rubin', pathname: "abc"
+	@is "//rubin/abc", CUrl.to host: 'rubin', pathname: "/abc"
 	
 	
 	
