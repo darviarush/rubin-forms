@@ -30,7 +30,7 @@ sub end_server {
 }
 
 our (
-	$ini, %_action, $_action, $_id, $_user_id, %_frames, %_forms, %_pages, %_layout,
+	$ini, %_action, %_action_htm, $_action, $_id, $_user_id, %_frames, %_forms, %_pages, %_layout,
 	%_tab_rules, %_rules, $dbh, $_info,
 	$param, $_COOKIE, $_GET, $POST, $_STATUS, %_STATUS, %_STASH
 	);
@@ -60,8 +60,8 @@ sub load_htm($) {
 	$path =~ /\baction\/(.*)\.htm$/;
 	my $index = $1;
 		
-	$_ = Utils::read($path);
-	$_ = Utils::TemplateStr($_, my $forms, my $page);
+	my $tmpl = Utils::read($path);
+	my $eval = Utils::TemplateStr($tmpl, my $forms, my $page);
 	
 	our %_forms; our %_pages;
 	$_pages{$index} = $page;
@@ -79,13 +79,14 @@ sub load_htm($) {
 		$_forms{$id} = $form;
 	}
 	
-	my $eval = eval $_;
-	if(my $error = $! || $@) { msg "load_htm `$path`: $error"; $path =~ s/\//_/g; msg "`$path.pl`"; Utils::write("$path.pl", $_); } else { $_pages{$index}{sub} = $_action_htm{$index} = $eval }
+	my $code = eval $eval;
+	if(my $error = $! || $@) { msg "load_htm `$path`: $error"; $path =~ s/\//_/g; $_action_htm{$index} = sub { die 501 }; }
+	else { $_pages{$index}{sub} = $_action_htm{$index} = $code }
 }
 sub load_action ($$) {
 	return load_htm $_[0] if $_[0] =~ /\.htm$/;
 	my $action = Utils::read($_[0]);
-	my %keys = Utils::set(qw/$_COOKIE $_POST $_GET $param $ini @_ %ENV %_pages %_forms %_action %_layout %_STASH/);
+	my %keys = Utils::set(qw/$_COOKIE $_POST $_GET $param $ini @_ %ENV %_pages %_forms %_action %_action_htm %_layout %_STASH/);
 	my %local = Utils::set(qw/$_ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9 $a $b/);
 	my %my = ();
 	while($action =~ /\$(\w+)\s*(\{|\[)|([\%\$\@]\w+)/g) {
@@ -97,7 +98,8 @@ sub load_action ($$) {
 	@my = grep { not exists $keys{$_} and not exists $local{$_} } @my;
 	my $eval = join("", "sub{ use strict; use warnings; " , (@local? ("\nlocal(", join(", ", @local), ");"): ()), (@my? ("\nmy(", join(", ", @my), ");"): ()), "\n", $action, "\n}");
 	my $code = eval $eval;
-	if(my $error=$! || $@) { msg RED."load_action $_[0]:".RESET." $error" } else { $_action{$_[1]} = $code }
+	my $index = $_[1];
+	if(my $error=$! || $@) { msg RED."load_action $_[0]:".RESET." $error"; $_action{$index} = sub { die 501 }; Utils::write("$index.pl", $eval) } else { $_action{$index} = $code }
 }
 for_action \&load_action;	# грузим экшены
 
@@ -110,7 +112,7 @@ for my $a (keys(%_tab_rules), keys(%_rules)) {
 # вспомогательные функции фреймов
 sub include_action ($$) {
 	my ($data, $frame_id, $default_action) = @_;
-	%_frames = Utils::parse_frames($param->{frames}) unless %_frames;
+	%_frames = Utils::parse_frames($param->{_frames_}) unless %_frames;
 	my $action = $_frames{$frame_id} // $default_action;
 	my $act;
 	$_action_htm{$action}->(($act=$_action{$action}? $act->($data, $action): $data), $action)
@@ -233,9 +235,9 @@ sub lord {
 
 		$_action = 'index' if $_action eq "";
 		eval {
-			my ($action, $form, $htm);
+			my ($action);
 			my $accept = $ENV{'HTTP_ACCEPT'};
-			unless(($action = $_action{$_action}) or (exists $_info->{$_action} and $form = $_forms{$_action}) or exists $_action_htm{$_action} and $accept !~ /^text\/json\b/i) {
+			unless(($action = $_action{$_action}) or exists $_action_htm{$_action}) {
 				$_STATUS = 404;
 				@ret = "404 Not Found";
 			} else {
@@ -245,7 +247,7 @@ sub lord {
 				$_COOKIE = Utils::param($ENV{'HTTP_COOKIE'}, qr/;\s*/);
 				$param = {%$_POST, %$_GET};
 				auth();
-				if($action) { @ret = $action->(); } elsif($form) { @ret = action_view $_action, $param }
+				if($action) { @ret = $action->(); } else { @ret = action_main $_action }
 				if($accept !~ /^text\/json\b/i and exists $_action_htm{$_action} and $_STATUS == 200) {
 					@ret = $_action_htm{$_action}->($ret[0], $_action);
 					for(; my $_layout = $_layout{$_action} ; $_action = $_layout) {
@@ -258,11 +260,15 @@ sub lord {
 		};
 		if($error = $@ || $!) {
 			$@ = $! = undef;
-			$_STATUS = 500;
-			@_HEAD = "Content-Type: text/plain; charset=utf-8";
-			msg "action-error `$_action".(defined($_id)? ".$_id": "")."`: $error\n";
-			@ret = to_json({error=> $_test ? $error: "Внутренняя ошибка"});
-			dbh_connect() unless $dbh and $dbh->ping;
+			if(ref $error) {
+				@ret = $error;
+			} else {
+				$_STATUS = ($error =~ /^\d+$/? $error: 500);
+				@_HEAD = "Content-Type: text/plain; charset=utf-8";
+				msg "action-error `$_action".(defined($_id)? ".$_id": "")."`: $error\n";
+				@ret = to_json({error=> $_test ? $error: "Внутренняя ошибка"});
+				dbh_connect() unless $dbh and $dbh->ping;
+			}
 		}
 		
 		push @_HEAD, "Status: $_STATUS $_STATUS{$_STATUS}\r\n" if $_STATUS;

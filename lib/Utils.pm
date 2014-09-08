@@ -628,6 +628,9 @@ sub TemplateStr {
 		m!\G\{%\s*(\w+)\s*=%\}!? do { "', do { \$_STASH{'$1'} = join '', ('" }:
 		m!\G\{%\s*end\s*%\}!? do { "'); () }, '" }:
 		m!\G\{%=\s*(\w+)\s*%\}!? do { "', \$_STASH{'$1'}, '" }:
+		m!\G\{%\s*load(?:\s+(\w+))?\s*%\}!? do { push @{$page->{load_forms}}, $form; $form->{load} = $1; () }:
+		m!\G\{%\s*model\s+(\w+)\s*%\}!? do { $form->{model} = $1; () }:
+		m!\G\{%\s*noload\s*%\}!? do { $form->{noload} = 1; () }:
 		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)]; () }:
 		m!\G(?:\$|(#))(\{\s*)?(\w+)!? do {
 			my $open_span = $1;

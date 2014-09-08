@@ -199,7 +199,8 @@ sub form_query (@) {
 # экшены
 # выбирает какая акция нужна. Параметров не использует
 sub action_main {
-	my $method = $ENV{'HTTP_AJAX'};
+	my ($_action) = @_;
+	my $method = $ENV{'HTTP_METHOD'};
 	
 	$param->{id} = $_id if defined $_id;
 	

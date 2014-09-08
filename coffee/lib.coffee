@@ -317,19 +317,22 @@ CRadix =
 		return x
 
 CUrl =
-	from: (uri) -> if m=uri.match ///^ (?: (?:(\w+):)? // ([^/:?#]+) (?::(\d+))? )? (?: ([^\?#]*) )? (?: \?([^#]*) )? (?: \#(.*) )? $/// then href: uri, protocol: m[1] || "", host: m[2] || "", port: m[3] || "", pathname: m[4] || "", search: m[5] || "", hash: m[6] || "" else null
+	from: (uri) -> if m=uri.match ///^ (?: (?:(\w+):)? // ([^/:?#]+) (?::(\d+))? )? (?: ([^\?#]*) )? (?: \?([^#]*) )? (?: \#(.*) )? $/// then href: uri, protocol: m[1] || "", host: m[2] || "", port: m[3] || "", pathname: m[4] || "", search: m[5] || "", hash: m[6] || "", param: (if m[5] then CParam.from m[5] else {}) else null
 	to: (a) -> 
 		s = if a.host then (if p=a.protocol then p+":" else "") + "//" + a.host + (if p=a.port then ":" + p else "") else ""
-		if p=a.pathname then s = (if s then s+(if p[0]!="/" then "/" else "")+p else p) 
-		if p=a.search then s+="?"+p
+		if p=a.pathname then s = (if s then s+(if p[0]!="/" then "/" else "")+p else p)
+		search = CParam.from a.search
+		extend search, a.param
+		search = CParam.to search
+		if search then s+="?"+search
 		if p=a.hash then s+="#"+p
 		s
 
 CParam =
 	get: (url=document.location) -> if match = String(url).match /// \?(.*) /// then CParam.from(match[1]) else {}
 	add: (url, param) -> url + (if /\?/.test url then "&" else "?") + CParam.to param
-	to: (param) -> if param instanceof Object then ([escape(key), escape(if val instanceof Object then toJSON val else String(val))].join("=") for key, val of param when val?).join "&" else param
-	from: (param, sep="&") -> x={}; (for i in param.split sep then a=i.match /// ([^=]+)=?(.*) ///; x[unescape a[1]]=(if a[2] then unescape a[2] else "")); x
+	to: (param, sep="&") -> if param instanceof Object then ([escape(key), escape(if val instanceof Object then toJSON val else String(val))].join("=") for key, val of param when val?).join sep else param
+	from: (param, sep=/&/) -> return {} unless param; x={}; (for i in param.split sep then a=i.match /// ([^=]+)=?(.*) ///; x[unescape a[1]]=(if a[2] then unescape a[2] else "")); x
 
 CDate =
 	i18n:
@@ -1131,14 +1134,17 @@ class CEvent
 	mid: off
 	right: off
 	
-	keys = 38: 'up', 40: 'down', 37: 'left', 39: 'right', 27: 'esc', 8: 'backspace', 9: 'tab', 46: 'delete', 13: 'enter'
+	keys$ = 38: 'up', 40: 'down', 37: 'left', 39: 'right', 27: 'esc', 8: 'backspace', 9: 'tab', 46: 'delete', 13: 'enter'
+	
+	for key$, val$ in keys$ then @::['press'+key$.upFirst()] = do(val$)-> -> @code() == val$
 	
 	stop: -> @event.stopPropagation()		# отключает всплывание
 	cancel: -> @event.preventDefault()		# отключает событие по умолчанию
+	break: -> @stop(); @cancel()
 	target: unless CNavigator.safari <= 3 then -> CRoot.createWidget @event.target else -> CRoot.createWidget(if (targ=@event.target).nodeType == 3 then targ.parentNode else targ) # safari3
 	relatedTarget: -> (target = @event.relatedTarget) and CRoot.createWidget target
 	code: -> @event.charCode || @event.keyCode || @event.which
-	key: -> keys[code=@code()] || String.fromCharCode code
+	key: -> keys$[code=@code()] || String.fromCharCode code
 	x: -> @event.pageX
 	y: -> @event.pageY
 	viewX: -> @event.clientX
@@ -1308,38 +1314,47 @@ class CWidget
 	if his$=history.pushState
 		pushState$ = (w, data, title, url) -> w.history.pushState null, title, url
 		replaceState$ = (w, data, title, url) -> w.history.replaceState null, title, url
-		gotoState$ = (n) -> w.history.go n
+		gotoState$ = (w, n) -> w.history.go n
 	else
 		pushState$ = (w, data, title, url) -> w.location.hash = "#"+url
 		replaceState$ = pushState$
 		gotoState$ = (w, n) -> w.location.hash = "#"+w.history$[w.history_pos$+=n][0]
-
+		
+	init_his$ = (w) -> unless w.history$ then w.history$ = [[w.location.href, w.document.title]]; w.history_pos$ = 0
+	
 	navigate: (args...) ->
-		w=@window()
-		unless w.history$ then w.history$ = [[w.location.href, w.document.title, null]]; w.history_pos$ = 0
+		init_his$ w=@window()
 		if arguments.length
 			if args[0] instanceof Array then return w.history$[w.history_pos$+args[0][0]]
 			if typeof args[0] == 'number' then n = args.shift()
-			[url, title, data] = args
 			title = w.document.title unless title?
+			[url, title, data] = args
 			w.document.title = title
 			unless n?
-				pushState$ w, data, title, url
-				(w.history$ = w.history$.slice 0, w.history_pos$++)[w.history_pos$] = args
-			else if n == 0 then replaceState$ w, data, title, url; w.history$[w.history_pos$] = args
+				pushState$ w, null, title, url
+				args[0] = w.location.href
+				(w.history$ = w.history$.slice w.history_pos$++)[w.history_pos$] = args
+			else if n == 0 then replaceState$ w, null, title, url; args[0] = w.location.href; w.history$[w.history_pos$] = args
 			else if (t=w.history$[w.history_pos$+=n])? then w.document.title = t[1]; gotoState$ w, n
 			else throw @raise "Переход по истории на несуществующий элемент"
 			this
 		else w.history$[w.history_pos$]
 	
 	history: (n) ->
-		w=@window()
+		init_his$ w = @window()
 		unless w.history$ then w.history$ = [[w.location.href, w.document.title, null]]; w.history_pos$ = 0
 		if arguments.length == 0 then w.history$[w.history_pos$]
 		else if typeof n == 'number' then w.history$[w.history_pos$+n]
 		else if n == on then w.history_pos$
 		else if n == off then w.history$.length
-		else (for h, i in w.history$ when h[0] == n then return i); -1
+		else 
+			i = j = w.history_pos$
+			h = w.history$
+			len = h.length
+			while i>=0 or j<len
+				if --i>=0 and h[i][0] == n then return i
+				if ++j<len and h[j][0] == n then return j
+			return null
 		
 
 	# методы работы с cookie
@@ -1753,7 +1768,7 @@ class CWidget
 	down: (i) -> if arguments.length then @wrap @element.childNodes[if i<0 then @element.childNodes.length+i else i] else new CWidgets @element.childNodes
 	
 	remove: -> @send 'onDestroy', 'remove'; e = @element; @unwrap(); e.parentNode.removeChild e; new CWidgets []
-	free: (timeout, listen) -> (if timeout? then @hide timeout, do(listen)->-> @free(); @send listen else @element.parentNode.removeChild @element); this
+	free: (timeout, listen) -> (if timeout? then @hide timeout, do(listen)->-> @free(); @send listen else @element.parentNode?.removeChild @element); this
 	
 	focus: -> @element.focus(); this
 	hasFocus: -> @document().activeElement == @element
@@ -3248,9 +3263,10 @@ class CLoaderWidget extends CWidget
 
 	_load: (type, param={}, customer, args) ->
 
-		if @request
-			@warn "Поступил load до того, как закончился предыдущий old_customer:", @request.customer, "new_customer:", customer
-			do @remove_request
+		if (req=@request) and not req.end
+			req.request.abort()
+			@loaded_error "Поступил load до того, как закончился предыдущий old_customer: " + req.customer + " new_customer: " + customer
+		
 		@request = type: type, param: param, args: args
 		return this if customer.send("onSubmit", param) is off or off is @ohSubmit param
 
@@ -3263,21 +3279,29 @@ class CLoaderWidget extends CWidget
 		
 		url = param._act || customer.attr("action") || @attr("action") || (if id=customer.id() then (if not param.id and pk=customer.data?.id then param.id = pk); "/"+id else @document().location.pathname)
 		
+		delete param._act
+		
+		if type == 'submit'
+			url = CUrl.from url
+			layout = if not url.pathname or not param._history and url.pathname == @document().location.pathname then '' else url.pathname
+			url.param._layout_ = layout.replace /^\/(.)/, "$1" if layout
+			if url.hash then url.param._layout_id_ = url.hash; url.hash = ""
+			url.pathname = "/frames"
+			url = CUrl.to url
+		
 		method = param._method || customer._method || customer.attr("cmethod") || @attr("cmethod") || @_method
-		async = if '_async' of param then param._async else on
+		delete param._method
+		async = if '_async' of param then param._async; delete param._async else on
 		
 		headers = Vary: 'Accept', Ajax: type
 		if CInit.post == 'json' then headers['Content-Type'] = 'application/json'
-		dopparam = {}
 		
-		for key of param
-			if key[0] == '$' then who=headers else if key[0] == '_' then who=dopparam else if param[key] == undefined then delete param[key]; continue else continue
-			who[key.slice 1] = param[key]
-			delete param[key]
+		for key of param when key[0] == '$' then headers[key.slice(1).upFirst()] = param[key]; delete param[key]
 			
-		extend @request, timer: timer, request: request, headers: headers, dopparam: dopparam, url: url, customer: (if t = customer.attr 'target' then @byId t else customer)
+		extend @request, timer: timer, request: request, headers: headers, history: param._history, url: url, customer: (if t = customer.attr 'target' then @byId t else customer)
+		delete param._history
 		
-		params = if method != "POST" then (if params then url += "?" + params); null
+		params = if method != "POST" then (if params then url = CUrl.from url; extend url.param, param; url = CUrl.to url); null
 		else if CInit.post == 'json' then toJSON param
 		else CParam.to param
 		request.open method, url, async
@@ -3286,7 +3310,7 @@ class CLoaderWidget extends CWidget
 		this
 
 	loaded: ->
-		do @remove_timer
+		do @end_request
 		request = @request.request
 		customer = @request.customer
 		try
@@ -3297,19 +3321,21 @@ class CLoaderWidget extends CWidget
 		args = @request.args
 		customer.send "onComplete", data, @request, args...
 		switch @request.type
-			when "load", "submit"
-				customer.update data, @request
 			when "upload"
 				customer.add data
+			when "submit"
+				@submit_manipulate data
+			when "load"
+				customer.update data, @request
 			when "erase"
 				customer.remove()
 		do @ohLoad
 		customer.send "onLoad", data, @request, args...
-		do @remove_request
+		@request = null
 		this
 
 	loaded_error: (error, e) ->
-		do @remove_timer
+		do @end_request
 		@warn "loaded_error", error, e
 		@request.error = error
 		@request.exception = e
@@ -3319,18 +3345,50 @@ class CLoaderWidget extends CWidget
 		do @ohError
 		customer.send "onComplete", error, @request, args...
 		customer.send "onError", error, @request, args...
-		do @remove_request
-
-	remove_timer: -> (if timer = @request.timer then clearTimeout timer; @request.timer = null); this
-	remove_request: ->
-		@request.request.onreadystatechange = null
-		do @remove_timer
 		@request = null
+
+	end_request: ->
+		@request.request.onreadystatechange = null
+		clearTimeout @request.timer
+		@request.end = on
+		
 
 	ohSubmit: -> @vid()
 	ohComplete: -> @novid()
 	ohLoad: -> @request.customer.tooltip null
 	ohError: -> @request.customer.tooltip html: "<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка ajax</h3>"+escapeHTML(@request.error), open: 1, timeout: 5000, class: 'c-error'
+	
+	submit_manipulate: (data) ->
+		data = fromJSON data if typeof data == 'string'
+		if stash = data['@stash'] then extend CTemplate._STASH, stash
+		if layout = data['@layout']
+			for i in [1...layout.length]
+				layout_id = data[layout[i-1]].layout_id
+				page = data[act = layout[i]]
+				@byId(layout_id).html CTemplate.compile(page.template)(page.data || {}, act)
+			title = CTemplate._STASH.title
+			
+		if frames
+			for act, id of frames
+				page = data[act]
+				@byId(page.id).html CTemplate.compile(page.template)(page.data || {}, act)
+
+		CRoot.onready_dom()
+		
+		old = CUrl.from @window().location.href
+		url = CUrl.from @request.url
+		url.pathname = url.param._layout_ || old.pathname
+		delete url.param._layout_
+		url.search = ""
+		extend frames = {}, CParam.from(old.param._frames_, /,/), CParam.from url.param._frames_, /,/
+		url.param._frames_ = frames if frames = CParam.to frames, ","
+		url = CUrl.to url
+		#if data["@frames"] then url.param._frames_ = data["@frames"] else delete url.param._frames_
+		args = [url, title || @document().title]
+		if @request.history then args.unshift 0
+		@navigate args...
+		say args..., window.history$, window.history_pos$
+		this
 
 
 class CStatusWidget extends CLoaderWidget
@@ -3349,55 +3407,37 @@ class CStatusWidget extends CLoaderWidget
 		@error.show()
 
 
-class CRouterWidget extends CLoaderWidget
+class CRouterWidget extends CWidget
+	config:
+		loader: off	# для якорей - если нет - то используется loader якоря
+
 	constructor: ->
 		super
 		@defineHandlers() unless @constructor.handlers
 		@setListens()
 		
-	onclick_document: (e) -> 
+	onclick_document: (e) ->
 		if (a=e.target()).tag() == "A"
 			url = CUrl.from a.attr "href"
-			if not url.host or url.host == a.document().location.host then @reload url, 1
-		this
-		
-	reload: (url, not_lay) ->
-		say url = CUrl.from url if typeof url == 'string'
-		layout = if not url.pathname or not_lay and url.pathname == @document().location.pathname then '' else url.pathname
-		param = if url.search then CParam.from url.search else {}
-		@_loader = this
-		p = {}
-		p.frames = CParam.to param.frames, "," if param.frames
-		p.layout = layout if layout
-		p.layout_id = url.hash if url.hash
-		p._act = 'frames'
-		@ping p, p.frames, url
-	
-	onLoad: (data, request, frames, url) ->
-		data = fromJSON data if typeof data == 'string'
-		if stash = data['@stash'] then extend CTemplate._STASH, stash
-		if layout = data['@layout']
-			for i in [1...layout.length]
-				layout_id = data[layout[i-1]].layout_id
-				page = data[act = layout[i]]
-				@byId(layout_id).html CTemplate.compile(page.template)(page.data || {}, page.act)
-			title = CTemplate._STASH.title
-			
-		if frames
-			for act, id of frames
-				page = data[act]
-				@byId(page.id).html CTemplate.compile(page.template)(page.data, page.act)
-		
-		CRoot.onready_dom()
-		
-		url = CUrl.to url
-		@navigate url, title || @document().title, data
+			if not url.host or url.host == a.document().location.host
+				if loader = @config.loader then a._loader = loader
+				if url.hash then a.attr "target", url.hash; url.hash = ""
+				a.submit _act: CUrl.to url
 		this
 	
-	pop$ = ->
-		#say 'popstate', arguments, location, window.history_pos$, window.history$
+	val: -> undefined
+	
+	prev_url$ = null
+	
+	pop$ = (e) ->
+		[old] = @history()
 		href = @window().location.href
-		@reload href
+		if (pos = @history href)? then @window.history_pos$ = pos
+		prev = href.replace ///\#.*$///, ''
+		#say 'popstate', href, old, pos, e
+		if prev_url$ != prev then @submit _act: href, _history: 1
+		prev_url$ = prev
+		this
 
 	onhashchange_window: pop$
 	onpopstate_window: pop$

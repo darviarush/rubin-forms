@@ -4,6 +4,8 @@ $result = {};
 
 $add_res = sub {
 
+	die "Нет экшина `$act`" unless exists $_action{$act} or exists $_action_htm{$act};
+
 	$result->{$act} = {
 		act => $act,
 		($id ? (id => $id): ()),
@@ -16,10 +18,10 @@ $add_res = sub {
 };
 
 
-if($param->{layout}) {
-	$act = $param->{layout};
+if($param->{_layout_}) {
+	$act = $param->{_layout_};
 	$act = 'index' if $act eq "/";
-	$layout_id = $param->{layout_id};
+	$layout_id = $param->{_layout_id_};
 	for(; $act; $act = $_layout{$act}) {
 		last if defined($layout_id) and $_pages{$act}{layout_id} eq $layout_id;
 		$add_res->();
@@ -32,7 +34,7 @@ if($param->{layout}) {
 	}
 }
 
-$frames = Utils::param($param->{frames}, qr/,/);
+$frames = Utils::param($param->{_frames_}, qr/,/);
 
 while(($id, $url) = each %$frames) {
 	if($url =~ /\?/) { ($act, $param) = ($`, Utils::param($')) } else { $act = $url; $param = {} }

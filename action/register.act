@@ -22,5 +22,5 @@ $id = $param->{id};
 $new_pass = query("sess", "new_pass", {id=>$id});
 
 if($new_pass) {
-	push @_HEAD, "Set-Cookie: sess=$id";
+	header "Set-Cookie", "sess=$id; path=/";
 } else { redirect "register_fail" }
