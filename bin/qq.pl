@@ -1,10 +1,9 @@
 #> сервер - реализует протокол FastCGI
 
-#use strict;
-#use warnings;
+use strict;
+use warnings;
 
-use FCGI;
-#use CGI;
+
 use File::Find;
 use File::Basename;
 use Time::HiRes qw//;
@@ -16,18 +15,13 @@ use threads ('yield',
 	'exit' => 'threads_only',
 	'stringify');
 use threads::shared;
-use Carp 'verbose';
-$SIG{ __DIE__ } = \&Carp::confess;
+use Devel::Confess  qw/color/;
+use Carp::Trace qw/trace/;
 use Watch;
 use Auth;
 use Helper;
 use HttpStatus;
-
-
-sub end_server {
-	for my $thr (threads->list()) { $thr->detach();  }
-	FCGI::CloseSocket($_socket);
-}
+use DRV;
 
 our (
 	$ini, %_action, %_action_htm, $_action, $_id, $_user_id, %_frames, %_forms, %_pages, %_layout,
@@ -47,10 +41,18 @@ my $_lords = $_site->{lords};
 my $_req = $ini->{req};
 
 
+our $_socket;
+
+sub end_server {
+	for my $thr (threads->list()) { $thr->detach();  }
+	$_socket->close;
+}
+
+
 # Открываем сокет
 # наш скрипт будет слушать порт $ini->{site}{port} (9000)
 # длина очереди соединений (backlog)- 5 штук
-$_socket = FCGI::OpenSocket(":$_port", 5);
+$_socket = ${"Rubin::".(uc($drv) // "HTTP")}->new($_port);
 
 # подгружаем экшены в %_action
 sub load_htm($) {
@@ -80,7 +82,7 @@ sub load_htm($) {
 	}
 	
 	my $code = eval $eval;
-	if(my $error = $! || $@) { msg "load_htm `$path`: $error"; $path =~ s/\//_/g; $_action_htm{$index} = sub { die 501 }; }
+	if(my $error = $! || $@) { msg "load_htm `$path`: $error"; $path =~ s/\//_/g; $_action_htm{$index} = sub { die raise(501) }; }
 	else { $_pages{$index}{sub} = $_action_htm{$index} = $code }
 }
 sub load_action ($$) {
@@ -99,7 +101,7 @@ sub load_action ($$) {
 	my $eval = join("", "sub{ use strict; use warnings; " , (@local? ("\nlocal(", join(", ", @local), ");"): ()), (@my? ("\nmy(", join(", ", @my), ");"): ()), "\n", $action, "\n}");
 	my $code = eval $eval;
 	my $index = $_[1];
-	if(my $error=$! || $@) { msg RED."load_action $_[0]:".RESET." $error"; $_action{$index} = sub { die 501 }; Utils::write("$index.pl", $eval) } else { $_action{$index} = $code }
+	if(my $error=$! || $@) { msg RED."load_action $_[0]:".RESET." $error"; $_action{$index} = sub { die raise(501) }; Utils::write("$index.pl", $eval) } else { $_action{$index} = $code }
 }
 for_action \&load_action;	# грузим экшены
 
@@ -138,6 +140,8 @@ sub redirect ($) {
 }
 
 sub status ($) { ($_STATUS = $_[0])." ".$_STATUS{$_STATUS} }
+
+sub raise ($;$) { my($error, $message) = @_; bless {error => $error, message => $message, trace => trace() }, CException }
 
 sub options ($;$&) {
 	local ($_);
@@ -217,35 +221,34 @@ sub lord {
 	
 	$dbh = undef;
 	dbh_connect();	# своё подключение к БД
-	my $_request = FCGI::Request(\*STDIN, \*STDOUT, \*STDOUT, \%ENV, $_socket);	# свой request
-
+	$_socket->bind;	# свой request
 	
 	for(;;) {
 		#my $nfound = select $vec, $out, undef, undef;
 		#msg CYAN."nfound ".RESET." soc=$_socket vec=$vec ".RED.$nfound.RESET;
-		next if $_request->Accept() < 0;
+		next unless $_socket->accept;
 		my $time = Time::HiRes::time();
 		@_HEAD = ("Content-Type: text/html; charset=utf-8");
-		msg "\n".RED."$ENV{REQUEST_METHOD}".RESET." $ENV{REQUEST_URI} ".CYAN."tid".RESET.": ".threads->tid().CYAN." from ".RESET.join(", ", threads->list());
-		if($_req > 0) { msg MAGENTA.$_.RESET.": ".CYAN.$ENV{$_}.RESET for grep { /^HTTP/ } keys %ENV }
+		msg "\n".RED."$_socket->{method}".RESET." $_socket->{location} ".CYAN."tid".RESET.": ".threads->tid().CYAN." from ".RESET.join(", ", threads->list());
+		if($_req > 0) { msg MAGENTA.$_.RESET.": ".CYAN.$_socket->head->{$_}.RESET for keys %{$_socket->head} };
 		
 		%_frames = ();
 		my @ret = ();
-		($_action, $_id) = $ENV{DOCUMENT_URI} =~ m!^/(.*?)(-?\d+)?/?$!;
+		($_action, $_id) = $_socket->{location} =~ m!^/(.*?)(-?\d+)?/?$!;
 
 		$_action = 'index' if $_action eq "";
+		my $accept = $_socket->head->{accept};
 		eval {
 			my ($action);
-			my $accept = $ENV{'HTTP_ACCEPT'};
 			unless(($action = $_action{$_action}) or exists $_action_htm{$_action}) {
 				$_STATUS = 404;
 				@ret = "404 Not Found";
 			} else {
 				$_STATUS = 200;
-				$_GET = Utils::param($ENV{'QUERY_STRING'}, qr/&/);
-				$_POST = $ENV{CONTENT_LENGTH}? Utils::param_from_post($ENV{'REQUEST_BODY_FILE'}? do { my $f; open $f, $ENV{'REQUEST_BODY_FILE'} or die "NOT OPEN REQUEST_BODY_FILE=".$ENV{'REQUEST_BODY_FILE'}." $!"; $f }: \*STDIN, $ENV{'CONTENT_TYPE'}, $ENV{'CONTENT_LENGTH'}): {};
-				$_COOKIE = Utils::param($ENV{'HTTP_COOKIE'}, qr/;\s*/);
-				$param = {%$_POST, %$_GET};
+				$_GET = $_socket->get;
+				$_POST = $_socket->post;
+				$param = $_socket->param;
+				$_COOKIE = $_socket->cookie;
 				auth();
 				if($action) { @ret = $action->(); } else { @ret = action_main $_action }
 				if($accept !~ /^text\/json\b/i and exists $_action_htm{$_action} and $_STATUS == 200) {
@@ -263,18 +266,17 @@ sub lord {
 			if(ref $error) {
 				@ret = $error;
 			} else {
-				$_STATUS = ($error =~ /^\d+$/? $error: 500);
-				@_HEAD = "Content-Type: text/plain; charset=utf-8";
+				if(ref $error eq "CException") { $_STATUS = $error->{error}; $error = $error->{message} . $error->{trace} }
+				else { $_STATUS = 500 }
+				
 				msg "action-error `$_action".(defined($_id)? ".$_id": "")."`: $error\n";
+				@_HEAD = "Content-Type: text/plain; charset=utf-8";
 				@ret = to_json({error=> $_test ? $error: "Внутренняя ошибка"});
 				dbh_connect() unless $dbh and $dbh->ping;
 			}
 		}
 		
-		push @_HEAD, "Status: $_STATUS $_STATUS{$_STATUS}\r\n" if $_STATUS;
-		print(), print "\r\n" for @_HEAD;
-		print "\r\n";
-		print for @ret;
+		$_socket->send($_STATUS, \@_HEAD, \@ret);
 		
 		/: /, msg GREEN.$`.RESET.": ".YELLOW.$'.RESET for @_HEAD;
 		if($_req > 1) { msg $_ for @ret }

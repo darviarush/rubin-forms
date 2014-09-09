@@ -1,3 +1,7 @@
+use strict;
+use warnings;
+
+
 use Data::Dumper;
 use Test::More tests => 58;
 
@@ -9,7 +13,7 @@ require_ok 'Helper';
 is_deeply [qw/a c b/], [Utils::unique(qw/a c b c/)];
 
 
-$ret = Utils::from_rows({
+my $ret = Utils::from_rows({
 fields => ["id", "name", ["user", "id", ["sess", "id"], "name"]],
 rows => [
 	["id1", "name1", [["user.id1", [['user.sess.id1']], "user.name1"], ["user.id2", [['user.sess.id2']], "user.name2"]]]
@@ -17,12 +21,12 @@ rows => [
 
 is_deeply $ret, [{"id"=>"id1","name"=>"name1","user"=>[{"id"=>"user.id1","name"=>"user.name1","sess"=>[{"id"=>"user.sess.id1"}]},{"id"=>"user.id2","name"=>"user.name2","sess"=>[{"id"=>"user.sess.id2"}]}]}];
 
-$data = Utils::to_rows([{id=> "id1", name=> "name1", user=> [{sess=> [{id=> 'user.sess.id1'}], id=> 'user.id1', name=> 'user.name1'}, {id=> 'user.id2', name=> 'user.name2', sess=> [{id=> 'user.sess.id2'}]}]}]);
+my $data = Utils::to_rows([{id=> "id1", name=> "name1", user=> [{sess=> [{id=> 'user.sess.id1'}], id=> 'user.id1', name=> 'user.name1'}, {id=> 'user.id2', name=> 'user.name2', sess=> [{id=> 'user.sess.id2'}]}]}]);
 
 is_deeply $data, {"fields"=>[["user","name","id",["sess","id"]],"name","id"],"rows"=>[[[["user.name1","user.id1",[["user.sess.id1"]]],["user.name2","user.id2",[["user.sess.id2"]]]],"name1","id1"]]};
 
 
-$example = << 'END';
+my $example = << 'END';
 ------WebKitFormBoundaryWdoiUAIAnqflZYdF
 Content-Disposition: form-data; name="file1"; filename="eula.1028.txt"
 Content-Type: text/plain
@@ -69,11 +73,11 @@ value2
 END
 
 use IO::String;
-$io = IO::String->new;
+my $io = IO::String->new;
 print $io $example;
 seek $io, 0, 0;
 
-$param = Utils::param_from_post($io, "multipart/form-data; boundary=----WebKitFormBoundaryWdoiUAIAnqflZYdF", length $example);
+my $param = Utils::param_from_post($io, "multipart/form-data; boundary=----WebKitFormBoundaryWdoiUAIAnqflZYdF", length $example);
 #msg $param;
 is_deeply $param, {
   'file1' => ["x1\n"],
@@ -88,20 +92,20 @@ is_deeply $param, {
 };
 
 
-$fn = Utils::Template("
+my $fn = Utils::Template("
 	<div id='\$+'>
 		#val1
 		#val2
 	</div>
 ");
-$html = $fn->({val1=> 'val-1', val2=> 'val-2'}, 'id-test');
+my $html = $fn->({val1=> 'val-1', val2=> 'val-2'}, 'id-test');
 
 like $html, qr/val-1/;
 like $html, qr/val-2/;
 like $html, qr/id=id-test-val1/;
 like $html, qr/id='id-test'/;
 
-$fn = Utils::Template(<<'END', $forms, $form);
+$fn = Utils::Template(<<'END', my $forms, my $form);
 <div id='$+' ctype=test_class1>
 	#val1
 	<div id="$*ls" ctype=test_class2>
@@ -181,7 +185,7 @@ is $html, "- \\Да\n -";
 $html = $fn->({x => 0}, "");
 is $html, "- \\Нет -";
 
-$r = <<'END';
+my $r = <<'END';
 ${x:bool($y:bool('\''), 10):raw}
 END
 $fn = Utils::Template($r);
@@ -195,10 +199,10 @@ $fn = Utils::Template('$xyz:raw');
 $html = $fn->({xyz=>10});
 is $html, 10;
 
-$code = Utils::TemplateStr('<div id=$-frame>$@list/index</div>');
+my $code = Utils::TemplateStr('<div id=$-frame>$@list/index</div>');
 like $code, qr!, include_action\(\$data->{'frame'}, "\$id-frame", 'list/index'\),!;
 
-$code = Utils::TemplateStr('<div id=$-layout>$&</div>', $forms, $page);
+$code = Utils::TemplateStr('<div id=$-layout>$&</div>', $forms, my $page);
 like $code, qr/\@/;
 is $page->{layout_id}, "layout";
 
@@ -213,7 +217,7 @@ is $html, '<tr tab="1"><div id="x1">';
 
 
 
-$ref = "
+my $ref = "
 [x]
 # коммент 2
 f = 1

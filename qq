@@ -1,11 +1,10 @@
 #!perl
 
-use strict;
-use warnings;
 
 BEGIN {
 	#use Carp 'verbose';
 	#$SIG{ __DIE__ } = *Carp::confess;
+	use Devel::Confess  qw/color/;
 	use Cwd qw/cwd/;
 	use Data::Dumper;
 }
@@ -30,6 +29,8 @@ my $ret;
 if(-e $path) { $ret = do $path; }
 elsif(-e "$framework_dir/$path") { $ret = do "$framework_dir/$path"; }
 else { die "Команда `$path` не найдена" }
+
+if(my $error = $@ // $!) { die $error }
 
 if(ref $ret ne "ARRAY") { return 1; } else { @av = @$ret; goto _START_; }
 

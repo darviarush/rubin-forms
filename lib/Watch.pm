@@ -1,3 +1,6 @@
+use strict;
+use warnings;
+
 use POSIX qw(strftime);
 
 sub stime {

@@ -4,12 +4,15 @@
 
 
 BEGIN {
+use strict;
+use warnings;
+
 use Test::More tests => 5;
 use Utils;
 use Msg;
 use Connect;
 
-$ini = Utils::parse_ini(undef, <<'END');
+our $ini = Utils::parse_ini(undef, <<'END');
 
 [do]
 
@@ -35,7 +38,7 @@ require_ok "Auth";
 
 eval { check_role "view", "main", {'v1'=>1, 'v2'=>1} };
 ok $@;
-$_user_id = 1;
+our $_user_id = 1;
 is "main", check_role "view", "main", {'v2'=>1, 'v3'=>1};
 valid_param "view", "main", {'v1'=>1, 'v2'=>1};
 

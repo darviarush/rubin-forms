@@ -1,3 +1,7 @@
+use strict;
+use warnings;
+
+
 use Data::Dumper;
 use Test::More tests => 11;
 

@@ -1,8 +1,12 @@
+use strict;
+use warnings;
 
 use POSIX qw/strftime/;
 use Data::Dumper;
 
 use Valid;
+
+our ($ini, $dbh, $_info, %_tab_selfcol, %_tab_validator, %_tab_update, %_tab_error, %_tab_valid, %_rules, %_tab_rules, %_alias_tab, $_user_id, $_COOKIE, %_STASH, $param, $_id, %_pages, %_forms);
 
 parse_perm();
 
@@ -27,14 +31,14 @@ sub get_validator {
 # валидация:
 #	user.int = id
 sub parse_perm {
-	our %_tab_selfcol = ();
-	our %_tab_validator = ();
-	our %_tab_update = ();
-	our %_tab_error = ();
-	our %_tab_valid = ();
-	our %_rules = ();
-	our %_tab_rules = ();
-
+	%_tab_selfcol = ();
+	%_tab_validator = ();
+	%_tab_update = ();
+	%_tab_error = ();
+	%_tab_valid = ();
+	%_rules = ();
+	%_tab_rules = ();
+	%_alias_tab = ();
 
 	while(my ($a, $cols) = each %{$ini->{do}}) {
 
@@ -42,7 +46,7 @@ sub parse_perm {
 		my @cols = $cols eq "*"? keys(%{$_info->{$tab}}): split /,\s*/, $cols;
 		
 		if(not defined $perm) {
-			$_alias_tab{$cols} = $tab if $role eq 'alias';	# для ...
+			$_alias_tab{$cols} = $tab if $role eq 'alias';	# для колумнов
 			$_tab_selfcol{$tab} = [map {my @x=split /\./; [@x==1? ($tab, @x): @x]} @cols], next if $role eq "selfcol"; # список столбцов в таблице
 			# валидаторы
 			unless(grep {/^(?:noauth|user|self)$/} $role) {
@@ -79,7 +83,8 @@ sub get_ini_info {
 		tab_error => {%_tab_error},
 		tab_valid => {%_tab_valid},
 		rules => {%_rules},
-		tab_rules => {%_tab_rules}
+		tab_rules => {%_tab_rules},
+		alias_tab => {%_alias_tab}
 	}
 }
 
@@ -160,14 +165,15 @@ sub check_role (@) {
 
 
 # проверяет вложенную структуру и формирует аргументы для sel_join
-sub check_role_view (@) {
+sub check_role_view {
 	
 	my ($valid, $tab, $view, @args) = @_;
 	
 	check_role 'view', $tab, $view;
 	#valid_param 'view', $tab, $view;
+	my $v;
 	for my $col (FIELDS_NAMES($view)) {
-		$valid->{$col} = $v if $v = $tab_valid{$tab}{$col};
+		$valid->{$col} = $v if $v = $_tab_valid{$tab}->{$col};
 	}
 
 	my @av = ($tab, $view);
@@ -204,10 +210,16 @@ sub action_main {
 	
 	$param->{id} = $_id if defined $_id;
 	
-	!$method || $method eq 'load'? action_view($_action, $param):
-	$method eq 'save'? action_do($_action, $param):
-	$method eq 'erase'? action_erase($_action, $param):
-	$method eq 'submit'? do { action_do($_action, $param); action_view($_action, $param) }:
+	my $p = {};
+	my $tab = $_info->{$_action};
+	while(my($key, $val) = each %$param) {
+		$p->{$key} = $val if exists $tab->{$key};
+	}
+	
+	!$method || $method eq 'load'? action_view($_action, $p):
+	$method eq 'save'? action_do($_action, $p):
+	$method eq 'erase'? action_erase($_action, $p):
+	$method eq 'submit'? do { action_do($_action, $p); action_view($_action, $p) }:
 	1;
 }
 
@@ -274,11 +286,12 @@ sub action_view ($$) {
 	my ($action, $param) = @_;
 	my $valid = {};
 	my $forms = $_pages{$action}{forms}; # // [$param->{_query}];
-	if(@$forms==1) { $response = action_form_view $action, $param }
+	my $response;
+	if(@$forms==1) { $response = action_form_view($action, $param) }
 	else {
 		for my $form (@$forms) {
 			my $id = $form->{id};
-			$response->{$id} = action_form_view $id, $param->{$id};
+			$response->{$id} = action_form_view($id, $param->{$id});
 		}
 	}
 	$response

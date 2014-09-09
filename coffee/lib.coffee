@@ -88,6 +88,7 @@
 #- 50. предусмотреть изменение при изменении формы и url-а
 # 60. Локализация (перевод) на другие языки
 # 61. accept в div-ах
+# 62. Взять для описания документации из http://enepomnyaschih.github.io/jwidget/1.0/index.html#!/guide/ruphilosophy и подправить
 
 # Ссылки:
 # http://habrahabr.ru/post/174987/ - редактор http://ace.c9.io
@@ -916,6 +917,7 @@ CTemplate =
 					T.push t; t = open_tag = undefined
 			else if not NO and m = s.match ///^/>/// then TAG = open_id = undefined ; html.push m[0]
 			else if not NO and m = s.match ///^</(\w+)\s*>/// then TAG = open_id = undefined ; tag = m[1]; (while T.length and pop() != tag then null); html.push m[0]
+			else if not NO and m = s.match ///^<\!--.*?-->/// then m[0].replace ///'///g, "\\'"
 			else if NO and (m = s.match ///^</(\w+)\s*>///) and m[1] == TAG then TAG = open_id = open_tag = NO = undefined ; html.push m[0]
 			else if open_tag and m = s.match ///^\$-(\w+)/// then open_id = m[1]; html.push "', id, '-" + m[1]
 			

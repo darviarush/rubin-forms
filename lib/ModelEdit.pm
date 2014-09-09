@@ -1,3 +1,6 @@
+use strict;
+use warnings;
+
 
 # изменяет модель. Изменяет $ini
 sub model_edit {

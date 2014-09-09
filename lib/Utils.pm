@@ -1,5 +1,8 @@
 package Utils;
 
+use strict;
+use warnings;
+
 use Data::Dumper;
 
 # создаёт множество
@@ -113,7 +116,7 @@ sub dump_ini {
 	my $tek = '';
 	while(@tree) {
 		my ($path, $tree) = splice @tree, -2;
-		$arr = ref $tree eq "HASH"? [$tree]: $tree;
+		my $arr = ref $tree eq "HASH"? [$tree]: $tree;
 		for $tree (@$arr) {
 			push @dump, "\n[".join("::", @$path)."]\n" if @$path;
 			while(my($a, $b) = each %$tree) {
@@ -128,7 +131,7 @@ sub dump_ini {
 
 # печатает ini в файл
 sub print_ini {
-	($path, $ini) = @_;
+	my ($path, $ini) = @_;
 	open my($f), ">", $path or die "not create ini-file `$path`. $!\n";
 	print $f dump_ini($ini);
 	close $f;
@@ -237,6 +240,7 @@ sub param_from_post {
 		my $this_is_header = 0;
 		my $is_val = 0;
 		my $buf = [];
+		my ($name, $encoding) = ("");
 		while(<$stdin>) {
 			if($_ =~ $boundary) {
 				my $the_end = $1;
@@ -356,8 +360,8 @@ sub tee {
 	require File::Tee;
 
 	# перенаправляем вывод тестов
-	File::Tee::tee(STDERR, ">>$path");
-	File::Tee::tee(STDOUT, ">>$path");
+	File::Tee::tee(\*STDERR, ">>$path");
+	File::Tee::tee(\*STDOUT, ">>$path");
 
 	select STDERR; $| = 1;  # make unbuffered
 	select STDOUT; $| = 1;  # make unbuffered
@@ -392,7 +396,7 @@ sub post {
 sub escapeHTML {
 	my ($x) = @_;
 	my $r;
-	$x =~ s!&(?{$r='&amp;'})|<(?{$r='&lt;'})|>(?{$r='&gt;'})|"(?{$r='&quote;'})|'(?{$r='&#39;'})]!$r!g;
+	$x =~ s!(&)|(<)|(>)|(")|(')! $1? '&amp;': $2? '&lt;': $3? '&gt;': $4? '&quote;': '&#39;' !ge;
 	$x
 }
 
@@ -410,7 +414,7 @@ sub escapejs {
 sub stringjs { '"'.escapejs($_[0]).'"' }
 
 # парсит из строки
-sub unstring { my ($x) = @_; if($x=~/^["']/) { $x = substr $x, 1, -1; $x=~s/\\([\\'"nrtv])/my $x=$1; $x=~tr!nrtv!\n\r\t\v!; $x/ge; } $x }
+sub unstring { my ($x) = @_; if($x=~/^["']/) { $x = substr $x, 1, -1; $x=~s/\\([\\'"nrt])/my $x=$1; $x=~tr!nrtv!\n\r\t!; $x/ge; } $x }
 
 # понятно
 sub camelcase {
@@ -496,8 +500,7 @@ sub to__rows {
 sub from_fields {
 	my $fields = [];
 	for my $field (@_) {
-		my ($key, @fields) = @$field;
-		push @$fields, (ref $field eq 'ARRAY'? { key => $key, fields => from_fields(@fields) } : $field);
+		push @$fields, (ref $field eq 'ARRAY'? { key => $field->[0], fields => from_fields(@$field[1..$#$field]) } : $field);
 	}
 	return $fields;
 }
@@ -524,7 +527,7 @@ sub to_fields {
 sub from_rows ($) {
 	my ($data) = @_;
 	my $fields = from_fields([0, @{$data->{fields}}]);
-	from__rows([$ret = {}, $fields->[0], $data->{rows}]);
+	from__rows([my $ret = {}, $fields->[0], $data->{rows}]);
 	$ret->{0};
 }
 
@@ -535,7 +538,7 @@ sub to_rows ($) {
 	
 	my ($fields, $fld) = to_fields($rows, 0);
 	shift @$fields;
-	to__rows([$ret = [], $fld, $rows]);
+	to__rows([my $ret = [], $fld, $rows]);
 	return {fields => $fields, rows => $ret->[0]};
 }
 
@@ -547,13 +550,14 @@ sub parse_frames {
 }
 
 # темплейт, аналогичный из js-библиотеки CTemplate::compile. Возвращает текст функции
+our %_STASH;
 sub TemplateStr {
 	
 	my $RE_TYPE = qr/("(?:\\"|[^"])*"|'(?:\\'|[^'])*'|-?\d+(?:\.\d+)?(?:E[+-]\d+)?)/;
 	
 	my $code_begin = 'sub {
 	my ($dataset, $id1) = @_;
-	my $i = 0;
+	my ($i, @res) = 0;
 	for my $data (@$dataset) {
 		my $id = "$id1-$i";	$data->{"_NUMBER"}=$i; $data->{"_NUMBER1"}=++$i;
 		push @res, \'';
@@ -580,7 +584,7 @@ sub TemplateStr {
 	local ($_, $&, $`, $', $1, $2, $3, $4, $5);
 	($_) = @_;
 	
-	my ($orig, $pos, $open_tag, $open_id, @html, @T, $form, $TAG, $NO, $STASH, $layout_id) = $_;
+	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id) = $_;
 	my $page = my $form = {};
 	
 	my $pop = sub {	# закрывается тег
@@ -603,14 +607,19 @@ sub TemplateStr {
 		pos() = $pos;
 
 		push @html,
-		!$NO && m!\G<(\w+)!? do { $TAG = $1; $open_tag = lc $TAG; $NO=1 if $TAG =~ /^(?:script|style)$/; if(my $re = $tags{$open_tag}) { $pop->() while @T and $T[$#T]->[0] !~ $re; } "<$TAG" }:
+		!$NO && m!\G<(\w+)!? do {
+			$TAG = $1;
+			$open_tag = lc $TAG;
+			$NO=1 if $TAG =~ /^(?:script|style)$/;
+			if(my $re = $tags{$open_tag}) { $pop->() while @T and $T[$#T]->[0] !~ $re; } "<$TAG" }:
 		!$NO && m!\G>!? do {
+			die "Невалидный шаблон - обнаружена `<` без тега: `$_`" if not defined $TAG;
 			if($TAG =~ $_tags) { $TAG = $open_id = undef; ">" } else {
 				my (@ret, $type, $name);
 				if($T) {
-					local($&, $`, $');
+					local($&, $`, $'); my $m;
 					$T = [$open_tag, $pos+1, $name=$T->[0], $type=$T->[1], $m=/\bcinit[^<]*\G/i, scalar(@html), $form];
-					my $id = defined($name)? $form->{id} . "-" . $name: undef;
+					my $id = (exists $form->{id}? $form->{id} . "-": "") . (defined($name)? $name: "");
 					$forms->{$id} = $form = {id => $id, name => $name, is_list => $type};
 					@ret=(">", "', (" . ($type? $code_begin: $code_begin1))
 				} else { $T = [$open_tag]; @ret = ">" }
@@ -621,6 +630,7 @@ sub TemplateStr {
 		}:
 		!$NO && m!\G/>!? do { $TAG = $open_id = undef; $& }:
 		!$NO && m!\G</(\w+)\s*>!? do { $TAG = $open_id = undef; my ($tag) = ($1); while(@T and $pop->() ne $tag) {}; $& }:
+		!$NO && m!\G<\!--.*?-->!s? do { my $x=$&; $x=~s/'/\\'/g; $x }:
 		$NO && m!\G</$TAG\s*>!? do { $TAG = $open_id = $open_tag = $NO = undef; $& }:
 		$open_tag && m!\G\$-(\w+)?!? do { $open_id = $1; "', \$id, '".(defined($1)? "-$1": "") }:
 		m!\G\$@([/\w]+)!? do { my $n = $1; my $id = $open_id // /\bid=["']?([\w-]+)[^<]*\G/i && $1; "', include_action(\$data->{'$id'}, \"\$id-$id\", '$n'), '" }:

@@ -1,5 +1,8 @@
 package Mailer;
 
+use strict;
+use warnings;
+
 use Data::Dumper;
 use Utils;
 

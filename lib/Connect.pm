@@ -1,7 +1,8 @@
-
+use strict;
+use warnings;
 use DBI;
 
-our $dbh;
+our($dbh, $ini, %_alias_tab);
 
 # коннект
 sub dbh_connect {
@@ -22,7 +23,7 @@ dbh_connect_full() if $ini->{mysql}{DNS};
 
 
 # зарезервированные слова sql
-%SQL_WORD = Utils::set(qw/ACCESSIBLE ADD ALL ALTER ANALYZE AND AS ASC ASENSITIVE BEFORE BETWEEN BIGINT BINARY BLOB BOTH BY CALL CASCADE CASE CHANGE CHAR CHARACTER CHECK COLLATE COLUMN CONDITION CONSTRAINT CONTINUE CONVERT CREATE CROSS CURRENT_DATE CURRENT_TIME CURRENT_TIMESTAMP CURRENT_USER CURSOR DATABASE DATABASES DAY_HOUR DAY_MICROSECOND DAY_MINUTE DAY_SECOND DEC DECIMAL DECLARE DEFAULT DELAYED DELETE DESC DESCRIBE DETERMINISTIC DISTINCT DISTINCTROW DIV DOUBLE DROP DUAL EACH ELSE ELSEIF ENCLOSED ESCAPED EXISTS EXIT EXPLAIN FALSE FETCH FLOAT FLOAT4 FLOAT8 FOR FORCE FOREIGN FROM FULLTEXT GET GRANT GROUP HAVING HIGH_PRIORITY HOUR_MICROSECOND HOUR_MINUTE HOUR_SECOND IF IGNORE IN INDEX INFILE INNER INOUT INSENSITIVE INSERT INT INT1 INT2 INT3 INT4 INT8 INTEGER INTERVAL INTO IO_AFTER_GTIDS IO_BEFORE_GTIDS IS ITERATE JOIN KEY KEYS KILL LEADING LEAVE LEFT LIKE LIMIT LINEAR LINES LOAD LOCALTIME LOCALTIMESTAMP LOCK LONG LONGBLOB LONGTEXT LOOP LOW_PRIORITY MASTER_BIND MASTER_SSL_VERIFY_SERVER_CERT MATCH MAXVALUE MEDIUMBLOB MEDIUMINT MEDIUMTEXT MIDDLEINT MINUTE_MICROSECOND MINUTE_SECOND MOD MODIFIES NATURAL NONBLOCKING NOT NO_WRITE_TO_BINLOG NULL NUMERIC ON OPTIMIZE OPTION OPTIONALLY OR ORDER OUT OUTER OUTFILE PARTITION PRECISION PRIMARY PROCEDURE PURGE RANGE READ READS READ_WRITE REAL REFERENCES REGEXP RELEASE RENAME REPEAT REPLACE REQUIRE RESIGNAL RESTRICT RETURN REVOKE RIGHT RLIKE SCHEMA SCHEMAS SECOND_MICROSECOND SELECT SENSITIVE SEPARATOR SET SHOW SIGNAL SMALLINT SPATIAL SPECIFIC SQL SQLEXCEPTION SQLSTATE SQLWARNING SQL_BIG_RESULT SQL_CALC_FOUND_ROWS SQL_SMALL_RESULT SSL STARTING STRAIGHT_JOIN TABLE TERMINATED THEN TINYBLOB TINYINT TINYTEXT TO TRAILING TRIGGER TRUE UNDO UNION UNIQUE UNLOCK UNSIGNED UPDATE USAGE USE USING UTC_DATE UTC_TIME UTC_TIMESTAMP VALUES VARBINARY VARCHAR VARCHARACTER VARYING WHEN WHERE WHILE WITH WRITE XOR YEAR_MONTH ZEROFILL/);
+our %SQL_WORD = Utils::set(qw/ACCESSIBLE ADD ALL ALTER ANALYZE AND AS ASC ASENSITIVE BEFORE BETWEEN BIGINT BINARY BLOB BOTH BY CALL CASCADE CASE CHANGE CHAR CHARACTER CHECK COLLATE COLUMN CONDITION CONSTRAINT CONTINUE CONVERT CREATE CROSS CURRENT_DATE CURRENT_TIME CURRENT_TIMESTAMP CURRENT_USER CURSOR DATABASE DATABASES DAY_HOUR DAY_MICROSECOND DAY_MINUTE DAY_SECOND DEC DECIMAL DECLARE DEFAULT DELAYED DELETE DESC DESCRIBE DETERMINISTIC DISTINCT DISTINCTROW DIV DOUBLE DROP DUAL EACH ELSE ELSEIF ENCLOSED ESCAPED EXISTS EXIT EXPLAIN FALSE FETCH FLOAT FLOAT4 FLOAT8 FOR FORCE FOREIGN FROM FULLTEXT GET GRANT GROUP HAVING HIGH_PRIORITY HOUR_MICROSECOND HOUR_MINUTE HOUR_SECOND IF IGNORE IN INDEX INFILE INNER INOUT INSENSITIVE INSERT INT INT1 INT2 INT3 INT4 INT8 INTEGER INTERVAL INTO IO_AFTER_GTIDS IO_BEFORE_GTIDS IS ITERATE JOIN KEY KEYS KILL LEADING LEAVE LEFT LIKE LIMIT LINEAR LINES LOAD LOCALTIME LOCALTIMESTAMP LOCK LONG LONGBLOB LONGTEXT LOOP LOW_PRIORITY MASTER_BIND MASTER_SSL_VERIFY_SERVER_CERT MATCH MAXVALUE MEDIUMBLOB MEDIUMINT MEDIUMTEXT MIDDLEINT MINUTE_MICROSECOND MINUTE_SECOND MOD MODIFIES NATURAL NONBLOCKING NOT NO_WRITE_TO_BINLOG NULL NUMERIC ON OPTIMIZE OPTION OPTIONALLY OR ORDER OUT OUTER OUTFILE PARTITION PRECISION PRIMARY PROCEDURE PURGE RANGE READ READS READ_WRITE REAL REFERENCES REGEXP RELEASE RENAME REPEAT REPLACE REQUIRE RESIGNAL RESTRICT RETURN REVOKE RIGHT RLIKE SCHEMA SCHEMAS SECOND_MICROSECOND SELECT SENSITIVE SEPARATOR SET SHOW SIGNAL SMALLINT SPATIAL SPECIFIC SQL SQLEXCEPTION SQLSTATE SQLWARNING SQL_BIG_RESULT SQL_CALC_FOUND_ROWS SQL_SMALL_RESULT SSL STARTING STRAIGHT_JOIN TABLE TERMINATED THEN TINYBLOB TINYINT TINYTEXT TO TRAILING TRIGGER TRUE UNDO UNION UNIQUE UNLOCK UNSIGNED UPDATE USAGE USE USING UTC_DATE UTC_TIME UTC_TIMESTAMP VALUES VARBINARY VARCHAR VARCHARACTER VARYING WHEN WHERE WHILE WITH WRITE XOR YEAR_MONTH ZEROFILL/);
 
 sub SQL_WORD(@) {
 	my ($col) = @_;
@@ -106,7 +107,7 @@ sub sel (@) {
 }
 
 package JOIN;
-sub new { my ($cls, $join, @args) = @_; my ($tab) = @args; my ($as, $tab) = main::TAB($tab); bless {tab => main::SQL_WORD($tab), as => main::SQL_WORD($as), args=>[@args], join=>$join}, $cls; }
+sub new { my ($cls, $join, @args) = @_; my ($tab) = @args; my ($as); ($as, $tab) = main::TAB($tab); bless {tab => main::SQL_WORD($tab), as => main::SQL_WORD($as), args=>[@args], join=>$join}, $cls; }
 
 package CONS;
 sub new { my ($cls, $op, $val) = @_; bless {op=>$op, val=>$val}, $cls }
@@ -171,7 +172,7 @@ sub sel_join (@) {
 	while(@st) {
 		my ($path, $args, $real) = @{ pop @st };
 		my ($tab, $view, @args) = @$args;
-		my ($as, $tab) = TAB($tab);
+		my ($as); ($as, $tab) = TAB($tab);
 		push @view, FOR_TAB_FIELDS($view, $as);
 		push @$fields, [$path, [ @cols = FIELDS_NAMES($view) ] ];
 		push @$real, @cols;
@@ -212,7 +213,7 @@ sub pack_rows (@) {
 		$row = $rows->[$#$rows], $rows = ($row->[$_] ||= [[]]) for @st[0..$#$path];
 		if( $#$rows == -1 ) { push @$rows, $row = [] } else { $row = $rows->[$#$rows] }
 		
-		if(not defined $add_row->[$i]) { $i += @$cols; pop @$rows if @$row == 0; msg1 $rows_start if $msg;}
+		if(not defined $add_row->[$i]) { $i += @$cols; pop @$rows if @$row == 0; }
 		elsif(@$row == 0) { push @$row, $add_row->[$i++] for @$cols; }
 		elsif($add_row->[$i] == $row->[0]) {	# сравниваем id
 			$i += @$cols;
@@ -247,19 +248,21 @@ sub query_rows (@) {
 # аналог query_rows: запрашивает строки отдельными запросами
 # отличие в том, что LIMIT может быть проставлен для отдельных подстрок
 # INNER_JOIN тут работает так же как и LEFT_JOIN
-sub quick_rows (@) {
+sub quick_rows {
 	my ($tab, $view, @args) = @_;
 	
 	my @join = grep { ref $_ eq 'JOIN' } @args;
 	@args = grep { ref $_ ne 'JOIN' } @args;
 	
-	my ($tab, $view, @a);
+	my (@a);
 	($tab, $view, @a) = @{$_->{args}}, $_->{a} = [@a], $_->{view} = $view for @join;
 	
-	my $rows = query_all $tab, $view, @args;
+	my $rows = query_all($tab, $view, @args);
 	
 	for my $row (@$rows) {
-		$row->{$_->{as}} = quick_rows($_->{tab}, $_->{view}, $row->{id}, @{$_->{a}}) for @join;
+		for my $join (@join) {
+			$row->{$join->{as}} = quick_rows(($join->{tab}, $join->{view}, $row->{id}, @{$join->{a}}));
+		}
 	}
 	
 	return $rows;
@@ -337,6 +340,7 @@ sub update ($$$) {
 # добавляет или изменяет запись
 sub replace ($$) {
 	my ($tab, $param) = @_;
+	my ($id, $count);
 	if($id = $param->{id}) {
 		delete $param->{id};
 		$count = update $tab, $param, $id;
@@ -363,8 +367,8 @@ sub get_info {
 }
 
 
-$ABC = {qw(а А б Б в В г Г д Д е Е ё Е Ё Е ж Ж з З и И й Й к К л Л м М н Н о О п П р Р с С т Т у У ф Ф х Х ц Ц ч Ч ш Ш щ Щ ъ Ъ ы Ы ь Ь э Э ю Ю я Я)};
-$ABCx = join "|", %$ABC;
+our $ABC = {qw(а А б Б в В г Г д Д е Е ё Е Ё Е ж Ж з З и И й Й к К л Л м М н Н о О п П р Р с С т Т у У ф Ф х Х ц Ц ч Ч ш Ш щ Щ ъ Ъ ы Ы ь Ь э Э ю Ю я Я)};
+our $ABCx = join "|", %$ABC;
 
 # фразу разбивает на слова для поиска
 sub build_words {
@@ -402,6 +406,7 @@ sub set_words {
 sub get_words {
 	my ($phrase) = @_;
 	my @words = build_words($phrase);
+	my @word_id;
 	for my $word (@words) {
 		my $word_id = $dbh->selectrow_array("SELECT word_id FROM words WHERE word=?", undef, $word);
 		push @word_id, $word_id if $word_id;

@@ -1,3 +1,6 @@
+use strict;
+use warnings;
+
 use Data::Dumper;
 require Cwd;
 
