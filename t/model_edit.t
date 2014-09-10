@@ -10,7 +10,7 @@ use Auth;
 use Utils;
 require_ok 'ModelEdit';
 
-$ref = "
+my $ref = "
 [do]
 project.self = add,edit,view
 project.selfcol = user_id
@@ -18,9 +18,9 @@ project.self.view = name, description
 project.ref = user_id
 ";
 
-$ini = Utils::parse_ini(undef, $ref);
+our $ini = Utils::parse_ini(undef, $ref);
 
-$param = {
+our $param = {
 	method => 'save',
 	action => 'perm',
 	tab => 'project',

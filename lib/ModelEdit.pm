@@ -1,8 +1,9 @@
 use strict;
 use warnings;
 
+our ($param, $ini);
 
-# изменяет модель. Изменяет $ini
+# РёР·РјРµРЅСЏРµС‚ РјРѕРґРµР»СЊ. РР·РјРµРЅСЏРµС‚ $ini
 sub model_edit {
 
 	my $erase = $param->{method} eq 'erase';
@@ -20,8 +21,8 @@ sub model_edit {
 	};
 	
 	if($action eq "valid") {
-		@roles = split /,\s*/, $perm;
-		get_validator($_, "$tab.$_", $col) for @roles; # тестируем, чтобы были такие валидаторы
+		my @roles = split /,\s*/, $perm;
+		get_validator($_, "$tab.$_", $col) for @roles; # С‚РµСЃС‚РёСЂСѓРµРј, С‡С‚РѕР±С‹ Р±С‹Р»Рё С‚Р°РєРёРµ РІР°Р»РёРґР°С‚РѕСЂС‹
 		$inject->($_[0], "$tab.$_", $col) for @roles;
 	}
 	elsif($action eq "tab_perm") {
@@ -31,22 +32,22 @@ sub model_edit {
 		$inject->($_[0], "$tab.$role.$perm", $col);
 	}
 	else {
-		die "Неизвестный action=$action";
+		die "РќРµРёР·РІРµСЃС‚РЅС‹Р№ action=$action";
 	}
 }
 
-
+# РІС‹Р±РёСЂР°РµС‚ РёРЅС„РѕСЂРјР°С†РёСЋ РёР· sql
 sub get_install_info {
 	my ($order, $install, $tab, $col) = 1;
-	local *f;
+	my $f;
 	
 	for my $file (@_) {
 		
-		open f, $file or die $!;
+		open $f, $file or die $!;
 		
 		my $package = undef;
 		
-		while(<f>) {
+		while(<$f>) {
 			if(/create\s+table\s+(?:`([^`]*)`|(\w+))/i) {
 				$install->{$tab = $1 // $2} = {
 					name => $tab,
@@ -57,6 +58,7 @@ sub get_install_info {
 			} elsif(!$tab) {
 			} elsif(/^\s*(?:`([^`]*)`|(\w+))\s+(\w+)/) {
 				my $ins = $3.$';
+				$col = $1 // $2;
 				$ins =~ s/,?\s*$//;
 				$install->{$tab}{cols}{$col} = {package => $package, install => $ins, order => $order++};
 			} elsif(/^\s*(\w+)/) {
@@ -70,11 +72,12 @@ sub get_install_info {
 				$tab = undef;
 			} elsif(/^--\s*\[(.*?)\]/) {
 				$package = $1;
+			} elsif(/^\s*--/ || /^\s*$/) {
 			} else {
-				die "что-то нераспознанное $_";
+				die "С‡С‚Рѕ-С‚Рѕ РЅРµСЂР°СЃРїРѕР·РЅР°РЅРЅРѕРµ `$_` РІ С‚Р°Р±Р»РёС†Рµ `$tab`";
 			}
 		}
-		close f;
+		close $f;
 	}
 	$install
 }

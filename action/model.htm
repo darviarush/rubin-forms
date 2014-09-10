@@ -1,5 +1,5 @@
-<meta layout=index_>
-<meta name=title value="Модель">
+{% layout "index_" %}
+{% title =%}Модель{% end %}
 
 <script>
 function ping(td, opt) {
@@ -96,12 +96,12 @@ table {border-collapse: collapse; }
 
 <tbody id=$*col tab="$name">
 	<tr col="$name">
-		<td class="$is_install:bool($is_sql:bool('is', 'no'), 'no')"><!--
+		<td class="$is_install:bool($is_sql:bool('is', 'no'), 'no')">{% call inject "<!--" %}
 			<table>
 			<tr><th>в файле<td>$install
 			<tr><th>в базе<td>$sql:bool("", "нет")$sql
 			</table>
-		-->$name
+		{% call inject "-->" %}$name
 		<td class="click $noauth_view:bool('is', 'no')" role="noauth">view
 		<td class="click $noauth_add:bool('is', 'no')" role="noauth">add
 		<td class="click $noauth_edit:bool('is', 'no')" role="noauth">edit

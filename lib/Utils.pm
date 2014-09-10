@@ -414,7 +414,7 @@ sub escapejs {
 sub stringjs { '"'.escapejs($_[0]).'"' }
 
 # парсит из строки
-sub unstring { my ($x) = @_; if($x=~/^["']/) { $x = substr $x, 1, -1; $x=~s/\\([\\'"nrt])/my $x=$1; $x=~tr!nrtv!\n\r\t!; $x/ge; } $x }
+sub unstring { my $x = $_[0] // ""; if($x=~/^["']/) { $x = substr $x, 1, -1; $x=~s/\\([\\'"nrt])/my $x=$1; $x=~tr!nrtv!\n\r\t!; $x/ge; } $x }
 
 # понятно
 sub camelcase {
@@ -630,7 +630,8 @@ sub TemplateStr {
 		}:
 		!$NO && m!\G/>!? do { $TAG = $open_id = undef; $& }:
 		!$NO && m!\G</(\w+)\s*>!? do { $TAG = $open_id = undef; my ($tag) = ($1); while(@T and $pop->() ne $tag) {}; $& }:
-		!$NO && m!\G<\!--.*?-->!s? do { my $x=$&; $x=~s/'/\\'/g; $x }:
+		!$NO && m!\G<\!--.*?-->!s? do { $& }:
+		!$NO && m!\G<\!doctype[^>]+>!i? do { $& }:
 		$NO && m!\G</$TAG\s*>!? do { $TAG = $open_id = $open_tag = $NO = undef; $& }:
 		$open_tag && m!\G\$-(\w+)?!? do { $open_id = $1; "', \$id, '".(defined($1)? "-$1": "") }:
 		m!\G\$@([/\w]+)!? do { my $n = $1; my $id = $open_id // /\bid=["']?([\w-]+)[^<]*\G/i && $1; "', include_action(\$data->{'$id'}, \"\$id-$id\", '$n'), '" }:

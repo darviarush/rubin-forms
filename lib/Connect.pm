@@ -103,7 +103,7 @@ sub TAB {
 # выборки
 sub sel (@) {
 	my ($tab, $view, @args) = @_;
-	join "", "SELECT ", FIELDS($view), " FROM ", SQL_WORD($tab), CONS::add(\@args, " ");
+	join "", "SELECT ", FIELDS($view), " FROM ", SQL_WORD($tab), CONS::add(" ", \@args);
 }
 
 package JOIN;
@@ -142,10 +142,10 @@ sub add {
 
 sub join {
 	my ($self, $sep) = @_;
-	(@{$self->{where}}? ("${sep}WHERE ", join " AND ", map { join "", "(", $_, ")" } @{$self->{where}}): ()), 
-	(@{$self->{group}}? ("${sep}GROUP BY ", join ", ", @{$self->{group}}): ()), 
-	(@{$self->{having}}? ("${sep}HAVING ", join " AND ", map { join "", "(", $_, ")" } @{$self->{having}}): ()),
-	(@{$self->{order}}? ("${sep}ORDER BY ", join ", ", @{$self->{order}}): ()), 
+	($self->{where} && @{$self->{where}}? ("${sep}WHERE ", join " AND ", map { join "", "(", $_, ")" } @{$self->{where}}): ()), 
+	($self->{group} && @{$self->{group}}? ("${sep}GROUP BY ", join ", ", @{$self->{group}}): ()), 
+	($self->{having} && @{$self->{having}}? ("${sep}HAVING ", join " AND ", map { join "", "(", $_, ")" } @{$self->{having}}): ()),
+	($self->{order} && @{$self->{order}}? ("${sep}ORDER BY ", join ", ", @{$self->{order}}): ()), 
 	($self->{limit}? ("${sep}LIMIT ", $self->{limit}): ())
 }
 
@@ -201,7 +201,7 @@ sub sel_join (@) {
 sub pack_rows (@) {
 	my ($fld, $rows_start, $add_row) = @_;
 	
-	my (@st, $row, $i, $rows);
+	my ($i, @st, $row, $rows) = 0;
 	my $old_path = -1;
 	
 	for my $field (@$fld) {

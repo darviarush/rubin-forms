@@ -43,6 +43,7 @@ sub parse_perm {
 	while(my ($a, $cols) = each %{$ini->{do}}) {
 
 		my ($tab, $role, $perm) = split /\./, $a;
+
 		my @cols = $cols eq "*"? keys(%{$_info->{$tab}}): split /,\s*/, $cols;
 		
 		if(not defined $perm) {
@@ -95,7 +96,7 @@ sub auth (@) {
 	my $sess = $_COOKIE->{sess};
 	return unless $sess;
 	my @res = $dbh->selectrow_array("SELECT user_id$fld FROM sess WHERE id=?", undef, $sess);
-	update("sess", {now=>strftime("%F %T", localtime())}, {id=>$sess}) if $_STASH{_user_id} = $_user_id = $res[0];
+	update("sess", {now=>strftime("%F %T", localtime())}, {id=>$sess}) if $res[0];
 	return $fld? @res: $_user_id;
 }
 

@@ -21,12 +21,12 @@ use Watch;
 use Auth;
 use Helper;
 use HttpStatus;
-use DRV;
+use Rubin;
 
 our (
 	$ini, %_action, %_action_htm, $_action, $_id, $_user_id, %_frames, %_forms, %_pages, %_layout,
 	%_tab_rules, %_rules, $dbh, $_info,
-	$param, $_COOKIE, $_GET, $POST, $_STATUS, %_STATUS, %_STASH
+	$param, $_GET, $_POST, $_COOKIE, $_STATUS, %_STATUS, %_STASH
 	);
 	
 my (
@@ -38,7 +38,7 @@ my $_test = $_site->{test};
 my $_port = $_site->{port};
 my $_watch = $_site->{watch};
 my $_lords = $_site->{lords};
-my $_req = $ini->{req};
+my $_req = $ini->{req} // 0;
 
 
 our $_socket;
@@ -52,7 +52,9 @@ sub end_server {
 # Открываем сокет
 # наш скрипт будет слушать порт $ini->{site}{port} (9000)
 # длина очереди соединений (backlog)- 5 штук
-$_socket = ${"Rubin::".(uc($drv) // "HTTP")}->new($_port);
+my $drv = $_site->{drv};
+$_socket = $drv =~ /^fcgi$/i? Rubin::FCGI->new($_port): Rubin::HTTP->new($_port);
+
 
 # подгружаем экшены в %_action
 sub load_htm($) {
@@ -120,8 +122,6 @@ sub include_action ($$) {
 	$_action_htm{$action}->(($act=$_action{$action}? $act->($data, $action): $data), $action)
 }
 
-sub layout ($) { $_layout{$_index} = $_[1] }
-
 # пару функций
 sub header ($$) {
 	if($_[0] =~ /^Content-Type$/i) { content($_[1]) }
@@ -141,7 +141,7 @@ sub redirect ($) {
 
 sub status ($) { ($_STATUS = $_[0])." ".$_STATUS{$_STATUS} }
 
-sub raise ($;$) { my($error, $message) = @_; bless {error => $error, message => $message, trace => trace() }, CException }
+sub raise ($;$) { my($error, $message) = @_; bless {error => $error, message => $message, trace => trace() }, "Rubin::Exception" }
 
 sub options ($;$&) {
 	local ($_);
@@ -157,9 +157,9 @@ sub options ($;$&) {
 }
 
 # демонизируемся
-if($_daemon) {
+if($_site->{daemon}) {
 	open STDERR, '>'.dirname($0).'/qq.log' or die $!;
-	$pid = fork;
+	my $pid = fork;
 	die "Не могу выполнить fork\n" if $pid<0;
 	exit if $pid;	# это родительский процесс - убиваем его
 	die "Не удалось отсоединится от терминала\n" if setsid() == -1;
@@ -215,11 +215,12 @@ sub lord {
 
 	#my $sel = IO::Socket->new($_socket);
 	#$sel->add();
-	my ($vec, $out) = "";
-	vec($vec, $_socket, 1) = 1;
-	vec($out, $_socket, 1) = 1;
 	
-	$dbh = undef;
+	#my ($vec, $out) = "";
+	#vec($vec, $_socket, 1) = 1;
+	#vec($out, $_socket, 1) = 1;
+	
+	$dbh = undef; # чтобы не закрылась через 
 	dbh_connect();	# своё подключение к БД
 	$_socket->bind;	# свой request
 	
@@ -237,7 +238,7 @@ sub lord {
 		($_action, $_id) = $_socket->{location} =~ m!^/(.*?)(-?\d+)?/?$!;
 
 		$_action = 'index' if $_action eq "";
-		my $accept = $_socket->head->{accept};
+		my $accept = $_socket->{head}{accept};
 		eval {
 			my ($action);
 			unless(($action = $_action{$_action}) or exists $_action_htm{$_action}) {
@@ -245,15 +246,21 @@ sub lord {
 				@ret = "404 Not Found";
 			} else {
 				$_STATUS = 200;
-				$_GET = $_socket->get;
-				$_POST = $_socket->post;
-				$param = $_socket->param;
-				$_COOKIE = $_socket->cookie;
-				auth();
-				if($action) { @ret = $action->(); } else { @ret = action_main $_action }
+				$_GET = $_socket->{get};
+				$_POST = $_socket->{post};
+				$param = {%$_POST, %$_GET};
+				$_COOKIE = $_socket->{cookie};
+				$_STASH{_user_id} = $_user_id = auth();
+				
+				if($action) { @ret = $action->(); } elsif(my $forms = $_pages{$_action}{load_forms}) {
+					for my $form (@$forms) {
+						msg $form;
+					}
+					#@ret = action_main $_action
+				}
 				if($accept !~ /^text\/json\b/i and exists $_action_htm{$_action} and $_STATUS == 200) {
 					@ret = $_action_htm{$_action}->($ret[0], $_action);
-					for(; my $_layout = $_layout{$_action} ; $_action = $_layout) {
+					for(; my $_layout = $_layout{$_action}; $_action = $_layout) {
 						my $arg = ($action = $_action{$_layout})? $action->(): {};
 						@ret = $_action_htm{$_layout}->($arg, $_layout, @ret);
 					}
@@ -261,12 +268,12 @@ sub lord {
 			}
 			@ret = map { ref($_)? to_json($_): $_ } @ret;
 		};
-		if($error = $@ || $!) {
+		if(my $error = $@ || $!) {
 			$@ = $! = undef;
 			if(ref $error) {
 				@ret = $error;
 			} else {
-				if(ref $error eq "CException") { $_STATUS = $error->{error}; $error = $error->{message} . $error->{trace} }
+				if(ref $error eq "Rubin::Exception") { $_STATUS = $error->{error}; $error = $error->{message} . $error->{trace} }
 				else { $_STATUS = 500 }
 				
 				msg "action-error `$_action".(defined($_id)? ".$_id": "")."`: $error\n";

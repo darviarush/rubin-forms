@@ -3,6 +3,9 @@ use warnings;
 
 use POSIX qw(strftime);
 
+our %_watch;
+
+
 sub stime {
 	strftime("%T", localtime)
 }
