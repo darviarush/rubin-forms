@@ -6,7 +6,7 @@ use Data::Dumper;
 
 use Valid;
 
-our ($ini, $dbh, $_info, %_tab_selfcol, %_tab_validator, %_tab_update, %_tab_error, %_tab_valid, %_rules, %_tab_rules, %_alias_tab, $_user_id, $_COOKIE, %_STASH, $param, $_id, %_pages, %_forms);
+our ($ini, $dbh, $_info, %_tab_selfcol, %_tab_validator, %_tab_update, %_tab_error, %_tab_valid, %_rules, %_tab_rules, %_alias_tab, $_user_id, $_COOKIE, $_HEAD, %_STASH, $param, $_id, %_pages, %_forms);
 
 parse_perm();
 
@@ -207,7 +207,7 @@ sub form_query (@) {
 # выбирает какая акция нужна. Параметров не использует
 sub action_main {
 	my ($_action) = @_;
-	my $method = $ENV{'HTTP_METHOD'};
+	my $method = $_HEAD->{'Ajax'};
 	
 	$param->{id} = $_id if defined $_id;
 	

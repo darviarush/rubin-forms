@@ -4,7 +4,7 @@ $result = {};
 
 $add_res = sub {
 
-	die "Нет экшина `$act`" unless exists $_action{$act} or exists $_action_htm{$act};
+	die "Нет экшена `$act`" unless exists $_action{$act} or exists $_action_htm{$act};
 
 	$result->{$act} = {
 		act => $act,

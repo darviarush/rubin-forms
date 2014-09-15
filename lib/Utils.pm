@@ -314,7 +314,6 @@ sub read {
 	return $body;
 }
 
-
 # записывает весь файл
 sub write {
 	my $path = shift;
@@ -431,7 +430,7 @@ sub decamelcase {
 }
 
 # создаёт путь
-sub mkpath { local ($_, $`, $'); $_ = $_[0]; mkdir $` while /\//g }
+sub mkpath { local ($_, $`, $'); $_ = $_[0]; mkdir $` while /\//g; $! = undef; }
 
 # возвращает путь к каталогу картинки без /image/. Параметр - id
 sub img_path { $_[1] = 62; $_[2] = '/'; goto &to_radix; }
@@ -643,18 +642,20 @@ sub TemplateStr {
 		m!\G\{%\s*model\s+(\w+)\s*%\}!? do { $form->{model} = $1; () }:
 		m!\G\{%\s*noload\s*%\}!? do { $form->{noload} = 1; () }:
 		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)]; () }:
-		m!\G(?:\$|(#))(\{\s*)?(\w+)!? do {
+		m!\G(?:\$|(#))(\{\s*)?(?:(%)?(\w+)|("(?:\\"|[^"])*"))!? do {
 			my $open_span = $1;
 			if($open_span && ($open_tag || $TAG =~ /^(?:script|style)$/i)) { $& }
 			else {
 				$pos += length $&;
 				my $open_braket = !!$2;
 				my $braket = 0;
-				my $var = $3;
+				my $type = $3;
+				my $var = $4;
+				my $const = $5;
 				my $VAR = undef;
-				$form->{fields}{$var} = 1 if $var !~ /^_/;
+				if(defined $var) { $form->{fields}{$var} = 1 if $var !~ /^_/; }
 				push @html, "<span id=', \$id, '-$var>" if $open_span;
-				push @html, "', ", "\$data->{'$var'}";
+				push @html, "', ", defined($const)? $const: defined($type)? "\$_STASH{'$var'}": "\$data->{'$var'}";
 				my ($fn_idx, @fn_idx) = ($#html, $#html);
 				for(;;) {
 					pos() = $pos;

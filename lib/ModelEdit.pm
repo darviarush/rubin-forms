@@ -15,8 +15,8 @@ sub model_edit {
 	
 	my $inject = sub {
 		my ($arg, $key, $col) = @_;
-		my $val;
-		$ini->{do}{$key} = $val = join ",", ($erase? (): $col), grep {$_ ne $col} (split /,\s*/, $ini->{do}{$key});
+		my $val = $ini->{do}{$key}? join ",", ($erase? (): $col), grep {$_ ne $col} (split /,\s*/, $ini->{do}{$key}): "";
+		$ini->{do}{$key} = $val;
 		if($val ne "") { Utils::inject_ini($_[0], "do", $key, $val) } else { Utils::delete_ini($_[0], "do", $key); delete $ini->{do}{$key} }
 	};
 	
@@ -61,9 +61,9 @@ sub get_install_info {
 				$col = $1 // $2;
 				$ins =~ s/,?\s*$//;
 				$install->{$tab}{cols}{$col} = {package => $package, install => $ins, order => $order++};
-			} elsif(/^\s*(\w+)/) {
-				my $ins = $3.$';
-				$ins =~ s/,?\s*$//;
+			} elsif(/^\s*(INDEX|UNIQUE)/i) {
+				my $ins = $1.$';
+				$ins =~ s/,?\s*$/\n/;
 				$install->{$tab}{indexes} .= $ins;
 			} elsif(/^\s*\)/) {
 				my $ins = $';

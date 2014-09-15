@@ -7,8 +7,8 @@ function ping(td, opt) {
 	var x = CRoot.wrap('<img ctype=loader src="img/intersection.gif">').css('position', 'absolute').prependTo(td)
 	td._loader = x
 	td.onComplete = function(r) { this._loader.free() }
-	td.onLoad = (opt.onLoad || function(r) { this.toggleClass('is', 'no') })
-	td.onError = opt.onError
+	td.onLoad = (opt.onLoad || function(r) { this.toggleClass(['is', 'no']) })
+	if(opt.onError) td.onError = opt.onError
 	delete opt.onLoad
 	delete opt.onError
 	
@@ -21,7 +21,7 @@ function ping(td, opt) {
 		tab: tbody.attr('tab'),
 		col: tr.attr('col'),
 		role: td.attr('role'),
-		perm: td.down().grep(function() { return this.element.nodeType === 3 }).text()
+		perm: td.down().grep(function() { return this.element.nodeType === 3 }).text().trim()
 	}, opt))
 }
 
@@ -96,12 +96,13 @@ table {border-collapse: collapse; }
 
 <tbody id=$*col tab="$name">
 	<tr col="$name">
-		<td class="$is_install:bool($is_sql:bool('is', 'no'), 'no')">{% call inject "<!--" %}
+		<td class="$is_install:bool($is_sql:bool('is', 'no'), 'no')">$"<!--":raw
 			<table>
 			<tr><th>в файле<td>$install
 			<tr><th>в базе<td>$sql:bool("", "нет")$sql
 			</table>
-		{% call inject "-->" %}$name
+		$"-->":raw
+		$name
 		<td class="click $noauth_view:bool('is', 'no')" role="noauth">view
 		<td class="click $noauth_add:bool('is', 'no')" role="noauth">add
 		<td class="click $noauth_edit:bool('is', 'no')" role="noauth">edit

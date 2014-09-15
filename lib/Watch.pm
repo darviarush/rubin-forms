@@ -3,7 +3,7 @@ use warnings;
 
 use POSIX qw(strftime);
 
-our %_watch;
+our %_watch:shared;
 
 
 sub stime {
@@ -35,7 +35,7 @@ sub _reload {
 sub _watch_actions {
 	my $msg = $_[0];
 	for_action {
-		my ($path, $fiename) = @_;
+		my ($path, $filename) = @_;
 		return unless $_watch{$path} < mtime($path);
 		msg stime()." - action $path" if $msg;
 		_reload();
@@ -48,8 +48,9 @@ sub _watch_actions {
 sub watch {
 	_watch_actions(1);
 
+	my $watch;
 	for my $path ("qq", "main.ini", values %INC) {
-		if(not my $watch=$_watch{$path}) { $_watch{$path} = mtime($path); }
+		unless($watch=$_watch{$path}) { $_watch{$path} = mtime($path); }
 		elsif($watch < mtime($path)) {
 			msg stime()." - module $path";
 			_reload();

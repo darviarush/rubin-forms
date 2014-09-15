@@ -6,10 +6,10 @@ return status 401 unless $ini->{site}{test};
 
 
 if($param->{method}) {
-	$_watch{"main.ini"} = mtime();
+	#$_watch{"main.ini"} = mtime("main.ini");
 	Utils::replace("main.ini", \&model_edit);
-	$_watch{"main.ini"} = mtime();
-	parse_perm();
+	#$_watch{"main.ini"} = mtime("main.ini");
+	#parse_perm();
 	return;
 }
 
@@ -99,20 +99,21 @@ for my $tab (keys %tab) {
 			is_sql => !!$sql,
 			is_install => !!$ins,
 
-			package => $ins->{package},
-			install => $ins->{install},
-			sql => ($sql? (($column_type{$sql->{column_type}} || $sql->{column_type}).
+			package => $ins->{package} // "",
+			install => $ins->{install} // "",
+			sql => ($sql? (($column_type{$sql->{column_type}} || $sql->{column_type} || "").
 				($sql->{is_nullable} eq "YES" || $sql->{column_key} =~ /PRI/? "": " not null").
 				(defined($sql->{column_default})? " default $sql->{column_default}": "").
 				($sql->{column_key} =~ /PRI/? " primary key": "").
-				($sql->{extra} ne ""? " $sql->{extra}": "")): undef),
+				($sql->{extra} ne ""? " $sql->{extra}": "")): ""),
 			valid => $info->{tab_valid}{$tab}{$col},
 			
-			order => $sql->{ordinal_position} || $ins->{order},
+			order => $sql->{ordinal_position} || $ins->{order} || "",
 		};
 	}
 	
 	$table->{col} = [ sort { $a->{order} <=> $b->{order} } @{$table->{col}} ];
+	msg $table->{col};
 }
 
 @table = sort {  $a->{order} <=> $b->{order} } @table;

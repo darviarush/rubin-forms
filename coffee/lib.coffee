@@ -91,6 +91,7 @@
 # 62. Взять для описания документации из http://enepomnyaschih.github.io/jwidget/1.0/index.html#!/guide/ruphilosophy и подправить
 
 # Ссылки:
+# http://www.javascripting.com/ - библиотеки js
 # http://habrahabr.ru/post/174987/ - редактор http://ace.c9.io
 # http://rubaxa.github.io/Sortable/ - библиотечка для сортировки, внизу другие ссылки: http://rubaxa.github.io/Pilot/, http://mailru.github.io/FileAPI/ и т.д.
 # http://experiment.net.ru/dirs.php.html - подробная документация по DOM, js, css2, html4
@@ -127,7 +128,8 @@ IE = if '\v'=='v' or document.documentMode?
 
 CTraceback = -> f = arguments.callee; i=0 ; [f.name || '<anonimous function>' while (f = f.caller && i++ < 10)].reverse().join(' → ')
 
-$A = (names) -> if names instanceof Array then names else String(names).split /\s+/
+$A = (n) -> if n instanceof Array then n else if typeof n == 'object' then Array::slice.call n else String(n).split /\s+/
+$H = (n) -> if n instanceof Array then x={}; (for i in [0...n] when i % 2 == 0 then x[n[i]] = n[i+1]) else if n instanceof Object then n else x = {}; (for i in String(n).split /s*;\s*/ then m=i.split /\s*:\s*/; x[m[0]]=m[1]); x
 say = (args...) -> console.log(args...); args[args.length-1]
 escapeHTML = (s) -> String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/\'/g, '&#39;')
 unescapeHTML = if (escapeHTML.div$ = document.createElement 'div').textContent? then (s) -> (div=escapeHTML.div$).innerHTML = s; x=div.textContent; div.innerHTML = ''; x else (s) -> (div=escapeHTML.div$).innerHTML = s; x=div.innerText; div.innerHTML = ''; x
@@ -1078,6 +1080,20 @@ CListen =
 		unless listen = (listens=CListen.listens)[who] then listen = listens[who] = {}
 		if ls = listen[type] then ls.push this
 		else CListen.putListen.call this, type, who; listen[type]=[this]
+		
+	erase: (type_who, w) ->
+		[a, type, who] = type_who.match ///^ on(\w+)_(\w+) $///
+		if who_ = CListen.listens[who]
+			if type_ = who_[type]
+				for i in type_ when i == w
+					if type_.length == 1
+						delete who_[type]
+						if erase = CListen[type+'_'+who+'__'+erase] then erase()
+						else if who == "window" then w.window()["on"+type] = ->
+						else if who == "document" then w.document()["on"+type] = ->
+					else type_.splice i, 1
+					return on
+		off
 		
 	error_window: (f) -> (w=@window()).onerror = w.document.onerror = f
 	#scroll_window: (f) -> @window().onscroll = f
@@ -3295,7 +3311,7 @@ class CLoaderWidget extends CWidget
 		delete param._method
 		async = if '_async' of param then param._async; delete param._async else on
 		
-		headers = Vary: 'Accept', Ajax: type
+		headers = Vary: 'Ajax', Ajax: type
 		if CInit.post == 'json' then headers['Content-Type'] = 'application/json'
 		
 		for key of param when key[0] == '$' then headers[key.slice(1).upFirst()] = param[key]; delete param[key]
