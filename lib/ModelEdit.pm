@@ -22,6 +22,7 @@ sub model_edit {
 	
 	if($action eq "valid") {
 		my @roles = split /,\s*/, $perm;
+		return status 501, "Параметр perm - пуст" unless @roles;
 		get_validator($_, "$tab.$_", $col) for @roles; # тестируем, чтобы были такие валидаторы
 		$inject->($_[0], "$tab.$_", $col) for @roles;
 	}

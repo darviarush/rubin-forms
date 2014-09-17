@@ -15,6 +15,7 @@ if($user_id) {
 	}
 	{sess => $sess, user_id => $user_id}
 } else {
-	{}
+	status 403, "Логин или пароль неверен";
+	{error => "Логин или пароль неверен"}
 }
 

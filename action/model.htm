@@ -33,7 +33,7 @@ CListen.setListen.call(function(e) {
 		} else if(role == 'valid') {
 			td.edit({line: 1})
 			td.onBeforeEdit = function() {
-				ping(this, {action: "valid", method: "save", onLoad: function() {} })
+				ping(this, {action: "valid", method: "save", perm: this._edit.val(), onLoad: function() { this.val( this._edit.val() ) } })
 				return false
 			};
 		}

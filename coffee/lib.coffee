@@ -91,6 +91,7 @@
 # 62. Взять для описания документации из http://enepomnyaschih.github.io/jwidget/1.0/index.html#!/guide/ruphilosophy и подправить
 
 # Ссылки:
+# http://topobzor.com/13-servisov-dlya-testirovaniya-sajta-v-raznyx-brauzerax/.html - сайты-тестеры
 # http://www.javascripting.com/ - библиотеки js
 # http://habrahabr.ru/post/174987/ - редактор http://ace.c9.io
 # http://rubaxa.github.io/Sortable/ - библиотечка для сортировки, внизу другие ссылки: http://rubaxa.github.io/Pilot/, http://mailru.github.io/FileAPI/ и т.д.
@@ -1131,16 +1132,22 @@ extend CSend,
 		element.setAttribute 'on'+(CSend[type+'_type'] || type), "return CSend(this, event)"
 		this
 	
-	mouseenter_type: 'mouseover'
-	mouseover: (e, widget) -> r = widget.viewPos(); if r.left<=e.viewX()<=r.right and r.top<=e.viewY()<=r.bottom then e.type='mouseenter'; CSend.send e, widget
-	mouseleave_type: 'mouseout'
-	mouseout: (e, widget) -> r = widget.viewPos(); unless r.left<=e.viewX()<=r.right and r.top<=e.viewY()<=r.bottom then e.type='mouseleave'; CSend.send e, widget
-	
 	mousedown: CListen.listens.document.mousedown[0]
 	mouseup: CListen.listens.document.mouseup[0]
 	click: -> CEvent::left = on
 	click_end: -> CEvent::left = off
-	
+
+#unless 'onmouseenter' of document then extend CSend,
+	mouseenter_type: 'mouseover'
+	mouseover: (e, widget) ->
+		to=e.relatedTarget()
+		while to and to != widget then to = to.up()
+		if to != widget then e.type='mouseenter'; CSend.send e, widget
+	mouseleave_type: 'mouseout'
+	mouseout: (e, widget) ->
+		to=e.relatedTarget()
+		while to and to != widget then to = to.up()
+		if to != widget then e.type='mouseleave'; CSend.send e, widget
 	
 
 # http://habrahabr.ru/post/118318/
@@ -2409,6 +2416,7 @@ class CWidget
 		else if param == 'toggle' then param = {}; (for key of (anim = @_animprev).start then param[key] = 'toggle'); @animate param, anim.timeout,anim.fps, timeout
 		else if param == 'clear' then (if len==1 then @_animqueue = []; @clear animate$ else if -1 != idx=@_animqueue.indexOf timeout then @_animqueue.splice idx, 1)
 		else if param == 'stop' then @clear animate$
+		else if param == 'end' then (if @_animqueue?.length then @_animqueue[0].i = @_animqueue[0].timeout; animate$.call this ; @_animqueue = []; @clear animate$)
 		else if param == 'active' then return @_timers[animate$]
 		else if param == 'empty' then return not @_animqueue?.length
 		else
@@ -2439,8 +2447,8 @@ class CWidget
 			@css param.begincss if param.begincss?
 			@css from
 		
-			if def=param.def
-				for i of to when not /\s[a-z]\w*$/i.test to[i] then to[i] = to[i] + ' ' + def
+			if easy=param.easy
+				for i of to when not /\s[a-z]\w*$/i.test to[i] then to[i] = to[i] + ' ' + easy
 		
 			listen = do(param, save)->-> @css save; (@css param.endcss if param.endcss?); @send param.end, param; @send param.end1, param
 			anim = @animation to, param.timeout, param.fps, listen, param.progress
@@ -2529,7 +2537,22 @@ class CWidget
 		line.position this, pos, scale, 'after', 'before', addx, addy
 		line
 
-	edit: (opt = {}) -> self = this ; @_edit=@wrap(if opt.line then "<input>" else "<textarea></textarea>").val(@val()).css(@css 'display font text-align vertical-align border width height padding vertical-align'.split ' ').css('position', 'absolute').css(opt.css || {}).on('blur', (do(self)->-> (return if off == self.send 'onBeforeEdit', this); self.val self.dataType @val(); self._edit = null ; self.send "onEdit")).prependTo(this).focus().relative this, 'left top before before'; this
+	edit: (opt = {}) ->
+		self = this
+		
+		edt = do(self)->->
+			return if off == self.send 'onBeforeEdit', this
+			self.val self.dataType @val()
+			self._edit = null
+			self.send "onEdit"
+		
+		@_edit = @wrap(if opt.line then "<input>" else "<textarea></textarea>").val(@val())
+		.css(@css 'display font text-align vertical-align border width height padding vertical-align'.split ' ')
+		.css('position', 'absolute')
+		.css(opt.css || {})
+		.on('keydown', (e) -> (if e.code() == 13 then @onblur()); this)
+		.on('blur', edt).prependTo(this).focus().relative this, 'left top before before'
+		this
 	
 	type$.all 'edit arrow arrow_border'
 	
@@ -3154,7 +3177,7 @@ class CCenterModalWidget extends CModalWidget
 	
 class CTooltipWidget extends CWidget
 	
-	config: { pos: 'top', scale: 'center', scalex: 'after', scaley: 'mid', height: 10, width: 30, corner: 'mid', focus: 1, mouse: 1, open: 'fadeIn', close: 'fadeOut', class: 'c-tip' }
+	config: { pos: 'top', scale: 'center', scalex: 'after', scaley: 'mid', height: 10, width: 30, corner: 'mid', focus: 1, mouse: 1, open: 'fadeIn', close: 'fadeOut', class: 'c-tip', turn: 1 }
 	
 	constructor: ->
 		super
@@ -3175,30 +3198,52 @@ class CTooltipWidget extends CWidget
 		p.corner = @position.normalize p.pos, p.corner
 		if msg.text then @text msg.text
 		if msg.html then @content msg.html
-		{pos, scale, height, width, scalex, scaley, corner}=p
+		{pos, scale, height, width, scalex, scaley, corner, turn}=p
 		position = if (parent=@parent()).contains this then 'relative' else 'position'
 		@[position] parent, pos, scale, scalex, scaley, height
+		if turn
+			vw = @viewWidth()
+			vh = @viewHeight()
+			@display()
+			{left, top, right, bottom} = @viewPos()
+			say right, bottom, vw, vh
+			if left < 0 or top < 0 or right > vw or bottom > vh
+				for i in [0..2]
+					pos = @position.rotate[pos]
+					scale = @position.normalize pos, scale
+					corner = @position.normalize pos, corner
+					@[position] parent, pos, scale, scalex, scaley, height
+					{left, top, right, bottom} = @viewPos()
+					say right, bottom, vw, vh
+					if left >= 0 and top >= 0 and right <= vw and bottom <= vh then break
+			@hidden()
+				
 		@arrow @position.invert[pos], corner, height, width
 		do @display if display
 		do @open if open
 		this
 	
-	open: -> @morph @config.open
-	close: -> @morph @config.close
+	open: -> @animate "end"; @morph @config.open
+	close: -> @animate "end"; @morph @config.close
 	display: -> @show()
+	hidden: -> @hide()
 	#onAnimate: -> @timeout @config.timeout, 'close' if @config.timeout
 
 
 class CTipWidget extends CTooltipWidget
-	initialize: -> @parent().setHandler 'mouseenter', 'mouseleave'
-	onmouseenter_parent: (e) -> if @config.mouse then @open()
-	onmouseleave_parent: (e) -> if @config.mouse then @close()
+	initialize: -> @parent().setHandler 'mouseenter', 'mouseleave'; @setHandler 'mouseenter', 'mouseleave'
+	onmouseenter: (e) -> if @config.mouse then @open()
+	onmouseleave: (e) -> if @config.mouse then @close()
+	onmouseenter_parent: @::onmouseenter
+	onmouseleave_parent: @::onmouseleave
 
 	
 class CTipFocusWidget extends CTooltipWidget
 	initialize: -> @parent().setHandler 'focusin', 'focusout'
-	onfocusin_parent: (e) -> if @config.focus then @open()
-	onfocusout_parent: (e) -> if @config.focus then @close()
+	onfocusin: (e) -> if @config.focus then @open()
+	onfocusout: (e) -> if @config.focus then @close()
+	onfocusin_parent: @::onfocusin
+	onfocusout_parent: @::onfocusout
 
 
 class CSelectMenuWidget extends CMenuWidget
@@ -3352,17 +3397,20 @@ class CLoaderWidget extends CWidget
 		@request = null
 		this
 
-	loaded_error: (error, e) ->
+	loaded_error: (ajax_error, e) ->
 		do @end_request
-		@warn "loaded_error", error, e
-		@request.error = error
+		@warn "loaded_error", ajax_error, e
+		
+		@request.error = error = if err=@request?.request.getResponseHeader("Error") then unescape err else ajax_error
+		@request.ajax_error = ajax_error
 		@request.exception = e
 		args = @request.args
 		customer = @request.customer
-		do @ohComplete
-		do @ohError
 		customer.send "onComplete", error, @request, args...
 		customer.send "onError", error, @request, args...
+		unless @request.abort_error
+			do @ohComplete
+			do @ohError
 		@request = null
 
 	end_request: ->
@@ -3374,7 +3422,9 @@ class CLoaderWidget extends CWidget
 	ohSubmit: -> @vid()
 	ohComplete: -> @novid()
 	ohLoad: -> @request.customer.tooltip null
-	ohError: -> @request.customer.tooltip html: "<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка ajax</h3>"+escapeHTML(@request.error), open: 1, timeout: 5000, class: 'c-error'
+	ohError: ->
+		error = if @request.request.status == 500 then @request.request.responseText else escapeHTML @request.error
+		@request.customer.tooltip html: "<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка ajax</h3>"+error, open: 1, timeout: 5000, class: 'c-error'
 	
 	submit_manipulate: (data) ->
 		data = fromJSON data if typeof data == 'string'

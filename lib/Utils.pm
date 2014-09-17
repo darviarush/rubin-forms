@@ -366,6 +366,22 @@ sub tee {
 	select STDOUT; $| = 1;  # make unbuffered
 }
 
+# эскейпит для url
+sub uri_escape {
+	my ($v) = @_;
+	local ($`, $', $&);
+	utf8::decode($v) unless utf8::is_utf8($v);
+	$v =~ s![^A-Za-z0-9\-\._~]!my $x=ord($&); $x<256? sprintf("%%%02X", $x): sprintf("%%u%04X", $x) !ge;
+	$v
+}
+
+sub uri_unescape {
+	my ($v) = @_;
+	local ($`, $', $1, $2);
+	$v =~ s!%u(\d{4})|%(\d{2})! defined($1)? unichr($1): chr($2) !ge;
+	$v
+}
+
 # формирует параметры
 sub form_param {
 	my ($param) = @_;
@@ -390,6 +406,37 @@ sub post {
 	die(error505($service, $response->status_line)) unless $response->is_success;
 	$response->content;
 }
+
+# превращает файл в массив
+package Utils::requestTieArray;
+
+sub TIEARRAY {
+	my ($cls, $path, $buf_size) = @_;
+	
+	my $static_file;
+	open $static_file, "<", $path or die $!; binmode $static_file;
+	
+	my $len = (-s $static_file) / $buf_size; $len++ if $len > int $len;
+	$len = int $len;
+	
+	bless {file => $static_file, len => $len, buf_size => $buf_size}, $cls
+}
+sub FETCHSIZE { $_[0]->{len} }
+sub FETCH { my ($self, $i) = @_; my ($file, $buf_size, $buf) = ($self->{file}, $self->{buf_size}); seek $file, $i*$buf_size, 0; read $file, $buf, $buf_size; $buf }
+sub CLEAR { untie @Utils::_BODY }	# @_BODY = (); уничтожит
+sub DESTROY { close $_[0]->{file} }
+
+package Utils;
+
+our @_BODY;
+
+# создаёт array для файла
+sub file2array {
+	my ($path, $buf_size) = @_;
+	tie @_BODY, 'Utils::requestTieArray', $path, $buf_size;
+	return \@_BODY;
+}
+
 
 # для вставки в html
 sub escapeHTML {
@@ -554,16 +601,9 @@ sub TemplateStr {
 	
 	my $RE_TYPE = qr/("(?:\\"|[^"])*"|'(?:\\'|[^'])*'|-?\d+(?:\.\d+)?(?:E[+-]\d+)?)/;
 	
-	my $code_begin = 'sub {
-	my ($dataset, $id1) = @_;
-	my ($i, @res) = 0;
-	for my $data (@$dataset) {
-		my $id = "$id1-$i";	$data->{"_NUMBER"}=$i; $data->{"_NUMBER1"}=++$i;
-		push @res, \'';
+	my $code_begin = 'sub {	my ($dataset, $id1) = @_; my ($i, @res) = 0; for my $data (@$dataset) { my $id = "$id1-$i";	$data->{"_NUMBER"}=$i; $data->{"_NUMBER1"}=++$i; push @res, \'';
 	
-	my $code_end = '\';
-	}
-	return join "", @res;
+	my $code_end = '\';	}	return join "", @res;
 }';
 
 	my $code_begin1 = 'sub { my ($data, $id) = @_; return join "", \'';

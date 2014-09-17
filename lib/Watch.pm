@@ -36,7 +36,7 @@ sub _watch_actions {
 	my $msg = $_[0];
 	for_action {
 		my ($path, $filename) = @_;
-		return unless $_watch{$path} < mtime($path);
+		return unless ($_watch{$path} // 0) < mtime($path);
 		msg stime()." - action $path" if $msg;
 		_reload();
 		#load_action($path, $filename);

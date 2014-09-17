@@ -8,6 +8,7 @@ use File::Find;
 use File::Basename;
 use Time::HiRes qw//;
 use JSON;
+use Cwd 'abs_path';
 use Term::ANSIColor qw(:constants);
 use POSIX ":sys_wait_h";
 use threads ('yield',
@@ -21,36 +22,46 @@ use Carp 'verbose';
 $SIG{ __DIE__ } = \&Carp::confess; #sub { print STDERR RED, $_[0] , GREEN, trace(), RESET;  };
 $SIG{ __WARN__ } = sub { print STDERR YELLOW, (ref($_[0])? Dumper($_[0]): $_[0]), CYAN, trace(), RESET; };
 use HttpStatus;
+use MimeType;
 use Watch;
 use Auth;
 use Helper;
 use Rubin;
-use Actions;
+use Action;
 
 our (
-	$ini, %_action, %_action_htm, $_action, $_id, $_user_id, %_frames, %_forms, %_pages, %_layout,
+	$ini, %_action, %_action_htm, %_frames, %_forms, %_pages, %_layout,
 	%_tab_rules, %_rules, $dbh, $_info,
-	$param, $_GET, $_POST, $_COOKIE, $_HEAD, $_STATUS, %_STATUS, %_STASH
+	$param, $_GET, $_POST, $_COOKIE, $_HEAD,
+	$_METHOD, $_LOCATION, $_URL, $_action, $_id, $_user_id, $_VERSION, $_EXT,
+	$_STATUS, %_STATUS, %_STASH,
+	@_HEAD, %_MIME
 	);
 	
-my (
-	@_HEAD
-	);
+our $_site = $ini->{site};
+our $_test = $_site->{test};
+our $_port = $_site->{port};
+our $_watch = $_site->{watch};
+our $_lords = $_site->{lords};
+our $_req = $ini->{req} // 0;
 
-my $_site = $ini->{site};
-my $_test = $_site->{test};
-my $_port = $_site->{port};
-my $_watch = $_site->{watch};
-my $_lords = $_site->{lords};
-my $_req = $ini->{req} // 0;
+our %_HIDDEN_EXT = Utils::set(qw/pl act pm/, ($_site->{hidden_ext} or ()));
+
 
 our $_socket;
 
+# при завершении сервера
 sub end_server {
 	for my $thr (threads->list()) { $thr->detach();  }
 	$_socket->close;
 }
 
+# перечитывает ini по сигналу
+$SIG{USR1} = sub {
+	msg RED.'signal USR1 thr='.threads->tid().RESET;
+	$ini = Utils::parse_ini("main.ini");
+	parse_perm();
+};
 
 # Открываем сокет
 # наш скрипт будет слушать порт $ini->{site}{port} (9000)
@@ -58,17 +69,15 @@ sub end_server {
 my $drv = $_site->{drv} // "";
 $_socket = $drv =~ /^fcgi$/i? Rubin::FCGI->new($_port): Rubin::HTTP->new($_port);
 
-for_action \&load_action;	# грузим экшены
-
-# подгружаем таблицы
-#msg \%_tab_rules, \%_rules;
-#for my $a (keys(%_tab_rules), keys(%_rules)) {
-#	$_action{$a} = \&action_main unless exists $_action{$a};
-#}
+# грузим экшены
+for_action \&load_action;
 
 # демонизируемся
 if($_site->{daemon}) {
-	open STDERR, '>'.dirname($0).'/qq.log' or die $!;
+	my $path = dirname($0).'/rubin.log';
+	open STDOUT, '>', $path or die $!;
+	open STDERR, '>>', $path or die $!;
+	open STDIN, "<", "/dev/null" or die $!;
 	my $pid = fork;
 	die "Не могу выполнить fork\n" if $pid<0;
 	exit if $pid;	# это родительский процесс - убиваем его
@@ -79,7 +88,6 @@ msg "Слушаем ".GREEN.$_port.RESET;
 
 # расщепляем процесс
 for(my $i=0; $i<$_lords; $i++) {
-	#if(($pid=fork)<0) {die $!} elsif($pid==0) {goto RUN} else { push @_lords, $pid }
 	threads->create(*lord) or die $!;
 }
 $! = undef;
@@ -122,14 +130,22 @@ sub lord {
 
 # Подчинённый обработчик запросов
 sub ritter {
-	my $time = Time::HiRes::time();
 	@_HEAD = ("Content-Type: text/html; charset=utf-8");
-	msg "\n".RED."$_socket->{method}".RESET." $_socket->{location} ".CYAN."tid".RESET.": ".threads->tid().CYAN." from ".RESET.join(", ", threads->list());
-	if($_req > 0) { msg MAGENTA.$_.RESET.": ".CYAN.$_socket->{head}{$_}.RESET for keys %{$_socket->{head}} };
+	if(defined $_EXT) {
+		$_EXT = lc $_EXT;
+		my $res;
+		eval {
+			my $root;
+			return [403, \@_HEAD, [status(403)]] if exists $_HIDDEN_EXT{$_EXT} or ($root=abs_path(".")) ne substr abs_path(".$_LOCATION"), 0, length $root;
+			$res = Utils::file2array("./$_LOCATION", $_site->{buf_size} // 1024*1024);
+		};
+		return [404, \@_HEAD, [status(404)]] if $! // $@;
+		content($_MIME{$_EXT} // "text/plain");
+		return [200, \@_HEAD, $res];
+	}
 	
 	%_frames = ();
 	my @ret = ();
-	($_action, $_id) = $_socket->{location} =~ m!^/(.*?)(-?\d+)?/?$!;
 
 	$_action = 'index' if $_action eq "";
 	eval {
@@ -141,12 +157,8 @@ sub ritter {
 			@ret = "404 Not Found";
 		} else {
 			$_STATUS = 200;
-			$_HEAD = $_socket->{head};
-			$_COOKIE = $_socket->{cookie};
-			$_GET = $_socket->{get};
-			$_POST = $_socket->{post};
-			$param = {%$_POST, %$_GET};
 			$_STASH{_user_id} = $_user_id = auth();
+			$_STASH{_id} = $_id;
 			
 			my $ajax = $_HEAD->{Ajax} // "";
 
@@ -205,12 +217,23 @@ $x
 		}
 	}
 	
-	/: /, msg GREEN.$`.RESET.": ".YELLOW.$'.RESET for @_HEAD;
-	if($_req > 1) { msg $_ for @ret }
-	$time = Time::HiRes::time() - $time;
-	msg MAGENTA."sec".RESET." $time";
-	
 	%_STASH = ();
 	
 	return [$_STATUS, \@_HEAD, \@ret];
+}
+
+my %_STAT = ();
+sub stat_begin {
+	$_STAT{time} = Time::HiRes::time();
+	msg "\n".RED."$_METHOD".RESET." $_URL ".RED."$_VERSION ".CYAN."tid".RESET.": ".threads->tid().CYAN." from ".RESET.join(", ", threads->list());
+	if($_req > 0) { msg MAGENTA.$_.RESET.": ".CYAN.$_HEAD->{$_}.RESET for keys %{$_HEAD} };
+	if($_req > 1) { msg CYAN.$_.RESET.": ".$_POST->{$_} for keys %{$_POST} };
+}
+
+sub stat_end {
+	my ($RESPONSE, $head, $out) = @_;
+	/: /, msg GREEN.$`.RESET.": ".YELLOW.$'.RESET for @$head;
+	if($_req > 1) { msg $_ for @$out }
+	my $time = Time::HiRes::time() - $_STAT{time};
+	msg MAGENTA."sec".RESET." $time";
 }

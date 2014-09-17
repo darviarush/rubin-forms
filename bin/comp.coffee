@@ -19,7 +19,7 @@ for file in fs.readdirSync Path.dirname(__filename) + "/../.." when fs.statSync(
 	fs.mkdirSync y unless fs.existsSync y
 	
 	r.push [y].concat files
-	
+
 for x, i in r
 
 	if r.length-1 != i then child_process.spawn process.execPath, [bin, '-bmcw', '-o'].concat(x), {

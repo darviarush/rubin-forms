@@ -58,26 +58,39 @@ sub accept {
 		#my $nfound = select $vec, $out, undef, undef;
 		#msg CYAN."nfound ".RESET." soc=$_socket vec=$vec ".RED.$nfound.RESET;
 		
-		next unless $HTTP =~ m!^(\w+) ([^\s\?]*?(\.\w+)?)(?:\?(\S+))? HTTP\/(\d\.\d)\r?$!o;
-		my($METHOD, $URL, $EXT, $SEARCH, $VERSION) = ($1, $2, $3, $4, $5);
+		next unless $HTTP =~ m!^(\w+) ((/([^\s\?]*?)(?:(-?\d+)|(\.\w+))?)(?:\?(\S+))?) (HTTP\/\d\.\d)\r?$!o;
+		my($METHOD, $URL, $LOCATION, $ACTION, $ID, $EXT, $SEARCH, $VERSION) = ($1, $2, $3, $4, $5, $6, $7, $8);
+				
+		$main::_METHOD = $METHOD;
+		$main::_LOCATION = $LOCATION;
+		$main::_URL = $URL;
+		$main::_action = $ACTION;
+		$main::_id = $ID;
+		$main::_EXT = $EXT;
+		$main::_VERSION = $VERSION;
 		
-		$self->{method} = $METHOD;
-		$self->{location} = $URL;
-		$self->{get} = Utils::param($SEARCH);
+		# считываем заголовки
+		/: (.*?)\r?$/ and $main::_HEAD->{$`} = $1 while defined($_ = <$ns>) and !/^\r?$/;
 		
-		 # считываем заголовки
-		$self->{head} = my $HEAD = {};
-		/: (.*?)\r?$/ and $HEAD->{$`} = $1 while defined($_ = <$ns>) and !/^\r?$/;
+		main::stat_begin() if $::_test;
 		
 		# считываем данные
-		my $CONTENT_LENGTH = $HEAD->{"Content-Length"};
-		my $f;
-		$self->{post} = $CONTENT_LENGTH? Utils::param_from_post($HEAD->{'REQUEST_BODY_FILE'}? do { open $f, $HEAD->{'REQUEST_BODY_FILE'} or die "NOT OPEN REQUEST_BODY_FILE=".$HEAD->{'REQUEST_BODY_FILE'}." $!"; $f }: $ns, $HEAD->{'Content-Type'}, $CONTENT_LENGTH): {};
-		close $f if defined $f;
-		$self->{cookie} = Utils::param($HEAD->{"Cookie"}, qr/;\s*/);
+		$main::_GET = Utils::param($SEARCH);
+		if(my $CONTENT_LENGTH = $main::_HEAD->{"Content-Length"}) {
+			my $f;
+			$main::_POST = Utils::param_from_post($main::_HEAD->{'REQUEST_BODY_FILE'}? do {
+			open $f, $main::_HEAD->{'REQUEST_BODY_FILE'} or die "NOT OPEN REQUEST_BODY_FILE=".$main::_HEAD->{'REQUEST_BODY_FILE'}." $!"; $f
+			}: $ns, $main::_HEAD->{'Content-Type'}, $CONTENT_LENGTH);
+			close $f if defined $f;
+			$main::param = { %$main::_POST, %$main::_GET };
+		}
+		else {
+			$main::param = $main::_GET;
+		}
+		$main::_COOKIE = Utils::param($main::_HEAD->{"Cookie"}, qr/;\s*/);
 		
 		# настраиваем сессионное подключение (несколько запросов на соединение, если клиент поддерживает)
-		$self->{'keep-alive'} = $keep_alive = (lc $HEAD->{Connection} eq 'keep-alive');
+		$self->{'keep-alive'} = $keep_alive = (lc $main::_HEAD->{Connection} eq 'keep-alive');
 		
 		my $ret = $app->();
 		my ($status, $head, $out) = @$ret;
@@ -94,7 +107,10 @@ sub accept {
 		send $ns, "\n", 0;
 		send $ns, $_, 0 for @$out;
 		
-		$self->{cookie} = $self->{method} = $self->{location} = $self->{get} = $self->{post} = undef;
+		$main::_action = $main::_id = $main::_VERSION = $main::_METHOD = $main::_LOCATION = $main::_URL = $main::_HEAD = $main::_COOKIE = $main::_GET = $main::_POST = $main::param = undef;
+		
+		main::stat_end($RESPONSE, $head, $out) if $::_test;
+		@$out = ();
 	}
 }
 
@@ -131,11 +147,20 @@ sub accept {
 	
 		my $env = $self->{env};
 		
-		$self->{location} = $self->{env}{DOCUMENT_URI}; # REQUEST_URI
-		$self->{method} = $self->{env}{REQUEST_METHOD};
-		$self->{head} = { map { my $val = $self->{env}{$_}; s/^HTTP_//; $_=lc $_; s/_(.)/"-".uc $1/ge; ($_ => $val) } grep { /^HTTP_/ } keys %$env };
+		$main::_METHOD = $self->{env}{REQUEST_METHOD};
+		$main::_LOCATION = $self->{env}{DOCUMENT_URI};
+		$main::_URL = $self->{env}{REQUEST_URI};
 		
-		$self->{get} = Utils::param($env->{'QUERY_STRING'}, qr/&/);
+		$main::_LOCATION =~ m!^/(.*(?:(-?\d+)|\.(\w+)))$!;
+		
+		$main::_action = $1;
+		$main::_id = $2;
+		$main::_EXT = $3;
+		$main::_VERSION = $self->{env}{SERVER_PROTOCOL};
+		
+		$main::_HEAD = { map { my $val = $self->{env}{$_}; s/^HTTP_//; $_=lc $_; s/_(.)/"-".uc $1/ge; ($_ => $val) } grep { /^HTTP_/ } keys %$env };
+		
+		$main::_GET = Utils::param($env->{'QUERY_STRING'}, qr/&/);
 		my $f;
 		$self->{post} = $env->{CONTENT_LENGTH}? Utils::param_from_post($env->{'REQUEST_BODY_FILE'}? do { open $f, $env->{'REQUEST_BODY_FILE'} or die "NOT OPEN REQUEST_BODY_FILE=".$env->{'REQUEST_BODY_FILE'}." $!"; $f }: $self->{stdin}, $env->{'CONTENT_TYPE'}, $env->{'CONTENT_LENGTH'}): {};
 		close $f if defined $f;
@@ -148,6 +173,8 @@ sub accept {
 		print($stdout $_), print $stdout "\r\n" for @$head;
 		print $stdout "\r\n";
 		print $stdout $_ for @$out;
+		
+		@$out = ();
 	}
 }
 

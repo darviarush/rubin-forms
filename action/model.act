@@ -8,8 +8,8 @@ return status 401 unless $ini->{site}{test};
 if($param->{method}) {
 	#$_watch{"main.ini"} = mtime("main.ini");
 	Utils::replace("main.ini", \&model_edit);
-	#$_watch{"main.ini"} = mtime("main.ini");
-	#parse_perm();
+	$::_watch{"main.ini"} = mtime("main.ini");
+	for my $thr (threads->list()) { $thr->kill("USR1");  }
 	return;
 }
 

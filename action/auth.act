@@ -1,0 +1,2 @@
+die raise 401 unless $_user_id;
+return {}
