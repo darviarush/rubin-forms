@@ -46,53 +46,59 @@ sub accept {
 	
 	my($ns, $keep_alive);
 	for(;;) {
-		my $HTTP = undef;
+		
+		my ($HTTP, $ret) = ();
 		$HTTP = <$ns> if $keep_alive;
 		unless(defined $HTTP) {
 			close $ns if $ns;
 			accept $ns, $self->{sd} or die "not ns: $!";
 			$self->{ns} = $ns;
-			die "get ns: $!" unless defined($HTTP = <$ns>);
+			next unless defined($HTTP = <$ns>);
 		}
+		
+		main::stat_start() if $::_test;
 		
 		#my $nfound = select $vec, $out, undef, undef;
 		#msg CYAN."nfound ".RESET." soc=$_socket vec=$vec ".RED.$nfound.RESET;
 		
-		next unless $HTTP =~ m!^(\w+) ((/([^\s\?]*?)(?:(-?\d+)|(\.\w+))?)(?:\?(\S+))?) (HTTP\/\d\.\d)\r?$!o;
-		my($METHOD, $URL, $LOCATION, $ACTION, $ID, $EXT, $SEARCH, $VERSION) = ($1, $2, $3, $4, $5, $6, $7, $8);
-				
-		$main::_METHOD = $METHOD;
-		$main::_LOCATION = $LOCATION;
-		$main::_URL = $URL;
-		$main::_action = $ACTION;
-		$main::_id = $ID;
-		$main::_EXT = $EXT;
-		$main::_VERSION = $VERSION;
-		
-		# считываем заголовки
-		/: (.*?)\r?$/ and $main::_HEAD->{$`} = $1 while defined($_ = <$ns>) and !/^\r?$/;
-		
-		main::stat_begin() if $::_test;
-		
-		# считываем данные
-		$main::_GET = Utils::param($SEARCH);
-		if(my $CONTENT_LENGTH = $main::_HEAD->{"Content-Length"}) {
-			my $f;
-			$main::_POST = Utils::param_from_post($main::_HEAD->{'REQUEST_BODY_FILE'}? do {
-			open $f, $main::_HEAD->{'REQUEST_BODY_FILE'} or die "NOT OPEN REQUEST_BODY_FILE=".$main::_HEAD->{'REQUEST_BODY_FILE'}." $!"; $f
-			}: $ns, $main::_HEAD->{'Content-Type'}, $CONTENT_LENGTH);
-			close $f if defined $f;
-			$main::param = { %$main::_POST, %$main::_GET };
+		if($HTTP =~ m!^(\w+) ((/([^\s\?]*?)(?:(-?\d+)|(\.\w+))?)(?:\?(\S+))?) (HTTP\/\d\.\d)\r?$!o) {
+			my($METHOD, $URL, $LOCATION, $ACTION, $ID, $EXT, $SEARCH, $VERSION) = ($1, $2, $3, $4, $5, $6, $7, $8);
+					
+			$main::_METHOD = $METHOD;
+			$main::_LOCATION = $LOCATION;
+			$main::_URL = $URL;
+			$main::_action = $ACTION;
+			$main::_id = $ID;
+			$main::_EXT = $EXT;
+			$main::_VERSION = $VERSION;
+			
+			# считываем заголовки
+			/: (.*?)\r?$/ and $main::_HEAD->{$`} = $1 while defined($_ = <$ns>) and !/^\r?$/;
+			
+			# считываем данные
+			$main::_GET = Utils::param($SEARCH);
+			if(my $CONTENT_LENGTH = $main::_HEAD->{"Content-Length"}) {
+				my $f;
+				$main::_POST = Utils::param_from_post($main::_HEAD->{'REQUEST_BODY_FILE'}? do {
+				open $f, $main::_HEAD->{'REQUEST_BODY_FILE'} or die "NOT OPEN REQUEST_BODY_FILE=".$main::_HEAD->{'REQUEST_BODY_FILE'}." $!"; $f
+				}: $ns, $main::_HEAD->{'Content-Type'}, $CONTENT_LENGTH);
+				close $f if defined $f;
+				$main::param = { %$main::_POST, %$main::_GET };
+			}
+			else {
+				$main::param = $main::_GET;
+			}
+			$main::_COOKIE = Utils::param($main::_HEAD->{"Cookie"}, qr/;\s*/);
+			
+			main::stat_begin() if $::_test;
+			
+			# настраиваем сессионное подключение (несколько запросов на соединение, если клиент поддерживает)
+			$self->{'keep-alive'} = $keep_alive = (lc $main::_HEAD->{Connection} eq 'keep-alive');
+			
+			$ret = $app->();
+		} else {
+			$ret = [400, ["Content-Type: text/plain; charset=utf-8"], ["400 Bad Request"]]
 		}
-		else {
-			$main::param = $main::_GET;
-		}
-		$main::_COOKIE = Utils::param($main::_HEAD->{"Cookie"}, qr/;\s*/);
-		
-		# настраиваем сессионное подключение (несколько запросов на соединение, если клиент поддерживает)
-		$self->{'keep-alive'} = $keep_alive = (lc $main::_HEAD->{Connection} eq 'keep-alive');
-		
-		my $ret = $app->();
 		my ($status, $head, $out) = @$ret;
 		
 		my $RESPONSE = "HTTP/1.1 $status $main::_STATUS{$status}\n";

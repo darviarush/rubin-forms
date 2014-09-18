@@ -6,9 +6,7 @@ return status 401 unless $ini->{site}{test};
 
 
 if($param->{method}) {
-	#$_watch{"main.ini"} = mtime("main.ini");
-	Utils::replace("main.ini", \&model_edit);
-	$::_watch{"main.ini"} = mtime("main.ini");
+	Utils::replace("main_do.ini", \&model_edit);
 	for my $thr (threads->list()) { $thr->kill("USR1");  }
 	return;
 }
@@ -113,7 +111,7 @@ for my $tab (keys %tab) {
 	}
 	
 	$table->{col} = [ sort { $a->{order} <=> $b->{order} } @{$table->{col}} ];
-	msg $table->{col};
+	#msg $table->{col};
 }
 
 @table = sort {  $a->{order} <=> $b->{order} } @table;

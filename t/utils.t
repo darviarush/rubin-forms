@@ -3,7 +3,8 @@ use warnings;
 
 
 use Data::Dumper;
-use Test::More tests => 58;
+use Msg;
+use Test::More tests => 59;
 
 use Msg;
 require_ok 'Utils';
@@ -118,7 +119,7 @@ $fn = Utils::Template(<<'END', my $forms, my $form);
 	#val2
 </div>
 END
-$html = $fn->({"val1"=> 'val-1', "val2"=> 'val-2', "ls"=> [{"val1"=> 'val-1-0', "val2"=> 'val-2-0', "ls"=> []}, {"val1"=> 'val-1-1', "val2"=> 'val-2-1', "ls"=> [{"val1"=> 'val-1-ls-0'}]}]}, 'id-test');
+$html = $fn->({"val1"=> 'val-1', "val2"=> 'val-2', "ls"=> [{"val1"=> 'val-1-0', "val2"=> 'val-2-0', "ls"=> []}, {"val1"=> 'val-1-1', "val2"=> 'val-2-1', "ls"=> [{"val1"=> 'val-1-ls-<0>'}]}]}, 'id-test');
 
 
 like $html, qr/val-1/;
@@ -128,7 +129,7 @@ like $html, qr/val-1-0/;
 like $html, qr/val-2-0/;
 like $html, qr/val-1-1/;
 like $html, qr/val-2-1/;
-like $html, qr/val-1-ls-0/;
+like $html, qr/val-1-ls-&lt;0&gt;/;
 like $html, qr/"id-test-ls-0-ls" ctype=test_class3/;
 like $html, qr/"id-test-ls-1-ls" ctype=test_class3/;
 unlike $html, qr/id-test-ls-0-ls-0-val1/;
@@ -207,9 +208,9 @@ like $code, qr/\@/;
 is $page->{layout_id}, "layout";
 
 %Utils::_STASH = (stash => '"');
-$fn = Utils::Template('{% a =%}{%= stash %}{% end %} - {%= a %}');
+$fn = Utils::Template('{% a =%}$%stash:raw{% end %} - $%a $"2":raw(2:raw) $\'2\'');
 $html = $fn->();
-is $html, " - \"";
+is $html, " - &quot; 2 2";
 
 $fn = Utils::Template('<tr tab="$abc"><div id="x1">');
 $html = $fn->({abc=>1});
@@ -229,6 +230,9 @@ z = 10
 z1 = 20
 x2 = 30
 ";
+
+Utils::inject_ini($ref, "x::y", "z", 12);
+like $ref, qr/^z = 12\nz1/m;
 
 Utils::inject_ini($ref, "x::y", "n", 50, "z1");
 

@@ -144,9 +144,10 @@ sub inject_ini {
 	my $re = $section eq ""? qr'\A'm: "^\\[$section\\]\\s*\$";
 	my $to = qr/^\[[^\n]*?\]|\Z/m;
 	$val = '""' if $val eq "" and defined $val;
+	$val =~ s/^\s*(.*?)\s*$/$1/;
 	$val = "$key = $val\n";
 	my $flag;
-	$_[0] =~ s/$/\n\n[$section]\n$val/, return unless $_[0] =~ s/$re.*?$to/ $_=$&; $flag=1 unless s!^\s*$key\s*=.*$!$val!m; $_ /mse;
+	$_[0] =~ s/$/\n\n[$section]\n$val/, return unless $_[0] =~ s/$re.*?$to/ $_=$&; $flag=1 unless s!^\s*$key\s*=.*\n?!$val!m; $_ /mse;
 	return unless $flag;
 	if($ins_key) {
 		$flag = 0;
@@ -270,7 +271,7 @@ sub param_from_post {
 		JSON::from_json($_);
 	} else {
 		read $stdin, $_, $len;
-		param($_, qr/&/);
+		param($_);
 	}
 }
 
@@ -442,7 +443,7 @@ sub file2array {
 sub escapeHTML {
 	my ($x) = @_;
 	my $r;
-	$x =~ s!(&)|(<)|(>)|(")|(')! $1? '&amp;': $2? '&lt;': $3? '&gt;': $4? '&quote;': '&#39;' !ge;
+	$x =~ s!(&)|(<)|(>)|(")|(')! $1? '&amp;': $2? '&lt;': $3? '&gt;': $4? '&quot;': '&#39;' !ge;
 	$x
 }
 
@@ -601,6 +602,8 @@ sub TemplateStr {
 	
 	my $RE_TYPE = qr/("(?:\\"|[^"])*"|'(?:\\'|[^'])*'|-?\d+(?:\.\d+)?(?:E[+-]\d+)?)/;
 	
+	my $re_type = sub { my ($x)=@_; return unless defined $x; local($`, $', $1); $x=~s/^'(.*)'$/$1/, $x=~s/"/\\"/g, $x="\"$x\"" if $x =~ /^'/; $x};
+	
 	my $code_begin = 'sub {	my ($dataset, $id1) = @_; my ($i, @res) = 0; for my $data (@$dataset) { my $id = "$id1-$i";	$data->{"_NUMBER"}=$i; $data->{"_NUMBER1"}=++$i; push @res, \'';
 	
 	my $code_end = '\';	}	return join "", @res;
@@ -677,12 +680,11 @@ sub TemplateStr {
 		m!\G\$&!? do { $page->{layout_id} = $open_id // /\bid=["']?([\w-]+)[^<]*\G/i && $1; "', \@_[2..\$#_], '" }:
 		m!\G\{%\s*(\w+)\s*=%\}!? do { "', do { \$_STASH{'$1'} = join '', ('" }:
 		m!\G\{%\s*end\s*%\}!? do { "'); () }, '" }:
-		m!\G\{%=\s*(\w+)\s*%\}!? do { "', \$_STASH{'$1'}, '" }:
 		m!\G\{%\s*load(?:\s+(\w+))?\s*%\}!? do { push @{$page->{load_forms}}, $form; $form->{load} = $1; () }:
 		m!\G\{%\s*model\s+(\w+)\s*%\}!? do { $form->{model} = $1; () }:
 		m!\G\{%\s*noload\s*%\}!? do { $form->{noload} = 1; () }:
 		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)]; () }:
-		m!\G(?:\$|(#))(\{\s*)?(?:(%)?(\w+)|("(?:\\"|[^"])*"))!? do {
+		m!\G(?:\$|(#))(\{\s*)?(?:(%)?(\w+)|$RE_TYPE)!? do {
 			my $open_span = $1;
 			if($open_span && ($open_tag || $TAG =~ /^(?:script|style)$/i)) { $& }
 			else {
@@ -691,7 +693,7 @@ sub TemplateStr {
 				my $braket = 0;
 				my $type = $3;
 				my $var = $4;
-				my $const = $5;
+				my $const = $re_type->($5);
 				my $VAR = undef;
 				if(defined $var) { $form->{fields}{$var} = 1 if $var !~ /^_/; }
 				push @html, "<span id=', \$id, '-$var>" if $open_span;
@@ -701,12 +703,10 @@ sub TemplateStr {
 					pos() = $pos;
 
 					push @html, (
-					!$VAR && m!\G:(\w+)(\()?!? do { $html[$fn_idx] = "Helper::$1(".$html[$fn_idx]; if($2) {++$braket; ", "} else { ")" } }:
-					$VAR && m!\G"(?:\\"|[^"])*"!? $&:
-					$VAR && m!\G'((?:\\'|[^'])*)'!? do { local $&; my $x=$1; $x=~s/"/\\"/g; "\"$x\"" }:
-					$VAR && m!\G-?\d+(?:\.\d+)?(?:E[+-]\d+)?!? $&:
-					!$VAR && m!\G,\s*!? $&:
-					$VAR && m!\G\$(\w+)!? do { push @fn_idx, $fn_idx; $fn_idx = scalar @html; "\$data->{'$1'}" }:
+					!$VAR && m!\G:(\w+)(\()?!? do { $html[$fn_idx] = "Helper::$1(".$html[$fn_idx]; if($2) { ++$braket;	", " }else { ")" } }:
+					$VAR && m!\G$RE_TYPE!? do { push @fn_idx, $fn_idx; $fn_idx = scalar @html; $re_type->($1) }:
+					$VAR && m!\G\$(%)?(\w+)!? do { push @fn_idx, $fn_idx; $fn_idx = scalar @html; $1? "\$_STASH{'$2'}": "\$data->{'$2'}" }:
+					!$VAR && m!\G,\s*!? do { $fn_idx = pop @fn_idx; $& }:
 					m!\G\)!? do { $VAR = 1; --$braket; $fn_idx = pop @fn_idx; ")" }:
 					m!\G\}!? do { die "нет `{` для `}`" unless $open_braket; $pos++; last; }:
 					last);
@@ -716,7 +716,9 @@ sub TemplateStr {
 				}
 				die "не закрыта `}`" if $open_braket and not m!\G\}!;
 				die "не закрыты скобки ($braket)" if $braket; 
-
+				
+				$html[$fn_idx] = "Helper::html($html[$fn_idx]", push @html, ")" unless $html[$fn_idx] =~ /^Helper::(\w+)/? exists $Helper::_NO_ESCAPE_HTML{$1}: undef;
+				
 				push @html, ", '" . ($open_span? "</span>": "");
 				next;
 			}

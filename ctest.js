@@ -448,7 +448,7 @@ CTest.build_indicators = function() {
 }
 
 
-CTest.start = function(url) {
+CTest.start = function(url, url_test) {
 	
 	CTest.build_indicators()
 	if(console.notFound) CInit('cons_')
@@ -458,15 +458,16 @@ CTest.start = function(url) {
 		var load = CRoot.body().prepend("<div id=CTest-load cloader=CTest-loader action='"+url+"'></div><div id=CTest-loader cview=status style='position:absolute'></div>").first()
 		load.onLoad = function(code) {
 			var coffee = {}
-			var split = code.split(/^(?:new|CTest.category)\b/m)
+			var split = code.split(/^(?:new\s+CTest|CTest.category)\s+/m)
 			for(var i=0, n=split.length; i<n; i++) {
-				var match = split[i].match(/['"]([\w\$-]+)['"]/)
+				var match = split[i].match(/^['"]([\w\$-]+)['"]/)
 				if(match) {
 					var s = split[i].split(/(?:"""|'''),\s*->/)
 					coffee[match[1]] = "->"+s[1].replace(/\s*$/, "").replace(/\t/g, '  ')
 				}
 			}
 			CTest.coffee = coffee
+			//CInit.require(url_test)
 		}
 		load.ping({_method: 'GET', _async: false})
 	} catch(e) {}

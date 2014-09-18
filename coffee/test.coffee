@@ -2566,7 +2566,7 @@ new CTest 'key-CTemplate-compile', """
 			#val2
 		</div>
 	""", forms = {}, form = {})
-	html = fn val1: 'val-1', val2: 'val-2', ls: [{val1: 'val-1-0', val2: 'val-2-0', ls: []}, {val1: 'val-1-1', val2: 'val-2-1', ls: [val1: 'val-1-ls-0']}], 'id-test'
+	html = fn val1: 'val-1', val2: 'val-2', ls: [{val1: 'val-1-0', val2: 'val-2-0', ls: []}, {val1: 'val-1-1', val2: 'val-2-1', ls: [val1: 'val-1-ls-<0>']}], 'id-test'
 	
 	@instanceof forms[""], Object
 	@instanceof forms["-ls"], Object
@@ -2579,7 +2579,7 @@ new CTest 'key-CTemplate-compile', """
 	@like html, /val-2-0/
 	@like html, /val-1-1/
 	@like html, /val-2-1/
-	@like html, /val-1-ls-0/
+	@like html, /val-1-ls-&lt;0&gt;/
 	@like html, /"id-test-ls-0-ls" ctype=test_class3/
 	@like html, /"id-test-ls-1-ls" ctype=test_class3/
 	@unlike html, /id-test-ls-0-ls-0-val1/
@@ -2655,9 +2655,9 @@ new CTest 'key-CTemplate-compile', """
 	#@is page.layout_id, "layout"
 
 	CTemplate._STASH = stash = stash: '"'
-	fn = CTemplate.compile '{% a =%}{%= stash %}{% end %} - {%= a %}'
+	fn = CTemplate.compile '{% a =%}$%stash:raw{% end %} - $%a $"2":raw(2:raw) $\'2\''
 	html = fn 'id'
-	@is html, " - \""
+	@is html, " - &quot; 2 2"
 	@is stash.a, '"'
 
 	fn = CTemplate.compile '<tr tab="$abc"><div id="x1">'

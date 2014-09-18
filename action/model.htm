@@ -30,10 +30,18 @@ CListen.setListen.call(function(e) {
 	if(role) {
 		if(/\b(?:noauth|user|self)\b/.test(role)) {
 			ping(td)
-		} else if(role == 'valid') {
+		} else if(role == 'valid' || role == 'selfcol') {
+			if(role == 'selfcol') { td.html(td.html().replace(/^self(?:: )?/, '')) }
 			td.edit({line: 1})
 			td.onBeforeEdit = function() {
-				ping(this, {action: "valid", method: "save", perm: this._edit.val(), onLoad: function() { this.val( this._edit.val() ) } })
+				ping(this, {action: role, method: "save", perm: this._edit.val(), onLoad: function() { 
+					var val = this._edit.val()
+					if(role == 'selfcol') {
+						if(val) { td.addClass('green'); td.removeClass('red') } else { td.removeClass('green'); td.addClass('red') }
+						val = val? "self: "+val: "self"
+					}
+					this.val( val )
+				} })
 				return false
 			};
 		}
@@ -42,7 +50,7 @@ CListen.setListen.call(function(e) {
 
 CListen.setListen.call(function(e) {
 	var td = e.target(), com
-	if(/^td|th$/i.test(td.tag()) && (com = td.down(0)).tag() == "#comment") {
+	if(td && /^td|th$/i.test(td.tag()) && (com = td.down(0)).tag() == "#comment") {
 		td.tooltip({html: com.free().text(), append: 'prepend', open: 1, pos: 'bottom'})
 	}
 }, "mouseover", "document")
@@ -66,7 +74,7 @@ table {border-collapse: collapse; }
 
 .click { cursor: pointer !important }
 
-.c-tip { background: Cornsilk; border: solid 1px grey; padding: 4px }
+.c-tip { background: Cornsilk; border: solid 1px grey; padding: 4px; color: black }
 </style>
 
 <center>
@@ -76,7 +84,7 @@ table {border-collapse: collapse; }
 	<tr><th rowspan=3 class="$is_install:bool($is_sql:bool('is', 'no'), 'no')">$name<th colspan=12>Права<th rowspan=3 class=w>Валидаторы<th rowspan=2 class=w>Пакет
 	<tr><th class="w red" colspan=4>noauth
 		<th class="w yellow" colspan=4>user
-		<th class="w click $selfcol:bool('green', 'red')" colspan=4>self$selfcol:bool(": ")$selfcol:raw
+		<th class="w click $selfcol:bool('green', 'red')" colspan=4 role=selfcol>self$selfcol:bool(": ")$selfcol
 	<tr>
 		<td role="noauth" class="click $noauth_view:bool('is', 'no')">view
 		<td role="noauth" class="click $noauth_add:bool('is', 'no')">add

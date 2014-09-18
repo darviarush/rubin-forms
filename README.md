@@ -2,4 +2,4 @@
 
 
 * Лицензия - BSD
-* [Wiki](https://bitbucket.org/darij/rubin/wiki/Home)
+* Документацию читайте в [Wiki](https://bitbucket.org/darij/rubin/wiki/Home)

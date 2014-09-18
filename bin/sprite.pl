@@ -3,6 +3,7 @@
 
 #use Image::Magick;
 use File::Basename;
+use POSIX qw/strftime/;
 
 $" = " ";
 
@@ -58,6 +59,7 @@ while(<img/sprite/*>) {
 		$append++;
 		$max_y = $height if $height > $max_y;
 	}
+	# ?update=".strftime("%F_%T", localtime)."
 	print f "\n".join(", ", @css)." { background: url(\"/$sprite\") no-repeat; display: -moz-inline-stack; display: inline-block; *zoom: 1; *display: inline; }\n\n";
 	close f;
 	

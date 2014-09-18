@@ -3,7 +3,7 @@ use warnings;
 
 use POSIX qw(strftime);
 
-our %_watch:shared;
+my %_watch;
 
 
 sub stime {

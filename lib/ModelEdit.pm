@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-our ($param, $ini);
+our ($param, $ini, $_info);
 
 # изменяет модель. Изменяет $ini
 sub model_edit {
@@ -15,16 +15,30 @@ sub model_edit {
 	
 	my $inject = sub {
 		my ($arg, $key, $col) = @_;
-		my $val = $ini->{do}{$key}? join ",", ($erase? (): $col), grep {$_ ne $col} (split /,\s*/, $ini->{do}{$key}): "";
+		my $val = $ini->{do}{$key}? join ",", sort { $a cmp $b } ($erase || !$col? (): $col), grep {$_ ne $col} (split /,\s*/, $ini->{do}{$key}): $col;
 		$ini->{do}{$key} = $val;
-		if($val ne "") { Utils::inject_ini($_[0], "do", $key, $val) } else { Utils::delete_ini($_[0], "do", $key); delete $ini->{do}{$key} }
+		msg "in", $key, $val;
+		if($val ne "") { Utils::inject_ini($_[0], "", $key, $val) } else { Utils::delete_ini($_[0], "", $key); delete $ini->{do}{$key} }
 	};
 	
-	if($action eq "valid") {
+	if($action eq "selfcol") {
+		my $key = "$tab.selfcol";
+		if($perm ne "") {
+			for my $col (split /,\s*/, $perm) {
+				return status 406, "`$col` не разделён \".\"" unless $col =~ /\./;
+				return status 406, "Нет таблицы $col в базе" unless exists $_info->{$`};
+				return status 406, "Нет столбца $col в базе" unless exists $_info->{$`}{$'};
+			}
+			$ini->{do}{$key} = $perm;
+			Utils::inject_ini($_[0], "", $key, $perm);
+		}
+		else { Utils::delete_ini($_[0], "", $key); delete $ini->{do}{$key} }
+	}
+	elsif($action eq "valid") {
 		my @roles = split /,\s*/, $perm;
-		return status 501, "Параметр perm - пуст" unless @roles;
 		get_validator($_, "$tab.$_", $col) for @roles; # тестируем, чтобы были такие валидаторы
 		$inject->($_[0], "$tab.$_", $col) for @roles;
+		$inject->($_[0], "$tab.$_") unless @roles;
 	}
 	elsif($action eq "tab_perm") {
 		$inject->($_[0], "$tab.$role", $perm);

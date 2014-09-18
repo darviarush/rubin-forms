@@ -45,7 +45,7 @@ our $_watch = $_site->{watch};
 our $_lords = $_site->{lords};
 our $_req = $ini->{req} // 0;
 
-our %_HIDDEN_EXT = Utils::set(qw/pl act pm/, ($_site->{hidden_ext} or ()));
+our %_HIDDEN_EXT = Utils::set(qw/pl pm act htm/, ($_site->{hidden_ext} or ()));
 
 
 our $_socket;
@@ -56,18 +56,15 @@ sub end_server {
 	$_socket->close;
 }
 
-# перечитывает ini по сигналу
-$SIG{USR1} = sub {
-	msg RED.'signal USR1 thr='.threads->tid().RESET;
-	$ini = Utils::parse_ini("main.ini");
-	parse_perm();
-};
+# считывает права на таблицы и их столбцы
+sub read_perm {
+	#msg RED.'signal USR1 thr='.threads->tid().RESET;
+	parse_perm( $ini->{do} = Utils::parse_ini("main_do.ini") );
+}
+read_perm();
 
-# Открываем сокет
-# наш скрипт будет слушать порт $ini->{site}{port} (9000)
-# длина очереди соединений (backlog)- 5 штук
-my $drv = $_site->{drv} // "";
-$_socket = $drv =~ /^fcgi$/i? Rubin::FCGI->new($_port): Rubin::HTTP->new($_port);
+# перечитывает main_do.ini по сигналу
+$SIG{USR1} = \&read_perm;
 
 # грузим экшены
 for_action \&load_action;
@@ -83,6 +80,12 @@ if($_site->{daemon}) {
 	exit if $pid;	# это родительский процесс - убиваем его
 	die "Не удалось отсоединится от терминала\n" if setsid() == -1;
 }
+
+# Открываем сокет
+# наш скрипт будет слушать порт $ini->{site}{port} (9000)
+# длина очереди соединений (backlog)- 5 штук
+my $drv = $_site->{drv} // "";
+$_socket = $drv =~ /^fcgi$/i? Rubin::FCGI->new($_port): $drv =~ /^psgi$/i? Rubin::PSGI->new($_port): Rubin::HTTP->new($_port);
 
 msg "Слушаем ".GREEN.$_port.RESET;
 
@@ -106,13 +109,15 @@ for(;;) {
 	eval {
 		my @joinable = threads->list(threads::joinable);
 		for my $thr (@joinable) {		# проверяем наших лордов
+			my @return = $thr->join();
 			my $tid = $thr->tid();
 			my $error = $thr->error();
 			#if($tid == $cron) {
 			#	print RED."Завершился крон № $tid\n".RESET."$error";
 			#	$cron = threads->create(*cron::run)->tid();
 			#} else {
-				msg RED."Завершился лорд № $tid\n".RESET.($error // "");
+				msg RED."Завершился лорд № $tid".RESET.($error? "\nС ошибкой: $error": "").(@return? "\nВернул: ": "");
+				msg \@return if @return;
 				threads->create(*lord);
 			#}
 		}
@@ -223,15 +228,21 @@ $x
 }
 
 my %_STAT = ();
-sub stat_begin {
+
+sub stat_start {
 	$_STAT{time} = Time::HiRes::time();
+}
+
+sub stat_begin {
 	msg "\n".RED."$_METHOD".RESET." $_URL ".RED."$_VERSION ".CYAN."tid".RESET.": ".threads->tid().CYAN." from ".RESET.join(", ", threads->list());
 	if($_req > 0) { msg MAGENTA.$_.RESET.": ".CYAN.$_HEAD->{$_}.RESET for keys %{$_HEAD} };
-	if($_req > 1) { msg CYAN.$_.RESET.": ".$_POST->{$_} for keys %{$_POST} };
+	if($_req > 1) { msg CYAN.$_.RESET.": ".(!defined($_POST->{$_})? RED."null".RESET: ref $_POST->{$_} eq "JSON::XS::Boolean"? RED.$_POST->{$_}.RESET: ref $_POST->{$_}? Utils::Dump($_POST->{$_}): $_POST->{$_} ) for keys %$_POST };
 }
 
 sub stat_end {
 	my ($RESPONSE, $head, $out) = @_;
+	$RESPONSE =~ s/\s*$//;
+	msg $RESPONSE;
 	/: /, msg GREEN.$`.RESET.": ".YELLOW.$'.RESET for @$head;
 	if($_req > 1) { msg $_ for @$out }
 	my $time = Time::HiRes::time() - $_STAT{time};

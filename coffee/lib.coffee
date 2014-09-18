@@ -869,8 +869,12 @@ CTemplate =
 		code_begin1 = "function(data, id) { return ['"
 		code_end1 = '\'].join("") }'
 		
-		RE_TYPE = "(\"(?:\\\"|[^\"])*\"|'(?:\\'|[^'])*'|-?\\d+(?:\\.\\d+)?(?:E[+-]\\d+)?)"
+		RE_TYPE = "(\"(?:\\\\\"|[^\"])*\"|'(?:\\\\'|[^'])*'|-?\\d+(?:\\.\\d+)?(?:E[+-]\\d+)?)"
 		CALL_FN = new RegExp "^\\{%\\s*(\\w+)\\s+#{RE_TYPE}(?:\\s*,\\s*#{RE_TYPE})?(?:\\s*,\\s*#{RE_TYPE})?(?:\\s*,\\s*#{RE_TYPE})?(?:\\s*,\\s*#{RE_TYPE})?\\s*%\\}"
+		PARSE_VAR = new RegExp "^(?:\\$|(#))(\\{\\s*)?(?:(%)?(\\w+)|#{RE_TYPE})"
+		PARSE_CONST = new RegExp "^#{RE_TYPE}"
+		re_type = (s) -> if s? then s.replace(/\n/g, '\\n').replace /\r/g, '\\r'
+		_NO_ESCAPE_HTML = raw: 1, json: 1, dump: 1
 		
 		_tags = ///(?:input|meta)///i
 		tags =
@@ -928,21 +932,24 @@ CTemplate =
 			else if m = s.match ///^\$&/// then 
 			else if m = s.match ///^{%\s*(\w+)\s*=%\}/// then html.push "', (function() { CTemplate._STASH.#{m[1]} = ['"
 			else if m = s.match ///^{%\s*end\s*%\}/// then html.push "'].join(''); return '' })(), '"
-			else if m = s.match ///^{%=\s*(\w+)\s*%\}/// then html.push "', CTemplate._STASH.#{m[1]}, '"
+			#else if m = s.match ///^{%=\s*(\w+)\s*%\}/// then html.push "', CTemplate._STASH.#{m[1]}, '"
 			else if m = s.match CALL_FN then	
-			else if m = s.match ///^(?:\$|(#))(\{\s*)?(\w+)///
+			else if m = s.match PARSE_VAR
 				open_span = m[1]
 				if open_span and (open_tag or /^(?:script|style)$/i.test TAG) then html.push m[0]
 				else
 					pos += len = m[0].length
 					s = s.slice len
 					open_braket = !!m[2]
-					_var = m[3]
-					VAR = undefined
-					form.fields[_var] = 1 unless /^_/.test _var
 					braket = 0
+					_type = m[3]
+					_var = m[4]
+					_const = re_type m[5]
+					VAR = undefined
+					form.fields[_var] = 1 if _var and not /^_/.test _var
+					
 					html.push "<span id=', id, '-#{_var}>" if open_span
-					html.push "', ", "data['#{_var}']"
+					html.push "', ", _const || if _type then "CTemplate._STASH.#{_var}" else "data['#{_var}']"
 					fn_idx = html.length-1
 					fn_idxs = [fn_idx]
 					while 1
@@ -950,10 +957,9 @@ CTemplate =
 						if not VAR and m = s.match ///^:(\w+)(\()?///
 							html[fn_idx] = "CHelper.#{m[1]}(" + html[fn_idx]
 							html.push (if m[2] then ++braket; ", " else ")")
-						else if VAR and m = s.match ///^(?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*')/// then html.push m[0].replace(/\n/g, '\\n').replace /\r/g, '\\r'
-						else if VAR and m = s.match ///^-?\d+(?:\.\d+)?(?:E[+-]\d+)?/// then html.push m[0]
-						else if not VAR and m = s.match ///^,\s*/// then html.push m[0]
-						else if VAR and m = s.match ///^\$(\w+)/// then fn_idxs.push fn_idx; fn_idx = html.length; html.push "data['#{m[1]}']"
+						else if VAR and m = s.match PARSE_CONST then fn_idxs.push fn_idx; fn_idx = html.length; html.push re_type m[0]
+						else if VAR and m = s.match ///^\$(%)?(\w+)/// then fn_idxs.push fn_idx; fn_idx = html.length; html.push (if m[1] then "CTemplate._STASH.#{m[2]}" else "data['#{m[2]}']")
+						else if not VAR and m = s.match ///^,\s*/// then fn_idx = fn_idxs.pop(); html.push m[0]
 						else if m = s.match ///^\)/// then VAR=1 ; --braket; fn_idx = fn_idxs.pop(); html.push ")"
 						else if m = s.match ///^\}/// then (throw "нет `{` для `}`" unless open_braket); open_braket = 0 ; pos++; s = s.slice 1 ; break
 						else break
@@ -963,7 +969,9 @@ CTemplate =
 
 					throw "не закрыта `}`" if open_braket
 					throw "не закрыты скобки (#{braket})" if braket
-
+					
+					unless (m=html[fn_idx].match /^CHelper\.(\w+)/) and _NO_ESCAPE_HTML[m[1]] then html[fn_idx] = "CHelper.html(" + html[fn_idx]; html.push ")"
+					
 					html.push ", '" + (if open_span then "</span>" else "")
 					continue
 
@@ -2480,8 +2488,9 @@ class CWidget
 			if msg instanceof CTooltipWidget then @_tooltip?.free(); @_tooltip = msg; return this
 			if typeof msg == 'string' then msg = text: msg
 			else if msg instanceof CWidget then msg = html: msg
-			unless @_tooltip
-				t = @_tooltip = @wrap "<div ctype="+(msg.ctype || "tip")+" style='display:none'></div>", this
+			if not @_tooltip or msg.ctype and @_tooltip.config.ctype != msg.ctype
+				@_tooltip?.free()
+				t = @_tooltip = @wrap "<div ctype="+(msg.ctype ||= "tip")+" style='display:none'></div>", this
 				if msg.append then @[msg.append] t
 				else if /^TBODY|TFOOT|THEAD$/.test tag=@tag() then @up().before t
 				else if tag == 'TR' then @up().up().before t
@@ -3214,7 +3223,7 @@ class CTooltipWidget extends CWidget
 					corner = @position.normalize pos, corner
 					@[position] parent, pos, scale, scalex, scaley, height
 					{left, top, right, bottom} = @viewPos()
-					say right, bottom, vw, vh
+					say right, bottom, vw, vh, pos, scale, scalex, scaley, height
 					if left >= 0 and top >= 0 and right <= vw and bottom <= vh then break
 			@hidden()
 				
@@ -3354,7 +3363,8 @@ class CLoaderWidget extends CWidget
 		
 		method = param._method || customer._method || customer.attr("cmethod") || @attr("cmethod") || @_method
 		delete param._method
-		async = if '_async' of param then param._async; delete param._async else on
+
+		if '_async' of param then async=param._async; delete param._async else async=on
 		
 		headers = Vary: 'Ajax', Ajax: type
 		if CInit.post == 'json' then headers['Content-Type'] = 'application/json'
@@ -3367,6 +3377,7 @@ class CLoaderWidget extends CWidget
 		params = if method != "POST" then (if params then url = CUrl.from url; extend url.param, param; url = CUrl.to url); null
 		else if CInit.post == 'json' then toJSON param
 		else CParam.to param
+
 		request.open method, url, async
 		for key of headers then request.setRequestHeader key, headers[key]
 		request.send params
@@ -3424,7 +3435,7 @@ class CLoaderWidget extends CWidget
 	ohLoad: -> @request.customer.tooltip null
 	ohError: ->
 		error = if @request.request.status == 500 then @request.request.responseText else escapeHTML @request.error
-		@request.customer.tooltip html: "<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка ajax</h3>"+error, open: 1, timeout: 5000, class: 'c-error'
+		@request.customer.tooltip ctype: 'tooltip', html: "<div class='fl mb mr ico-ajax-error'></div><div class='fr ico-close-red'></div><h3>Ошибка</h3>"+error, open: 1, timeout: 5000, class: 'c-error'
 	
 	submit_manipulate: (data) ->
 		data = fromJSON data if typeof data == 'string'

@@ -6,9 +6,7 @@ use Data::Dumper;
 
 use Valid;
 
-our ($ini, $dbh, $_info, %_tab_selfcol, %_tab_validator, %_tab_update, %_tab_error, %_tab_valid, %_rules, %_tab_rules, %_alias_tab, $_user_id, $_COOKIE, $_HEAD, %_STASH, $param, $_id, %_pages, %_forms);
-
-parse_perm();
+our ($dbh, $_info, %_tab_selfcol, %_tab_validator, %_tab_update, %_tab_error, %_tab_valid, %_rules, %_tab_rules, %_alias_tab, $_user_id, $_COOKIE, $_HEAD, %_STASH, $param, $_id, %_pages, %_forms);
 
 # возвращает валидаторы или выбрасывает исключение
 sub get_validator {
@@ -31,6 +29,7 @@ sub get_validator {
 # валидация:
 #	user.int = id
 sub parse_perm {
+	my ($do) = @_;
 	%_tab_selfcol = ();
 	%_tab_validator = ();
 	%_tab_update = ();
@@ -40,7 +39,7 @@ sub parse_perm {
 	%_tab_rules = ();
 	%_alias_tab = ();
 
-	while(my ($a, $cols) = each %{$ini->{do}}) {
+	while(my ($a, $cols) = each %$do) {
 
 		my ($tab, $role, $perm) = split /\./, $a;
 
