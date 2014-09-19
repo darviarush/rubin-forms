@@ -5,7 +5,7 @@ $pass = $param->{pass};
 
 $user_id = query "user", "id", {email=>$email, pass=>$pass};
 if($user_id) {
-	if($user_id == auth()) {
+	if($user_id == $_user_id) {
 		$sess = $_COOKIE->{sess};
 	} else {
 		$sess = Utils::unic_id(20);
@@ -13,6 +13,7 @@ if($user_id) {
 		erase "sess", {user_id=>$user_id};
 		add "sess", {id=>$sess, user_id=>$user_id};
 	}
+	#redirect $_HEAD->{Referer};
 	{sess => $sess, user_id => $user_id}
 } else {
 	status 403, "Логин или пароль неверен";

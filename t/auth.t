@@ -32,7 +32,7 @@ END
 
 require_ok "Valid";
 require_ok "Auth";
-
+parse_perm($ini->{do});
 }
 
 

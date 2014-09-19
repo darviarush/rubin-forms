@@ -52,15 +52,15 @@ while(<img/sprite/*>) {
 
 		$add .= ' '.$file;
 		@sel = $file =~ m!([\w-]+)\.[^/]+$!;
-		print f ".$sel[0] { background-position: -${x}px -${y}px; width: ${width}px; height: ${height}px }\n";
+		push @img, ".$sel[0] { background-position: -${x}px -${y}px; width: ${width}px; height: ${height}px }\n";
 		push @css, ".".$sel[0];
 
 		$x+=$width;
 		$append++;
 		$max_y = $height if $height > $max_y;
 	}
-	# ?update=".strftime("%F_%T", localtime)."
-	print f "\n".join(", ", @css)." { background: url(\"/$sprite\") no-repeat; display: -moz-inline-stack; display: inline-block; *zoom: 1; *display: inline; }\n\n";
+
+	print f join(", ", @css)." { background: url(\"/$sprite?update=".strftime("%F_%T", localtime)."\") no-repeat; display: -moz-inline-stack; display: inline-block; *zoom: 1; *display: inline; }\n\n".join("", @img);
 	close f;
 	
 	$add .= " +append \\) \\( ";

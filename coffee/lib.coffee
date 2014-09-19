@@ -89,6 +89,9 @@
 # 60. Локализация (перевод) на другие языки
 # 61. accept в div-ах
 # 62. Взять для описания документации из http://enepomnyaschih.github.io/jwidget/1.0/index.html#!/guide/ruphilosophy и подправить
+# 63. узнать произошло ли изменение адреса из history или добавлением элемента через history.length - она увеличится, а если позиция истории - посредине - уменьшиться при добавлении. Иначе - она в истории
+# 64. @init id - регистрирует объект в массиве и привязывает его при пересоздании страниц
+# 65. Добавить в темплейт выделение в функцию {% def fn $x, $y, $z %} $x $y $z {% end def %}   Использование: $"fn":print(1,2,3)
 
 # Ссылки:
 # http://topobzor.com/13-servisov-dlya-testirovaniya-sajta-v-raznyx-brauzerax/.html - сайты-тестеры
@@ -873,6 +876,9 @@ CTemplate =
 		CALL_FN = new RegExp "^\\{%\\s*(\\w+)\\s+#{RE_TYPE}(?:\\s*,\\s*#{RE_TYPE})?(?:\\s*,\\s*#{RE_TYPE})?(?:\\s*,\\s*#{RE_TYPE})?(?:\\s*,\\s*#{RE_TYPE})?\\s*%\\}"
 		PARSE_VAR = new RegExp "^(?:\\$|(#))(\\{\\s*)?(?:(%)?(\\w+)|#{RE_TYPE})"
 		PARSE_CONST = new RegExp "^#{RE_TYPE}"
+		RE_IF = new RegExp "^\\{%\\s*if\\s+(?:\\$(%)?(\\w+)|#{RE_TYPE})"
+		RE_ELIF = new RegExp "^\\{%\\s*elif\\s+(?:\\$(%)?(\\w+)|#{RE_TYPE})"
+		
 		re_type = (s) -> if s? then s.replace(/\n/g, '\\n').replace /\r/g, '\\r'
 		_NO_ESCAPE_HTML = raw: 1, json: 1, dump: 1
 		
@@ -888,6 +894,34 @@ CTemplate =
 		form.forms = []
 			
 		T = []; html = []; pos = 0 ; s = i_html
+		
+		helper = (_type, _var, _const, open_braket) ->
+			braket = 0
+			VAR = undefined
+			html.push _const || if _type then "CTemplate._STASH.#{_var}" else "data['#{_var}']"
+			fn_idx = html.length-1
+			fn_idxs = [fn_idx]
+			while 1
+
+				if not VAR and m = s.match ///^:(\w+)(\()?///
+					html[fn_idx] = "CHelper.#{m[1]}(" + html[fn_idx]
+					html.push (if m[2] then ++braket; ", " else ")")
+				else if VAR and m = s.match PARSE_CONST then fn_idxs.push fn_idx; fn_idx = html.length; html.push re_type m[0]
+				else if VAR and m = s.match ///^\$(%)?(\w+)/// then fn_idxs.push fn_idx; fn_idx = html.length; html.push (if m[1] then "CTemplate._STASH.#{m[2]}" else "data['#{m[2]}']")
+				else if not VAR and m = s.match ///^,\s*/// then fn_idx = fn_idxs.pop(); html.push m[0]
+				else if m = s.match ///^\)/// then VAR=1 ; --braket; fn_idx = fn_idxs.pop(); html.push ")"
+				else if m = s.match ///^\}/// then (throw "нет `{` для `}`" unless open_braket); open_braket = 0 ; pos++; s = s.slice 1 ; break
+				else break
+				pos += len = m[0].length
+				s = s.slice len
+				VAR = !VAR
+
+			throw "не закрыта `}`" if open_braket
+			throw "не закрыты скобки (#{braket})" if braket
+			
+			return fn_idx
+		
+		
 		pop = ->
 			tag = T.pop()
 			if tag.length > 2
@@ -932,43 +966,30 @@ CTemplate =
 			else if m = s.match ///^\$&/// then 
 			else if m = s.match ///^{%\s*(\w+)\s*=%\}/// then html.push "', (function() { CTemplate._STASH.#{m[1]} = ['"
 			else if m = s.match ///^{%\s*end\s*%\}/// then html.push "'].join(''); return '' })(), '"
-			#else if m = s.match ///^{%=\s*(\w+)\s*%\}/// then html.push "', CTemplate._STASH.#{m[1]}, '"
+			
+			else if m = s.match RE_IF then s = s.slice len = m[0].length; pos += len; html.push "', ("; helper(m[1], m[2], m[3]); throw "Нет закрывающей `%}` для if" unless m = s.match ///^\s*%\}///; html.push "? ['"
+			else if m = s.match RE_ELIF then s = s.slice len = m[0].length; pos += len; html.push "'].join(''): "; helper(m[1], m[2], m[3]); throw "Нет закрывающей `%}` для elif" unless m = s.match ///^\s*%\}///; html.push "? ['"
+			else if m = s.match ///^\{%\s*else\s*%\}/// then html.push "'].join(''): ['"
+			else if m = s.match ///^\{%\s*fi\s*%\}/// then html.push "'].join('')), '"
+			
 			else if m = s.match CALL_FN then	
 			else if m = s.match PARSE_VAR
 				open_span = m[1]
 				if open_span and (open_tag or /^(?:script|style)$/i.test TAG) then html.push m[0]
 				else
-					pos += len = m[0].length
-					s = s.slice len
+					s = s.slice len = m[0].length; pos += len
+					
 					open_braket = !!m[2]
-					braket = 0
 					_type = m[3]
 					_var = m[4]
 					_const = re_type m[5]
-					VAR = undefined
-					form.fields[_var] = 1 if _var and not /^_/.test _var
+					
+					form.fields[_var] = 1 if _var and not type
 					
 					html.push "<span id=', id, '-#{_var}>" if open_span
-					html.push "', ", _const || if _type then "CTemplate._STASH.#{_var}" else "data['#{_var}']"
-					fn_idx = html.length-1
-					fn_idxs = [fn_idx]
-					while 1
-
-						if not VAR and m = s.match ///^:(\w+)(\()?///
-							html[fn_idx] = "CHelper.#{m[1]}(" + html[fn_idx]
-							html.push (if m[2] then ++braket; ", " else ")")
-						else if VAR and m = s.match PARSE_CONST then fn_idxs.push fn_idx; fn_idx = html.length; html.push re_type m[0]
-						else if VAR and m = s.match ///^\$(%)?(\w+)/// then fn_idxs.push fn_idx; fn_idx = html.length; html.push (if m[1] then "CTemplate._STASH.#{m[2]}" else "data['#{m[2]}']")
-						else if not VAR and m = s.match ///^,\s*/// then fn_idx = fn_idxs.pop(); html.push m[0]
-						else if m = s.match ///^\)/// then VAR=1 ; --braket; fn_idx = fn_idxs.pop(); html.push ")"
-						else if m = s.match ///^\}/// then (throw "нет `{` для `}`" unless open_braket); open_braket = 0 ; pos++; s = s.slice 1 ; break
-						else break
-						pos += len = m[0].length
-						s = s.slice len
-						VAR = !VAR
-
-					throw "не закрыта `}`" if open_braket
-					throw "не закрыты скобки (#{braket})" if braket
+					html.push "', "
+					
+					fn_idx = helper _type, _var, _const, open_braket
 					
 					unless (m=html[fn_idx].match /^CHelper\.(\w+)/) and _NO_ESCAPE_HTML[m[1]] then html[fn_idx] = "CHelper.html(" + html[fn_idx]; html.push ")"
 					
@@ -1005,14 +1026,14 @@ CTemplate =
 		html = cview[1]
 		content=element.innerHTML
 		html = html.replace /\$@/, content
-		html = CTemplate.compile(html)(CTemplate.fromArgs(element.getAttribute 'cargs'), id)
+		html = CTemplate.compile(html)($H(element.getAttribute 'cargs'), id)
 		html = html.replace /\$&/, content
 		element.removeAttribute "cview"
 		element.removeAttribute "cargs"
 		element.setAttribute 'ctype', CWidget::className.call constructor: cls || cview[0]
 		element.innerHTML = html
 		
-	fromArgs: (s) -> x={}; fromArg = ((v) -> [key, val] = v.split("="); x[key]=val); s=String s; (while (pos=s.search(/\s+\w+=/)) != -1 then v=s.slice 0, pos; s=s.slice(pos).replace /^\s+/, ''; fromArg v); fromArg s.replace /\s+$/, ''; x
+	#fromArgs: (s) -> x={}; fromArg = ((v) -> [key, val] = v.split("="); x[key]=val); s=String s; (while (pos=s.search(/\s+\w+=/)) != -1 then v=s.slice 0, pos; s=s.slice(pos).replace /^\s+/, ''; fromArg v); fromArg s.replace /\s+$/, ''; x
 	_color: ['Cornsilk', 'lavender', 'Ivory', 'LavenderBlush', 'LemonChiffon', 'MistyRose', 'Seashell', 'Honeydew', 'MintCream', 'Azure', 'AliceBlue']
 	color: (n=parseInt(Math.random()*CTemplate._color.length)) -> CTemplate._color[n]
 
@@ -1029,6 +1050,16 @@ CHelper =
 	odd: (x, a='odd', b='') -> if x % 2 then a else b
 	even: (x, a='even', b='') -> if x % 2==0 then a else b
 	oddeven: (x, a='odd', b='even') -> if x % 2 then a else b
+	# логические операторы
+	and: (a, b) -> a and b
+	or: (a, b) -> a or b
+	not: (a) -> not a
+	lt: (a, b) -> a < b
+	gt: (a, b) -> a > b
+	le: (a, b) -> a <= b
+	ge: (a, b) -> a >= b
+	eq: (a, b) -> a == b
+	ne: (a, b) -> a != b
 	
 	
 CValid =
@@ -1455,8 +1486,7 @@ class CWidget
 		handlers = {}
 		r = []
 		p = this
-		while p and p.element.id
-			h = p.constructor.handlers
+		while p and p.element.id and h = p.constructor.handlers
 			for name, i in r then unless h = h[name] then break
 			if i==r.length then for name of h when a=h[name]["@"] then handlers[name]=a
 			r.splice 0, 0, if /^\d+$/.test name=p.name() then 'frame' else name
@@ -2378,7 +2408,7 @@ class CWidget
 				if to1.length == 1 and (v1 = @getCss(key).split /\s+/).length > 1 then to1 = [x=to1[0], x, x, x]
 				if to1.length > 1 then to = []; ci = []; (for t, i in to1 then m = t.match ///^(.*?)([a-z%]+)$///; to[i]=m[1]; ci[i]=m[2]); px = 'pxvector'
 				else
-					if ci = to.match ///[a-z%]+$/// then px = ci = ci[0]; to = to.slice 0, to.length-ci.length
+					if ci = to.match ///[a-z%]+$/// then px = ci = ci[0]; to = to.slice 0, to.length-ci.length; (if px == '%' then px = "pv")
 					else if @hasCss key, '1px' then ci = px = 'px'
 					else if @hasCss key, '1' then ci = ''; px = 'px'
 					else anim_css_set$.call this, key, v; continue
@@ -3186,7 +3216,7 @@ class CCenterModalWidget extends CModalWidget
 	
 class CTooltipWidget extends CWidget
 	
-	config: { pos: 'top', scale: 'center', scalex: 'after', scaley: 'mid', height: 10, width: 30, corner: 'mid', focus: 1, mouse: 1, open: 'fadeIn', close: 'fadeOut', class: 'c-tip', turn: 1 }
+	config: { pos: 'top', scale: 'center', scalex: 'after', scaley: 'mid', height: 10, width: 30, corner: 'mid', focus: 1, mouse: 1, open: 'fadeIn', close: 'fadeOut', class: 'c-tip', turn: 1, close_button: "<div class='fr ico-close-red cp' onclick='$(this).up().close()'></div>" }
 	
 	constructor: ->
 		super
@@ -3201,12 +3231,14 @@ class CTooltipWidget extends CWidget
 	conf: (msg = {}) ->
 		if msg.display == 1 then display = 1 ; delete msg.display
 		if msg.open == 1 then open = 1 ; delete msg.open
+		if msg.close == 1 then close = 1 ; delete msg.close
 		super msg
 		p = @config
 		p.scale = @position.normalize p.pos, p.scale
 		p.corner = @position.normalize p.pos, p.corner
 		if msg.text then @text msg.text
 		if msg.html then @content msg.html
+		if close then @prepend p.close_button
 		{pos, scale, height, width, scalex, scaley, corner, turn}=p
 		position = if (parent=@parent()).contains this then 'relative' else 'position'
 		@[position] parent, pos, scale, scalex, scaley, height
@@ -3215,7 +3247,7 @@ class CTooltipWidget extends CWidget
 			vh = @viewHeight()
 			@display()
 			{left, top, right, bottom} = @viewPos()
-			say right, bottom, vw, vh
+			#say right, bottom, vw, vh
 			if left < 0 or top < 0 or right > vw or bottom > vh
 				for i in [0..2]
 					pos = @position.rotate[pos]
@@ -3223,7 +3255,7 @@ class CTooltipWidget extends CWidget
 					corner = @position.normalize pos, corner
 					@[position] parent, pos, scale, scalex, scaley, height
 					{left, top, right, bottom} = @viewPos()
-					say right, bottom, vw, vh, pos, scale, scalex, scaley, height
+					#say right, bottom, vw, vh, pos, scale, scalex, scaley, height
 					if left >= 0 and top >= 0 and right <= vw and bottom <= vh then break
 			@hidden()
 				
@@ -3435,7 +3467,7 @@ class CLoaderWidget extends CWidget
 	ohLoad: -> @request.customer.tooltip null
 	ohError: ->
 		error = if @request.request.status == 500 then @request.request.responseText else escapeHTML @request.error
-		@request.customer.tooltip ctype: 'tooltip', html: "<div class='fl mb mr ico-ajax-error'></div><div class='fr ico-close-red'></div><h3>Ошибка</h3>"+error, open: 1, timeout: 5000, class: 'c-error'
+		@request.customer.tooltip ctype: 'tooltip', close: 1, html: "<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка</h3>"+error, open: 1, timeout: 5000, class: 'c-error'
 	
 	submit_manipulate: (data) ->
 		data = fromJSON data if typeof data == 'string'

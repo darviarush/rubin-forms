@@ -162,8 +162,16 @@ sub ritter {
 			@ret = "404 Not Found";
 		} else {
 			$_STATUS = 200;
-			$_STASH{_user_id} = $_user_id = auth();
-			$_STASH{_id} = $_id;
+			$_user_id = auth();
+			%_STASH = (
+				_id => $_id,
+				_user_id => $_user_id,
+				_COOKIE => $_COOKIE,
+				_GET => $_GET,
+				_POST => $_POST,
+				param => $param,
+			);
+			
 			
 			my $ajax = $_HEAD->{Ajax} // "";
 
@@ -227,6 +235,8 @@ $x
 	return [$_STATUS, \@_HEAD, \@ret];
 }
 
+
+# распечатывают статистику. Используются в драйверах
 my %_STAT = ();
 
 sub stat_start {

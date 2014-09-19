@@ -96,7 +96,7 @@ sub auth (@) {
 	return unless $sess;
 	my @res = $dbh->selectrow_array("SELECT user_id$fld FROM sess WHERE id=?", undef, $sess);
 	update("sess", {now=>strftime("%F %T", localtime())}, {id=>$sess}) if $res[0];
-	return $fld? @res: $_user_id;
+	return $fld? @res: $res[0];
 }
 
 # проверяет валидацию параметров

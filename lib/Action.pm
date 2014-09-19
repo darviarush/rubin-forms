@@ -2,6 +2,7 @@ use strict;
 use warnings;
 
 use URI::Escape;
+use Term::ANSIColor qw(:constants);
 
 # подгружаем экшены в %_action
 sub load_htm($) {
@@ -102,7 +103,7 @@ sub include_action ($$) {
 sub header ($$) {
 	my ($k, $v) = @_;
 	if($k =~ /^Content-Type$/i) { content($v) }
-	else { push @::_HEAD, $k.": ".Utils::uri_escape($v); }
+	else { push @::_HEAD, $k.": ".Utils::uri_escape($v, qr/[^ -\xFF]/); }
 }
 
 sub content ($) {
@@ -110,10 +111,10 @@ sub content ($) {
 	$::_HEAD[0] = "Content-Type: $_[0]$charset"
 }
 
-sub redirect ($) {
+sub redirect ($;$) {
 	$::_STATUS = 307;
 	push @::_HEAD, "Location: $_[0]";
-	"Redirect to <a href='$_[0]'>$_[0]</a>"
+	"Redirect to <a href='$_[0]'>".($_[1] // $_[0])."</a>"
 }
 
 sub status ($;$) { $::_STATUS = $_[0]; if($_[1]) { header "Error" => $_[1]; $_[1] } else { ($::_STATUS)." ".$::_STATUS{$::_STATUS} } }

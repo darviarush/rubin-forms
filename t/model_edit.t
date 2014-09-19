@@ -3,12 +3,13 @@ use warnings;
 
 
 use Data::Dumper;
-use Test::More tests => 11;
+use Test::More tests => 10;
 
 use Msg;
 use Auth;
 use Utils;
-require_ok 'ModelEdit';
+use Action;
+use ModelEdit;
 
 my $ref = "
 [do]

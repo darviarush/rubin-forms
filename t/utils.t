@@ -4,7 +4,7 @@ use warnings;
 
 use Data::Dumper;
 use Msg;
-use Test::More tests => 59;
+use Test::More tests => 62;
 
 use Msg;
 require_ok 'Utils';
@@ -189,6 +189,7 @@ is $html, "- \\Нет -";
 my $r = <<'END';
 ${x:bool($y:bool('\''), 10):raw}
 END
+
 $fn = Utils::Template($r);
 $html = $fn->({x=>1, y=>1});
 is $html, "'\n";
@@ -196,9 +197,28 @@ is $html, "'\n";
 $html = $fn->({x=>0, y=>1});
 is $html, "10\n";
 
-$fn = Utils::Template('$xyz:raw');
-$html = $fn->({xyz=>10});
-is $html, 10;
+$fn = Utils::Template('$xyz:raw ');
+$html = $fn->({xyz=>"<>"});
+is $html, "<> ";
+
+$r = <<'END';
+{% if $x:lt(10) %}
+1
+{% elif $y:eq($z) %}
+2
+{% else %}
+3
+{% fi %}
+END
+
+$fn = Utils::Template($r);
+$html = $fn->({x=>1});
+is $html, "\n1\n\n";
+$html = $fn->({x=>10, y=>13, z=>13});
+is $html, "\n2\n\n";
+$html = $fn->({x=>10, y=>1, z=>2});
+is $html, "\n3\n\n";
+
 
 my $code = Utils::TemplateStr('<div id=$-frame>$@list/index</div>');
 like $code, qr!, include_action\(\$data->{'frame'}, "\$id-frame", 'list/index'\),!;

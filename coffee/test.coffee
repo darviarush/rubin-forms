@@ -2644,8 +2644,27 @@ new CTest 'key-CTemplate-compile', """
 	@is html, "10\n"
 
 	fn = CTemplate.compile '$xyz:raw'
-	html = fn xyz:10
-	@is html, "10"
+	html = fn xyz:"<>"
+	@is html, "<>"
+	
+	
+	r = """
+{% if $x:lt(10) %}
+1
+{% elif $y:eq($z) %}
+2
+{% else %}
+3
+{% fi %}
+"""
+
+	fn = CTemplate.compile r
+	html = fn x:1
+	@is html, "\n1\n"
+	html = fn x:10, y:13, z:13
+	@is html, "\n2\n"
+	html = fn x:10, y:1, z:2
+	@is html, "\n3\n"
 	
 	#code = CTemplate.compile '<div id=$-frame>$@list/index</div>'
 	#@like String(code), ///, CTemplate.include_action\(\$data->{'frame'}, "\$id-frame", 'list/index'\),///

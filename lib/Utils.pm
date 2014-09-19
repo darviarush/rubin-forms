@@ -369,10 +369,11 @@ sub tee {
 
 # эскейпит для url
 sub uri_escape {
-	my ($v) = @_;
+	my ($v, $re) = @_;
 	local ($`, $', $&);
 	utf8::decode($v) unless utf8::is_utf8($v);
-	$v =~ s![^A-Za-z0-9\-\._~]!my $x=ord($&); $x<256? sprintf("%%%02X", $x): sprintf("%%u%04X", $x) !ge;
+	$re //= qr/[^A-Za-z0-9\-\._~]/;
+	$v =~ s!$re!my $x=ord($&); $x<256? sprintf("%%%02X", $x): sprintf("%%u%04X", $x) !ge;
 	$v
 }
 
@@ -626,8 +627,37 @@ sub TemplateStr {
 	local ($_, $&, $`, $', $1, $2, $3, $4, $5);
 	($_) = @_;
 	
-	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id) = $_;
+	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id) = ($_, 0);
 	my $page = my $form = {};
+	
+	my $vario = sub { my ($type, $var, $const) = @_; defined($const)? $re_type->($const): defined($type)? ($var eq "_DATA"? "\$data": $var eq "_STASH"? "\\%_STASH": "\$_STASH{'$var'}"): "\$data->{'$var'}" };
+	my $helper = sub {
+		my ($type, $var, $const, $open_braket) = @_;
+		push @html, $vario->($type, $var, $const);
+		my ($fn_idx, @fn_idx) = ($#html, $#html);
+		my $VAR = undef;
+		my $braket = 0;
+		for(;;) {
+			pos() = $pos;
+
+			push @html, (
+			!$VAR && m!\G:(\w+)(\()?!? do { $html[$fn_idx] = "Helper::$1(".$html[$fn_idx]; if($2) { ++$braket;	", " }else { ")" } }:
+			$VAR && m!\G(?:\$(%)?(\w+)|$RE_TYPE)!? do { push @fn_idx, $fn_idx; $fn_idx = scalar @html; $vario->($1, $2, $3) }:
+			!$VAR && m!\G,\s*!? do { $fn_idx = pop @fn_idx; $& }:
+			m!\G\)!? do { $VAR = 1; --$braket; $fn_idx = pop @fn_idx; ")" }:
+			m!\G\}!? do { die "нет `{` для `}`" unless $open_braket; $pos++; last; }:
+			last);
+			$pos += length $&;
+			$VAR = !$VAR;
+			
+		}
+		if($open_braket) { die "не закрыта `}`" unless m!\G\}!; }
+		die "не закрыты скобки ($braket)" if $braket;
+		
+		return $fn_idx;
+	};
+	
+	
 	
 	my $pop = sub {	# закрывается тег
 		my $tag = pop @T;
@@ -680,6 +710,10 @@ sub TemplateStr {
 		m!\G\$&!? do { $page->{layout_id} = $open_id // /\bid=["']?([\w-]+)[^<]*\G/i && $1; "', \@_[2..\$#_], '" }:
 		m!\G\{%\s*(\w+)\s*=%\}!? do { "', do { \$_STASH{'$1'} = join '', ('" }:
 		m!\G\{%\s*end\s*%\}!? do { "'); () }, '" }:
+		m!\G\{%\s*if\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do { $pos += length $&; push @html, "', ("; $helper->($1, $2, $3); die "Нет закрывающей `%}` для if" unless m!\G\s*%\}!; $pos += length $&; push @html, "? ('"; next }:
+		m!\G\{%\s*elif\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do { $pos += length $&; push @html, "'): "; $helper->($1, $2, $3); die "Нет закрывающей `%}` для elif" unless m!\G\s*%\}!; $pos += length $&; push @html, "? ('"; next }:
+		m!\G\{%\s*else\s*%\}!? "'): ('":
+		m!\G\{%\s*fi\s*%\}!? "')), '":
 		m!\G\{%\s*load(?:\s+(\w+))?\s*%\}!? do { push @{$page->{load_forms}}, $form; $form->{load} = $1; () }:
 		m!\G\{%\s*model\s+(\w+)\s*%\}!? do { $form->{model} = $1; () }:
 		m!\G\{%\s*noload\s*%\}!? do { $form->{noload} = 1; () }:
@@ -690,32 +724,14 @@ sub TemplateStr {
 			else {
 				$pos += length $&;
 				my $open_braket = !!$2;
-				my $braket = 0;
 				my $type = $3;
 				my $var = $4;
-				my $const = $re_type->($5);
-				my $VAR = undef;
-				if(defined $var) { $form->{fields}{$var} = 1 if $var !~ /^_/; }
-				push @html, "<span id=', \$id, '-$var>" if $open_span;
-				push @html, "', ", defined($const)? $const: defined($type)? "\$_STASH{'$var'}": "\$data->{'$var'}";
-				my ($fn_idx, @fn_idx) = ($#html, $#html);
-				for(;;) {
-					pos() = $pos;
+				my $const = $5;
 
-					push @html, (
-					!$VAR && m!\G:(\w+)(\()?!? do { $html[$fn_idx] = "Helper::$1(".$html[$fn_idx]; if($2) { ++$braket;	", " }else { ")" } }:
-					$VAR && m!\G$RE_TYPE!? do { push @fn_idx, $fn_idx; $fn_idx = scalar @html; $re_type->($1) }:
-					$VAR && m!\G\$(%)?(\w+)!? do { push @fn_idx, $fn_idx; $fn_idx = scalar @html; $1? "\$_STASH{'$2'}": "\$data->{'$2'}" }:
-					!$VAR && m!\G,\s*!? do { $fn_idx = pop @fn_idx; $& }:
-					m!\G\)!? do { $VAR = 1; --$braket; $fn_idx = pop @fn_idx; ")" }:
-					m!\G\}!? do { die "нет `{` для `}`" unless $open_braket; $pos++; last; }:
-					last);
-					$pos += length $&;
-					$VAR = !$VAR;
-					
-				}
-				die "не закрыта `}`" if $open_braket and not m!\G\}!;
-				die "не закрыты скобки ($braket)" if $braket; 
+				$form->{fields}{$var} = 1 if defined $var and not $type;
+				push @html, "<span id=', \$id, '-$var>" if $open_span;
+				push @html, "', ";
+				my $fn_idx = $helper->($type, $var, $const, $open_braket);
 				
 				$html[$fn_idx] = "Helper::html($html[$fn_idx]", push @html, ")" unless $html[$fn_idx] =~ /^Helper::(\w+)/? exists $Helper::_NO_ESCAPE_HTML{$1}: undef;
 				
