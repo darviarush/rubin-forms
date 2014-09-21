@@ -32,6 +32,6 @@ else { die "Команда `$path` не найдена" }
 
 if(my $error = $@ // $!) { die $error }
 
-if(ref $ret ne "ARRAY") { return 1; } else { @av = @$ret; goto _START_; }
+if(ref $ret eq "ARRAY") { @av = @$ret; goto _START_; }
 
 1;

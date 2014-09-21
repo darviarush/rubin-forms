@@ -53,7 +53,7 @@ sub model_edit {
 
 # выбирает информацию из sql
 sub get_install_info {
-	my ($order, $install, $tab, $col) = 1;
+	my ($order, $prev, $install, $tab, $col) = (1, "\@", {});
 	my $f;
 	
 	for my $file (@_) {
@@ -71,11 +71,12 @@ sub get_install_info {
 					order => $order++
 				};
 			} elsif(!$tab) {
+				push @{ $install->{$prev}{"after"} }, $_;
 			} elsif(/^\s*(?:`([^`]*)`|(\w+))\s+(\w+)/) {
 				my $ins = $3.$';
 				$col = $1 // $2;
 				$ins =~ s/,?\s*$//;
-				$install->{$tab}{cols}{$col} = {package => $package, install => $ins, order => $order++};
+				$install->{$tab}{cols}{$col} = {name => $col, package => $package, install => $ins, order => $order++};
 			} elsif(/^\s*(INDEX|UNIQUE)/i) {
 				my $ins = $1.$';
 				$ins =~ s/,?\s*$/\n/;
@@ -84,6 +85,7 @@ sub get_install_info {
 				my $ins = $';
 				$ins =~ s/;?\s*$//;
 				$install->{$tab}{options} = $ins;
+				$prev = $tab;
 				$tab = undef;
 			} elsif(/^--\s*\[(.*?)\]/) {
 				$package = $1;
@@ -95,6 +97,15 @@ sub get_install_info {
 		close $f;
 	}
 	$install
+}
+
+sub sql_from_info {
+	my ($sql) = @_;
+	($sql? (($column_type{$sql->{column_type}} || $sql->{column_type} || "").
+	($sql->{is_nullable} eq "YES" || $sql->{column_key} =~ /PRI/? "": " not null").
+	(defined($sql->{column_default})? " default $sql->{column_default}": "").
+	($sql->{column_key} =~ /PRI/? " primary key": "").
+	($sql->{extra} ne ""? " $sql->{extra}": "")): "")
 }
 
 1;

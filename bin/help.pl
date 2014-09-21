@@ -1,7 +1,7 @@
 #= [name]
 #> возвращает список команд
 
-use Term::AnsiColor qw/:constants/;
+use Term::ANSIColor qw(:constants);
 
 $name = $ARGV[1];
 if($name) {
@@ -23,11 +23,14 @@ for $path (dirs("bin")) {
 		if(not exists $files{$file} and $file =~ /\.pl$/) {
 			$name = $`;
 			$_ = Utils::read("$path/$file");
-			($args) = /#= (.*)/;
-			($help) = /#> (.*)/;
-			$name .= " $args" if defined $args;
-			print "$file `$name`\n";
-			print $name . (" " x  (20 - length $name)) . $help . "\n";
+			($args) = /^#= (.*)/m;
+			($help) = /^#> (.*)/m;
+			$name .= MAGENTA." $args" if defined $args;
+			utf8::encode($name);
+			$len = length $name;
+			utf8::decode($name);
+			#print "$file `$name`\n";
+			print CYAN.$name .RESET. (" " x  (20 - $len)) ." ". $help . "\n";
 			$files{$file} = 1;
 		}
 	}

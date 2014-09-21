@@ -1,4 +1,4 @@
-#> сервер - реализует протокол FastCGI
+#> сервер - http, fcgi или psgi
 
 use strict;
 use warnings;

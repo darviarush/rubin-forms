@@ -99,11 +99,7 @@ for my $tab (keys %tab) {
 
 			package => $ins->{package} // "",
 			install => $ins->{install} // "",
-			sql => ($sql? (($column_type{$sql->{column_type}} || $sql->{column_type} || "").
-				($sql->{is_nullable} eq "YES" || $sql->{column_key} =~ /PRI/? "": " not null").
-				(defined($sql->{column_default})? " default $sql->{column_default}": "").
-				($sql->{column_key} =~ /PRI/? " primary key": "").
-				($sql->{extra} ne ""? " $sql->{extra}": "")): ""),
+			sql => sql_from_info($sql),
 			valid => $info->{tab_valid}{$tab}{$col},
 			
 			order => $sql->{ordinal_position} || $ins->{order} || "",

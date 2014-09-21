@@ -11,6 +11,13 @@ sub set { map { $_=>1 } @_ }
 # удаляет дубликаты
 sub unique { my %x; map { if(exists $x{$_}) { () } else { $x{$_} = 1; $_ } } @_ }
 
+# сортирует по свойству
+sub order_by {
+	my ($sort, $arr, $desc) = @_;
+	if($desc) {	sort { $b->{$sort} <=> $a->{$sort} } values %$arr }
+	else { sort { $a->{$sort} <=> $b->{$sort} } values %$arr }
+}
+
 # разбирает построчный файл. Возвращает массив. Начальные и конечные пробельные символы удаляются
 sub parse_vector {
 	my ($path) = @_;
