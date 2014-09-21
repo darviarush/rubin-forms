@@ -176,7 +176,7 @@ extend_uniq Function.prototype, CFunction =
 	rename: (name) -> f=null ; eval String(this).replace ///function(\s+[\$\w]+)?///, 'f=function '+name; f
 	getName: if escape.name then -> @name else -> String(this).match(/// function\s+(\w+) ///)?[1] || ""
 	getMethodName: (obj) -> (for name, fn of obj when fn == this then return name); null
-	init: (args...) -> (CRoot._init_widgets ||= []).push [this, args || [this.getName().lc()]]
+	init: (args...) -> CRoot._init_widgets.push [this, args || [this.getName().lc()]]
 	implements: (args...) ->
 		replace = if typeof args[args.length-1] != 'function' then args.pop() else {}
 		n = @prototype
@@ -1114,15 +1114,16 @@ CListen =
 		else if who == "window" and t of (win = w.window()) then win[t] = ln
 		else if who == "document" and t of (doc=w.document()) then doc[t] = ln
 		else throw @raise "Нет такого обработчика on"+type+"_"+who
+		undefined
 		
 	setListen: (type, who) ->
 		if who == 'parent' then return
 		unless listen = (listens=CListen.listens)[who] then listen = listens[who] = {}
 		if ls = listen[type] then ls.push this
 		else CListen.putListen.call this, type, who; listen[type]=[this]
+		undefined
 		
-	erase: (type_who, w) ->
-		[a, type, who] = type_who.match ///^ on(\w+)_(\w+) $///
+	erase: (type, who, w) ->
 		if who_ = CListen.listens[who]
 			if type_ = who_[type]
 				for i in type_ when i == w
@@ -1133,7 +1134,14 @@ CListen =
 						else if who == "document" then w.document()["on"+type] = ->
 					else type_.splice i, 1
 					return on
-		off
+		undefined
+		
+	clean: ->
+		for _who, who of CListen.listens
+			for _type, type of who 
+				who[type] = for widget in type when document.contains widget then widget
+		undefined
+		
 		
 	error_window: (f) -> (w=@window()).onerror = w.document.onerror = f
 	#scroll_window: (f) -> @window().onscroll = f
@@ -1218,7 +1226,7 @@ class CEvent
 
 
 CRoot = null
-unless window.$ then $ = (e, parent) -> CRoot.wrap e, parent
+unless window.$ then $ = (e, parent) -> if typeof e == 'function' then CRoot._init_functions.push e else CRoot.wrap e, parent
 
 	
 class CWidget
@@ -1333,13 +1341,25 @@ class CWidget
 	unwrap: -> @send 'onDestroy', 'unwrap'; @parent()?.detach this ; e=@element; @element = @element.widget = null ; new CWidgets [e]
 	rewrap: (cls) -> p = @parent(); e = @unwrap()._all[0]; w = (if typeof cls == 'function' then new cls e, p else cls.unwrap(); cls.element = e; e.widget = cls; cls.parent p); (if p and p.id()+'-'+w.name() == w.id() then p.attach w); w
 	
-	type$.nothing 'createWidget ctype unwrap'
-	type$.all 'rewrap'
+	new$ = (tag, param) ->
+		param = ctype: param if typeof param == 'string'
+		e = $0$
+		if param then for k of param then e.setAttribute k, param[k]
+		@createWidget e
+		
+	new: new$.inline "__new__", "document.createElement(tag)"
+	svg: new$.inline "svg", "document.createElementNS('http://www.w3.org/2000/svg', tag)"
+	xml: new$.inline "xml", "document.createElementNS('http://www.w3.org/1999/xhtml', tag)"
+	
+	type$.nothing 'createWidget ctype new'
+	type$.all 'rewrap unwrap'
 	type$.any 'wrap'
 	
 	
 	# служебные элементы
 	class CRoot$ extends CWidget
+		_ready_functions: []
+		_init_widgets: []
 		initialize: ->
 			CInit.init_from_param()
 			@defineHandlers().setListens()
@@ -1350,12 +1370,14 @@ class CWidget
 				for id in init.split /,/ then @byId id
 			if init = CInit.param.form
 				for id in init.split /,/ then new (window[id.uc()])()
-			if init = @_init_widgets
-				doc = @document()
-				for x in init
-					cls = x[0].getName()
-					for id in x[1] when e = doc.getElementById id then e.setAttribute 'ctype', cls; @byId id
+			do @initWidgets
+			for ready in @_ready_functions then ready.call this
 			this
+		initWidgets: ->
+			doc = @document()
+			for x in @_init_widgets
+				cls = x[0].getName()
+				for id in x[1] when e = doc.getElementById id then e.setAttribute 'ctype', cls; @createWidget e
 	
 	CRoot = new CRoot$ document.documentElement || document.firstChild
 	
