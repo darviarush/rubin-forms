@@ -92,6 +92,13 @@
 # 63. узнать произошло ли изменение адреса из history или добавлением элемента через history.length - она увеличится, а если позиция истории - посредине - уменьшиться при добавлении. Иначе - она в истории
 # 64. @init id - регистрирует объект в массиве и привязывает его при пересоздании страниц
 # 65. Добавить в темплейт выделение в функцию {% def fn $x, $y, $z %} $x $y $z {% end def %}   Использование: $"fn":print(1,2,3)
+# 66. Оптимизировать send и добавить очередь слушателей, которые должны иметь метод emit
+# 67. CListen заменить на слушатели виджетов $(window) и $(document)
+# 68. Добавить потоки
+# 69. Переделать animate
+# 70. В модель добавить функции для сравнения данных
+# 71. Переопределить __bind на нормальное наследование метаклассов
+# 72. send
 
 # Ссылки:
 # http://topobzor.com/13-servisov-dlya-testirovaniya-sajta-v-raznyx-brauzerax/.html - сайты-тестеры
@@ -762,8 +769,37 @@ class CLongPoll extends CSocket
 	# eval: (code) -> @emit act: 'eval', code: code
 	# call: ()
 	
-	
+# Потоки
+# http://pozadi.github.io/kefir/
+# http://baconjs.github.io/api.html
+# https://rxjs.codeplex.com/
+# http://habrahabr.ru/post/237495/
+class CStream
+	@callback: (f, args...) -> stream = new CStream; f (do(stream, args)->-> stream.emit ); stream
 
+	constructor: -> @fork = []
+	
+	emitFilter$ = (channel, args...) ->
+		return this if off == @_filter.apply channel, args
+		super
+	emitMap$ = (channel, args...) ->
+		args = @_map.apply channel, args
+		super channel, args...
+	emitOnValue$ = (channel, args...) ->
+		@_onValue.apply channel, args
+		super
+	emit: ->
+		for f in @fork then emit.apply f, arguments
+		this
+	
+	map: (map) -> @fork.push stream = new CStream; stream.emit = emitMap$; stream._map = (if typeof map == 'function' then map else do(map)->-> [map]); stream
+	filter: (filter) -> @fork.push stream = new CStream; stream.emit = emitFilter$; stream._filter = filter; stream
+	onValue: (onValue) -> @fork.push stream = new CStream; stream.emit = emitOnValue$; stream._onValue = onValue; stream
+	
+	assign: (w, method, args...) -> @fork.push stream = new CStream; ; stream
+
+
+# Модели
 class CModel
 	# $: {} - данные
 	# $on: {} и on... - обработчики при изменении данных
@@ -778,7 +814,7 @@ class CModel
 		
 	add: (key, val, fn) -> @$[key] = val; (@on fn if fn); this[key] = do(key)-> (val) -> if arguments.length == 1 then @$ret key else @change key, val
 	
-	_on = (key, fn) -> (@$0$[key] || @$0$[key] = []).push fn
+	_on = (key, fn) -> (@$0$[key] ||= []).push fn
 	_un = (key, fn) -> if arguments.length == 1 then delete @$0$[key] else ons = @$0$[key]; (if ons and -1!= idx=ons.indexOf fn then ons.splice idx, 1)
 	
 	del: (key) -> @un key; @ut key; delete @$[key]
@@ -1258,6 +1294,7 @@ class CWidget
 			# удаляем эвенты - можно не удалять
 			#if @_parent then 
 			# устанавливаем эвенты
+			if prev = @parent() then prev.detach this
 			@_parent = parent
 			this
 		else
@@ -1269,6 +1306,7 @@ class CWidget
 
 			throw @raise "parent не CWidget: "+@_parent unless !@_parent or @_parent && @_parent instanceof CWidget
 			@_parent
+	parentAll: -> p = this ; while p = p.parent() then p
 	
 	valueOf: -> '<'+@className()+' '+(@element && (@element.id && "#"+@element.id || @element.className && '.'+@element.className.split(' ').join(".") || @element.tagName))+'>'
 	toString: CWidget::valueOf
