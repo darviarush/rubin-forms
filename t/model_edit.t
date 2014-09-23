@@ -12,14 +12,14 @@ use Action;
 use ModelEdit;
 
 my $ref = "
-[do]
 project.self = add,edit,view
 project.selfcol = user_id
 project.self.view = name, description
 project.ref = user_id
 ";
 
-our $ini = Utils::parse_ini(undef, $ref);
+our $ini;
+$ini->{do} = Utils::parse_ini(undef, $ref);
 
 our $param = {
 	method => 'save',
@@ -90,5 +90,5 @@ $param = {
 
 model_edit($ref);
 
-like $ref, qr/project.self = rm,add,edit/;
-is $ini->{do}{"project.self"}, "rm,add,edit";
+like $ref, qr/project.self = add,edit,rm/;
+is $ini->{do}{"project.self"}, "add,edit,rm";

@@ -103,7 +103,7 @@ sub include_action ($$) {
 sub header ($$) {
 	my ($k, $v) = @_;
 	if($k =~ /^Content-Type$/i) { content($v) }
-	else { push @::_HEAD, $k.": ".Utils::uri_escape($v, qr/[^ -\xFF]/); }
+	else { $::_HEAD{$k} = $v = Utils::uri_escape($v, qr/[^ -\xFF]/); push @::_HEAD, $k.": ".$v; }
 }
 
 sub content ($) {
@@ -113,8 +113,8 @@ sub content ($) {
 
 sub redirect ($;$) {
 	$::_STATUS = 307;
-	push @::_HEAD, "Location: $_[0]";
-	"Redirect to <a href='$_[0]'>".($_[1] // $_[0])."</a>"
+	header "Location", $_[0];
+	"Redirect to <a href='$_[0]'>".Utils::escapeHTML($_[1] // $_[0])."</a>"
 }
 
 sub status ($;$) { $::_STATUS = $_[0]; if($_[1]) { header "Error" => $_[1]; $_[1] } else { ($::_STATUS)." ".$::_STATUS{$::_STATUS} } }

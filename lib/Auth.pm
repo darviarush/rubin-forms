@@ -94,7 +94,7 @@ sub auth (@) {
 	return $_user_id if $_user_id and not $fld;
 	my $sess = $_COOKIE->{sess};
 	return unless $sess;
-	my @res = $dbh->selectrow_array("SELECT user_id$fld FROM sess WHERE id=?", undef, $sess);
+	my @res = $dbh->selectrow_array(join("", "SELECT user_id", ($fld? $fld: ()), " FROM sess WHERE id=?"), undef, $sess);
 	update("sess", {now=>strftime("%F %T", localtime())}, {id=>$sess}) if $res[0];
 	return $fld? @res: $res[0];
 }
@@ -305,6 +305,21 @@ sub action_form_view ($$) {
 	$response = Utils::to_rows(quick_rows(@query));
 	$response->{valid} = $valid;
 	$response
+}
+
+# загружает данные для форм
+sub action_load_forms {
+	my ($action) = @_;
+	my $forms = $_pages{$action}{load_forms};
+	for my $form ($forms) {
+		my ($id, $valid) = $form->{id};
+		next if $_STASH{$id};
+		my $query = $form->{query};
+		my @query = check_role_view $valid, @$query, $param;
+		my $response = quick_rows(@query);
+		$response->{valid} = $valid;
+		$_STASH{$id} = $response;
+	}
 }
 
 # удаляет просроченные сессии

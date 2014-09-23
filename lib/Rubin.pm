@@ -61,12 +61,12 @@ sub accept {
 		#my $nfound = select $vec, $out, undef, undef;
 		#msg CYAN."nfound ".RESET." soc=$_socket vec=$vec ".RED.$nfound.RESET;
 		
-		if($HTTP =~ m!^(\w+) ((/([^\s\?]*?)(?:(-?\d+)|(\.\w+))?)(?:\?(\S+))?) (HTTP\/\d\.\d)\r?$!o) {
+		if($HTTP =~ m!^(\w+) $::_RE_LOCATION (HTTP\/\d\.\d)\r?$!o) {
 			my($METHOD, $URL, $LOCATION, $ACTION, $ID, $EXT, $SEARCH, $VERSION) = ($1, $2, $3, $4, $5, $6, $7, $8);
 					
 			$main::_METHOD = $METHOD;
-			$main::_LOCATION = $LOCATION;
 			$main::_URL = $URL;
+			$main::_LOCATION = $LOCATION;
 			$main::_action = $ACTION;
 			$main::_id = $ID;
 			$main::_EXT = $EXT;

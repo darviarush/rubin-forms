@@ -27,8 +27,6 @@ $rules = $info->{rules};
 # rules 
 # tab_rules
 
-%column_type = ("int(11)" => "int", "tinyint(4)" => "tinyint");
-
 for my $tab (keys %tab) {
 	
 	$perm = $info->{tab_rules}{$tab};

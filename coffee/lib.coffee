@@ -91,7 +91,7 @@
 # 62. Взять для описания документации из http://enepomnyaschih.github.io/jwidget/1.0/index.html#!/guide/ruphilosophy и подправить
 # 63. узнать произошло ли изменение адреса из history или добавлением элемента через history.length - она увеличится, а если позиция истории - посредине - уменьшиться при добавлении. Иначе - она в истории
 # 64. @init id - регистрирует объект в массиве и привязывает его при пересоздании страниц
-# 65. Добавить в темплейт выделение в функцию {% def fn $x, $y, $z %} $x $y $z {% end def %}   Использование: $"fn":print(1,2,3)
+# 65. Добавить в темплейт выделение в функцию {% fn $x, $y, $z -> %} $x $y $z {% end def %}   Использование: $"fn":print(1,2,3)
 
 # Ссылки:
 # http://topobzor.com/13-servisov-dlya-testirovaniya-sajta-v-raznyx-brauzerax/.html - сайты-тестеры
@@ -860,7 +860,6 @@ CTemplate =
 	for(var i=0, n=dataset.length; i<n; i++) {
 		var data = dataset[i]
 		var id = id1+'-'+(('id' in data)? data.id: start+i)
-		data['_NUMBER']=i; data['_NUMBER1']=i+1
 		res.push('"""
 		
 		code_end = """')
@@ -895,10 +894,12 @@ CTemplate =
 			
 		T = []; html = []; pos = 0 ; s = i_html
 		
+		var_x = (_type, _var) -> if _type then (if _var == '_DATA' then "data" else if _var == "_STASH" then "CTemplate._STASH" else if _var == 'i' then "i" else if _var == 'i0' then "(i-1)" else "CTemplate._STASH.#{_var}") else "data['#{_var}']"
+		
 		helper = (_type, _var, _const, open_braket) ->
 			braket = 0
 			VAR = undefined
-			html.push _const || if _type then "CTemplate._STASH.#{_var}" else "data['#{_var}']"
+			html.push _const || var_x _type, _var
 			fn_idx = html.length-1
 			fn_idxs = [fn_idx]
 			while 1
@@ -907,7 +908,7 @@ CTemplate =
 					html[fn_idx] = "CHelper.#{m[1]}(" + html[fn_idx]
 					html.push (if m[2] then ++braket; ", " else ")")
 				else if VAR and m = s.match PARSE_CONST then fn_idxs.push fn_idx; fn_idx = html.length; html.push re_type m[0]
-				else if VAR and m = s.match ///^\$(%)?(\w+)/// then fn_idxs.push fn_idx; fn_idx = html.length; html.push (if m[1] then "CTemplate._STASH.#{m[2]}" else "data['#{m[2]}']")
+				else if VAR and m = s.match ///^\$(%)?(\w+)/// then fn_idxs.push fn_idx; fn_idx = html.length; html.push var_x m[1], m[2]
 				else if not VAR and m = s.match ///^,\s*/// then fn_idx = fn_idxs.pop(); html.push m[0]
 				else if m = s.match ///^\)/// then VAR=1 ; --braket; fn_idx = fn_idxs.pop(); html.push ")"
 				else if m = s.match ///^\}/// then (throw "нет `{` для `}`" unless open_braket); open_braket = 0 ; pos++; s = s.slice 1 ; break
@@ -1044,7 +1045,7 @@ CHelper =
 	html: escapeHTML
 	nbsp: (x) -> if x? and x!="" then "&nbsp;" else escapeHTML x
 	bool: (x, a, b) -> if x then (if a? then a else "+") else (if b? then b else "-")
-	dump: toJSON
+	dump: (x) -> "<pre>"+escapeHTML(toJSON x, undefined, 4)+"</pre>"
 	join: (x, sep=", ", args...) -> x.concat(args).join sep
 	at: (x, i) -> x[i]
 	odd: (x, a='odd', b='') -> if x % 2 then a else b
@@ -1139,7 +1140,7 @@ CListen =
 	clean: ->
 		for _who, who of CListen.listens
 			for _type, type of who 
-				who[type] = for widget in type when document.contains widget then widget
+				who[type] = for widget in type when typeof widget == 'function' or document.contains widget then widget
 		undefined
 		
 		
@@ -1226,7 +1227,7 @@ class CEvent
 
 
 CRoot = null
-unless window.$ then $ = (e, parent) -> if typeof e == 'function' then CRoot._init_functions.push e else CRoot.wrap e, parent
+unless window.$ then $ = (e, parent) -> (if typeof e == 'function' then CRoot._init_functions.push e else CRoot.wrap e, parent)
 
 	
 class CWidget
@@ -3303,10 +3304,12 @@ class CTipWidget extends CTooltipWidget
 	
 class CTipFocusWidget extends CTooltipWidget
 	initialize: -> @parent().setHandler 'focusin', 'focusout'
-	onfocusin: (e) -> if @config.focus then @open()
-	onfocusout: (e) -> if @config.focus then @close()
-	onfocusin_parent: @::onfocusin
-	onfocusout_parent: @::onfocusout
+	onfocus: (e) -> if @config.focus then @open()
+	onblur: (e) -> if @config.focus then @close()
+	onfocus_parent: @::onfocusin
+	onblur_parent: @::onfocusout
+	#for ie: onfocus_parent: @::onfocusin
+	#onblur_parent: @::onfocusout
 
 
 class CSelectMenuWidget extends CMenuWidget
@@ -3501,15 +3504,18 @@ class CLoaderWidget extends CWidget
 				@byId(layout_id).html CTemplate.compile(page.template)(page.data || {}, act)
 			title = CTemplate._STASH.title
 			
-		if frames
+		if frames = data["@frames"]
 			for act, id of frames
 				page = data[act]
 				@byId(page.id).html CTemplate.compile(page.template)(page.data || {}, act)
 
-		CRoot.onready_dom()
+		CListen.clean()
+		do CRoot.initWidgets
+		
+		url = CUrl.from data["@url"]
 		
 		old = CUrl.from @window().location.href
-		url = CUrl.from @request.url
+		#url = CUrl.from @request.url
 		url.pathname = url.param._layout_ || old.pathname
 		delete url.param._layout_
 		url.search = ""
@@ -3553,6 +3559,7 @@ class CRouterWidget extends CWidget
 		if (a=e.target()).tag() == "A"
 			url = CUrl.from a.attr "href"
 			if not url.host or url.host == a.document().location.host
+				e.cancel()
 				if loader = @config.loader then a._loader = loader
 				if url.hash then a.attr "target", url.hash; url.hash = ""
 				a.submit _act: CUrl.to url
@@ -3562,6 +3569,7 @@ class CRouterWidget extends CWidget
 	
 	prev_url$ = null
 	
+	# history.length
 	pop$ = (e) ->
 		[old] = @history()
 		href = @window().location.href

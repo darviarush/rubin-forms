@@ -35,8 +35,10 @@ our (
 	$param, $_GET, $_POST, $_COOKIE, $_HEAD,
 	$_METHOD, $_LOCATION, $_URL, $_action, $_id, $_user_id, $_VERSION, $_EXT,
 	$_STATUS, %_STATUS, %_STASH,
-	@_HEAD, %_MIME
+	@_HEAD, %_MIME, %_HEAD
 	);
+
+our $_RE_LOCATION = qr!((/([^\s\?]*?)(?:(-?\d+)|(\.\w+))?)(?:\?(\S+))?)!;
 	
 our $_site = $ini->{site};
 our $_test = $_site->{test};
@@ -136,6 +138,7 @@ sub lord {
 # Подчинённый обработчик запросов
 sub ritter {
 	@_HEAD = ("Content-Type: text/html; charset=utf-8");
+	
 	if(defined $_EXT) {
 		$_EXT = lc $_EXT;
 		my $res;
@@ -156,11 +159,9 @@ sub ritter {
 	eval {
 		my $action = $_action{$_action};
 		my $action_htm = $_action_htm{$_action};
-		my $info = $_info->{$_action};
-		unless(defined $action or defined $action_htm or defined $info) {
-			$_STATUS = 404;
-			@ret = "404 Not Found";
-		} else {
+		my $ajax = $_HEAD->{Ajax} // "";
+		
+		if(defined $action or defined $action_htm and $ajax =~ /^|submit$/) {
 			$_STATUS = 200;
 			$_user_id = auth();
 			%_STASH = (
@@ -172,25 +173,43 @@ sub ritter {
 				param => $param,
 			);
 			
-			
-			my $ajax = $_HEAD->{Ajax} // "";
-
 			if($action) {
 				@ret = $action->();
-				if($action_htm and $_STATUS == 200 and not $ajax) { goto HTM; } else { goto FIN; }
+				# редирект
+				if($_STATUS == 307 and $ajax and $_HEAD{'Location'} =~ /^$_RE_LOCATION$/o) {
+					$_URL = $1;
+					$_LOCATION = $2;
+					$_action = $3;
+					$_id = $4;
+					$_EXT = $5;
+					$param = $_GET = Utils::param($6);
+					$_POST = {};
+					my $ret = ritter();
+					$_STATUS = $ret->[0];
+					@_HEAD = @{$ret->[1]};
+					@ret = @{$ret->[2]};
+					return;
+				}
 			}
-			if($info and (not $action_htm or not $ajax =~ /^|submit$/)) { action_main($_action); goto FIN; }
 			
-			HTM:
-			@ret = $_action_htm{$_action}->($ret[0], $_action);
-			for(; my $_layout = $_layout{$_action}; $_action = $_layout) {
-				my $arg = ($action = $_action{$_layout})? $action->(): {};
-				@ret = $_action_htm{$_layout}->($arg, $_layout, @ret);
+			if($action_htm and $_STATUS == 200) {
+				@ret = $_action_htm{$_action}->($ret[0], $_action);
+				for(; my $_layout = $_layout{$_action}; $_action = $_layout) {
+					my $arg = ($action = $_action{$_layout})? $action->(): {};
+					@ret = $_action_htm{$_layout}->($arg, $_layout, @ret);
+				}
 			}
-			FIN:
+		} elsif(my $info = $_info->{$_action}) {
+			$_STATUS = 200;
+			$_user_id = auth();
+			@ret = action_main($_action);
+		} else {
+			$_STATUS = 404;
+			@ret = "404 Not Found";
 		}
 		@ret = map { ref($_)? to_json($_): $_ } @ret;
 	};
+
 	if(my $error = $@ || $!) {
 		my $is_io = $!;
 		$@ = $! = undef;

@@ -612,7 +612,7 @@ sub TemplateStr {
 	
 	my $re_type = sub { my ($x)=@_; return unless defined $x; local($`, $', $1); $x=~s/^'(.*)'$/$1/, $x=~s/"/\\"/g, $x="\"$x\"" if $x =~ /^'/; $x};
 	
-	my $code_begin = 'sub {	my ($dataset, $id1) = @_; my ($i, @res) = 0; for my $data (@$dataset) { my $id = "$id1-$i";	$data->{"_NUMBER"}=$i; $data->{"_NUMBER1"}=++$i; push @res, \'';
+	my $code_begin = 'sub {	my ($dataset, $id1) = @_; my ($i, @res) = 0; for my $data (@$dataset) { $i++; my $id = "$id1-".($data->{id} // $i); push @res, \'';
 	
 	my $code_end = '\';	}	return join "", @res;
 }';
@@ -637,7 +637,9 @@ sub TemplateStr {
 	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id) = ($_, 0);
 	my $page = my $form = {};
 	
-	my $vario = sub { my ($type, $var, $const) = @_; defined($const)? $re_type->($const): defined($type)? ($var eq "_DATA"? "\$data": $var eq "_STASH"? "\\%_STASH": "\$_STASH{'$var'}"): "\$data->{'$var'}" };
+	my $get_id = sub { $open_id? ($form->{id}? "$form->{id}-$open_id": $open_id): /\bid=["']?([\w-]+)[^<]*\G/i && $1 };
+	
+	my $vario = sub { my ($type, $var, $const) = @_; defined($const)? $re_type->($const): defined($type)? ($var eq "_DATA"? "\$data": $var eq "_STASH"? "\\%_STASH": $var eq 'i'? "\$i": $var eq "i0"? "(\$i-1)": "\$_STASH{'$var'}"): "\$data->{'$var'}" };
 	my $helper = sub {
 		my ($type, $var, $const, $open_braket) = @_;
 		push @html, $vario->($type, $var, $const);
@@ -713,15 +715,15 @@ sub TemplateStr {
 		!$NO && m!\G<\!doctype[^>]+>!i? do { $& }:
 		$NO && m!\G</$TAG\s*>!? do { $TAG = $open_id = $open_tag = $NO = undef; $& }:
 		$open_tag && m!\G\$-(\w+)?!? do { $open_id = $1; "', \$id, '".(defined($1)? "-$1": "") }:
-		m!\G\$@([/\w]+)!? do { my $n = $1; my $id = $open_id // /\bid=["']?([\w-]+)[^<]*\G/i && $1; "', include_action(\$data->{'$id'}, \"\$id-$id\", '$n'), '" }:
-		m!\G\$&!? do { $page->{layout_id} = $open_id // /\bid=["']?([\w-]+)[^<]*\G/i && $1; "', \@_[2..\$#_], '" }:
+		m!\G\$@([/\w]+)!? do { my $n = $1; my $id = $get_id->(); "', include_action(\$data->{'$id'}, \"\$id-$id\", '$n'), '" }:
+		m!\G\$&!? do { $page->{layout_id} = $get_id->(); "', \@_[2..\$#_], '" }:
 		m!\G\{%\s*(\w+)\s*=%\}!? do { "', do { \$_STASH{'$1'} = join '', ('" }:
 		m!\G\{%\s*end\s*%\}!? do { "'); () }, '" }:
 		m!\G\{%\s*if\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do { $pos += length $&; push @html, "', ("; $helper->($1, $2, $3); die "Нет закрывающей `%}` для if" unless m!\G\s*%\}!; $pos += length $&; push @html, "? ('"; next }:
 		m!\G\{%\s*elif\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do { $pos += length $&; push @html, "'): "; $helper->($1, $2, $3); die "Нет закрывающей `%}` для elif" unless m!\G\s*%\}!; $pos += length $&; push @html, "? ('"; next }:
 		m!\G\{%\s*else\s*%\}!? "'): ('":
 		m!\G\{%\s*fi\s*%\}!? "')), '":
-		m!\G\{%\s*load(?:\s+(\w+))?\s*%\}!? do { push @{$page->{load_forms}}, $form; $form->{load} = $1; () }:
+		m!\G\{%\s*load(?:\s+(\w+))?\s*%\}!? do { push @{$page->{load_forms}}, $form; $form->{load} = $1; my $id = $form->{id}; splice @html, $T[$#T][5]+1, 0, "', do { \$data->{'$open_id'} //= \$_STASH{'$id'}; () }, '"; () }:
 		m!\G\{%\s*model\s+(\w+)\s*%\}!? do { $form->{model} = $1; () }:
 		m!\G\{%\s*noload\s*%\}!? do { $form->{noload} = 1; () }:
 		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)]; () }:
@@ -761,7 +763,7 @@ sub TemplateStr {
 	
 	$form->{template} = $_;
 	
-	my $x = join "", $code_begin1, @html, $code_end1;
+	my $x = join "", 'sub { my ($data, $id) = @_; '.($form->{load_forms}? 'action_load_forms($id); ': '').'return join "", \'', @html, $code_end1;
 	#our $rem++;
 	#Utils::write("$rem.pl", $x);
 	$x

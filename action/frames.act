@@ -5,7 +5,7 @@ $result = {};
 $add_res = sub {
 
 	die "Нет экшена `$act`" unless exists $main::_action{$act} or exists $main::_action_htm{$act};
-
+	
 	$result->{$act} = {
 		act => $act,
 		($id ? (id => $id): ()),
@@ -15,6 +15,8 @@ $add_res = sub {
 		(exists $main::_pages{$act}{layout_id}? (layout_id => $main::_pages{$act}{layout_id}): ()),
 		(exists $main::_layout{$act}? (layout => $main::_layout{$act}): ())
 	};
+	
+	action_load_forms($act) if $main::_pages{$act}{load_forms};
 };
 
 
@@ -42,5 +44,6 @@ while(($id, $url) = each %$frames) {
 }
 
 $result->{'@stash'} = \%_STASH;
+$result->{'@url'} = $::_URL;
 
 $result

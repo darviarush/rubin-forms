@@ -17,8 +17,7 @@ sub model_edit {
 		my ($arg, $key, $col) = @_;
 		my $val = $ini->{do}{$key}? join ",", sort { $a cmp $b } ($erase || !$col? (): $col), grep {$_ ne $col} (split /,\s*/, $ini->{do}{$key}): $col;
 		$ini->{do}{$key} = $val;
-		msg "in", $key, $val;
-		if($val ne "") { Utils::inject_ini($_[0], "", $key, $val) } else { Utils::delete_ini($_[0], "", $key); delete $ini->{do}{$key} }
+		if($val ne "") { Utils::inject_ini($_[0], "", $key, $val) } else { msg "in $key delete"; Utils::delete_ini($_[0], "", $key); delete $ini->{do}{$key} }
 	};
 	
 	if($action eq "selfcol") {
@@ -98,6 +97,8 @@ sub get_install_info {
 	}
 	$install
 }
+
+my %column_type = ("int(11)" => "int", "tinyint(4)" => "tinyint");
 
 sub sql_from_info {
 	my ($sql) = @_;
