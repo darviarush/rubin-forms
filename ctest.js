@@ -39,6 +39,7 @@ function CTest(name, manual, css, html, fn) {
 	this.css = css
 	this.html = html
 	this.fn = fn
+	this.category = CTest._category
 	this._count = 0
 	this._counter = 0
 	this.isFail = false
@@ -191,8 +192,9 @@ CTest.extend({
 	add_to_category: function() {
 	
 		var category
-		if(CTest._category) {
-			category = escapeHTML(CTest._category)
+		if(CTest._category != this.category) {
+			CTest._category = this.category
+			category = escapeHTML(this.category)
 			this.print("<h2><a name=category-"+CTest.category_counter+">"+category+"</a></h2>")
 
 			var menu = document.getElementById('CTest-category')
@@ -200,7 +202,7 @@ CTest.extend({
 			div.innerHTML = "<span class=category-ch onclick='location = \"#category-"+(CTest.category_counter++)+"\"'>&#8669;</span> <span onclick='CTest.toggleCategory(this)'><span class=category-ch>&#9654;</span> "+escapeHTML(category)+"</span><ul style='display:none'></ul>"
 			menu.appendChild(div)
 
-			CTest._category = ''
+			//CTest._category = ''
 		}
 	
 		category = document.getElementById('CTest-category')

@@ -62,8 +62,8 @@
 # -----------------------
 # 35. Разбить на мелкие файлы библиотеку и сделать сборщик по запросу js/CWidget+CApplicationWidget+CInit.js. 
 #	Не так: файлы разбить на мелкие. Затем вывести дерево разбора coffee, взять из него функции и классы и подключить их модули
-# 36. animate на after, before, append, prepend 
 
+# *36. animate на after, before, append, prepend 
 #- 37. убрать upper: заменить на up - нарушит работу swap
 #- 38. Ввести ret-методы - есть last и first. Может какое-то ret-свойство в котором остаётся значение операции. @append(1).$.text 2
 
@@ -90,7 +90,7 @@
 # 61. accept в div-ах
 # 62. Взять для описания документации из http://enepomnyaschih.github.io/jwidget/1.0/index.html#!/guide/ruphilosophy и подправить
 # 63. узнать произошло ли изменение адреса из history или добавлением элемента через history.length - она увеличится, а если позиция истории - посредине - уменьшиться при добавлении. Иначе - она в истории
-# 64. @init id - регистрирует объект в массиве и привязывает его при пересоздании страниц
+# 64. @init id, ... - регистрирует объект в массиве и привязывает его при пересоздании страниц
 # 65. Добавить в темплейт выделение в функцию {% def fn $x, $y, $z %} $x $y $z {% end def %}   Использование: $"fn":print(1,2,3)
 # 66. Оптимизировать send и добавить очередь слушателей, которые должны иметь метод emit
 # 67. CListen заменить на слушатели виджетов $(window) и $(document)
@@ -98,7 +98,7 @@
 # 69. Переделать animate
 # 70. В модель добавить функции для сравнения данных
 # 71. Переопределить __bind на нормальное наследование метаклассов
-# 72. send
+# 72. Протестировать удаление элементов из памяти, так как все они имеют перекрёстные ссылки
 
 # Ссылки:
 # http://topobzor.com/13-servisov-dlya-testirovaniya-sajta-v-raznyx-brauzerax/.html - сайты-тестеры
@@ -136,7 +136,7 @@ IE = if '\v'=='v' or document.documentMode?
 	else if	document.compatMode			then 6
 	else 5
 
-
+	
 CTraceback = -> f = arguments.callee; i=0 ; [f.name || '<anonimous function>' while (f = f.caller && i++ < 10)].reverse().join(' → ')
 
 $A = (n) -> if n instanceof Array then n else if typeof n == 'object' then Array::slice.call n else String(n).split /\s+/
@@ -773,31 +773,69 @@ class CLongPoll extends CSocket
 # http://pozadi.github.io/kefir/
 # http://baconjs.github.io/api.html
 # https://rxjs.codeplex.com/
+# http://xgrommx.github.io/rx-book/index.html
 # http://habrahabr.ru/post/237495/
 class CStream
 	@callback: (f, args...) -> stream = new CStream; f (do(stream, args)->-> stream.emit ); stream
 
 	constructor: -> @fork = []
 	
-	emitFilter$ = (channel, args...) ->
-		return this if off == @_filter.apply channel, args
-		super
-	emitMap$ = (channel, args...) ->
-		args = @_map.apply channel, args
-		super channel, args...
-	emitOnValue$ = (channel, args...) ->
-		@_onValue.apply channel, args
-		super
-	emit: ->
-		for f in @fork then emit.apply f, arguments
+	emitter: (args...) -> stream = this ; do(stream, args1)-> (args...)-> stream.emit this, args...
+	@fromCallback: (fn, args...) -> stream = new СStream; fn stream.emitter(args...); stream
+	
+	emitFilter = (channel, args...) ->
+		return this if off == @_callback.apply channel, args
+		@send arguments
+	emitMap = (channel, args...) ->
+		args = @_callback.apply channel, args
+		@send [channel].concat args
+	emitDo = (channel, args...) ->
+		@_callback.apply channel, args
+		@send arguments
+	emitTimeout = (args) ->
+		setTimeout do(args) => @send args
+		, @_callback
 		this
+	# emitInterval = (channel, args...) ->
+		# setInterval do(channel, args)=>
+			# @_callback.apply channel, args
+			# @send arguments
+		# , @_ms
+		# this
+		
 	
-	map: (map) -> @fork.push stream = new CStream; stream.emit = emitMap$; stream._map = (if typeof map == 'function' then map else do(map)->-> [map]); stream
-	filter: (filter) -> @fork.push stream = new CStream; stream.emit = emitFilter$; stream._filter = filter; stream
-	onValue: (onValue) -> @fork.push stream = new CStream; stream.emit = emitOnValue$; stream._onValue = onValue; stream
+	send: (args) ->
+		for f in @fork then f.emit.apply f, args
+		this
+		
+	emit: @::send
 	
-	assign: (w, method, args...) -> @fork.push stream = new CStream; ; stream
+	# модифицирующие
+	transvuier: (emit, fn, param) -> @fork.push stream = new (@constructor)(); stream.emit = emit; stream._callback = fn; (if param then for i of param then @[i] = param[i]); stream
+	
+	map: (args...) -> map = args[0]; @transvuier emitMap, (if typeof map == 'function' then map else do(args)->-> args)
+	mapArgs: ->
+	
+	
+	filter: (filter) -> @transvuier emitFilter, filter
+	
+	throttle: (ms) -> @transvuier emitTimeout, ms
+	
+	reduce: (args..., fn) -> @transvuier 
+	
+	# связывающие
+	do: (onValue) -> @transvuier emitDo, onValue
+	
+	assign: (object, method, args...) -> @transvuier emitDo, do(stream, object, method, args)-> (args2...)-> CRoot.wrap(object).invoke method, args..., args2...
 
+	assignAny: (object, method, args...) -> @transvuier emitDo, do(stream, object, method, args)-> (args2...)-> (for i in (if object instanceof Array then object else [object]) then i[method] args..., args2...)
+	
+	# объединяющие
+	merge: (streams...) -> @fork.push stream = new (@constructor)(); (for s in streams then s.fork.push stream); stream
+	
+	# управляющие
+	log: -> @constructor._log = 1 ; this
+	
 
 # Модели
 class CModel
@@ -805,31 +843,33 @@ class CModel
 	# $on: {} и on... - обработчики при изменении данных
 	# $at: {} и at... - обработчики при запросе данных
 	$models: {} # все модели по имени (@$name)
-	constructor: (data = {}, name = 'noname') ->
-		@$models[@$name = name] = this
+	$counter: 0
+	constructor: (data = {}, cmp, name) ->
+		if typeof cmp != 'object' then name = cmp; cmp = null
+		@constructor::$counter++
+		@$models[@$name = name || "[CModel ##{@$counter}]"] = this
 		@$ = data
+		@$cmp = cmp ||= {}
 		@$on = {}
 		@$at = {}
-		for key of data then @add key, data[key]
+		for key of data then @add key, data[key], cmp[key]
 		
-	add: (key, val, fn) -> @$[key] = val; (@on fn if fn); this[key] = do(key)-> (val) -> if arguments.length == 1 then @$ret key else @change key, val
+	add: (key, val, cmp) -> @$[key] = val; (@$cmp[key] = cmp if cmp); unless key of this then @[key] = do(key, cmp)-> (val) -> if arguments.length == 1 then @$retrive key else @change key, val
 	
 	_on = (key, fn) -> (@$0$[key] ||= []).push fn
-	_un = (key, fn) -> if arguments.length == 1 then delete @$0$[key] else ons = @$0$[key]; (if ons and -1!= idx=ons.indexOf fn then ons.splice idx, 1)
+	_off = (key, fn) -> if arguments.length == 1 then delete @$0$[key] else ons = @$0$[key]; (if ons and -1!= idx=ons.indexOf fn then ons.splice idx, 1)
 	
-	del: (key) -> @un key; @ut key; delete @$[key]
+	del: (key) -> @un key; @ut key; delete @$[key]; delete @$cmp[key]
 	on: _on.inline "on", "$on"
-	un: _un.inline "un", "$on"
+	off: _off.inline "off", "$on"
 	at: _on.inline "at", "$at"
-	ut: _un.inline "ut", "$at"
+	un: _off.inline "un", "$at"
 	
 	change: (key, val) ->
-		throw CRoot.raise "Нет ключа `#{key}` в модели #{@constructor.getName()}.#{@$name}" unless key of @$
-		
+		throw CRoot.raise "Нет ключа `#{key}` в модели #{@constructor.getName()}.#{@$name}" unless key of @$		
 		if arguments.length == 1 then val = !@$[key]
-		if val != old=@$[key]
-			if typeof(val) == typeof(old) == 'object'
-				return this unless CMath.equal val, old
+		old=@$[key]
+		if (if cmp=@$cmp[key] then !cmp.call this, val, old else val != old)
 			@$send key, val, old; @$[key] = val
 		this
 
@@ -839,10 +879,12 @@ class CModel
 			for fn in ons then fn.call this, val, old, key
 		this
 			
-	$ret: (key) ->
+	$retrive: (key) ->
 		if fn = this['at'+key] then @change key, fn.call this, key
 		if at = @$at[key] then for fn in at then @change key, fn.call this, key
 		@$[key]
+		
+	modelStream: (key) -> stream = new Stream; @on key, stream.emitter(); stream
 		
 
 class CRepository	# Abstract, $: {} - ключи
@@ -1263,7 +1305,7 @@ class CEvent
 
 
 CRoot = null
-unless window.$ then $ = (e, parent) -> (if typeof e == 'function' then CRoot._init_functions.push e else CRoot.wrap e, parent)
+unless window.$ then $ = (e) -> (if typeof e == 'function' then CRoot._init_functions.push e else CRoot.wrap e)
 
 	
 class CWidget
@@ -1295,7 +1337,7 @@ class CWidget
 			# удаляем эвенты - можно не удалять
 			#if @_parent then 
 			# устанавливаем эвенты
-			if prev = @parent() then prev.detach this
+			#if prev = @parent() then prev.detach this
 			@_parent = parent
 			this
 		else
@@ -1380,15 +1422,18 @@ class CWidget
 	unwrap: -> @send 'onDestroy', 'unwrap'; @parent()?.detach this ; e=@element; @element = @element.widget = null ; new CWidgets [e]
 	rewrap: (cls) -> p = @parent(); e = @unwrap()._all[0]; w = (if typeof cls == 'function' then new cls e, p else cls.unwrap(); cls.element = e; e.widget = cls; cls.parent p); (if p and p.id()+'-'+w.name() == w.id() then p.attach w); w
 	
-	new$ = (tag, param) ->
-		param = ctype: param if typeof param == 'string'
+	new$ = (tag, ctype, param) ->
+		if typeof ctype == 'object' then param = ctype; ctype = undefined
+		param || = {}
+		if typeof ctype == 'string' then param.ctype = ctype; ctype = undefined
+		if ctype then param.ctype = ctype.getName()
 		e = $0$
 		if param then for k of param then e.setAttribute k, param[k]
 		@createWidget e
-		
-	new: new$.inline "__new__", "document.createElement(tag)"
-	svg: new$.inline "svg", "document.createElementNS('http://www.w3.org/2000/svg', tag)"
-	xml: new$.inline "xml", "document.createElementNS('http://www.w3.org/1999/xhtml', tag)"
+
+	new: new$.inline "new", "document.createElement(tag)"
+	#svg: new$.inline "svg", "document.createElementNS('http://www.w3.org/2000/svg', tag)"
+	#xml: new$.inline "xml", "document.createElementNS('http://www.w3.org/1999/xhtml', tag)"
 	
 	type$.nothing 'createWidget ctype new'
 	type$.all 'rewrap unwrap'
@@ -1452,8 +1497,8 @@ class CWidget
 		if arguments.length
 			if args[0] instanceof Array then return w.history$[w.history_pos$+args[0][0]]
 			if typeof args[0] == 'number' then n = args.shift()
-			title = w.document.title unless title?
 			[url, title, data] = args
+			title = w.document.title unless title?
 			w.document.title = title
 			unless n?
 				pushState$ w, null, title, url
@@ -1538,6 +1583,7 @@ class CWidget
 					h = x
 				unless h = x["@"] then h = x["@"] = []
 				h.push type
+		#CHandlers[@className()] 
 		extend @constructor, handlers: handlers, listens: listens, selfHandlers: selfHandlers
 		this
 		
@@ -1563,7 +1609,7 @@ class CWidget
 	setListens: -> setListen = CListen.setListen; (for type, who of @constructor.listens then setListen.call this, type, who); this
 
 	setModel: ->
-		if attr = e.attr 'cmodel'
+		if attr = @attr 'model'
 			[model, slot, type] = attr.split /:/
 			model = CModel.$models[model || 'noname']
 			slot ||= @name()
@@ -1627,8 +1673,9 @@ class CWidget
 	detach: (name) -> (if typeof name != 'string' then x=name; name = name.name()); (if (x?=this[name]) instanceof CWidget then delete this[name]); x?.parent null ; (if -1 != idx=(e=@_elements).indexOf name then e.splice idx, 1); delete this["$"+name]; this
 
 	getElements: ->
-		regexp = new RegExp '^'+@element.id+'-(\\w+)$'
-		for element in @root().find("[id^="+@element.id+"-]")._all when match = element.id.match(regexp) then match[1]
+		id = @element.id
+		regexp = new RegExp '^'+id+'-(\\w+)$'
+		for element in @root().find("[id^="+id+"-]")._all when match = element.id.match(regexp) then match[1]
 	attachElements: ->
 		unless @_elements then @_elements = []
 		elem = if arguments.length then Array::slice.call arguments else @getElements()
@@ -2829,15 +2876,17 @@ class CIframeWidget extends CImgWidget
 # формы
 class CFormWidget extends CWidget
 	_method: 'POST'
+	
 	constructor: ->
 		if arguments.length == 0 then super document.getElementById((cn=@className()).lc()) || document.getElementById cn else super
-		do @defineHandlers unless @constructor.handlers
-		@send "onBeforeCreate"
+		counter = if @constructor::hasOwnProperty '_counter' then ++@constructor::_counter else @constructor::_counter = 0
+		@send "onBeforeCreate", counter
+		do @defineHandlers if 0 == counter
 		do @setHandler
 		do @setListens
 		do @initialize
 		#@attr "ctype", @className()
-		@send "onCreate"
+		@send "onCreate", counter
 
 	initialize: ->
 		do @setHandlersOnElements

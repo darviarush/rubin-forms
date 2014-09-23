@@ -106,8 +106,62 @@ new CTest 'key-CEffect-slideDown', """
 	@w().on 'click', -> @morph effect: 'slideDown', timeout: 'fast', end: -> @timeout 500, -> @show()
 	@w().morph effect: 'slideDown', timeout: 'fast', end: -> self.ok 1 ; @timeout 500, -> @show()
 
+	
+
+CTest.category "потоки"
+
+new CTest "cls-CStream", """
+`CStream` - класс поточного или реактивного программирования (FRP)
+""", """
+#%name-plus, #%name-minus, #%name-result { display: block-inline; width: 100px; border: solid 1px orange; background:  }
+""", """
+<div id=$name-plus>1</div>
+<div id=$name-minus>-1</div>
+<div id=$name-result></div>
+""", ->
+	plus = @w("plus").eventStream("click").map(1)
+	minus = @w("minus").eventStream("click").map(-1)
+	
+	merge = plus.merge minus
+	result = merge.reduce 5, (a, b) -> a + b
+	
+	result.assign @w("result"), "text"
+	
+	@w("plus").fire("click")
+	@is "6", @w("result").text()
+	
+	@w("minus").fire("click")
+	@is "5", @w("result").text()
+	
+	minus.emit()
+	@is "4", @w("result").text()
+
+	
+CTest.category "модели"
+
+
+
 
 CTest.category "служебные методы"
+
+
+new CTest 'cls-CWidget', """
+`CWidget element, [parent]` - класс виджет
+
+element - элемент который оборачивается виджетом
+parent - виджет, который будет главным над этим
+
+Порождает циклическую ссылку
+
+См. #CFormWidget
+""", ->
+	@count 3
+	try	new CWidget	catch e then @ok 1
+	e = document.createElement 'div'
+	w = new CWidget e
+	@is w.element, e
+	@is e.widget, w
+
 
 new CTest 'obj-CWidget-raise', """
 `raise message` - создаёт экземпляр исключения Error, добавляя к нему объект в котором произошло исключение и stack trace
@@ -198,9 +252,54 @@ new CTest 'obj-CWidget-ctype', """
 	div = document.createElement 'div'
 	div.setAttribute 'ctype', 'img'
 	@is CRoot.ctype(div), CImgWidget
+
 	
+new CTest 'obj-CWidget-new', """
+`new tag, [ctype|cls], [attr]` - создаёт элемент и оборачивает его в виджет
+
+- ctype - строка с названием класса виджета
+- cls - класс виджета
+- attr - хеш с атрибутами, которые будут установлены до обёртки элемента в виджет
+
+См. #wrap, #xml, #svg, #createWidget, #CFormWidget
+""", ->
+	@instanceof CRoot.new("div"), CWidget
+	@instanceof CRoot.new("div", "input"), CInputWidget
+	@instanceof CRoot.new("div", CFormWidget, id: 'ex-test'), CFormWidget
+	w = CRoot.new "div", ctype: "form", id: 'ex-test', action: "/test"
+	@instanceof w, CFormWidget
+	@is w.attr("action"), "/test"
 
 
+# new CTest 'obj-CWidget-xml', """
+# `xml tag, [ctype|cls], [attr]` - создаёт элемент xml и оборачивает его в виджет
+
+# - ctype - строка с названием класса виджета
+# - cls - класс виджета
+# - attr - хеш с атрибутами, которые будут установлены до обёртки элемента в виджет
+
+# См. #new, #svg, #wrap, #createWidget, #CFormWidget
+# """, ->
+	# @instanceof CRoot.xml("author"), CWidget
+	# @instanceof CRoot.xml("author", "form"), CFormWidget
+	# @instanceof CRoot.xml("author", ctype: "form"), CFormWidget
+
+
+# new CTest 'obj-CWidget-svg', """
+# `svg tag, [ctype|cls], [attr]` - создаёт элемент svg и оборачивает его в виджет
+
+# - ctype - строка с названием класса виджета
+# - cls - класс виджета
+# - attr - хеш с атрибутами, которые будут установлены до обёртки элемента в виджет
+
+# См. #new, #xml, #wrap, #createWidget, #CFormWidget
+# """, ->
+	# @instanceof CRoot.svg("line"), CWidget
+	# @instanceof CRoot.svg("div", "form"), CFormWidget
+	# @instanceof CRoot.new("div", ctype: "form"), CFormWidget
+
+	
+	
 CTest.category "служебные елементы"
 
 
@@ -317,17 +416,18 @@ new CTest 'obj-CWidget-send', """
 
 #Send.setHandler
 """, """
-<div id=Ex>
-	<div id=Ex-fld>_</div>
+<div id=ExSend>
+	<div id=ExSend-fld>_</div>
 </div>
 """, ->
 	@count 3
 	test = this
-	class Ex extends CFormWidget
+	class ExSend extends CFormWidget
 		fld_onclick: (param, fld) ->
 			test.is fld, @fld
 			test.is param, 22
-	ex = new Ex
+
+	ex = new ExSend
 	@like /CSend/, ex.fld.attr 'onclick'
 	ex.fld.send 'onclick', 22
 	
