@@ -99,6 +99,7 @@
 # 70. В модель добавить функции для сравнения данных
 # 71. Переопределить __bind на нормальное наследование метаклассов
 # 72. Протестировать удаление элементов из памяти, так как все они имеют перекрёстные ссылки
+# 73. Отложенное выполнение в модели. Как сработал send - пока из него не выйдет - другие обновления этого ключа не выполняются. А добавляются в очередь и начинают отправляться после. Добавить значение для ключа - нет - очередь будет отправлять для всех значений последовательно, 0 - очередь игнорируется, 1 - выполнится последнее значение из очереди
 
 # Ссылки:
 # http://topobzor.com/13-servisov-dlya-testirovaniya-sajta-v-raznyx-brauzerax/.html - сайты-тестеры
@@ -769,6 +770,147 @@ class CLongPoll extends CSocket
 	# eval: (code) -> @emit act: 'eval', code: code
 	# call: ()
 	
+
+CListen =
+	listens:
+		document:
+			mousedown: [(e) -> which=e.event.which; p = CEvent.prototype; (if which == 1 then p.left = on); (if which == 2 then p.mid = on); (if which == 3 then p.right = on)]
+			mouseup: [(e) -> which=e.event.which; p = CEvent.prototype; (if which == 1 then p.left = off); (if which == 2 then p.mid = off); (if which == 3 then p.right = off)]
+	
+	listen: (who, type) -> do(who, type)-> (args...) -> (if typeof args[0] == 'object' then args[0] = new CEvent args[0], 'on'+type+'_'+who); (for widget in CListen.listens[who][type] then (if typeof widget == 'function' then widget args... else widget.send args[0].type, args...)); on
+	
+	add: (type_who, arg) -> match = type_who.match ///^ on(\w+)_(\w+) $///; CListen.setListen.call arg, match[1], match[2]
+	
+	putListen: (type, who) ->
+		ln = CListen.listen who, type
+		t = "on"+type
+		w = if typeof this == 'function' then CRoot else this
+		
+		if set = CListen[type+'_'+who] then set.call w, ln
+		else if who == "window" and t of (win = w.window()) then win[t] = ln
+		else if who == "document" and t of (doc=w.document()) then doc[t] = ln
+		else throw @raise "Нет такого обработчика on"+type+"_"+who
+		undefined
+		
+	setListen: (type, who) ->
+		if who == 'parent' then return
+		unless listen = (listens=CListen.listens)[who] then listen = listens[who] = {}
+		if ls = listen[type] then ls.push this
+		else CListen.putListen.call this, type, who; listen[type]=[this]
+		undefined
+		
+	erase: (type, who, w) ->
+		if who_ = CListen.listens[who]
+			if type_ = who_[type]
+				for i in type_ when i == w
+					if type_.length == 1
+						delete who_[type]
+						if erase = CListen[type+'_'+who+'__'+erase] then erase()
+						else if who == "window" then w.window()["on"+type] = ->
+						else if who == "document" then w.document()["on"+type] = ->
+					else type_.splice i, 1
+					return on
+		undefined
+		
+	clean: ->
+		for _who, who of CListen.listens
+			for _type, type of who 
+				who[type] = for widget in type when typeof widget == 'function' or document.contains widget then widget
+		undefined
+		
+		
+	error_window: (f) -> (w=@window()).onerror = w.document.onerror = f
+	#scroll_window: (f) -> @window().onscroll = f
+	#pageshow_window: (f) -> @window().onpageshow = f #@window().addEventListener? "pageshow", f, false
+	#pagehide_window: (f) -> @window().onpagehide = f #@window().addEventListener? "pagehide", f, false
+	#resize_window: (f) -> @window().onresize = f
+	#orientationchange_window: (f) -> @window().onorientationchange = f #@window().addEventListener? "orientationchange", f, false
+	#unload_window: (f) -> @window().onunload = f
+	#beforeunload_window: (f) -> @window().onbeforeunload = f
+	
+	hashchange_window: if "onhashchange" in window then ((f) -> @window().onhashchange = f) else (f) ->
+		win = @window()
+		win._c_old_hash = win.location.hash
+		setTimeout (=> win = @window(); if win._c_old_hash != h=win.location.hash then f h, win._c_old_hash; win._c_old_hash = h), 200
+	# http://learn.javascript.ru/onload-onerror
+	# http://snipplr.com/view/6029/domreadyjs/
+	runReady: 0
+	ready: ->
+	ready_dom: (f) -> CListen.ready=((e) -> unless CListen.runReady then CListen.runReady = 1 ; f(e)); CListen.load_window.call this, (->); @document().addEventListener? "DOMContentLoaded", CListen.ready, false
+	load_window: (f) -> @window().onload = (e) -> CListen.ready(e); f(e)
+	
+
+# http://help.dottoro.com/larrqqck.php - список event-ов
+CSend = (element, event) ->
+	unless widget = element.widget then widget = CRoot.createWidget element
+	e = new CEvent event, event.type
+	ret1 = CSend[e.type]?.call widget, e, widget
+	ret2 = widget.send 'on'+e.type, e, widget
+	ret3 = CSend[e.type+"_end"]?.call widget, e, widget
+	if ret2? then ret2 else if ret3? then ret3 else ret1
+
+extend CSend,
+	_on: (key, fn) -> (for key in $A key then (@$0$[key] ||= []).push fn); this
+	_off: (key, fn) ->
+		if arguments.length == 1
+			for key in $A key then delete @$0$[key]
+		else
+			for key in $A key
+				if (ons = @$0$[key]) and -1 != idx=ons.indexOf fn then ons.splice idx, 1
+		this
+
+	#send: (e, widget) -> widget._tooltip?.send 'on'+e.type+'_parent', e; widget.send 'on'+e.type, e
+	
+	setHandler: (element, type) -> element.setAttribute 'on'+(CSend[type+'_type'] || type), "return CSend(this, event)"
+	removeHandler: (element, type) -> element.removeAttribute 'on'+(CSend[type+'_type'] || type)
+	
+	mousedown: CListen.listens.document.mousedown[0]
+	mouseup: CListen.listens.document.mouseup[0]
+	click: -> CEvent::left = on
+	click_end: -> CEvent::left = off
+
+#unless 'onmouseenter' of document then extend CSend,
+	mouseenter_type: 'mouseover'
+	mouseover: (e, widget) ->
+		to=e.relatedTarget()
+		while to and to != widget then to = to.up()
+		if to != widget then e.type='mouseenter'; widget.send 'on'+e.type, e, widget
+	mouseleave_type: 'mouseout'
+	mouseout: (e, widget) ->
+		to=e.relatedTarget()
+		while to and to != widget then to = to.up()
+		if to != widget then e.type='mouseleave'; widget.send 'on'+e.type, e, widget
+	
+
+# http://habrahabr.ru/post/118318/
+# http://unixpapa.com/js/mouse.html - mouse buttons
+class CEvent
+	constructor: (@event, @type) ->
+	
+	left: off
+	mid: off
+	right: off
+	
+	keys$ = 38: 'up', 40: 'down', 37: 'left', 39: 'right', 27: 'esc', 8: 'backspace', 9: 'tab', 46: 'delete', 13: 'enter'
+	
+	for key$, val$ in keys$ then @::['press'+key$.upFirst()] = do(val$)-> -> @code() == val$
+	
+	stop: -> @event.stopPropagation()		# отключает всплывание
+	cancel: -> @event.preventDefault()		# отключает событие по умолчанию
+	break: -> @stop(); @cancel()
+	target: unless CNavigator.safari <= 3 then -> CRoot.createWidget @event.target else -> CRoot.createWidget(if (targ=@event.target).nodeType == 3 then targ.parentNode else targ) # safari3
+	relatedTarget: -> (target = @event.relatedTarget) and CRoot.createWidget target
+	code: -> @event.charCode || @event.keyCode || @event.which
+	key: -> keys$[code=@code()] || String.fromCharCode code
+	x: -> @event.pageX
+	y: -> @event.pageY
+	viewX: -> @event.clientX
+	viewY: -> @event.clientY
+	offsetX: -> (CEvent::offsetX = if @event.offsetX? then -> @event.offsetX else -> @event.clientX - (t=@target()).viewPos().left - t.px 'border-left-width'); @offsetX()
+	offsetY: -> (CEvent::offsetY = if @event.offsetY? then -> @event.offsetY else -> @event.clientY - (t=@target()).viewPos().top - t.px 'border-top-width'); @offsetY()
+
+	
+	
 # Потоки
 # http://pozadi.github.io/kefir/
 # http://baconjs.github.io/api.html
@@ -780,16 +922,26 @@ class CStream
 
 	constructor: -> @fork = []
 	
-	emitter: (args...) -> stream = this ; do(stream, args1)-> (args...)-> stream.emit this, args...
 	@fromCallback: (fn, args...) -> stream = new СStream; fn stream.emitter(args...); stream
+	#(key) -> stream = new Stream; @on key, stream.emitter(); stream
+	emitter: -> stream = this ; do(stream)-> (args...)-> stream.emit this, args...
 	
 	emitFilter = (channel, args...) ->
 		return this if off == @_callback.apply channel, args
 		@send arguments
 	emitMap = (channel, args...) ->
+		@send [channel, @_callback.apply channel, args]
+	emitMaps = (channel, args...) ->
 		args = @_callback.apply channel, args
 		@send [channel].concat args
-	emitDo = (channel, args...) ->
+	emitMapAll = (channel, args...) ->
+		args = @_callback.apply channel, args
+		@send args
+	emitMapTo = (channel) ->
+		@send [channel].concat @_callback
+	emitMapAllTo = (channel) ->
+		@send @_callback
+	emitThen = (channel, args...) ->
 		@_callback.apply channel, args
 		@send arguments
 	emitTimeout = (args) ->
@@ -813,25 +965,32 @@ class CStream
 	# модифицирующие
 	transvuier: (emit, fn, param) -> @fork.push stream = new (@constructor)(); stream.emit = emit; stream._callback = fn; (if param then for i of param then @[i] = param[i]); stream
 	
-	map: (args...) -> map = args[0]; @transvuier emitMap, (if typeof map == 'function' then map else do(args)->-> args)
-	mapArgs: ->
+	map: (args...) -> if typeof (map = args[0]) == 'function' then @transvuier emitMap, map else @transvuier emitMapTo, args
+	maps: (args...) -> if typeof (map = args[0]) == 'function' then @transvuier emitMaps, map else @transvuier emitMapTo, args
+	mapWithChannel: (args...) -> if typeof (map = args[0]) == 'function' then @transvuier emitMapAll, map else @transvuier emitMapAllTo, args
 	
 	
 	filter: (filter) -> @transvuier emitFilter, filter
 	
-	throttle: (ms) -> @transvuier emitTimeout, ms
+	sleep: (ms) -> @transvuier emitTimeout, ms
 	
-	reduce: (args..., fn) -> @transvuier 
+	#reduce: (args..., fn) -> @transvuier emitMap, 
+	#reduces: 
 	
 	# связывающие
-	do: (onValue) -> @transvuier emitDo, onValue
+	then: (onValue) -> @transvuier emitThen, onValue
 	
-	assign: (object, method, args...) -> @transvuier emitDo, do(stream, object, method, args)-> (args2...)-> CRoot.wrap(object).invoke method, args..., args2...
+	assign: (object, method, args...) ->
+		@transvuier emitThen, if typeof object == 'string'
+			do(object, method, args)-> (args2...)-> CRoot.find(object).invoke method, args..., args2...
+		else
+			do(object, method, args)-> (args2...)-> object[method] args..., args2...
 
-	assignAny: (object, method, args...) -> @transvuier emitDo, do(stream, object, method, args)-> (args2...)-> (for i in (if object instanceof Array then object else [object]) then i[method] args..., args2...)
-	
 	# объединяющие
 	merge: (streams...) -> @fork.push stream = new (@constructor)(); (for s in streams then s.fork.push stream); stream
+	
+	# отключающие
+	off: (streams...) -> fork = @fork; (for s in streams when -1 != i=fork.indexOf s then fork.splice i, 1); this
 	
 	# управляющие
 	log: -> @constructor._log = 1 ; this
@@ -839,63 +998,77 @@ class CStream
 
 # Модели
 class CModel
-	# $: {} - данные
-	# $on: {} и on... - обработчики при изменении данных
-	# $at: {} и at... - обработчики при запросе данных
-	$models: {} # все модели по имени (@$name)
-	$counter: 0
+	# _: {} - данные
+	# _cmp: {} - функции сравнения
+	# _queue: {} - очереди обрабатывающихся ключей
+	# _on: {} и on... - обработчики при изменении данных
+	# _at: {} и at... - обработчики при запросе данных
+	# _name: string - имя модели в ::_models
+	_models: {} # все модели по имени (@_name)
+	_counter: 0
 	constructor: (data = {}, cmp, name) ->
-		if typeof cmp != 'object' then name = cmp; cmp = null
-		@constructor::$counter++
-		@$models[@$name = name || "[CModel ##{@$counter}]"] = this
-		@$ = data
-		@$cmp = cmp ||= {}
-		@$on = {}
-		@$at = {}
+		if typeof cmp == 'string' then name = cmp; cmp = {}
+		@constructor::_counter++
+		@_models[@_name = name || "[CModel ##{@_counter}]"] = this
+		@_ = data
+		@_cmp = cmp ||= {}
+		@_on = {}
+		@_at = {}
+		@_queue = {}
 		for key of data then @add key, data[key], cmp[key]
+		for key of cmp when not key of data then throw CRoot.raise "Нет ключа `#{key}` для функции сравнения"
 		
-	add: (key, val, cmp) -> @$[key] = val; (@$cmp[key] = cmp if cmp); unless key of this then @[key] = do(key, cmp)-> (val) -> if arguments.length == 1 then @$retrive key else @change key, val
+	add: (key, val, cmp) ->
+		@_[key] = val
+		@_cmp[key] = cmp if cmp
+		@["$"+key] = fn = do(key, cmp)-> (val) -> if arguments.length == 1 then @retrive key else @change key, val
+		@[key] = fn unless key of this
+		this
 	
-	_on = (key, fn) -> (@$0$[key] ||= []).push fn
-	_off = (key, fn) -> if arguments.length == 1 then delete @$0$[key] else ons = @$0$[key]; (if ons and -1!= idx=ons.indexOf fn then ons.splice idx, 1)
+	del: (key) -> @un key; @ut key; delete @_[key]; delete @_cmp[key]
 	
-	del: (key) -> @un key; @ut key; delete @$[key]; delete @$cmp[key]
-	on: _on.inline "on", "$on"
-	off: _off.inline "off", "$on"
-	at: _on.inline "at", "$at"
-	un: _off.inline "un", "$at"
+	on: CSend._on.inline "on", "_on"
+	off: CSend._off.inline "off", "_on"
+	at: CSend._on.inline "at", "_at"
+	un: CSend._off.inline "un", "_at"
 	
 	change: (key, val) ->
-		throw CRoot.raise "Нет ключа `#{key}` в модели #{@constructor.getName()}.#{@$name}" unless key of @$		
-		if arguments.length == 1 then val = !@$[key]
-		old=@$[key]
-		if (if cmp=@$cmp[key] then !cmp.call this, val, old else val != old)
-			@$send key, val, old; @$[key] = val
+		throw CRoot.raise "Нет ключа `#{key}` в модели #{@constructor.getName()}.#{@_name}" unless key of @_
+		if arguments.length == 1 then val = !@_[key]
+		old=@_[key]
+		if (if cmp=@_cmp[key] then !cmp.call this, val, old else val != old)
+			@send val, old, key; @_[key] = val
 		this
 
-	$send: (key, val, old) ->
+	send: (val, old, key) ->
+		#if q = @_queue[key] then q.push 
+		#else
+		#	@_queue[key] = []
+			
 		this['on'+key]? val, old, key
-		if ons = @$on[key]
+		if ons = @_on[key]
 			for fn in ons then fn.call this, val, old, key
+		#delete @_queue[key]
 		this
 			
-	$retrive: (key) ->
+	retrive: (key) ->
 		if fn = this['at'+key] then @change key, fn.call this, key
-		if at = @$at[key] then for fn in at then @change key, fn.call this, key
-		@$[key]
+		if at = @_at[key] then for fn in at then @change key, fn.call this, key
+		@_[key]
 		
 	modelStream: (key) -> stream = new Stream; @on key, stream.emitter(); stream
-		
+	retriveStream: (key) -> stream = new Stream; @at key, stream.emitter(); stream
 
-class CRepository	# Abstract, $: {} - ключи
-	constructor: (model, @$ = {}) ->
+
+class CRepository	# Abstract, _: {} - ключи
+	constructor: (model, @_ = {}, cmp = {}) ->
 		@model = model
-		for key of @$
-			unless key of model.$ then model.add key, @$[key]
+		for key of @_
+			unless key of model._ then model.add key, @_[key], cmp[key]
 			if @save then model.on key, (val, old, key) => @save key, val
 			if @load then model.at key, (key) => @load key
 			
-	sync: -> (for key of @$ when (val = @load key) != undefined then @model.change key, val); this
+	sync: -> (for key of @_ when (val = @load key) != undefined then @model.change key, val); this
 
 	
 class CCookieRepository extends CRepository
@@ -906,11 +1079,11 @@ class CCookieRepository extends CRepository
 
 class CAjaxRepository extends CRepository
 	constructor: (model, fields, @widget) -> super model, fields; @widget.onLoad ||= (req) => @save = (->); (for key, val of req.data then @model.change key, val); delete @save; this
-	save: (key, val) -> if @$ajax_save then @$ajax_save[key]=val else @$ajax_save = x = {}; x[key] = val; setTimeout (=> @widget.ping save: toJSON @$ajax_save; @$ajax_save = null), 0
+	save: (key, val) -> if @_ajax_save then @_ajax_save[key]=val else @_ajax_save = x = {}; x[key] = val; setTimeout (=> @widget.ping save: toJSON @_ajax_save; @_ajax_save = null), 0
 
 
 class CAjaxIoRepository extends CAjaxRepository
-	load: (key) -> (if @$ajax_load then @$ajax_load.push key else @$ajax_load = [key]; setTimeout (=> @widget.ping load: @$ajax_load; @$ajax_load = null), 0); @$[key]
+	load: (key) -> (if @_ajax_load then @_ajax_load.push key else @_ajax_load = [key]; setTimeout (=> @widget.ping load: @_ajax_load; @_ajax_load = null), 0); @_[key]
 	
 
 # работает с socket.io
@@ -923,7 +1096,7 @@ class CIoRepository extends CRepository
 
 	
 class CIoLoadRepository extends CIoRepository
-	load: (key) -> @iosocket.emit 'load', key; @$[key]
+	load: (key) -> @iosocket.emit 'load', key; @_[key]
 	
 	
 CTemplate =
@@ -1174,136 +1347,6 @@ CEffect =
 		endcss: { display: 'none' }
 
 
-CListen =
-	listens:
-		document:
-			mousedown: [(e) -> which=e.event.which; p = CEvent.prototype; (if which == 1 then p.left = on); (if which == 2 then p.mid = on); (if which == 3 then p.right = on)]
-			mouseup: [(e) -> which=e.event.which; p = CEvent.prototype; (if which == 1 then p.left = off); (if which == 2 then p.mid = off); (if which == 3 then p.right = off)]
-	
-	listen: (who, type) -> do(who, type)-> (args...) -> (if typeof args[0] == 'object' then args[0] = new CEvent args[0], 'on'+type+'_'+who); (for widget in CListen.listens[who][type] then (if typeof widget == 'function' then widget args... else widget.send args[0].type, args...)); on
-	
-	add: (type_who, arg) -> match = type_who.match ///^ on(\w+)_(\w+) $///; CListen.setListen.call arg, match[1], match[2]
-	
-	putListen: (type, who) ->
-		ln = CListen.listen who, type
-		t = "on"+type
-		w = if typeof this == 'function' then CRoot else this
-		
-		if set = CListen[type+'_'+who] then set.call w, ln
-		else if who == "window" and t of (win = w.window()) then win[t] = ln
-		else if who == "document" and t of (doc=w.document()) then doc[t] = ln
-		else throw @raise "Нет такого обработчика on"+type+"_"+who
-		undefined
-		
-	setListen: (type, who) ->
-		if who == 'parent' then return
-		unless listen = (listens=CListen.listens)[who] then listen = listens[who] = {}
-		if ls = listen[type] then ls.push this
-		else CListen.putListen.call this, type, who; listen[type]=[this]
-		undefined
-		
-	erase: (type, who, w) ->
-		if who_ = CListen.listens[who]
-			if type_ = who_[type]
-				for i in type_ when i == w
-					if type_.length == 1
-						delete who_[type]
-						if erase = CListen[type+'_'+who+'__'+erase] then erase()
-						else if who == "window" then w.window()["on"+type] = ->
-						else if who == "document" then w.document()["on"+type] = ->
-					else type_.splice i, 1
-					return on
-		undefined
-		
-	clean: ->
-		for _who, who of CListen.listens
-			for _type, type of who 
-				who[type] = for widget in type when typeof widget == 'function' or document.contains widget then widget
-		undefined
-		
-		
-	error_window: (f) -> (w=@window()).onerror = w.document.onerror = f
-	#scroll_window: (f) -> @window().onscroll = f
-	#pageshow_window: (f) -> @window().onpageshow = f #@window().addEventListener? "pageshow", f, false
-	#pagehide_window: (f) -> @window().onpagehide = f #@window().addEventListener? "pagehide", f, false
-	#resize_window: (f) -> @window().onresize = f
-	#orientationchange_window: (f) -> @window().onorientationchange = f #@window().addEventListener? "orientationchange", f, false
-	#unload_window: (f) -> @window().onunload = f
-	#beforeunload_window: (f) -> @window().onbeforeunload = f
-	
-	hashchange_window: if "onhashchange" in window then ((f) -> @window().onhashchange = f) else (f) ->
-		win = @window()
-		win._c_old_hash = win.location.hash
-		setTimeout (=> win = @window(); if win._c_old_hash != h=win.location.hash then f h, win._c_old_hash; win._c_old_hash = h), 200
-	# http://learn.javascript.ru/onload-onerror
-	# http://snipplr.com/view/6029/domreadyjs/
-	runReady: 0
-	ready: ->
-	ready_dom: (f) -> CListen.ready=((e) -> unless CListen.runReady then CListen.runReady = 1 ; f(e)); CListen.load_window.call this, (->); @document().addEventListener? "DOMContentLoaded", CListen.ready, false
-	load_window: (f) -> @window().onload = (e) -> CListen.ready(e); f(e)
-	
-
-# http://help.dottoro.com/larrqqck.php - список event-ов
-CSend = (element, event) ->
-	unless widget = element.widget then widget = CRoot.createWidget(element)
-	e = new CEvent event, event.type
-	ret1 = CSend[e.type]?.call widget, e, widget
-	ret2 = widget.send 'on'+e.type, e, widget
-	ret3 = CSend[e.type+"_end"]?.call widget, e, widget
-	if ret2? then ret2 else if ret3? then ret3 else ret1
-
-extend CSend,
-	send: (e, widget) -> widget._tooltip?.send 'on'+e.type+'_parent', e; widget.send 'on'+e.type, e
-	setHandler: (element, type) ->
-		element.setAttribute 'on'+(CSend[type+'_type'] || type), "return CSend(this, event)"
-		this
-	
-	mousedown: CListen.listens.document.mousedown[0]
-	mouseup: CListen.listens.document.mouseup[0]
-	click: -> CEvent::left = on
-	click_end: -> CEvent::left = off
-
-#unless 'onmouseenter' of document then extend CSend,
-	mouseenter_type: 'mouseover'
-	mouseover: (e, widget) ->
-		to=e.relatedTarget()
-		while to and to != widget then to = to.up()
-		if to != widget then e.type='mouseenter'; CSend.send e, widget
-	mouseleave_type: 'mouseout'
-	mouseout: (e, widget) ->
-		to=e.relatedTarget()
-		while to and to != widget then to = to.up()
-		if to != widget then e.type='mouseleave'; CSend.send e, widget
-	
-
-# http://habrahabr.ru/post/118318/
-# http://unixpapa.com/js/mouse.html - mouse buttons
-class CEvent
-	constructor: (@event, @type) ->
-	
-	left: off
-	mid: off
-	right: off
-	
-	keys$ = 38: 'up', 40: 'down', 37: 'left', 39: 'right', 27: 'esc', 8: 'backspace', 9: 'tab', 46: 'delete', 13: 'enter'
-	
-	for key$, val$ in keys$ then @::['press'+key$.upFirst()] = do(val$)-> -> @code() == val$
-	
-	stop: -> @event.stopPropagation()		# отключает всплывание
-	cancel: -> @event.preventDefault()		# отключает событие по умолчанию
-	break: -> @stop(); @cancel()
-	target: unless CNavigator.safari <= 3 then -> CRoot.createWidget @event.target else -> CRoot.createWidget(if (targ=@event.target).nodeType == 3 then targ.parentNode else targ) # safari3
-	relatedTarget: -> (target = @event.relatedTarget) and CRoot.createWidget target
-	code: -> @event.charCode || @event.keyCode || @event.which
-	key: -> keys$[code=@code()] || String.fromCharCode code
-	x: -> @event.pageX
-	y: -> @event.pageY
-	viewX: -> @event.clientX
-	viewY: -> @event.clientY
-	offsetX: -> (CEvent::offsetX = if @event.offsetX? then -> @event.offsetX else -> @event.clientX - (t=@target()).viewPos().left - t.px 'border-left-width'); @offsetX()
-	offsetY: -> (CEvent::offsetY = if @event.offsetY? then -> @event.offsetY else -> @event.clientY - (t=@target()).viewPos().top - t.px 'border-top-width'); @offsetY()
-
-
 CRoot = null
 unless window.$ then $ = (e) -> (if typeof e == 'function' then CRoot._init_functions.push e else CRoot.wrap e)
 
@@ -1472,8 +1515,8 @@ class CWidget
 		if ownerDocument$
 			-> if (htm=@htm()).element.contains @element then htm else e=@element; (while e.parentNode then e = e.parentNode); @wrap e
 		else -> if @element.ownerDocument then @htm() else e=@element; (while e.parentNode then e = e.parentNode); @wrap e
-	body: -> @wrap(@document().body) || (htm=@htm()).byTag('body') || htm
-	head: -> @wrap(@document().head) || (htm=@htm()).byTag('head') || htm
+	body: -> @wrap(@document().body) || (htm=@htm()).byTag('body') || @new("body").appendTo(htm)
+	head: -> @wrap(@document().head) || (htm=@htm()).byTag('head') || @new("head").appendTo(htm)
 	viewport: if CNavigator.chrome then @::body else @::htm #-> @wrap if (d=@document()).compatMode=="CSS1Compat" then d.documentElement else d.body
 
 	
@@ -1551,63 +1594,97 @@ class CWidget
 	# методы установки обработчиков
 	send: (type, args...) ->
 		return unless type?
-		if typeof type == 'function' then return type.call this, args...
-	
-		if type of this then action = [[this, type, args]] else action = []
-		self = this
-		path = '_'+type
-		while p = self.parent()
-			break unless name=self.name()
-			path = (if /^\d+$/.test name then 'frame' else name)+path
-			if path of p then action.unshift [p, path, args = args.concat self]
-			path = '__' + path
-			self = p
-		for a in action then ret = (x=a[0])[a[1]] a[2]...; if x.stopHandlersQueue then delete x.stopHandlersQueue; break
-		ret
-	
-	on: (type, listen) -> (if typeof type == 'object' then (for k of type then @setHandler k; @['on'+k] = type[k]) else @setHandler type; @['on'+type] = listen); this
-	off: (type) -> (for k in (if typeof type == 'object' then type else [type]) then @attr "on"+k, null); this
+		if typeof type == 'function' then return type.apply this, args
+		if @_sendQueue and q = @_sendQueue[type]
+			for w in q then w.apply this, args
+		@[type]? args...
+		
+	on: (type, listen) ->
+		@_sendQueue ||= {}
+		for type in $A type 
+			if /^[a-z0-9]+$/.test type then @setHandler type
+			(@_sendQueue['on'+type] ||= []).push listen
+		this
+
+	off: (type, listen) ->
+		if arguments.length == 1
+			for type in $A type
+				delete @_sendQueue['on'+type]
+				if /^[a-z0-9]+$/.test type then @removeHandler type
+		else if typeof listen != 'function'
+			for type in $A type when ons = @_sendQueue['on'+type]
+				for fn, i in ons when fn._belong == listen then ons.splice i, 1 ; break
+				if ons.length == 0 and /^[a-z0-9]+$/.test type then @removeHandler type
+		else
+			for type in $A type
+				if (ons = @_sendQueue['on'+type]) and -1 != idx=ons.indexOf fn then ons.splice idx, 1
+				if ons.length == 0 and /^[a-z0-9]+$/.test type then @removeHandler type
+		this
 	
 	# export_handlers = {'name-name-name': types}
 	defineHandlers: ->
 		handlers = {}
 		listens = {}
 		selfHandlers = []
-		for key of this when match = key.match /^(?:(.+)_)?on([a-z]+)(?:_(\w+))?$/
+		for key of this when match = key.match /^(?:(.+)_)?on([a-z0-9]+)(?:_([a-z0-9]+))?$/i
 			[a, names, type, who] = match
 			if names and who then throw @raise "Устанавливать listens на элементы нельзя"
-			if who then listens[type] = who else unless names then selfHandlers.push type else
+			if who then listens[key] = [who, type] else unless names then (if /^[a-z]+$/.test type then selfHandlers.push type) else
 				h = handlers
 				for name in names = names.split /__/
 					unless x=h[name] then h[name] = x = {}
 					h = x
-				unless h = x["@"] then h = x["@"] = []
-				h.push type
-		#CHandlers[@className()] 
+				unless h = x["@"] then h = x["@"] = {}
+				h[type] = key
 		extend @constructor, handlers: handlers, listens: listens, selfHandlers: selfHandlers
 		this
 		
 	# http://forum.vingrad.ru/forum/topic-32350.html
-	setHandler: (handlers...) -> (for type in (if handlers.length then handlers else @constructor.selfHandlers) then CSend.setHandler.call this, @element, type); this
-	getHandlersOnElements: ->
-		handlers = {}
-		r = []
+	setHandlers: -> (if @constructor.selfHandlers.length then @setHandler @constructor.selfHandlers...); this
+	setHandler: -> (if arguments.length == 0 then throw @raise "укажите хоть один аргумент для setHandler"); (for type in arguments then CSend.setHandler @element, type); this
+	removeHandler: -> (for type in arguments then CSend.removeHandler @element, type); this
+	
+	setHandlersOnElements: (list) ->
+		path = []
 		p = this
 		while p and p.element.id and h = p.constructor.handlers
-			for name, i in r then unless h = h[name] then break
-			if i==r.length then for name of h when a=h[name]["@"] then handlers[name]=a
-			r.splice 0, 0, if /^\d+$/.test name=p.name() then 'frame' else name
-			p=p.parent()
-		handlers
+			for name, i in path when not h = h[name] then break
+			if i==path.length then for name of h when a=h[name]["@"]
+				widget = if name == 'frame' then list || @child() else @byName name
+				for type of a
+					main_type = a[type]
+					listener = do(p, main_type)-> (args...)-> p[main_type] args..., this
+					listener._belong = p
+					widget.on type, listener
+			path.unshift if /^\d+$/.test name = @name() then 'frame' else name
+			p = p.parent()
+		this		
 
-	setHandlersOnElements: (list) ->
-		for name, handlers of @getHandlersOnElements()
-			widget = if name == 'frame' then list || @child() else @byName name
-			for type in handlers then widget.setHandler type
-		this			
+	readyRun$ = 0
+	ready$ = -> (if readyRun$ < 2 then readyRun$ = 2 ; $(window).send 'onReadyDom'); this
+	
+	listens$ =
+		onready_dom: (listener) ->
+			if readyRun$ == 2 then #listener()
+			else 
+				$(window).on 'onReadyDom', listener
+				if readyRun$ == 0
+					readyRun$ = 1
+					document.addEventListener? "DOMContentLoaded", ready$, false
+					$(window).on 'load', ready$
+			this
+	
+	setListens: ->
+		self = this
+		for key, [who, type] of @constructor.listens
+			listener = do(self, key)-> (args...)-> self[key] args...
+			listener._belong = this
+			if fn = listens$[key] then fn.call this, listener
+			else @wrap(@[who]()).on type, listener
+		this
 
-	setListens: -> setListen = CListen.setListen; (for type, who of @constructor.listens then setListen.call this, type, who); this
-
+	eventStream: (events) -> stream = new CStream; @on events, stream.emitter(); stream
+		
 	setModel: ->
 		if attr = @attr 'model'
 			[model, slot, type] = attr.split /:/
@@ -1682,7 +1759,7 @@ class CWidget
 		for name in elem then @attach name
 		this	
 
-	type$.all 'defineHandlers setHandler setHandlersOnElements setListens setModel setModelOnElements observe fire listen drop attach detach attachElements'
+	type$.all 'defineHandlers setHandler setHandlers setHandlersOnElements setListens setModel setModelOnElements observe fire listen drop attach detach attachElements on off'
 		
 	# методы поиска элементов
 	byName: (name) ->
@@ -2786,6 +2863,12 @@ class CNode extends CWidget
 	outer: @::text
 	parent: (parent) -> if arguments.length then @_parent=parent; this else @_parent
 	tag: (tag) -> if arguments.length then throw @raise "Для CNode.tag изменение ноды по имени не определено" else @element.nodeName
+	
+	Send$ = (event) -> CSend this, event
+	Empty$ = ->
+	
+	setHandler: (handlers...) -> (for handler in handlers then @element['on'+handler] = Send$); this
+	removeHandler: (handlers...) -> (for handler in handlers then @element['on'+handler] = Empty$); this
 
 
 class CButtonWidget extends CWidget
@@ -2882,7 +2965,7 @@ class CFormWidget extends CWidget
 		counter = if @constructor::hasOwnProperty '_counter' then ++@constructor::_counter else @constructor::_counter = 0
 		@send "onBeforeCreate", counter
 		do @defineHandlers if 0 == counter
-		do @setHandler
+		do @setHandlers
 		do @setListens
 		do @initialize
 		#@attr "ctype", @className()

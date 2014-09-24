@@ -437,7 +437,7 @@ new CTest 'obj-CWidget-defineHandlers', """
 
 * методы начинающиеся на on и записанные буквами нижнего регистра - устанавливаются на элемент: onclick, onchange
 * начинающиеся на имя элемента формы - используется формами (CForm): bt_onclick
-* формы могут быть вложенными: form2__form3__bt_onclick
+* формы могут быть вложенными: `form2__form3__bt_onclick`
 * заканчивающиеся на описатель: onscroll_window, onload_window, onmouseleave_parent
 
 См. #setHandler, #send, #getHandlersOnElements, #setListens
@@ -449,40 +449,42 @@ new CTest 'obj-CWidget-defineHandlers', """
 		onscroll_window: ->
 
 	ex=$ "<div ctype=Ex></div>"
-	do ex.defineHandlers unless Ex.handlers
+	ex.defineHandlers()
 	
 	@is Ex.selfHandlers[0], "click"
-	@is Ex.handlers.bt["@"][0], "click"
-	@is Ex.handlers.form2.form3.bt["@"][0], "click"
-	@is Ex.listens.scroll, "window"
+	@is Ex.handlers.bt["@"]["click"], "bt_onclick"
+	@is Ex.handlers.form2.form3.bt["@"]["click"], "form2__form3__bt_onclick"
+	@is Ex.listens.onscroll_window[0], "window"
+	@is Ex.listens.onscroll_window[1], "scroll"
 
 
 new CTest 'obj-CWidget-setHandler', """
-`setHandler handlers...` - устанавливает собственные события, переданные списком параметров или найденные defineHandlers
+`setHandler handlers...` - устанавливает собственные события, переданные списком параметров
 
-См. #defineHandlers, #send, #getHandlersOnElements, #setListens
+См. #setHandlers, #defineHandlers, #send, #getHandlersOnElements, #setListens
 """, ->
 	@like $("<div></div>").setHandler("click").attr("onclick"), /CSend/
+
+new CTest 'obj-CWidget-setHandlers', """
+`setHandlers` - устанавливает события класса формата on[a-z]+
+
+См. #setHandlers, #defineHandlers, #send, #getHandlersOnElements, #setListens
+""", ->
 	class window.Ex extends CWidget
 		onclick: ->
-	@like $("<div ctype=Ex></div>").defineHandlers().setHandler().attr("onclick"), /CSend/
-	
+	@like $("<div ctype=Ex></div>").defineHandlers().setHandlers().attr("onclick"), /CSend/
 
-new CTest 'obj-CWidget-getHandlersOnElements', """
-`getHandlersOnElements` - возвращает хандлеры для элементов формы. В поиске таких хандлеров проходит по парентам (вышестоящим формам)
+	
+new CTest 'obj-CWidget-setHandlersOnElements', """
+`setHandlersOnElements` - устанавливает хандлеры на элементов формы. В поиске таких хандлеров проходит по парентам (вышестоящим формам)
 """, ->
 	class window.Ex extends CFormWidget
 		form2__bt_onclick: ->
 		fld_onclick: ->
 	
-	@is $("<div id=ex ctype=Ex><span id=ex-fld></span></div>").getHandlersOnElements().fld[0], "click"
-
+	w = $("<div id=ex ctype=Ex><span id=ex-fld></span></div>")
 	@like $("<div id=ex ctype=Ex><span id=ex-fld></span><div id=ex-form2 ctype=form><span id=ex-form2-bt></span></div></div>").form2.bt.attr("onclick"), /CSend/
 
-	
-new CTest 'obj-CWidget-setHandlersOnElements', """
-`setHandlersOnElements` - устанавливает возращённые getHandlersOnElements хандлеры на элементы
-""", ->
 	class window.Ex extends CWidget
 		bt_onclick: ->
 	w = $("<div id=ex ctype=Ex><span id=ex-bt></span></div>").defineHandlers().setHandlersOnElements()
@@ -495,9 +497,9 @@ new CTest 'obj-CWidget-setListens', """
 	@count 1
 	self = this
 	class window.Ex extends CWidget
-		onresize_window: -> @onresize_window = (->); self.ok 1 
+		onresize_window: -> $(window).off 'onresize_window', this ; self.ok 1 
 	w = $("<div ctype=Ex></div>").defineHandlers().setListens()
-	$(w.window()).fire 'resize'
+	$(window).fire 'resize'
 
 
 new CTest 'obj-CWidget-observe', """
