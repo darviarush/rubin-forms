@@ -111,7 +111,7 @@ new CTest 'key-CEffect-slideDown', """
 CTest.category "потоки"
 
 new CTest "cls-CStream", """
-`CStream` - класс поточного или реактивного программирования (FRP)
+`CStream` - класс реактивного программирования (FRP)
 """, """
 #%name-plus, #%name-minus, #%name-result { display: block-inline; width: 100px; border: solid 1px orange; background:  }
 """, """
@@ -137,8 +137,71 @@ new CTest "cls-CStream", """
 	@is "4", @w("result").text()
 
 	
+new CTest "obj-CStream-emitter", """
+`emitter` - возвращает замыкание с этим потоком, которое используется как слушатель
+
+Аргументы переданные при вызове замыкания передаются далее по потоку, так же как и объект вызвавший замыкание.
+От имени этого объекта и вызываются все функции установленные в потоке
+
+""", ->
+	@count 1
+
+	stream = new CStream
+	fn = stream.emitter()
+	stream.then (val) -> @is val, 6
+	fn.call this, 6
+
+
+new CTest "obj-CStream-map", """
+`map fn|arg, args...` - замещает передающиеся по потоку аргументы на значение возвращённое функцией fn, либо устанавливает аргументы
+
+См. #maps, #mapAll
+""", ->
+	@count 4
+	(stream = new CStream).map(10, 12).then (arg1, arg2) => @is arg1, 10 ; @is arg2, 12
+	stream.emit()
+	(stream = new CStream).map((-> 13), 12).then((arg1) => @is arg1, 13 ; @is arguments.length, 1)
+	stream.emit 20, 30
+	
+
+new CTest "obj-CStream-flatMap", """
+`flatMap fn` - заменяет поток на возвращённый функцией fn
+
+См. #merge, #combine
+""", ->
+	self = this
+	@count 2
+	
+	СStream::exMap = (f) ->
+		@flatMap (x) ->
+			CStream.unit f(x)
+
+	CStream::exFilter = (f) ->
+		@flatMap (x) ->
+			if f(x)
+				CStream.unit(x)
+			else
+				CStream.nothing()
+
+	(stream = new CStream).exMap(-> 13).then (v)-> @is v, 13
+	stream.emit 10
+	
+	(stream = new CStream).exFilter(-> true).then (v)-> @is v, 10
+	stream.emit 10
+	
+	(stream = new CStream).exFilter(-> false).then (v)-> @ok false
+	stream.emit 10
+	
+
 CTest.category "модели"
 
+new CTest "cls-CModel", """
+`CModel ` - модель имеет свойства и вызывает обработчики событий, если свойство изменилось
+
+См. #maps, #mapWithSrc 
+""", ->
+	#@count 2
+	
 
 
 
@@ -497,27 +560,81 @@ new CTest 'obj-CWidget-setListens', """
 	@count 1
 	self = this
 	class window.Ex extends CWidget
-		onresize_window: -> $(window).off 'onresize_window', this ; self.ok 1 
+		onresize_window: -> $(window).off 'resize', this ; self.ok 1 
 	w = $("<div ctype=Ex></div>").defineHandlers().setListens()
+	$(window).fire 'resize'
 	$(window).fire 'resize'
 
 
 new CTest 'obj-CWidget-observe', """
-`observe dispatch, after, [before]` - заменяет указанный метод в объекте на замыкание, которое отправляет сообщение на указанный метод до или после вызова заменённого метода. before-обработчик может отменить запуск заменённого метода и after-обработчика вернув ''[ret-значение]''
+`observe method, before, [after], [phase]` - заменяет указанный метод в объекте на замыкание, которое возбуждает исключения и onBeforeMethod и onMethod. На них и устанавливаются обработчики
+
+- обработчик before срабатывает перед методом, а обработчик after - после
+- обработчик after получает первым параметром результат метода, а затем - его параметры
+
+Удалить обсерверы можно методом #shut.
+
+См. #shut
 """, ->
-	before = after = off
+	before = after = 0
 	
 	class Ex extends CWidget
-		onExBefore: -> before = on
-		onExAfter: -> after = on
-		method: -> 22
+		method: (a, b) -> 22 + a * b
+	
+	onExBefore = (a, b) -> before += a
+	onExAfter = (ret, a, b) -> after += b
+	onExBefore2 = (a, b) -> before -= a * 2
+	onExAfter2 = (ret, a, b) -> after -= b * 2
 	
 	ex = new Ex document.createElement 'div'
 	
-	ex.observe 'method', 'onExAfter', 'onExBefore', on
-	@is ex.method(), 22
-	@ok before and after
+	ex.observe 'method', onExBefore
+	ex.observe 'method', null, onExAfter
+	ex.observe 'method', onExBefore2, onExAfter2
 	
+	@is ex.method(2, 3), 28
+	
+	@is before, -2
+	@is after, -3
+	
+
+new CTest 'obj-CWidget-shut', """
+`shut method, [observer]` - удаляет обработчики установленные методом #observer
+
+См. #observer
+""", ->
+	before = after = 0
+
+	class Ex extends CWidget
+		method: (a, b) -> 22 + a * b
+	
+	onExBefore = (a, b) -> before += a
+	onExAfter = (ret, a, b) -> after += b
+	onExBefore2 = (a, b) -> before -= a
+	onExAfter2 = (ret, a, b) -> after -= b
+	
+	ex = new Ex document.createElement 'div'
+	
+	ex.observe 'method', onExBefore, onExAfter
+	ex.observe 'method', onExBefore2, onExAfter2
+	
+	@is ex.method(2, 3), 28
+	
+	@is before, 0
+	@is after, 0
+	
+	ex.shut 'method', onExBefore
+	@is ex.method(2, 3), 28
+	
+	@is before, -2
+	@is after, 0
+	
+	ex.shut 'method'
+	@is ex.method(2, 3), 28
+	
+	@is before, -2
+	@is after, 0
+
 
 new CTest 'obj-CWidget-listen', """
 `listen type, fn, [fase]` - устанавливает обработчик на виджет, используя обычный addEventListener. Использовать нерекомендуется. Лучше использовать стандартный механизм фреймворка - методы начинающиеся на "on"

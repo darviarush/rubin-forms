@@ -140,7 +140,7 @@ IE = if '\v'=='v' or document.documentMode?
 	
 CTraceback = -> f = arguments.callee; i=0 ; [f.name || '<anonimous function>' while (f = f.caller && i++ < 10)].reverse().join(' → ')
 
-$A = (n) -> if n instanceof Array then n else if typeof n == 'object' then Array::slice.call n else String(n).split /\s+/
+$A = (n, sep) -> if n instanceof Array then n else if typeof n == 'object' then Array::slice.call n else String(n).split sep || /\s+/
 $H = (n) -> if n instanceof Array then x={}; (for i in [0...n] when i % 2 == 0 then x[n[i]] = n[i+1]) else if n instanceof Object then n else x = {}; (for i in String(n).split /s*;\s*/ then m=i.split /\s*:\s*/; x[m[0]]=m[1]); x
 say = (args...) -> console.log(args...); args[args.length-1]
 escapeHTML = (s) -> String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/\'/g, '&#39;')
@@ -917,37 +917,23 @@ class CEvent
 # https://rxjs.codeplex.com/
 # http://xgrommx.github.io/rx-book/index.html
 # http://habrahabr.ru/post/237495/
+# http://dimoneverything.blogspot.ru/2013/11/blog-post.html - пример подробный
+# http://habrahabr.ru/post/237733/ - трансдьюсеры
 class CStream
-	@callback: (f, args...) -> stream = new CStream; f (do(stream, args)->-> stream.emit ); stream
-
-	constructor: -> @fork = []
-	
+	# конструкторы
+	#@callback: (f, args...) -> stream = new CStream; f (do(stream, args)->-> stream.emit ); stream
 	@fromCallback: (fn, args...) -> stream = new СStream; fn stream.emitter(args...); stream
-	#(key) -> stream = new Stream; @on key, stream.emitter(); stream
-	emitter: -> stream = this ; do(stream)-> (args...)-> stream.emit this, args...
 	
-	emitFilter = (channel, args...) ->
-		return this if off == @_callback.apply channel, args
-		@send arguments
-	emitMap = (channel, args...) ->
-		@send [channel, @_callback.apply channel, args]
-	emitMaps = (channel, args...) ->
-		args = @_callback.apply channel, args
-		@send [channel].concat args
-	emitMapAll = (channel, args...) ->
-		args = @_callback.apply channel, args
-		@send args
-	emitMapTo = (channel) ->
-		@send [channel].concat @_callback
-	emitMapAllTo = (channel) ->
-		@send @_callback
-	emitThen = (channel, args...) ->
-		@_callback.apply channel, args
-		@send arguments
-	emitTimeout = (args) ->
-		setTimeout do(args) => @send args
-		, @_callback
-		this
+	@never: -> new CStream
+	@unit: (args...) -> new CStream.map args...
+	@error: (args...) -> new CStream.error args...
+	@later: (ms, args...) -> new СStream.sleep(ms).emit args...
+	@fromPromise: (promise, args...) -> stream = new CStream; promise args..., stream.emitter(), stream.errorer()
+	
+	constructor: -> @fork = []
+	emitter: -> stream = this ; do(stream)-> (args...)-> stream.emitValue src: this, args: args
+	errorer: -> stream = this ; do(stream)-> (args...)-> stream.emitError src: this, args: args
+	
 	# emitInterval = (channel, args...) ->
 		# setInterval do(channel, args)=>
 			# @_callback.apply channel, args
@@ -956,38 +942,78 @@ class CStream
 		# this
 		
 	
-	send: (args) ->
-		for f in @fork then f.emit.apply f, args
+	send: (channel) ->
+		for f in @fork then f.emitValue.call f, channel
 		this
 		
-	emit: @::send
+	sendError: (channel) ->
+		for f in @fork then f.emitError.call f, channel
+		this
+		
+	emitValue: @::send
+	emitError: @::sendError
+	
+	emit: (args...) -> @emitValue src: null, args: args
+	emitAll: (src, args...) -> @emitValue src: src, args: args
+	
+	emitErrorTo = (channel) -> channel.args = @_callback; @sendError channel
+	error: (args...) -> @transvuierError emitErrorTo, args
+	
+	emitFail = (channel) -> @_callback.apply channel.src, channel.args; @sendError channel
+	fail: (onError) -> @transvuierError emitFail, onError
+	
+	transvuierError: (emit, fn, param) -> @fork.push stream = new (@constructor)(); stream.emitError = emit; stream._callback = fn; (if param then for i of param then stream[i] = param[i]); stream
+	
+	transvuier: (emit, fn, param) -> @fork.push stream = new (@constructor)(); stream.emitValue = emit; stream._callback = fn; (if param then for i of param then stream[i] = param[i]); stream
 	
 	# модифицирующие
-	transvuier: (emit, fn, param) -> @fork.push stream = new (@constructor)(); stream.emit = emit; stream._callback = fn; (if param then for i of param then @[i] = param[i]); stream
-	
+	emitMap = (channel) -> channel.args = [@_callback.apply channel.src, channel.args]; @send channel
+	emitMapTo = (channel) -> channel.args = @_callback; @send channel
 	map: (args...) -> if typeof (map = args[0]) == 'function' then @transvuier emitMap, map else @transvuier emitMapTo, args
+	
+	emitMaps = (channel) ->	channel.args = @_callback.apply channel.src, channel.args; @send channel
 	maps: (args...) -> if typeof (map = args[0]) == 'function' then @transvuier emitMaps, map else @transvuier emitMapTo, args
-	mapWithChannel: (args...) -> if typeof (map = args[0]) == 'function' then @transvuier emitMapAll, map else @transvuier emitMapAllTo, args
 	
+	emitMapAll = (channel) -> args = @_callback.apply channel.src, channel.args; channel.src = args[0]; channel.args = args.slice 1 ; @send channel
+	emitMapAllTo = (channel) -> channel.src = @_callback; channel.args = @_args; @send channel
+	mapAll: (args...) -> if typeof (map = args[0]) == 'function' then @transvuier emitMapAll, map else @transvuier emitMapAllTo, args[0], _args: args.slice 1
 	
+	emitMapChannel = (channel) -> channel.args = [channel, this]; @send channel
+	mapChannel: (map) -> @transvuier emitMapChannel
+	
+	emitFilter = (channel) -> (if @_callback.apply channel.src, channel.args then @send channel); this
 	filter: (filter) -> @transvuier emitFilter, filter
 	
-	sleep: (ms) -> @transvuier emitTimeout, ms
+	emitFilterNot = (channel) -> (unless @_callback.apply channel.src, channel.args then @send channel); this
+	filterNot: (filter) -> @transvuier emitFilterNot, filter
 	
-	#reduce: (args..., fn) -> @transvuier emitMap, 
-	#reduces: 
+	emitSleep = (channel) -> setTimeout (do(channel) => => @send channel), @_callback; this
+	sleep: (ms) -> @transvuier emitSleep, ms
+	
+	emitReduce = (channel) -> @_acc = @_callback.apply channel.src, [@_acc].concat channel.args; channel.args = [@_acc]; @send channel
+	reduce: (arg, fn) -> (if arguments.length == 1 then fn = arg; arg = 0); @transvuier emitReduce, fn, _acc: arg
+	
+	emitSkipDuplicates = (channel) -> (if '_prev' of this and @_prev != channel.args[0] or not '_prev' of this then @_prev = channel.args[0]; @send channel); this
+	emitSkipDuplicatesCmp = (channel) -> (if '_prev' of this and @_callback @_prev, channel.args[0] or not '_prev' of this then @_prev = channel.args[0]; @send channel); this
+	skipDuplicates: (cmp) -> @transvuier (if cmp then emitSkipDuplicatesCmp else emitSkipDuplicates), cmp
 	
 	# связывающие
+	emitThen = (channel) -> @_callback.apply channel.src, channel.args; @send channel
 	then: (onValue) -> @transvuier emitThen, onValue
 	
+	emitFindAssign = (channel) -> CRoot.find(@_object).invoke @_callback, @_args..., channel.args...; @send channel
+	emitAssign = (channel) -> @_object[@_callback] @_args..., channel.args...; @send channel
 	assign: (object, method, args...) ->
-		@transvuier emitThen, if typeof object == 'string'
-			do(object, method, args)-> (args2...)-> CRoot.find(object).invoke method, args..., args2...
-		else
-			do(object, method, args)-> (args2...)-> object[method] args..., args2...
+		@transvuier (if typeof object == 'string' then emitFindAssign else emitAssign), method, _object: object, _args: args
 
 	# объединяющие
 	merge: (streams...) -> @fork.push stream = new (@constructor)(); (for s in streams then s.fork.push stream); stream
+	
+	# ожидает пока все потоки не пришлют значение и объединяет их в массив
+	emitCombine = (channel) -> 
+	combine: (streams...) -> @transvuier emitCombine, null, _streams: streams
+	
+	zip: (streams...) ->
 	
 	# отключающие
 	off: (streams...) -> fork = @fork; (for s in streams when -1 != i=fork.indexOf s then fork.splice i, 1); this
@@ -1599,26 +1625,29 @@ class CWidget
 			for w in q then w.apply this, args
 		@[type]? args...
 		
-	on: (type, listen) ->
+	on: (type, listen, phase) ->
 		@_sendQueue ||= {}
 		for type in $A type 
 			if /^[a-z0-9]+$/.test type then @setHandler type
-			(@_sendQueue['on'+type] ||= []).push listen
+			q = @_sendQueue['on'+type] ||= []
+			if phase then q.unshift listen else q.push listen
 		this
 
+	rmEventAndHandler$ = (type) -> delete @_sendQueue['on'+type]; if /^[a-z]+$/.test type then @removeHandler type
+	rmEvent$ = (type) -> delete @_sendQueue['on'+type]
+	rmHandler$ = rmEventAndHandler$
+		
 	off: (type, listen) ->
-		if arguments.length == 1
-			for type in $A type
-				delete @_sendQueue['on'+type]
-				if /^[a-z0-9]+$/.test type then @removeHandler type
+		unless listen?
+			for type in $A type then rmHandler$.call this, type
 		else if typeof listen != 'function'
 			for type in $A type when ons = @_sendQueue['on'+type]
 				for fn, i in ons when fn._belong == listen then ons.splice i, 1 ; break
-				if ons.length == 0 and /^[a-z0-9]+$/.test type then @removeHandler type
+				if ons.length == 0 then rmHandler$.call this, type
 		else
-			for type in $A type
-				if (ons = @_sendQueue['on'+type]) and -1 != idx=ons.indexOf fn then ons.splice idx, 1
-				if ons.length == 0 and /^[a-z0-9]+$/.test type then @removeHandler type
+			for type in $A type when ons = @_sendQueue['on'+type]
+				if -1 != idx=ons.indexOf listen then ons.splice idx, 1
+				if ons.length == 0 then rmHandler$.call this, type
 		this
 	
 	# export_handlers = {'name-name-name': types}
@@ -1661,13 +1690,13 @@ class CWidget
 		this		
 
 	readyRun$ = 0
-	ready$ = -> (if readyRun$ < 2 then readyRun$ = 2 ; $(window).send 'onReadyDom'); this
+	ready$ = (e) -> (if readyRun$ < 2 then readyRun$ = 2 ; (w=$(window)).send 'onReadyDom'; w.off 'load ReadyDom', ready$); this
 	
 	listens$ =
 		onready_dom: (listener) ->
 			if readyRun$ == 2 then #listener()
 			else 
-				$(window).on 'onReadyDom', listener
+				$(window).on 'ReadyDom', listener
 				if readyRun$ == 0
 					readyRun$ = 1
 					document.addEventListener? "DOMContentLoaded", ready$, false
@@ -1684,6 +1713,7 @@ class CWidget
 		this
 
 	eventStream: (events) -> stream = new CStream; @on events, stream.emitter(); stream
+	observeStream: (events) -> stream = new CStream; @observe events, stream.emitter(); stream
 		
 	setModel: ->
 		if attr = @attr 'model'
@@ -1697,14 +1727,31 @@ class CWidget
 		this
 	setModelOnElements: (elem=@_elements) -> (for e in elem then @byName(e).setModel()); this
 	
-	observe: (dispatch, after, before) -> fn=this[dispatch]; this[dispatch] = if typeof after == 'function' then do(fn)->(args...)-> after.apply this, fn, args...
-	else do(fn, after, before)->
-		if before and after then ((args...)-> if (ret=@send before, args...) instanceof Array then ret[0] else ret=fn.apply this, args; @send after, args...; ret)
-		else if before then (args...)-> (if (ret=@send before, args...) instanceof Array then ret[0] else fn.apply this, args)
-		else if after then (args...)-> ret=fn.apply this, args; @send after, args...; ret
+	observe: (methods, before, after, phase) ->
+		for method in $A methods
+			After = method.ucFirst()
+			onBefore = "on" + Before = "Before"+After
+			onAfter = "on" + After
+			unless '_observe' of @[method]
+				@[method] = fn = do(method, onBefore, onAfter)-> (args...)-> @send onBefore, args...; ret = @constructor::[method].apply this, args; @send onAfter, ret, args...; ret
+				fn._observe = 1
+			if before then @on Before, before, phase
+			if after then @on After, after, phase
+		this
+	shut: (methods, observe) ->
+		rmHandler$ = rmEvent$
+		for method in $A methods when @[method]._observe
+			After = method.ucFirst()
+			onBefore = "on" + Before = "Before"+After
+			onAfter = "on" + After
+			@off Before, observe
+			@off After, observe
+			unless onBefore of @_sendQueue and onAfter of @_sendQueue then delete @[method]
+		rmHandler$ = rmEventAndHandler$
+		this
 	
-	listen: (type, fn, fase) -> @element.addEventListener type, fn, fase || false ; this
-	drop: (type, fn, useCapture) -> @element.removeEventListener type, fn, useCapture || off ; this
+	listen: (type, fn, phase) -> @element.addEventListener type, fn, phase || off ; this
+	drop: (type, fn, phase) -> @element.removeEventListener type, fn, phase || off ; this
 
 	# https://github.com/eduardolundgren/jquery-simulate/blob/master/jquery.simulate.js - симулятор
 	# https://developer.mozilla.org/en-US/docs/Web/API/Event?redirectlocale=en-US&redirectslug=DOM%2Fevent
@@ -1721,7 +1768,7 @@ class CWidget
 			evt = document.createEvent "MouseEvents"
 			extend_uniq e, cancelable: type != "mousemove", relatedTarget: @htm().element, view: @window(), fire_mouse$
 			evt.initMouseEvent type, e.bubbles, e.cancelable, e.view, e.detail, e.screenX, e.screenY, e.clientX, e.clientY, e.ctrlKey, e.altKey, e.shiftKey, e.metaKey, e.button, e.relatedTarget
-		else if /^key(up|down|press)$/.test(type)
+		else if /^key(up|down|press)$/.test type
 			extend_uniq e, view: @window(), fire_key$
 			try
 				evt = document.createEvent "KeyEvents"

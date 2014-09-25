@@ -310,11 +310,13 @@ CTest.extend({
 			if(!(fn = cls.prototype[match[2]])) throw new Error("Нет метода "+match[1]+"::"+match[2])
 			var type = fn.type$ || "$result", s = "В коллекции операция производится "
 			var a = s + 'над первым элементом', m = s + "над всеми элементами"
-			manual += fn.type$===0? "\n\n*Используется и для коллекции*": "\n\n*"+(type==='$result'? a: type==='$any'? a+', а если коллекция пуста - то над CRoot': type==='$range'? m+'. Возвращает новую коллекцию из результатов операций': type==='$join'? m+'. Возвращает объединение строк результатов': type==='$all'? m+'. Возвращает себя': type==='$attr'? 'В коллекции, если аргументов меньше двух или первый элемент не массив, то применяется к первому элементу. Иначе применяется ко всем и возвращает себя': 'Неизвестная операция')+". См. [" + type + "](#CTest-obj-CWidget-"+type+")*";
+			if(cls == CWidget) manual += fn.type$===0? "\n\n*Используется и для коллекции*": "\n\n*"+(type==='$result'? a: type==='$any'? a+', а если коллекция пуста - то над CRoot': type==='$range'? m+'. Возвращает новую коллекцию из результатов операций': type==='$join'? m+'. Возвращает объединение строк результатов': type==='$all'? m+'. Возвращает себя': type==='$attr'? 'В коллекции, если аргументов меньше двух или первый элемент не массив, то применяется к первому элементу. Иначе применяется ко всем и возвращает себя': 'Неизвестная операция')+". См. [" + type + "](#CTest-obj-CWidget-"+type+")*";
 		}
 	
+		match = this.name.match(/^\w+-(\w+)/)
+	
 		print("<div class=markdown>")
-		print( CTest.manual(manual) )
+		print( CTest.manual(manual, match[1]) )
 		print("</div>")
 		
 		print("<div class=comm>Комментариев: </div>")
@@ -350,8 +352,12 @@ CTest.extend({
 	}
 })
 
-CTest.manual = function(manual) {
-	manual = manual.replace(/`[^`]*`|#(!|[\$\w]+)(?:\.([\$\w]+))?/g, function(a, b, c) { if(a[0] == '`' || b == '!') return a; if(!c) {word=c=b; b="CWidget"} else {word=b+"."+c} return "["+word+"](#CTest-obj-"+b+"-"+c+")" })
+CTest.manual = function(manual, cls) {
+	manual = manual.replace(/`[^`]*`|#(!|[\$\w]+)(?:\.([\$\w]+))?/g, function(a, b, c) {
+		if(a[0] == '`' || b == '!') return a
+		if(!c) {word=c=b; b=cls || "CWidget"} else {word=b+"."+c}
+		return "["+word+"](#CTest-obj-"+b+"-"+c+")"
+	})
 	
 	var converter = new Showdown.converter()
 	manual = converter.makeHtml(manual)
