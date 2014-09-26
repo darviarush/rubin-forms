@@ -93,3 +93,4 @@ extend CWidget.prototype,
 			right: x + w = @offsetWidth()
 			width: w
 			height: h
+

@@ -172,7 +172,7 @@ new CTest "obj-CStream-flatMap", """
 	self = this
 	@count 2
 	
-	СStream::exMap = (f) ->
+	CStream::exMap = (f) ->
 		@flatMap (x) ->
 			CStream.unit f(x)
 

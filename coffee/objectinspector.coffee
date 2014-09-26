@@ -27,7 +27,23 @@ class CObjectInspector extends CWidget
 	constructor: ->
 		@wrap(///body///).listen 'click', -> 
 	
+
+
+
+
+class CConsoleWidget extends CFormWidget
+	onCreate: ->
+		@css "position", "fixed"
+		console.log = (args...) => @log.append('<div>'+"info".fontcolor('blue')+": "+escapeHTML(args.join(", "))+'</div>'); @count.inc()
+	count_onclick: -> @log.width @body().clientWidth; @log.toggle()
+	onerror_window: (msg, url, line, dop='') -> (if msg instanceof Object then url=msg.filename; line=msg.lineno; dop=' '+toJSON(msg); msg=msg.message); @log.append('error'.fontcolor('red')+': '+msg+' '+String(url).fontcolor('green')+':'+String(line).fontcolor('royalblue')+dop); @count.inc()
+
 	
-CView.objectinspector = [CObjectInspector, """
+extend CView,
+	console: [CConsoleWidget, """<div id=$+>
+<div id=$-count style='color: red; border:solid 4px gray; width:auto; cursor:pointer'>0</div>
+<div id=$-log style='display:none; background:white; border:solid 4px gray; width: 100%; height: 500px; overflow:auto'></div>
+</div>"""]
+	objectinspector: [CObjectInspector, """
 <>
 """]

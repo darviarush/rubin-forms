@@ -4,6 +4,7 @@ use warnings;
 
 package Rubin::HTTP;
 
+use Term::ANSIColor qw(:constants);
 use Carp qw/verbose/;
 use Socket;
 
@@ -40,12 +41,24 @@ sub accept {
 	#my $sel = IO::Socket->new($_socket);
 	#$sel->add();
 	
-	#my ($vec, $out) = "";
-	#vec($vec, $_socket, 1) = 1;
-	#vec($out, $_socket, 1) = 1;
+	# добавляем в векторы сокет
+	# my ($vec, $out, $err) = ("", "", "");
+	# my $sd = fileno($self->{sd});
+	# vec($vec, $sd, 1) = 1;
+	# vec($out, $sd, 1) = 1;
+	# vec($err, $sd, 1) = 1;
 	
 	my($ns, $keep_alive);
 	for(;;) {
+		
+		#my $nfound = select $vec, undef, undef, undef;
+		#msg CYAN."nfound ".RESET." soc=$self->{sd} vec=$vec ".RED.$nfound.RESET;
+		#$nfound = select undef, $out, undef, undef;
+		#if $nfound == $sd
+		#$nfound = select undef, undef, $err, undef;
+		#next unless defined $nfound;
+		
+		#if $nfound == $sd;
 		
 		my ($HTTP, $ret) = ();
 		$HTTP = <$ns> if $keep_alive;
@@ -57,9 +70,6 @@ sub accept {
 		}
 		
 		main::stat_start() if $::_test;
-		
-		#my $nfound = select $vec, $out, undef, undef;
-		#msg CYAN."nfound ".RESET." soc=$_socket vec=$vec ".RED.$nfound.RESET;
 		
 		if($HTTP =~ m!^(\w+) $::_RE_LOCATION (HTTP\/\d\.\d)\r?$!o) {
 			my($METHOD, $URL, $LOCATION, $ACTION, $ID, $EXT, $SEARCH, $VERSION) = ($1, $2, $3, $4, $5, $6, $7, $8);

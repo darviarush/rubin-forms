@@ -1,13 +1,20 @@
 # for IE < 9 ONLY!
 
 
-# ['Active'].concat('Object').join('X')	
+unless window.XMLHttpRequest then do ->
+	if X = window[(['Active'].concat('Object').join('X'))]
+		for version in ["MSXML2.XMLHttp.5.0", "MSXML2.XMLHttp.4.0", "MSXML2.XMLHttp.3.0", "MSXML2.XMLHttp", "Microsoft.XMLHttp"]
+			try
+				if new (req = X version) then window.XMLHttpRequest = req; break
+			catch
+				null
+	else CInit.require "old"
 
 # CSend
 extend CSend,
 	load_type: 'onreadystatechange'
 	error_type: 'onreadystatechange'
-	readystatechange ->
+	readystatechange: ->
 		if @readyState=='loaded' then @_onreadystatechange_timer = setTimeout (=> @onerror?()), 10
 		if @readyState=='complete'
 			clearTimeout @_onreadystatechange_timer if @_onreadystatechange_timer

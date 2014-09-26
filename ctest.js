@@ -463,6 +463,7 @@ CTest.start = function(url, url_test) {
 
 	CTest.coffee = {}
 	try {
+	
 		var load = CRoot.body().prepend("<div id=CTest-load cloader=CTest-loader action='"+url+"'></div><div id=CTest-loader cview=status style='position:absolute'></div>").first()
 		load.onLoad = function(code) {
 			var coffee = {}
@@ -478,7 +479,7 @@ CTest.start = function(url, url_test) {
 			//CInit.require(url_test)
 		}
 		load.ping({_method: 'GET', _async: false})
-	} catch(e) {}
+	} catch(e) { console.log("not load coffee") }
 }
 
 

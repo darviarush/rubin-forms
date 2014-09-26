@@ -68,7 +68,7 @@
 #- 38. Ввести ret-методы - есть last и first. Может какое-то ret-свойство в котором остаётся значение операции. @append(1).$.text 2
 
 # -----------------------
-# 39. WebSocket и longpull-socket. Заменить FCGI на http
+# 39. WebSocket и longpull-socket. * Заменить FCGI на http
 # 40. Модель через IoRepository - чтобы была соединена с базой
 # 41. RPC (?) - а нужна ли?
 
@@ -102,6 +102,7 @@
 # 73. Отложенное выполнение в модели. Как сработал send - пока из него не выйдет - другие обновления этого ключа не выполняются. А добавляются в очередь и начинают отправляться после. Добавить значение для ключа - нет - очередь будет отправлять для всех значений последовательно, 0 - очередь игнорируется, 1 - выполнится последнее значение из очереди
 
 # Ссылки:
+# http://todomvc.com/ - блог на разных фреймворках
 # http://topobzor.com/13-servisov-dlya-testirovaniya-sajta-v-raznyx-brauzerax/.html - сайты-тестеры
 # http://www.javascripting.com/ - библиотеки js
 # http://habrahabr.ru/post/174987/ - редактор http://ace.c9.io
@@ -349,160 +350,6 @@ CParam =
 	to: (param, sep="&") -> if param instanceof Object then ([escape(key), escape(if val instanceof Object then toJSON val else String(val))].join("=") for key, val of param when val?).join sep else param
 	from: (param, sep=/&/) -> return {} unless param; x={}; (for i in param.split sep then a=i.match /// ([^=]+)=?(.*) ///; x[unescape a[1]]=(if a[2] then unescape a[2] else "")); x
 
-CDate =
-	i18n:
-		month: 'Январ:я|ь,Феврал:я|ь,Март:а|,Апрел:я|ь,Ма:я|й,Июн:я|ь,Июл:я|ь,Август:а|,Сентябр:я|ь,Октябр:я|ь,Ноябр:я|ь,Декабр:я|ь'
-		mon: 'Янв,Фев,Мар,Апр,Май,Июн,Июл,Авг,Сен,Окт,Ноя,Дек'
-		days: 'Воскресенье,Понедельник,Вторник,Среда,Четверг,Пятница,Суббота'
-		day: 'Вс,Пн,Вт,Ср,Чт,Пт,Сб'
-		unit: 'миллисекунд:а|у|ы|,секунд:а|у|ы|,минут:а|у|ы|,час:||а|ов,день|день|дня|дней,недел:я|ю|и|ь|е,месяц:||а|ев|е,год|год|года|лет|году',
-		number: 'од:ин|ну,дв:а|е,три,четыре,пять,шесть,семь,восемь,девять,десять'
-		ampm: 'утра,вечера'
-		ap: 'ут,веч'
-		relative: (n) -> if 5 <= n <= 20 then 3 else if 1 == n % 10 then "" else if 2 <= n % 10 <= 4 then 2 else 3
-
-	masks:
-		format: 'yyyy-mm-dd'
-		timeFormat: 'yyyy-mm-dd HH:MM:ss'
-		
-	format: (format, date = this, i18n = CDate.i18n) ->
-		pad = CMath.pad
-		r = i18n.relative
-		
-		utc = off
-		format = format.replace /^UTC:/, -> utc = on ; ""
-		_ = if utc then "getUTC" else "get"
-		d = date[_ + "Date"]()
-		D = date[_ + "Day"]()
-		m = date[_ + "Month"]()
-		y = date[_ + "FullYear"]()
-		H = date[_ + "Hours"]()
-		M = date[_ + "Minutes"]()
-		s = date[_ + "Seconds"]()
-		L = date[_ + "Milliseconds"]()
-		o = if utc then 0 else date.getTimezoneOffset()
-		
-		token = ///day|mon|month|year|h12|h24|min|sec|msec|d{1,4}|m{1,4}|yy(?:yy)?|([HhMsTt])\1?|[LloSZ]|"[^"]*"|'[^']*'///g
-		timezone = ///\b(?:[PMCEA][SDP]T|(?:Pacific|Mountain|Central|Eastern|Atlantic) (?:Standard|Daylight|Prevailing) Time|(?:GMT|UTC)(?:[-+]\d{4})?)\b///g
-		timezoneClip = ///[^-+\dA-Z]///g
-		
-		
-		flags =
-			d:		d,
-			dd:		pad d
-			ddd:	i18n.day[D]
-			dddd: 	i18n.days[D]
-			day:	i18n["unit"+r d][4]
-			#week:	i18n["unit"+r d][5]
-			m:		m + 1
-			mm:		pad m + 1
-			mmm:	i18n.mon[m]
-			mmmm: 	i18n.month1[m]
-			mon:	i18n.month[m]
-			month:	i18n["unit"+r m][6]
-			yy:		pad y % 100
-			yyyy: 	pad y, 4
-			year:	i18n["unit"+r y][7]
-			h:		H % 12 || 12
-			hh:		pad H % 12 || 12
-			h12:	i18n["unit"+r H % 12][3]
-			H:		H
-			HH:		pad H
-			h24:	i18n["unit"+r H][3]
-			M:		M
-			MM:		pad M
-			min:	i18n["unit"+r M][2]
-			s:		s
-			ss:		pad s
-			sec:	i18n["unit"+r s][1]
-			l:		pad L, 3
-			L:		pad if L > 99 then Math.round L / 10 else L
-			msec:	i18n["unit"+r L][0]
-			t:		i18n.ap[Number H > 12]
-			tt:		i18n.ampm[Number H > 12]
-			T:		i18n.ap[Number H > 12].toUpperCase()
-			TT:		i18n.ampm[Number H > 12].toUpperCase()
-			Z:		if utc then "UTC" else (String(date).match(timezone) || [""]).pop().replace timezoneClip, ""
-			o:		(if o > 0 then "-" else "+") + pad(Math.floor(Math.abs(o) / 60) * 100 + Math.abs(o) % 60, 4)
-			S:		["th", "st", "nd", "rd"][if d % 10 > 3 then 0 else (d % 100 - d % 10 != 10) * d % 10]
-		
-		#for i, k in 'millisecond,second,minute,hour,day,month,year'.split "," then flags[i] = i18n.unit3[k]
-		
-		format.replace token, (a) -> if f=flags[a] then f else a.slice 1, a.length - 1
-		
-	parse_dict: (date, method, s) ->
-		if typeof method == 'string' then date[method] parseInt(r=s.match(/^\d+/)[0]) - Number /Month$/.test method; return r.length
-		x = s.match(/^(?:[a-z]|[\u80-\uFFFF])+/i)[0].toLowerCase()
-		if method instanceof Array then for key in method when key.toLowerCase() == x then return key.length
-		else {f, n, a} = method; n ||= a.length; for key, k in a when key.toLowerCase() == x then (if typeof f == 'function' then f date, k, n else date[f] k % n); return key.length
-		throw "parse_dict: не распознано слово `#{x}` с места `#{s}`"
-	
-	parse: (format, s) ->
-		date = new Date()
-		i18n = CDate.i18n
-		utc = off
-		format = format.replace /^UTC:/, -> utc = on ; ""
-		_ = if utc then "setUTC" else "set"
-		_r =
-			dddd:	i18n.days
-			ddd:	i18n.day
-			dd:		_+'Date'
-			d:		_+'Date'
-			day:	i18n.unitAll
-			mmmm:	a: i18n.month1, f: _+'Month'
-			mmm:	a: i18n.mon, f: _+'Month'
-			mm:		_+'Month'
-			m:		_+'Month'
-			mon:	a: i18n.month, f: _+'Month'
-			month:	i18n.unitAll
-			yyyy:	_+'FullYear'
-			yy:		_+'Year'
-			year:	i18n.unitAll
-			hh:		_+'Hours'
-			h:		_+'Hours'
-			h12:	i18n.unitAll
-			HH:		_+'Hours'
-			H:		_+'Hours'
-			h24:	i18n.unitAll
-			MM:		_+'Minutes'
-			M:		_+'Minutes'
-			min:	i18n.unitAll
-			ss:		_+'Seconds'
-			s:		_+'Seconds'
-			sec:	i18n.unitAll
-			l:		_+'Milliseconds'
-			L:		_+'Milliseconds'
-			msec:	i18n.unitAll
-			tt: 	a: i18n.ampm, f: tt=(date, k) -> (if k then date.setHours date.getHours() + 12); on
-			t:		a: i18n.ap, f: tt
-		parse_dict = CDate.parse_dict
-		try
-			for r in format.split ///(day|mon|month|year|h12|h24|min|sec|msec|[dmyhHMstTlL]+)///
-				s = s.slice if x = _r[r] then parse_dict date, x, s else if r == s.slice 0, r.length then r.length else throw "Распознаваемая дата не соответствует формату #{format} c `#{s}`"
-			date
-		catch e
-			new Date NaN
-
-	set_i18n: (i18n) ->
-		for key, s of i18n when typeof s == 'string'
-			t = [[]]
-			for i, u in s.split ","
-				x=i.split ":"
-				if x.length==1 then x[1] = x[0]; x[0] = ""
-				r = x[1].split "|"
-				if 0 < m = r.length - t.length
-					for j in [0...m] then t.push []
-				for j, k in r then t[k][u] = x[0]+j
-			
-			all = []
-			for r, i in t
-				for j in [0...t[0].length] when !r[j]? then r[j] = t[i-1][j]
-				CDate.i18n[key+if i then i else ""] = r; all = all.concat r
-			CDate.i18n[key+'All'] = all
-		on
-		
-CDate.set_i18n CDate.i18n
-
 
 # https://github.com/gka/chroma.js/blob/master/src/conversions/rgb2lab.coffee
 class CColor
@@ -641,60 +488,51 @@ CCssF =
 		root.window()
 	
 	
-class CInit
-	constructor: (args...) ->
-		if args?[0] instanceof Array then @init args[0]; return
-		for id in args then CRoot.byId id
-		null
-
-	@requires: {}
-	@path: null
-	@check: (path) -> x = not(name of @requires); @requires[path] = 1; x
-	@require: (name) ->
-		if name[0]!='/' then name = @path+'/'+name
-		if @check name+='.js' then document.writeln('\n<script src="'+name+'" type="text/javascript"></script>'); on else off
-	@link: (name, media) ->
-		if name[0] != '/' then path = @path.replace ///\w+$///, 'css'; name = path+'/'+name
-		if @check name+='.css' then document.writeln('\n<link rel="stylesheet" href="'+name+'" type="text/css"'+(if media then ' media="'+media+'"' else '')+'>'); on else off
+CInit =
+	requires: {}
+	path: null
+	pack: []
+	check: (path) -> x = not(name of CInit.requires); CInit.requires[path] = 1 ; x
+	require: (name) ->
+		if name[0]!='/' then name = CInit.path+'/'+name
+		if CInit.check name+='.js' then document.writeln('\n<script src="'+name+'" type="text/javascript"></script>'); on else off
+	link: (name, media) ->
+		if name[0] != '/' then path = CInit.path.replace ///\w+$///, 'css'; name = path+'/'+name
+		if CInit.check name+='.css' then document.writeln('\n<link rel="stylesheet" href="'+name+'" type="text/css"'+(if media then ' media="'+media+'"' else '')+'>'); on else off
 		
-	@init_from_param: ->
+	init_from_param: ->
 		src = if a=document.getElementById "_app_" then a.src else (document.getElementsByTagName('body') || document.getElementsByTagName('head'))[0].innerHTML.match(/// src=['"]?( [^\s'"<>]+ ) [^<>]+> (\s*</\w+>)+ \s* $ ///i)[1].replace(/&amp(?:;|\b)/g, '&')
-		@path = src.replace /// /? [^/]+? \.js\b.*///, ''
+		CInit.path = src.replace /// /? [^/]+? \.js\b.*///, ''
 		param = src.replace /// .*? \? ///, ''
 		param = CParam.get(src)
-		if IE < 9 then (if param.pack then param.pack = "ie,"+param.pack else param.pack = "ie")
-		@param = param
-		@init param
+		if IE < 9 then CInit.require "ie"
+		CInit.param = extend {}, param
+		CInit.init param
 		
-	@init: (param) ->
-		if param.name then window.name = param.name
-		if param.post then @post = param.post
-		if param.url then @url = param.url
-		if 'cssf' of param then CCssF.w CRoot
+	init: (param) ->
+		if param.name then window.name = param.name; delete param.name
+		if param.post then CInit.post = param.post; delete param.post
+		if param.url then CInit.url = param.url; delete param.url
+		if 'cssf' of param then CCssF.w CRoot; delete param.cssf
 		if param.css
-			for i in param.css.split(",") then @link i
+			for i in param.css.split(",") then CInit.link i
+			delete param.css
 		if param.theme == "blueprint"
-			@link "screen", "screen, projection"
-			@link "print", "print"
-			if IE < 8 then @link "ie", "screen, projection"
+			CInit.link "screen", "screen, projection"
+			CInit.link "print", "print"
+			if IE < 8 then CInit.link "ie", "screen, projection"
+			delete param.theme
 		if param.theme == "app"
-			@link "style", "screen, projection"
+			CInit.link "style", "screen, projection"
+			delete param.theme
 		if param.pack
-			for i in param.pack.split(",") then @require i
-		this
+			for i in CInit.pack = param.pack.split(",") then CInit.require i
+			delete param.pack
+		for i of param then throw CRoot.raise "Нет параметра #{i} для инициализации библиотеки"
+		undefined
 
 
-	
-
-unless window.XMLHttpRequest then do ->
-	if X = window[(['Active'].concat('Object').join('X'))]
-		for version in ["MSXML2.XMLHttp.5.0", "MSXML2.XMLHttp.4.0", "MSXML2.XMLHttp.3.0", "MSXML2.XMLHttp", "Microsoft.XMLHttp"]
-			try
-				if new (req = X version) then window.XMLHttpRequest = req; break
-			catch
-				null
-
-	unless window.XMLHttpRequest then CInit.require "old"
+unless window.XMLHttpRequest and not IE then CInit.require "old"
 
 
 class CSocket
@@ -746,11 +584,12 @@ class CLongPoll extends CSocket
 	connect: (url) ->
 		@url = url
 		url = escapeHTML url
+		id_counter = @constructor::id_counter++
 		id = @constructor.className() + 'Emitter' + id_counter
 		CRoot.body().append @form = CRoot.wrap "<form method=POST action='#{url}' target=#{id} accept-charset=utf-8 style='display:none'><textarea name=d></textarea></form>"
 		.append @iframe = CRoot.wrap "<iframe name=#{id} src='about:blank'></iframe>"
 		CRoot.head().append @script = CRoot.wrap "<script src='#{url}?n=#{id_counter}&t=#{new Date().getTime()}' type='text/javascript' charset=utf-8></script>"
-		@sockets[@id_counter = id_counter++] = this
+		@sockets[id_counter] = this
 		this
 	
 	send: (data) ->
@@ -956,11 +795,13 @@ class CStream
 	emit: (args...) -> @emitValue src: null, args: args
 	emitAll: (src, args...) -> @emitValue src: src, args: args
 	
-	emitErrorTo = (channel) -> channel.args = @_callback; @sendError channel
-	error: (args...) -> @transvuierError emitErrorTo, args
+	error: (args...) -> @emitError src: null, args: args
+	errorAll: (src, args...) -> @emitError src: src, args: args
 	
 	emitFail = (channel) -> @_callback.apply channel.src, channel.args; @sendError channel
 	fail: (onError) -> @transvuierError emitFail, onError
+	
+	mapError: -> @transvuierError @send
 	
 	transvuierError: (emit, fn, param) -> @fork.push stream = new (@constructor)(); stream.emitError = emit; stream._callback = fn; (if param then for i of param then stream[i] = param[i]); stream
 	
@@ -974,11 +815,11 @@ class CStream
 	emitMaps = (channel) ->	channel.args = @_callback.apply channel.src, channel.args; @send channel
 	maps: (args...) -> if typeof (map = args[0]) == 'function' then @transvuier emitMaps, map else @transvuier emitMapTo, args
 	
-	emitMapAll = (channel) -> args = @_callback.apply channel.src, channel.args; channel.src = args[0]; channel.args = args.slice 1 ; @send channel
-	emitMapAllTo = (channel) -> channel.src = @_callback; channel.args = @_args; @send channel
+	emitMapAll = (channel) -> @send @_callback channel
+	emitMapAllTo = (channel) -> @send extend channel, @_callback
 	mapAll: (args...) -> if typeof (map = args[0]) == 'function' then @transvuier emitMapAll, map else @transvuier emitMapAllTo, args[0], _args: args.slice 1
 	
-	emitMapChannel = (channel) -> channel.args = [channel, this]; @send channel
+	emitMapChannel = (channel) -> channel.args = [extend {}, channel]; @send channel
 	mapChannel: (map) -> @transvuier emitMapChannel
 	
 	emitFilter = (channel) -> (if @_callback.apply channel.src, channel.args then @send channel); this
@@ -987,15 +828,28 @@ class CStream
 	emitFilterNot = (channel) -> (unless @_callback.apply channel.src, channel.args then @send channel); this
 	filterNot: (filter) -> @transvuier emitFilterNot, filter
 	
-	emitSleep = (channel) -> setTimeout (do(channel) => => @send channel), @_callback; this
-	sleep: (ms) -> @transvuier emitSleep, ms
-	
 	emitReduce = (channel) -> @_acc = @_callback.apply channel.src, [@_acc].concat channel.args; channel.args = [@_acc]; @send channel
 	reduce: (arg, fn) -> (if arguments.length == 1 then fn = arg; arg = 0); @transvuier emitReduce, fn, _acc: arg
 	
 	emitSkipDuplicates = (channel) -> (if '_prev' of this and @_prev != channel.args[0] or not '_prev' of this then @_prev = channel.args[0]; @send channel); this
 	emitSkipDuplicatesCmp = (channel) -> (if '_prev' of this and @_callback @_prev, channel.args[0] or not '_prev' of this then @_prev = channel.args[0]; @send channel); this
 	skipDuplicates: (cmp) -> @transvuier (if cmp then emitSkipDuplicatesCmp else emitSkipDuplicates), cmp
+	
+	emitSleep = (channel) -> setTimeout (do(channel) => => @send channel), @_callback; this
+	sleep: (ms) -> @transvuier emitSleep, ms
+	
+	emitSkip = (channel) -> (if @_skip < t = new Date().getTime() then @_skip = t+@_callback; @send channel); this
+	skip: (ms) -> @transvuier emitSkip, ms, _skip: 0
+	
+	emitSkipCount = (channel) -> (unless @_count-- then @_count = @_callback; @send channel); this
+	skipN: (n) -> @transvuier emitSkipCount, n, _count: n
+	
+	
+	emitFlatMap: (channel) -> stream = @_callback.apply channel.src, channel.args; stream.fork = @fork; stream.emitValue channel; this
+	flatMap: (map) -> @transvuier emitFlatMap, map
+	
+	emitFlatMapLast: (channel) -> stream = @_callback.apply channel.src, channel.args; stream.fork = @fork; (if stream._Box then stream.emitValue stream._Box); (if stream._Error then stream.emitError stream._Error); this
+	flatMapLast: (map) -> @transvuier emitFlatMapLast, map
 	
 	# связывающие
 	emitThen = (channel) -> @_callback.apply channel.src, channel.args; @send channel
@@ -1010,11 +864,32 @@ class CStream
 	merge: (streams...) -> @fork.push stream = new (@constructor)(); (for s in streams then s.fork.push stream); stream
 	
 	# ожидает пока все потоки не пришлют значение и объединяет их в массив
-	emitCombine = (channel) -> 
-	combine: (streams...) -> @transvuier emitCombine, null, _streams: streams
+	mapCombine = (channel) -> channel.idx = @_callback; @send channel
+	emitCombine = (channel) ->
+		(q = @_queue[channel.idx]).push channel
+		#delete channel.idx
+		if q.length == 0
+			@_len++
+			if @_len == @_queue.length-1
+				args = []
+				for q in @_queue
+					args.push q.shift().args[0]
+					if q.length == 0 then @_len--
+				@send src: channel.src, args: args
+		
+	combine: (streams...) ->
+		streams.unshift this
+		len = streams.length
+		streams = (for s, i in streams then s.transvuier mapCombine, i)
+		stream = streams.shift()
+		stream = stream.merge sreams
+		stream.emitValue = emitCombine
+		stream._queue = q = []
+		for i in [0...len] then q.push []
+		stream
 	
 	zip: (streams...) ->
-	
+
 	# отключающие
 	off: (streams...) -> fork = @fork; (for s in streams when -1 != i=fork.indexOf s then fork.splice i, 1); this
 	
@@ -1559,10 +1434,10 @@ class CWidget
 		replaceState$ = pushState$
 		gotoState$ = (w, n) -> w.location.hash = "#"+w.history$[w.history_pos$+=n][0]
 		
-	init_his$ = (w) -> unless w.history$ then w.history$ = [[w.location.href, w.document.title]]; w.history_pos$ = 0
+	init_his$ = (w) -> w.history$ = [[w.location.href, w.document.title, null]]; w.history_pos$ = 0 ; w.history_before$ = w.history.length
 	
 	navigate: (args...) ->
-		init_his$ w=@window()
+		init_his$ w unless (w=@window()).history$
 		if arguments.length
 			if args[0] instanceof Array then return w.history$[w.history_pos$+args[0][0]]
 			if typeof args[0] == 'number' then n = args.shift()
@@ -1580,8 +1455,7 @@ class CWidget
 		else w.history$[w.history_pos$]
 	
 	history: (n) ->
-		init_his$ w = @window()
-		unless w.history$ then w.history$ = [[w.location.href, w.document.title, null]]; w.history_pos$ = 0
+		init_his$ w unless (w=@window()).history$
 		if arguments.length == 0 then w.history$[w.history_pos$]
 		else if typeof n == 'number' then w.history$[w.history_pos$+n]
 		else if n == on then w.history_pos$
@@ -1594,7 +1468,16 @@ class CWidget
 				if --i>=0 and h[i][0] == n then return i
 				if ++j<len and h[j][0] == n then return j
 			return null
-		
+	
+	change_history: (data) ->
+		w = @window()
+		if w.history.length + 1 == w.history$.length + w.history_before$ then w.history$.push [w.location.href, w.document.title, data]
+		else if w.history.length == w.history$.length + w.history_before$
+			if null == n = @history w.location.href then throw @raise "Невозможно определить позицию в истории - нет текущего url `#{w.location.href}`"
+			w.history_pos$ = n
+		else
+			w.histoey-pos$ = w.history$.length + w.history_before$ - w.history.length
+		this
 
 	# методы работы с cookie
 	cookie: (name, value, props) ->
@@ -1714,7 +1597,8 @@ class CWidget
 
 	eventStream: (events) -> stream = new CStream; @on events, stream.emitter(); stream
 	observeStream: (events) -> stream = new CStream; @observe events, stream.emitter(); stream
-		
+	ajaxStream: -> stream = new CStream; @on 'Load', stream.emitter(); @on 'Error', stream.errorer(); stream
+
 	setModel: ->
 		if attr = @attr 'model'
 			[model, slot, type] = attr.split /:/
@@ -2479,6 +2363,8 @@ class CWidget
 	
 	# http://learn.javascript.ru/metrics-window
 	# http://javascript.ru/ui/offset
+	
+	unless div$.getBoundingClientRect then CInit.require 'old'
 	
 	viewPos: -> @element.getBoundingClientRect()
 	# возвращает прямоугольники в к-х расположена нода
@@ -3251,164 +3137,6 @@ class CSortableWidget extends CListWidget
 			if @_sortable_prev != sort.prev() then @send "onSorted", sort, @_sortable_prev
 			@_sortable_css = @_void = @_distance_x = @_distance_y = @_sortable_prev = null
 	
-	
-class CMonthWidget extends CWidget
-	config:
-		firstWeekDay: 1
-		vertical: 0
-	
-	create: (date) ->
-		year = date.getFullYear()
-		month = date.getMonth()
-		i18n = CDate.i18n
-		
-		cur = new Date year, month, 1
-		k = 1-cur.getDay()-(conf=@config).firstWeekDay*6
-		
-		matrix = @tab row: 7, col: 7
-		for td, i in matrix[0] then td.html(i18n.day[i]).addClass 'c-week'
-		
-		cday = date.getDate()
-		@_days = days = {}
-		
-		for i in [1...7]
-			for j in [0...7]
-				cur = new Date year, month, k++
-				day = matrix[i][j]
-				day.text dcur = cur.getDate()
-				day.element._$date = cur
-				days[year+'-'+cur.getMonth()+'-'+dcur] = day
-				if cur.getMonth() != month then day.addClass 'c-othermon'
-				else if cday == dcur then day.addClass 'c-current'
-		
-		if conf.vertical then @tab cells: CMath.transpose matrix
-		this
-		
-	byDate: (date) -> @_days[date.getFullYear()+'-'+date.getMonth()+'-'+date.getDate()]
-
-
-class CCalendarWidget extends CFormWidget
-	config:
-		format: 'yyyy-mm-dd'
-		timeFormat: 'yyyy-mm-dd HH:MM:ss'
-		
-	create: (date) ->
-		@_date = date
-		@mon.html CDate.i18n.month[date.getMonth()]
-		@year.html date.getFullYear()
-		@month.create date
-		this
-
-	inc_year: (inc, handlerName) -> @to_year @_date.getFullYear() + inc, handlerName
-	inc_month: (inc, handlerName) -> @to_month @_date.getMonth() + inc, handlerName	
-	to_year: (year, handlerName = 'onYear') -> date=@_date; date.setFullYear year; (if off != @send handlerName, date then @create date); off
-	to_month: (mon) -> date=@_date; date.setMonth mon; (if off != @send "onMonth", date then @create date); off
-	to_date: (date) -> (if off != @send "onDate", date then (if date.getYear() == @_date.getYear() and date.getMonth() == @_date.getMonth() then c='c-current'; @byDate().removeClass c; @byDate(@_date = date).addClass c else @create date)); this
-	byDate: (date = @_date) -> @month.byDate date
-	#date: (args...) -> @month.date args...
-
-	getTargetDate: (e) -> t=e.target(); all = t.union(t.upAll())._all; d = all[all.indexOf(@month.element)-3]._$date; u=@_date;	new Date d.getFullYear(), d.getMonth(), d.getDate(), u.getHours(), u.getMinutes(), u.getSeconds(), u.getMilliseconds()
-
-	larr_onclick: -> @inc_month -1
-	rarr_onclick: -> @inc_month 1
-	mon_onclick: -> @open 'year'
-	year_onclick: (e) -> e.stop(); @open 'years'
-	month_onclick: (e) -> @to_date @getTargetDate e
-
-	open: (type) ->
-		css = @css ['width', 'height']
-		css.position = 'absolute'
-		x = @wrap("<table id=#{@id()}_#{type} cview=calendar ctype="+type+"></table>").create(@_date).prependTo(@larr).css css
-		x.mon.remove()
-		x.month.css(width: '100%', height: '100%').up().attr 'colspan', 3
-		x._calendar = this
-		x.onMonth = x.onYear = (date) -> @_calendar.create date; @free(); off
-		this
-	
-	input: (@_input, format) -> @conf format: format if format; @body().append this.create (if isNaN date = CDate.parse @config.format, @_input.val() then new Date() else date); @position @_input, 'bottom', 'right'
-	timeInput: (@_timeInput, format) -> @conf timeFormat: format if format; @input @_timeInput; @_input = null ; this
-	onDate: (date) ->
-		if @_input then @_input.val(CDate.format @config.format, date).send 'onDate', date; @free()
-		if @_timeInput then @free(); @_timeInput.val CDate.format @config.timeFormat, date; @wrap("<div cview=clock></div>").input(@_timeInput, @config.timeFormat)
-		this
-		
-
-class CYearWidget extends CCalendarWidget
-	create: (date) ->
-		@_date = date
-		mon = CDate.i18n.mon
-		@year.html year = date.getFullYear()
-		day = date.getDate()
-		for w, i in tds = @wrap(@month.tab row: 3, col: 4).items() then w.element._$date = new Date year, i, day; w.html mon[i]
-		tds[date.getMonth()].addClass 'c-current'	
-		this
-
-	larr_onclick: (e) -> e.stop(); @inc_year -1
-	rarr_onclick: (e) -> e.stop(); @inc_year 1
-	month_onclick: (e) -> e.stop(); @to_month @getTargetDate(e).getMonth()
-	
-
-class CYearsWidget extends CCalendarWidget
-	create: (date) ->
-		@_date = date
-		cur = date.getFullYear()
-		begin = year = parseInt(cur / 20) * 20
-		month = date.getMonth()
-		day = date.getDate()
-		for w, i in tds = @wrap(@month.tab row: 4, col: 5).items() then w.html year; w.element._$date = new Date year++, month, day
-		tds[cur-begin].addClass 'c-current'
-		@year.html begin+' - '+(begin+19)
-		this
-		
-	larr_onclick: (e) -> e.stop(); @inc_year -20, 'onYears'
-	rarr_onclick: (e) -> e.stop(); @inc_year 20, 'onYears'
-	year_onclick: (e) -> e.stop()
-	month_onclick: (e) -> e.stop(); @to_year @getTargetDate(e).getFullYear()
-
-
-class CClockWidget extends CFormWidget
-	config:
-		format: 'd mon yyyy'
-		timeFormat: 'HH:MM:ss'
-		inputFormat: 'yyyy-mm-dd HH:MM:ss'
-	create: (date) ->
-		hours = @$hours.tab row: 2, col: 12
-		for cell, i in hours[0] then cell.html i; hours[1][i].html i+12
-		minsec = @$minsec.tab row: 2, col: 16
-		for cell, i in minsec[0] then j=(if i<6 then i else i-6); cell.html j; minsec[1][i].html j
-		
-		@date date
-		@$minsec.tab(0, 6).union(@$minsec.tab(1, 6)).addClass 'c-zero'
-		this
-		
-	clock: (date) -> @$clock.html CDate.format @config.timeFormat, date ; this
-	date: (date) ->
-		if arguments.length
-			@_date = date
-			@$date.html CDate.format @config.format, date
-			@clock date
-			@hours date.getHours()
-			@min date.getMinutes()
-			@sec date.getSeconds()
-			this
-		else
-			@_date
-	
-	hours: (h) -> if arguments.length then @wrap(@$hours.tab {}).removeClass 'c-current'; @$hours.tab(Number(h>12), h % 12).addClass 'c-current'; this else @$hours.first('.c-current').prevAll().length
-	getUnit: (w) -> x = w.find '.c-current'; x.item(0).prevAll().length*10 + x.item(1).prevAll().length - 6
-	setUnit: (m, w) -> w.child().removeClass 'c-current'; w.child(parseInt m / 10).union(w.child 6 + m % 10).addClass 'c-current'; this
-	min: (min) -> m = @$minsec.byTag 'tr'; if arguments.length then @setUnit min, m else @getUnit m
-	sec: (sec) -> m = @$minsec.byTagAll('tr').item(1); if arguments.length then @setUnit sec, m else @getUnit m
-		
-	date_onclick: -> @wrap("<table cview=calendar></table>").input(@$date, @config.format).create @_date
-	date_onDate: (date) -> @date date
-	getTarget: (e, w) -> t=e.target(); all = t.union(t.upAll())._all; @wrap all[all.indexOf(w.element)-3]
-	hours_onclick: (e) -> (date=@_date).setHours (t=@getTarget e, @$hours).prevAll().length + t.up().prevAll().length*12 ; @hours date.getHours(); @clock date
-	minsec_onclick: (e) -> t=@getTarget e, @$minsec; unit=(if t.up().prev() then 'sec' else 'min'); m=this[unit](); this[unit] n = (if 6 > n = t.prevAll().length then n * 10 + m % 10 else n - 6 + parseInt(m / 10) * 10); @_date['set'+(if unit=='min' then 'Minutes' else 'Seconds')] n; @clock @_date
-	
-	input: (@_input, date, format) -> @$apply.show(); @conf inputFormat: format if format; @body().append @create (if isNaN date = CDate.parse @config.inputFormat, @_input.val() then new Date() else date); @position @_input, 'bottom', 'right'
-	apply_onclick: -> @_input.val(CDate.format @config.inputFormat, @_date).send 'onDate'; @free(); off
-	
 
 class CModalWidget extends CFormWidget
 	zIndex = 1500000
@@ -3528,59 +3256,6 @@ class CTipFocusWidget extends CTooltipWidget
 	#for ie: onfocus_parent: @::onfocusin
 	#onblur_parent: @::onfocusout
 
-
-class CSelectMenuWidget extends CMenuWidget
-	# main; menu ctype=menu; cvalue; main указывает на выбранный элемент, value - выбранное значение
-	onCreate: -> @menu.css 'position', 'absolute'; if value=@attr 'cvalue' then @setByValue value else @setByIndex 0
-	byValue: (value) -> (for ch, i in @menu.child() when value==ch.attr 'cvalue' then return i); null
-	setByValue: (value) -> @setByIndex @byValue value; this
-	setByIndex: (i) -> @set @menu.down i
-	set: (option) -> (if option then option.activate(); @value = option.attr('cvalue') || option.text(); @main.html('').append option.clone @main.id()); this
-	main_onclick: -> @menu.toggle(); off
-	menu_onActivate: (frame) -> @menu.toggle(); @set frame; off
-	
-
-class CRangeWidget extends CFormWidget
-	style$ = left: 'left', offsetX: 'offsetX', mid: 'mid', offsetWidth: 'offsetWidth'
-	style_vertical$ = left: 'top', offsetX: 'offsetY', mid: 'center', offsetWidth: 'offsetHeight'
-
-	pos$ = (k) -> (if off != @send 'onBeforeChange', k then val=@val(); @range.relative this, @_pos.mid, k, 'before', 'before'; @send 'onChange', val); this
-	
-	onCreate: ->
-		@_min = parseFloat @attr("min") || 0 ; @_max = parseFloat @attr("max") || 100 ; @_step = parseFloat @attr("step") || 1
-		@_pos = if @attr "cvertical" then style_vertical$ else style$
-		@val @_min
-		
-	onmousemove: (e) -> if e.left and e.target() == this then pos$.call this, e[@_pos.offsetX]() / this[@_pos.offsetWidth]()
-	onclick: @::onmousemove
-	val: (val) ->
-		if arguments.length then pos$.call this, val / ((@_max-@_min) / @_step)
-		else @_min + @range.px('margin-'+@_pos.left) / (this[@_pos.offsetWidth]() - @range[@_pos.offsetWidth]()) * ((@_max-@_min) / @_step)
-	
-	
-class CIntervalRangeWidget extends CRangeWidget
-	onCreate: -> super ; @r_width 0 ; this
-	position: (pos) ->
-		pos = Math.round pos
-		###if pos <= lf=@r_left() then @r_left pos; @r_width lf-pos+@r_width()
-		else if pos => lf + w=@r_width() then @r_width pos-lf
-		else if pos <= lf + w/2 then @r_left pos; @r_width w-pos+lf
-		else @r_width w-pos+lf###
-		this
-	#val: (val) -> if arguments.length then @position (@_max-@_min) / @_step * val else @position() / ((@_max-@_min) / @_step)
-	
-	
-class CIntervalWidget extends CFormWidget
-	# from, to, range
-
-
-class CConsoleWidget extends CFormWidget
-	onCreate: ->
-		@css "position", "fixed"
-		console.log = (args...) => @log.append('<div>'+"info".fontcolor('blue')+": "+escapeHTML(args.join(", "))+'</div>'); @count.inc()
-	count_onclick: -> @log.width @body().clientWidth; @log.toggle()
-	onerror_window: (msg, url, line, dop='') -> (if msg instanceof Object then url=msg.filename; line=msg.lineno; dop=' '+toJSON(msg); msg=msg.message); @log.append('error'.fontcolor('red')+': '+msg+' '+String(url).fontcolor('green')+':'+String(line).fontcolor('royalblue')+dop); @count.inc()
-
 		
 # загрузчики
 class CLoaderWidget extends CWidget
@@ -3629,7 +3304,7 @@ class CLoaderWidget extends CWidget
 		
 		if type == 'submit'
 			url = CUrl.from url
-			layout = if not url.pathname or not param._history and url.pathname == @document().location.pathname then '' else url.pathname
+			layout = if not url.pathname or not param._no_history and url.pathname == @document().location.pathname then '' else url.pathname
 			url.param._layout_ = layout.replace /^\/(.)/, "$1" if layout
 			if url.hash then url.param._layout_id_ = url.hash; url.hash = ""
 			url.pathname = "/frames"
@@ -3645,8 +3320,8 @@ class CLoaderWidget extends CWidget
 		
 		for key of param when key[0] == '$' then headers[key.slice(1).upFirst()] = param[key]; delete param[key]
 			
-		extend @request, timer: timer, request: request, headers: headers, history: param._history, url: url, customer: (if t = customer.attr 'target' then @byId t else customer)
-		delete param._history
+		extend @request, timer: timer, request: request, headers: headers, history: param._no_history, url: url, customer: (if t = customer.attr 'target' then @byId t else customer)
+		delete param._no_history
 		
 		params = if method != "POST" then (if params then url = CUrl.from url; extend url.param, param; url = CUrl.to url); null
 		else if CInit.post == 'json' then toJSON param
@@ -3712,7 +3387,12 @@ class CLoaderWidget extends CWidget
 		@request.customer.tooltip ctype: 'tooltip', close: 1, html: "<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка</h3>"+error, open: 1, timeout: 5000, class: 'c-error'
 	
 	submit_manipulate: (data) ->
-		data = fromJSON data if typeof data == 'string'
+		
+		#data = data.split /<!(\w*)>/
+		#pages = {}
+		#for i in [1...data.length] then pages[] = 
+		
+		data = fromJSON data
 		if stash = data['@stash'] then extend CTemplate._STASH, stash
 		if layout = data['@layout']
 			for i in [1...layout.length]
@@ -3788,27 +3468,19 @@ class CRouterWidget extends CWidget
 	
 	# history.length
 	pop$ = (e) ->
-		[old] = @history()
+		@history_change()
 		href = @window().location.href
-		if (pos = @history href)? then @window.history_pos$ = pos
-		prev = href.replace ///\#.*$///, ''
-		#say 'popstate', href, old, pos, e
-		if prev_url$ != prev then @submit _act: href, _history: 1
-		prev_url$ = prev
-		this
-
+		href = href.replace ///\#.*$///, ''
+		# # say 'popstate', href, old, pos, e
+		if prev_url$ != href then @_no_history = 1 ; @submit _act: href, _no_history: 1
+		prev_url$ = href
+		
 	onhashchange_window: pop$
 	onpopstate_window: pop$
 
 
 CView =
-	calendar: [CCalendarWidget, '''<thead><tr><td id=$-larr class=c-arr>&larr;<td id=$-mon class=c-mon><td id=$-year class=c-year><td id=$-rarr class=c-arr>&rarr;</thead><tbody><tr><td colspan=4><table id=$-month ctype=month class=c-month></table></tbody>''', class: 'c-calendar']
-	clock: [CClockWidget, '''<div id=$-date class=c-date></div><div id=$-clock class=c-head></div><table id=$-hours class=c-hours></table><table id=$-minsec class=c-minsec></table><div><a href="#" id=$-apply class=c-apply style='display:none'>Ок</a></div>''', class: 'c-clock']
 	modal: [CCenterModalWidget, '''<div id=$-fg class='$class' style='$style'>$&</div>''']
-	select: [CSelectWidget, '''
-<div id=$-main></div>
-<div id=$-menu ctype=menu>$&</div>
-''']
 	loading: [CLoaderWidget, '''
 <div id=$-error style='display:none'></div>
 <img id=$-preloader src='/img/fanding_lines.gif'>
@@ -3821,14 +3493,6 @@ CView =
 <img src="img/loader_error.gif"> #error_msg
 </div>
 ''']
-	range: [CRangeWidget, """<div id=$-range></div>""", class: 'c-range']
-	'interval-range': [CIntervalRangeWidget, """<div id=$-range></div>""", class: 'c-interval-range']
-	interval: [CIntervalWidget, """<input id=$-from type=text> <input id=$-to type=text> <div id=$-range class=c-interval-range ctype=interval-range><div id=$-range-range>&nbsp;</div></div>"""]
-	console: [CConsoleWidget, """<div id=$+>
-<div id=$-count style='color: red; border:solid 4px gray; width:auto; cursor:pointer'>0</div>
-<div id=$-log style='display:none; background:white; border:solid 4px gray; width: 100%; height: 500px; overflow:auto'></div>
-</div>"""]
 	
-
-
+	
 CRoot.initialize()

@@ -132,14 +132,13 @@ sub lord {
 	$dbh = undef; # чтобы не закрылась через dbh_connect
 	dbh_connect();	# своё подключение к БД
 	$_socket->bind;	# инициализируемся в новом треде
-	$_socket->accept(\&ritter);
+	$_socket->accept($_site->{ext}? \&tan: \&ritter);
 }
 
-# Подчинённый обработчик запросов
-sub ritter {
-	@_HEAD = ("Content-Type: text/html; charset=utf-8");
-	
+# Обработчик с файлами
+sub tan {
 	if(defined $_EXT) {
+		@_HEAD = ("Content-Type: text/html; charset=utf-8");
 		$_EXT = lc $_EXT;
 		my $res;
 		eval {
@@ -151,6 +150,13 @@ sub ritter {
 		content($_MIME{$_EXT} // "text/plain");
 		return [200, \@_HEAD, $res];
 	}
+	
+	ritter();
+}
+
+# Подчинённый обработчик запросов
+sub ritter {
+	@_HEAD = ("Content-Type: text/html; charset=utf-8");
 	
 	%_frames = ();
 	my @ret = ();
