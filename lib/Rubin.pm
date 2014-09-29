@@ -210,13 +210,59 @@ sub bind {
 	my ($self) = @_;
 }
 
+# http://perl5doc.ru/cpan/PSGI
 sub accept {
 	my ($self, $app) = @_;
 	$main::app = (sub {
 		return sub {
+			my $env = shift;
+			
+			my ($URL, $LOCATION, $ACTION, $ID, $EXT, $SEARCH) = $env->{REQUEST_URI} =~ /^$::_RE_LOCATION$/;
+			
+			$main::_METHOD = $env->{REQUEST_METHOD};
+			$main::_URL = $URL;
+			$main::_LOCATION = $LOCATION;
+			$main::_action = $ACTION;
+			$main::_id = $ID;
+			$main::_EXT = $EXT;
+			$main::_VERSION = $env->{SERVER_PROTOCOL};
+			
+			$SEARCH //= $env->{QUERY_STRING};
+			
+			
+			
+			# считываем заголовки
+			while(my($key, $val) = each %$env) {
+				if($key =~ s/^HTTP_//) {
+					$key = lc $key;
+					$key =~ s/_(\w)/"-".ucFirst $1/ge;
+					$main::_HEAD->{ucFirst $key} = $val;
+				}
+			}
+			
+			$main::_HEAD->{"Content-Length"} = my $CONTENT_LENGTH = $env->{CONTENT_LENGTH};
+			$main::_HEAD->{"Content-Type"} = $env->{CONTENT_TYPE};
+			
+			# считываем данные
+			$main::_GET = Utils::param($SEARCH);
+			if($CONTENT_LENGTH) {
+				my $f;
+				my $body = $main::_HEAD->{'Request-Body-File'}
+				$main::_POST = Utils::param_from_post($body? do {
+					open $f, $body or die "NOT OPEN REQUEST_BODY_FILE=$body $!"; $f
+				}: $env->{"psgi.input"}, $main::_HEAD->{'Content-Type'}, $CONTENT_LENGTH);
+				close $f if defined $f;
+				$main::param = { %$main::_POST, %$main::_GET };
+			}
+			else {
+				$main::param = $main::_GET;
+			}
+			$main::_COOKIE = Utils::param($main::_HEAD->{"Cookie"}, qr/;\s*/);
+			
 			my $ret = $app->();
 			my ($status, $head, $out) = @$ret;
-			
+			$head = [map { /:\s*/; ($`, $') } @$head];
+			[$status, $head, $out]
 		}
 	})->($app);
 }

@@ -439,6 +439,15 @@ CMath =
 		for k in b then j++
 		i == j
 	
+	# http://habrahabr.ru/company/nordavind/blog/209462/
+	# http://htmlbook.ru/css/transition-timing-function
+	cubicBezier: (p0, p1, p2, p3) -> do(p0, p1, p2, p3)-> (t)-> t_1=1-t; t2_1 = t_1*t_1; t3_1=t2_1*t_1; t2=t*t; t3=t2*t; t3_1*p0 + 3*t*t2_1*p1 + 3*t2*t_1*p2 + t3*p3
+	
+	ease: cubicBezier 0.25,0.1,0.25,1
+	ease_In: cubicBezier 0.42,0,1,1
+	ease_Out: cubicBezier 0,0,0.58,1
+	ease_InOut: cubicBezier 0.42,0,0.58,1
+	
 	easeIn: (transition, pos, args...) -> transition(pos, args...)
 	easeOut: (transition, pos, args...) -> 1 - transition 1 - pos, args...
 	easeInOut: (transition, pos, args...) -> (if pos <= 0.5 then transition 2 * pos, args... else 2 - transition 2 * (1 - pos), args...) / 2
