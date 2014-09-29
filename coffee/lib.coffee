@@ -14,7 +14,7 @@
 # 11. drag&drop on CListWidget
 
 #- 12. CSend всегда возвращает false. Другое значение можно передать по event.ret - в coffeescript всё равно нужно следить за возвратом после массива
-# act='onclick: load; onkeydown: submit; onmousemove: save' - отправляет хандлер на любую функцию
+#- act='onclick: load; onkeydown: submit; onmousemove: save' - отправляет хандлер на любую функцию
 #- inject и create - не соотвествуют философии
 #* 13. attr, css, prop могут принимать {}
 #* 14. onload, onerror на CImgWidget
@@ -85,23 +85,25 @@
 # -----------------------
 # 48. сделать в CInit параметр для создания стилей .w\d+ и .mobile, .pad, .computer
 # 49. @submit - как в обычной форме. Предусмотреть target=id
-#- 50. предусмотреть изменение при изменении формы и url-а
+# 50. предусмотреть изменение при изменении формы и url-а
 # 60. Локализация (перевод) на другие языки
-# 61. accept в div-ах
+#? 61. accept в div-ах
 # 62. Взять для описания документации из http://enepomnyaschih.github.io/jwidget/1.0/index.html#!/guide/ruphilosophy и подправить
-# 63. узнать произошло ли изменение адреса из history или добавлением элемента через history.length - она увеличится, а если позиция истории - посредине - уменьшиться при добавлении. Иначе - она в истории
-# 64. @init id, ... - регистрирует объект в массиве и привязывает его при пересоздании страниц
+#* 63. узнать произошло ли изменение адреса из history или добавлением элемента через history.length - она увеличится, а если позиция истории - посредине - уменьшиться при добавлении. Иначе - она в истории
+#* 64. @init id, ... - регистрирует объект в массиве и привязывает его при пересоздании страниц
 # 65. Добавить в темплейт выделение в функцию {% def fn $x, $y, $z %} $x $y $z {% end def %}   Использование: $"fn":print(1,2,3)
-# 66. Оптимизировать send и добавить очередь слушателей, которые должны иметь метод emit
-# 67. CListen заменить на слушатели виджетов $(window) и $(document)
-# 68. Добавить потоки
+#* 66. Оптимизировать send и добавить очередь слушателей, которые должны иметь метод emit - вместо слушателей - замыкания с _belong указывающим на поместившего замыкание в очередь объект
+#* 67. CListen заменить на слушатели виджетов $(window) и $(document)
+#* 68. Добавить потоки
 # 69. Переделать animate
-# 70. В модель добавить функции для сравнения данных
-# 71. Переопределить __bind на нормальное наследование метаклассов
+#* 70. В модель добавить функции для сравнения данных
+#- 71. Переопределить __bind на нормальное наследование метаклассов - невозможно
 # 72. Протестировать удаление элементов из памяти, так как все они имеют перекрёстные ссылки
 # 73. Отложенное выполнение в модели. Как сработал send - пока из него не выйдет - другие обновления этого ключа не выполняются. А добавляются в очередь и начинают отправляться после. Добавить значение для ключа - нет - очередь будет отправлять для всех значений последовательно, 0 - очередь игнорируется, 1 - выполнится последнее значение из очереди
 
 # Ссылки:
+# http://docs.ractivejs.org/latest/observers - фреймворк с моделью данных и темплейтами
+# http://jsfiddle.net/C3WeM/5/ - анимация основанная на css3 - http://habrahabr.ru/post/209140/
 # http://todomvc.com/ - блог на разных фреймворках
 # http://topobzor.com/13-servisov-dlya-testirovaniya-sajta-v-raznyx-brauzerax/.html - сайты-тестеры
 # http://www.javascripting.com/ - библиотеки js
@@ -608,76 +610,6 @@ class CLongPoll extends CSocket
 	# onMessage: (data) -> 
 	# eval: (code) -> @emit act: 'eval', code: code
 	# call: ()
-	
-
-CListen =
-	listens:
-		document:
-			mousedown: [(e) -> which=e.event.which; p = CEvent.prototype; (if which == 1 then p.left = on); (if which == 2 then p.mid = on); (if which == 3 then p.right = on)]
-			mouseup: [(e) -> which=e.event.which; p = CEvent.prototype; (if which == 1 then p.left = off); (if which == 2 then p.mid = off); (if which == 3 then p.right = off)]
-	
-	listen: (who, type) -> do(who, type)-> (args...) -> (if typeof args[0] == 'object' then args[0] = new CEvent args[0], 'on'+type+'_'+who); (for widget in CListen.listens[who][type] then (if typeof widget == 'function' then widget args... else widget.send args[0].type, args...)); on
-	
-	add: (type_who, arg) -> match = type_who.match ///^ on(\w+)_(\w+) $///; CListen.setListen.call arg, match[1], match[2]
-	
-	putListen: (type, who) ->
-		ln = CListen.listen who, type
-		t = "on"+type
-		w = if typeof this == 'function' then CRoot else this
-		
-		if set = CListen[type+'_'+who] then set.call w, ln
-		else if who == "window" and t of (win = w.window()) then win[t] = ln
-		else if who == "document" and t of (doc=w.document()) then doc[t] = ln
-		else throw @raise "Нет такого обработчика on"+type+"_"+who
-		undefined
-		
-	setListen: (type, who) ->
-		if who == 'parent' then return
-		unless listen = (listens=CListen.listens)[who] then listen = listens[who] = {}
-		if ls = listen[type] then ls.push this
-		else CListen.putListen.call this, type, who; listen[type]=[this]
-		undefined
-		
-	erase: (type, who, w) ->
-		if who_ = CListen.listens[who]
-			if type_ = who_[type]
-				for i in type_ when i == w
-					if type_.length == 1
-						delete who_[type]
-						if erase = CListen[type+'_'+who+'__'+erase] then erase()
-						else if who == "window" then w.window()["on"+type] = ->
-						else if who == "document" then w.document()["on"+type] = ->
-					else type_.splice i, 1
-					return on
-		undefined
-		
-	clean: ->
-		for _who, who of CListen.listens
-			for _type, type of who 
-				who[type] = for widget in type when typeof widget == 'function' or document.contains widget then widget
-		undefined
-		
-		
-	error_window: (f) -> (w=@window()).onerror = w.document.onerror = f
-	#scroll_window: (f) -> @window().onscroll = f
-	#pageshow_window: (f) -> @window().onpageshow = f #@window().addEventListener? "pageshow", f, false
-	#pagehide_window: (f) -> @window().onpagehide = f #@window().addEventListener? "pagehide", f, false
-	#resize_window: (f) -> @window().onresize = f
-	#orientationchange_window: (f) -> @window().onorientationchange = f #@window().addEventListener? "orientationchange", f, false
-	#unload_window: (f) -> @window().onunload = f
-	#beforeunload_window: (f) -> @window().onbeforeunload = f
-	
-	hashchange_window: if "onhashchange" in window then ((f) -> @window().onhashchange = f) else (f) ->
-		win = @window()
-		win._c_old_hash = win.location.hash
-		setTimeout (=> win = @window(); if win._c_old_hash != h=win.location.hash then f h, win._c_old_hash; win._c_old_hash = h), 200
-	# http://learn.javascript.ru/onload-onerror
-	# http://snipplr.com/view/6029/domreadyjs/
-	runReady: 0
-	ready: ->
-	ready_dom: (f) -> CListen.ready=((e) -> unless CListen.runReady then CListen.runReady = 1 ; f(e)); CListen.load_window.call this, (->); @document().addEventListener? "DOMContentLoaded", CListen.ready, false
-	load_window: (f) -> @window().onload = (e) -> CListen.ready(e); f(e)
-	
 
 # http://help.dottoro.com/larrqqck.php - список event-ов
 CSend = (element, event) ->
@@ -689,22 +621,14 @@ CSend = (element, event) ->
 	if ret2? then ret2 else if ret3? then ret3 else ret1
 
 extend CSend,
-	_on: (key, fn) -> (for key in $A key then (@$0$[key] ||= []).push fn); this
-	_off: (key, fn) ->
-		if arguments.length == 1
-			for key in $A key then delete @$0$[key]
-		else
-			for key in $A key
-				if (ons = @$0$[key]) and -1 != idx=ons.indexOf fn then ons.splice idx, 1
-		this
 
 	#send: (e, widget) -> widget._tooltip?.send 'on'+e.type+'_parent', e; widget.send 'on'+e.type, e
 	
 	setHandler: (element, type) -> element.setAttribute 'on'+(CSend[type+'_type'] || type), "return CSend(this, event)"
 	removeHandler: (element, type) -> element.removeAttribute 'on'+(CSend[type+'_type'] || type)
 	
-	mousedown: CListen.listens.document.mousedown[0]
-	mouseup: CListen.listens.document.mouseup[0]
+	mousedown: (e) -> which=e.event.which; p = CEvent.prototype; (if which == 1 then p.left = on); (if which == 2 then p.mid = on); (if which == 3 then p.right = on)
+	mouseup: (e) -> which=e.event.which; p = CEvent.prototype; (if which == 1 then p.left = off); (if which == 2 then p.mid = off); (if which == 3 then p.right = off)
 	click: -> CEvent::left = on
 	click_end: -> CEvent::left = off
 
@@ -763,15 +687,16 @@ class CStream
 	#@callback: (f, args...) -> stream = new CStream; f (do(stream, args)->-> stream.emit ); stream
 	@fromCallback: (fn, args...) -> stream = new СStream; fn stream.emitter(args...); stream
 	
-	@never: -> new CStream
-	@unit: (args...) -> new CStream.map args...
-	@error: (args...) -> new CStream.error args...
-	@later: (ms, args...) -> new СStream.sleep(ms).emit args...
+	emitEmpty = ->
+	@nothing: -> stream = new CStream; stream.emitValue = emitEmpty; stream
+	@unit: (args...) -> (new CStream).map args...
+	@error: (args...) -> (new CStream).mapError args...
+	@later: (ms, args...) -> (new СStream).sleep(ms).emit args...
 	@fromPromise: (promise, args...) -> stream = new CStream; promise args..., stream.emitter(), stream.errorer()
 	
 	constructor: -> @fork = []
-	emitter: -> stream = this ; do(stream)-> (args...)-> stream.emitValue src: this, args: args
-	errorer: -> stream = this ; do(stream)-> (args...)-> stream.emitError src: this, args: args
+	emitter: -> stream = this ; fn = (do(stream)-> (args...)-> stream.emitValue src: this, args: args); fn._belong = this ; fn
+	errorer: -> stream = this ; fn = (do(stream)-> (args...)-> stream.emitError src: this, args: args); fn._belong = this ; fn
 	
 	# emitInterval = (channel, args...) ->
 		# setInterval do(channel, args)=>
@@ -780,7 +705,7 @@ class CStream
 		# , @_ms
 		# this
 		
-	
+	# пути
 	send: (channel) ->
 		for f in @fork then f.emitValue.call f, channel
 		this
@@ -793,78 +718,97 @@ class CStream
 	emitError: @::sendError
 	
 	emit: (args...) -> @emitValue src: null, args: args
-	emitAll: (src, args...) -> @emitValue src: src, args: args
-	
 	error: (args...) -> @emitError src: null, args: args
-	errorAll: (src, args...) -> @emitError src: src, args: args
 	
+	emits: (src, args...) -> @emitValue src: src, args: args
+	errors: (src, args...) -> @emitError src: src, args: args
+	
+	# мета
+	meta: (emit, param) -> @fork.push stream = new (@constructor)(); stream.emitValue = emit; (if param then for i of param then stream[i] = param[i]); stream
+	
+	metaError: (emit, param) -> @fork.push stream = new (@constructor)(); stream.emitError = emit; (if param then for i of param then stream[i] = param[i]); stream
+	
+	# ошибки
 	emitFail = (channel) -> @_callback.apply channel.src, channel.args; @sendError channel
-	fail: (onError) -> @transvuierError emitFail, onError
+	fail: (onError) -> @metaError emitFail, onError
 	
-	mapError: -> @transvuierError @send
-	
-	transvuierError: (emit, fn, param) -> @fork.push stream = new (@constructor)(); stream.emitError = emit; stream._callback = fn; (if param then for i of param then stream[i] = param[i]); stream
-	
-	transvuier: (emit, fn, param) -> @fork.push stream = new (@constructor)(); stream.emitValue = emit; stream._callback = fn; (if param then for i of param then stream[i] = param[i]); stream
+	mapError: -> @metaError @send
 	
 	# модифицирующие
 	emitMap = (channel) -> channel.args = [@_callback.apply channel.src, channel.args]; @send channel
-	emitMapTo = (channel) -> channel.args = @_callback; @send channel
-	map: (args...) -> if typeof (map = args[0]) == 'function' then @transvuier emitMap, map else @transvuier emitMapTo, args
+	emitMapTo = (channel) -> channel.args = @_args; @send channel
+	map: (args...) -> if typeof (map = args[0]) == 'function' then @meta emitMap, _callback: map else @meta emitMapTo, _args: args
 	
 	emitMaps = (channel) ->	channel.args = @_callback.apply channel.src, channel.args; @send channel
-	maps: (args...) -> if typeof (map = args[0]) == 'function' then @transvuier emitMaps, map else @transvuier emitMapTo, args
+	maps: (args...) -> if typeof (map = args[0]) == 'function' then @meta emitMaps, _callback: map else @meta emitMapTo, _args: args
 	
 	emitMapAll = (channel) -> @send @_callback channel
-	emitMapAllTo = (channel) -> @send extend channel, @_callback
-	mapAll: (args...) -> if typeof (map = args[0]) == 'function' then @transvuier emitMapAll, map else @transvuier emitMapAllTo, args[0], _args: args.slice 1
+	emitMapAllTo = (channel) -> @send extend channel, @_map
+	mapAll: (args...) -> if typeof (map = args[0]) == 'function' then @meta emitMapAll, _callback: map else @meta emitMapAllTo, _map: args[0], _args: args.slice 1
 	
 	emitMapChannel = (channel) -> channel.args = [extend {}, channel]; @send channel
-	mapChannel: (map) -> @transvuier emitMapChannel
+	mapChannel: (map) -> @meta emitMapChannel
 	
 	emitFilter = (channel) -> (if @_callback.apply channel.src, channel.args then @send channel); this
-	filter: (filter) -> @transvuier emitFilter, filter
+	filter: (filter) -> @meta emitFilter, _callback: filter
 	
 	emitFilterNot = (channel) -> (unless @_callback.apply channel.src, channel.args then @send channel); this
-	filterNot: (filter) -> @transvuier emitFilterNot, filter
+	filterNot: (filter) -> @meta emitFilterNot, _callback: filter
 	
 	emitReduce = (channel) -> @_acc = @_callback.apply channel.src, [@_acc].concat channel.args; channel.args = [@_acc]; @send channel
-	reduce: (arg, fn) -> (if arguments.length == 1 then fn = arg; arg = 0); @transvuier emitReduce, fn, _acc: arg
+	reduce: (arg, fn) -> (if arguments.length == 1 then fn = arg; arg = 0); @meta emitReduce, _callback: fn, _acc: arg
 	
 	emitSkipDuplicates = (channel) -> (if '_prev' of this and @_prev != channel.args[0] or not '_prev' of this then @_prev = channel.args[0]; @send channel); this
 	emitSkipDuplicatesCmp = (channel) -> (if '_prev' of this and @_callback @_prev, channel.args[0] or not '_prev' of this then @_prev = channel.args[0]; @send channel); this
-	skipDuplicates: (cmp) -> @transvuier (if cmp then emitSkipDuplicatesCmp else emitSkipDuplicates), cmp
+	skipDuplicates: (cmp) -> @meta (if cmp then emitSkipDuplicatesCmp else emitSkipDuplicates), _callback: cmp
 	
-	emitSleep = (channel) -> setTimeout (do(channel) => => @send channel), @_callback; this
-	sleep: (ms) -> @transvuier emitSleep, ms
+	emitSleep = (channel) -> setTimeout (do(channel) => => @send channel), @_ms; this
+	sleep: (ms) -> @meta emitSleep, _ms: ms
 	
-	emitSkip = (channel) -> (if @_skip < t = new Date().getTime() then @_skip = t+@_callback; @send channel); this
-	skip: (ms) -> @transvuier emitSkip, ms, _skip: 0
+	emitSkip = (channel) -> (if @_skip < t = new Date().getTime() then @_skip = t+@_ms; @send channel); this
+	skip: (ms) -> @meta emitSkip, _ms: ms, _skip: 0
 	
-	emitSkipCount = (channel) -> (unless @_count-- then @_count = @_callback; @send channel); this
-	skipN: (n) -> @transvuier emitSkipCount, n, _count: n
+	emitSkipCount = (channel) -> (unless @_count-- then @_count = @_n; @send channel); this
+	skipN: (n) -> @meta emitSkipCount, _n: n, _count: n
 	
 	
-	emitFlatMap: (channel) -> stream = @_callback.apply channel.src, channel.args; stream.fork = @fork; stream.emitValue channel; this
-	flatMap: (map) -> @transvuier emitFlatMap, map
+	getEnds: (ends) -> (if @fork.length == 0 then ends.push this else for s in @fork then s.getEnds ends); this
+	getEndLast: (end) -> (if @fork.length == 0 then end.push this else @fork[@fork.length-1].getEndLast end); this
+	getEndFirst: (end) -> (if @fork.length == 0 then end.push this else @fork[0].getEndFirst end); this
 	
-	emitFlatMapLast: (channel) -> stream = @_callback.apply channel.src, channel.args; stream.fork = @fork; (if stream._Box then stream.emitValue stream._Box); (if stream._Error then stream.emitError stream._Error); this
-	flatMapLast: (map) -> @transvuier emitFlatMapLast, map
+	emitFlatMap = (channel) ->
+		stream = @_callback.apply channel.src, channel.args
+		stream.getEnds ends = []
+		for end in ends then end.fork = @fork
+		stream.emitValue channel
+		this
+	flatMap: (map) -> @meta emitFlatMap, _callback: map
+	
+	emitFlatMapLast = (channel) ->
+		stream = @_callback.apply channel.src, channel.args
+		stream.getEndLast end = []
+		end[0].fork = @fork
+		stream.emitValue channel
+		this
+	emitFlatMapFirst = "emitFlatMapFirst="+String(emitFlatMapLast).replace /\bgetEndLast\b/, 'getEndFirst'
+	eval emitFlatMapFirst
+	flatMapLast: (map) -> @meta emitFlatMapLast, _callback: map
+	flatMapFirst: (map) -> @meta emitFlatMapFirst, _callback: map
 	
 	# связывающие
 	emitThen = (channel) -> @_callback.apply channel.src, channel.args; @send channel
-	then: (onValue) -> @transvuier emitThen, onValue
+	then: (onValue) -> @meta emitThen, _callback: onValue
 	
 	emitFindAssign = (channel) -> CRoot.find(@_object).invoke @_callback, @_args..., channel.args...; @send channel
 	emitAssign = (channel) -> @_object[@_callback] @_args..., channel.args...; @send channel
 	assign: (object, method, args...) ->
-		@transvuier (if typeof object == 'string' then emitFindAssign else emitAssign), method, _object: object, _args: args
+		@meta (if typeof object == 'string' then emitFindAssign else emitAssign), _callback: method, _object: object, _args: args
 
 	# объединяющие
 	merge: (streams...) -> @fork.push stream = new (@constructor)(); (for s in streams then s.fork.push stream); stream
 	
 	# ожидает пока все потоки не пришлют значение и объединяет их в массив
-	mapCombine = (channel) -> channel.idx = @_callback; @send channel
+	mapCombine = (channel) -> channel.idx = @_idx; @send channel
 	emitCombine = (channel) ->
 		(q = @_queue[channel.idx]).push channel
 		#delete channel.idx
@@ -880,7 +824,7 @@ class CStream
 	combine: (streams...) ->
 		streams.unshift this
 		len = streams.length
-		streams = (for s, i in streams then s.transvuier mapCombine, i)
+		streams = (for s, i in streams then s.meta mapCombine, _idx: i)
 		stream = streams.shift()
 		stream = stream.merge sreams
 		stream.emitValue = emitCombine
@@ -890,6 +834,10 @@ class CStream
 	
 	zip: (streams...) ->
 
+	#switch: ->
+	#	for i in [0...arguments] by 2
+			
+	
 	# отключающие
 	off: (streams...) -> fork = @fork; (for s in streams when -1 != i=fork.indexOf s then fork.splice i, 1); this
 	
@@ -928,10 +876,28 @@ class CModel
 	
 	del: (key) -> @un key; @ut key; delete @_[key]; delete @_cmp[key]
 	
-	on: CSend._on.inline "on", "_on"
-	off: CSend._off.inline "off", "_on"
-	at: CSend._on.inline "at", "_at"
-	un: CSend._off.inline "un", "_at"
+	cmp: (key, cmp) ->
+		if arguments.length == 1
+			if typeof key == 'string' then @_cmp[key]
+			else (for i of key then @_cmp[i] = key[i]); this
+		else if cmp then @_cmp[key] = cmp
+		else delete @_cmp[key]
+		this
+	
+	_on = (key, fn) -> (for key in $A key then (@$0$[key] ||= []).push fn); this
+	_off = (key, fn) ->
+		if arguments.length == 1
+			for key in $A key
+				delete @$0$[key]
+		else
+			for key in $A key
+				if (ons = @$0$[key]) and -1 != idx=ons.indexOf fn then ons.splice idx, 1
+		this
+	
+	on: _on.inline "on", "_on"
+	off: _off.inline "off", "_on"
+	at: _on.inline "at", "_at"
+	un: _off.inline "un", "_at"
 	
 	change: (key, val) ->
 		throw CRoot.raise "Нет ключа `#{key}` в модели #{@constructor.getName()}.#{@_name}" unless key of @_
@@ -957,17 +923,17 @@ class CModel
 		if at = @_at[key] then for fn in at then @change key, fn.call this, key
 		@_[key]
 		
-	modelStream: (key) -> stream = new Stream; @on key, stream.emitter(); stream
+	stream: (key) -> stream = new Stream; @on key, stream.emitter(); stream
 	retriveStream: (key) -> stream = new Stream; @at key, stream.emitter(); stream
 
 
 class CRepository	# Abstract, _: {} - ключи
-	constructor: (model, @_ = {}, cmp = {}) ->
+	constructor: (model, @_ = {}) ->
 		@model = model
 		for key of @_
-			unless key of model._ then model.add key, @_[key], cmp[key]
-			if @save then model.on key, (val, old, key) => @save key, val
-			if @load then model.at key, (key) => @load key
+			unless key of model._ then model.add key, @_[key]
+			if @save then model.on key, fn = ((val, old, key) => @save key, val); fn._belong = this
+			if @load then model.at key, fn = ((key) => @load key); fn._belong = this
 			
 	sync: -> (for key of @_ when (val = @load key) != undefined then @model.change key, val); this
 
@@ -1254,6 +1220,8 @@ unless window.$ then $ = (e) -> (if typeof e == 'function' then CRoot._init_func
 	
 class CWidget
 
+	model: new CModel()
+
 	constructor: (element, @_parent) ->
 		throw @raise "element не HTMLElement", element unless element and element.tagName
 		throw @raise "element уже имеет виджет ", element.widget if element.widget
@@ -1391,8 +1359,7 @@ class CWidget
 		initialize: ->
 			CInit.init_from_param()
 			@defineHandlers().setListens()
-			CListen.putListen.call this, 'mousedown', 'document'
-			CListen.putListen.call this, 'mouseup', 'document'
+			$(document).setHandler 'mousedown', 'mouseup'
 		onready_dom: ->
 			if init = CInit.param.init
 				for id in init.split /,/ then @byId id
@@ -1516,7 +1483,7 @@ class CWidget
 			if phase then q.unshift listen else q.push listen
 		this
 
-	rmEventAndHandler$ = (type) -> delete @_sendQueue['on'+type]; if /^[a-z]+$/.test type then @removeHandler type
+	rmEventAndHandler$ = (type) -> delete @_sendQueue[t='on'+type]; if not t of this and /^[a-z]+$/.test type then @removeHandler type
 	rmEvent$ = (type) -> delete @_sendQueue['on'+type]
 	rmHandler$ = rmEventAndHandler$
 		
@@ -1531,6 +1498,14 @@ class CWidget
 			for type in $A type when ons = @_sendQueue['on'+type]
 				if -1 != idx=ons.indexOf listen then ons.splice idx, 1
 				if ons.length == 0 then rmHandler$.call this, type
+		this
+	
+	clean: ->
+		return unless @_sendQueue
+		for type, events of @_sendQueue
+			type = type.replace /^on/, ''
+			ws = (for event in events when not document.contains (w = event._belong).element then [type, w])
+			for [type, w] in ws then @off type, w
 		this
 	
 	# export_handlers = {'name-name-name': types}
@@ -1595,7 +1570,7 @@ class CWidget
 			else @wrap(@[who]()).on type, listener
 		this
 
-	eventStream: (events) -> stream = new CStream; @on events, stream.emitter(); stream
+	stream: (events) -> stream = new CStream; @on events, stream.emitter(); stream
 	observeStream: (events) -> stream = new CStream; @observe events, stream.emitter(); stream
 	ajaxStream: -> stream = new CStream; @on 'Load', stream.emitter(); @on 'Error', stream.errorer(); stream
 
@@ -2591,7 +2566,7 @@ class CWidget
 			from = param.from || {}
 			to = param.to || {}
 			
-			save = if not('save' of param) or param.save == 1 then (x=Object.keys(from)).push Object.keys(to)...; x else param.save
+			save = if not('save' of param) or param.save == 1 then (x=Object.keys(from)).push Object.keys(to)...; x else if param.save == 0 then [] else param.save
 			if param.css? then save.push Object.keys(param.css)...
 			save = if save.length then @saveCss save else {}
 			@css param.css if param.css?
@@ -2606,7 +2581,7 @@ class CWidget
 			if easy=param.easy
 				for i of to when not /\s[a-z]\w*$/i.test to[i] then to[i] = to[i] + ' ' + easy
 		
-			listen = do(param, save)->-> @css save; (@css param.endcss if param.endcss?); @send param.end, param; @send param.end1, param
+			listen = do(param, save)->-> @saveCss save; (@css param.endcss if param.endcss?); @send param.end, param; @send param.end1, param
 			anim = @animation to, param.timeout, param.fps, listen, param.progress
 			anim.param = param
 			anim.to = to
@@ -3302,14 +3277,6 @@ class CLoaderWidget extends CWidget
 		
 		delete param._act
 		
-		if type == 'submit'
-			url = CUrl.from url
-			layout = if not url.pathname or not param._no_history and url.pathname == @document().location.pathname then '' else url.pathname
-			url.param._layout_ = layout.replace /^\/(.)/, "$1" if layout
-			if url.hash then url.param._layout_id_ = url.hash; url.hash = ""
-			url.pathname = "/frames"
-			url = CUrl.to url
-		
 		method = param._method || customer._method || customer.attr("cmethod") || @attr("cmethod") || @_method
 		delete param._method
 
@@ -3393,7 +3360,7 @@ class CLoaderWidget extends CWidget
 		#for i in [1...data.length] then pages[] = 
 		
 		data = fromJSON data
-		if stash = data['@stash'] then extend CTemplate._STASH, stash
+		if stash = data['@stash'] then CTemplate._STASH = stash
 		if layout = data['@layout']
 			for i in [1...layout.length]
 				layout_id = data[layout[i-1]].layout_id
@@ -3406,7 +3373,10 @@ class CLoaderWidget extends CWidget
 				page = data[act]
 				@byId(page.id).html CTemplate.compile(page.template)(page.data || {}, act)
 
-		CListen.clean()
+		CTemplate._STASH = {}		
+				
+		$(window).clean()
+		$(document).clean()
 		do CRoot.initWidgets
 		
 		url = CUrl.from data["@url"]
@@ -3458,8 +3428,13 @@ class CRouterWidget extends CWidget
 			if not url.host or url.host == a.document().location.host
 				e.cancel()
 				if loader = @config.loader then a._loader = loader
-				if url.hash then a.attr "target", url.hash; url.hash = ""
-				a.submit _act: CUrl.to url
+				#if url.hash then a.attr "target", url.hash; url.hash = ""
+				param = {}
+				param._noact_ = noact if url.pathname == @document().location.pathname
+				if url.hash then param._layout_id_ = url.hash; url.hash = ""
+				param._act = CUrl.to url
+				#if not a._loader and not a.attr 'cloader' then a.loader this
+				@submit param
 		this
 	
 	val: -> undefined

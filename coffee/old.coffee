@@ -94,3 +94,20 @@ extend CWidget.prototype,
 			width: w
 			height: h
 
+
+	# CWidget. listens$
+	#onerror_window: (f) -> (w=@window()).onerror = w.document.onerror = f
+	#scroll_window: (f) -> @window().onscroll = f
+	#pageshow_window: (f) -> @window().onpageshow = f #@window().addEventListener? "pageshow", f, false
+	#pagehide_window: (f) -> @window().onpagehide = f #@window().addEventListener? "pagehide", f, false
+	#resize_window: (f) -> @window().onresize = f
+	#orientationchange_window: (f) -> @window().onorientationchange = f #@window().addEventListener? "orientationchange", f, false
+	#unload_window: (f) -> @window().onunload = f
+	#beforeunload_window: (f) -> @window().onbeforeunload = f
+
+	# hashchange_window: if "onhashchange" in window then ((f) -> @window().onhashchange = f) else (f) ->
+		# win = @window()
+		# win._c_old_hash = win.location.hash
+		# setTimeout (=> win = @window(); if win._c_old_hash != h=win.location.hash then f h, win._c_old_hash; win._c_old_hash = h), 200
+	# http://learn.javascript.ru/onload-onerror
+	# http://snipplr.com/view/6029/domreadyjs/

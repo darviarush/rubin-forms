@@ -17,6 +17,7 @@ new CTest 'key-CFunction-implements', """
 	@ok ex.text
 	@ok not ex.wrap
 
+
 CTest.category "эффекты"
 
 new CTest 'key-CEffect-fadeIn', """
@@ -113,14 +114,18 @@ CTest.category "потоки"
 new CTest "cls-CStream", """
 `CStream` - класс реактивного программирования (FRP)
 """, """
-#%name-plus, #%name-minus, #%name-result { display: block-inline; width: 100px; border: solid 1px orange; background:  }
+#%name-plus, #%name-minus, #%name-result { text-align: center; display: inline-block; width: 100px; border: solid 1px orange; color: white}
+
+#%name-plus, #%name-minus { background: brown; cursor: pointer}
+
+#%name-result { background: SlateGrey; }
 """, """
 <div id=$name-plus>1</div>
 <div id=$name-minus>-1</div>
 <div id=$name-result></div>
 """, ->
-	plus = @w("plus").eventStream("click").map(1)
-	minus = @w("minus").eventStream("click").map(-1)
+	plus = @w("plus").stream("click").map(1)
+	minus = @w("minus").stream("click").map(-1)
 	
 	merge = plus.merge minus
 	result = merge.reduce 5, (a, b) -> a + b
@@ -162,7 +167,6 @@ new CTest "obj-CStream-map", """
 	stream.emit()
 	(stream = new CStream).map((-> 13), 12).then((arg1) => @is arg1, 13 ; @is arguments.length, 1)
 	stream.emit 20, 30
-	
 
 new CTest "obj-CStream-flatMap", """
 `flatMap fn` - заменяет поток на возвращённый функцией fn
@@ -173,25 +177,21 @@ new CTest "obj-CStream-flatMap", """
 	@count 2
 	
 	CStream::exMap = (f) ->
-		@flatMap (x) ->
-			CStream.unit f(x)
+		@flatMap (x) ->	CStream.unit f(x)
 
 	CStream::exFilter = (f) ->
-		@flatMap (x) ->
-			if f(x)
-				CStream.unit(x)
-			else
-				CStream.nothing()
+		@flatMap (x) -> if f(x) then CStream.unit(x) else CStream.nothing()
 
-	(stream = new CStream).exMap(-> 13).then (v)-> @is v, 13
-	stream.emit 10
+	(stream = new CStream).exMap((x)-> x+3).then (v)-> @is v, 13
+	stream.emits this, 10
 	
-	(stream = new CStream).exFilter(-> true).then (v)-> @is v, 10
-	stream.emit 10
+	(stream = new CStream).exFilter((x)-> x==10).then (v)-> @is v, 10
+	stream.emits this, 10
 	
-	(stream = new CStream).exFilter(-> false).then (v)-> @ok false
-	stream.emit 10
+	(stream = new CStream).exFilter((x)-> x!=10).then (v)-> @ok false
+	stream.emits this, 10
 	
+
 
 CTest.category "модели"
 

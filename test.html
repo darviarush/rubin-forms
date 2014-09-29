@@ -114,19 +114,19 @@ window.mcTitleSize = '15';
 
 	<div class="head">
 		<div style="float: right">
-			<a id='menu-downup' href="#" onclick="cookie_model.change('roll'); return false">свернуть</a>
+			<a id='menu-downup' href="#" onclick="CRoot.model.change('roll'); return false">свернуть</a>
 			<br>
-			<a id='menu-showcomment' href="#" onclick="cookie_model.change('tab'); return false">оглавление</a>
+			<a id='menu-showcomment' href="#" onclick="CRoot.model.change('tab'); return false">оглавление</a>
 		</div>
-		<h1><span style="cursor:pointer" onclick="CRoot.body().animate({hscroll: 0}, 'fast', function() { CRoot.navigate(location.pathname) })">&#9650;</span> <span id=menu-ogl>Комментарии</span></h1>
+		<h1><span style="cursor:pointer" onclick="CRoot.body().animate({hscroll: 0}, function() { CRoot.navigate(location.pathname) })">&#9650;</span> <span id=menu-ogl>Комментарии</span></h1>
 	</div>
 	
 	<div class="main">
 		<div id="CTest-category" style="display:none"></div>
 		<div id=menu-comment>
-			<!--div style="float:right; padding: 4px"><a href="#" onclick="Cackle.reinit(); return false">обновить</a></div>
+			<!-- <div style="float:right; padding: 4px"><a href="#" onclick="Cackle.reinit(); return false">обновить</a></div>
 			<div id="mc-last"></div>
-			<a href="http://cackle.me" id="mc-link">система комментирования <b style="color:#4FA3DA">CACKL</b><b style="color:#F65077">E</b></a-->
+			<a href="http://cackle.me" id="mc-link">система комментирования <b style="color:#4FA3DA">CACKL</b><b style="color:#F65077">E</b></a> -->
 		</div>
 	</div>
 
@@ -135,6 +135,7 @@ window.mcTitleSize = '15';
 <!--script src="http://cackle.me/mc.last-min.js" async="async" type='text/javascript'></script-->
 
 <script>
++function() {
 /*if(window.mcSite) {
 	var mc = document.createElement('script')
 	mc.type = 'text/javascript'
@@ -179,23 +180,46 @@ function menu_resize() {
 setInterval(menu_resize, 200)
 
 
-var cookie_vars = {
-	roll: false,
+var model = CRoot.model
+var cookie_repository = new CCookieRepository(model, {
+	roll: 0,
 	tab: false
-}
-var cookie_model = new CModel(cookie_vars)
-var cookie_repository = new CCookieRepository(cookie_model, cookie_vars, {expires: 3600*24*365*20})
+}, {expires: 3600*24*365*20})
 
-cookie_model.onroll = function(r) {
+var roll = function(r) {
+	var x = menu_main_head()
+	$(x.menu).animate("end")
+	$(x.main).css("overflow", "hidden")
+	//say(!r? 'свёрнуто-развернуть': 'развёрнуто-свернуть')
+	if(r) {
+		$(x.menu).animate({ height: $(x.head).offsetHeight() }, function() { $(x.main).saveCss("overflow", "") } )
+	} else {
+		var height = x.menu.style.height
+		x.menu.style.height = ''
+		var to = $(x.menu).height()
+		x.menu.style.height = height
+		$(x.menu).animate({ height: to }, function() { x.menu.style.height = ''; $(x.main).saveCss("overflow", "") })
+	}
+}
+
+var init = 1
+
+model.onroll = function(r) {
 	var text = document.getElementById('menu-downup')
 	//var r = text.innerHTML=='свернуть'
 	text.innerHTML = r? 'развернуть': 'свернуть'
 	var x = menu_main_head()
-	x.menu.style.height = r? x.head.offsetHeight + 'px': ''
+	if(init) x.menu.style.height = r? x.head.offsetHeight + 'px': ''; else roll(r)
+	init = 0
+	/*if(r) { // свёрнуто
+		$(/#menu/).on("mouseenter mouseleave", function(e) { roll(e.type !== 'mouseleave') })
+	} else {
+		$(/#menu/).off("mouseenter mouseleave")
+	}*/
 	return false
 }
 
-cookie_model.ontab = function(r) {
+model.ontab = function(r) {
 	var text = document.getElementById('menu-showcomment')
 	var ogl = document.getElementById('menu-ogl')
 	//var r = text.innerHTML=='оглавление'
@@ -207,7 +231,7 @@ cookie_model.ontab = function(r) {
 }
 
 cookie_repository.sync()
-
+}()
 </script>
 
 
@@ -271,10 +295,12 @@ $( /#dialog/ ).close()`
 </div>
 
 <script>
-var v = document.getElementById('vvedenie1')
-if(location.hash.slice(1) === '') v.innerHTML = CTest.manual(v.innerHTML); else v.style.display = 'none'
++function() {
+	var v = document.getElementById('vvedenie1')
+	if(location.hash.slice(1) === '') v.innerHTML = CTest.manual(v.innerHTML); else v.style.display = 'none'
 
-CTest.start("coffee/test.coffee", "js/test.js")
+	CTest.start("coffee/test.coffee", "js/test.js")
+}()
 </script>
 
 

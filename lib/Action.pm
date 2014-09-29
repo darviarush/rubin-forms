@@ -134,4 +134,72 @@ sub options ($;$&) {
 	return $ret;
 }
 
+
+# ajax-редирект
+sub ajax_redirect {
+	our $_URL = $1;
+	our $_LOCATION = $2;
+	our $_action = $3;
+	our $_id = $4;
+	our $_EXT = $5;
+	our $param = $_GET = Utils::param($6);
+	our $_POST = {};
+	my $ret = ritter();
+	our $_STATUS = $ret->[0];
+	our @_HEAD = @{$ret->[1]};
+	@{$_[0]} = @{$ret->[2]};
+}
+
+
+# фреймы - механизм лайоутов и таргетов форм
+sub action_submit {
+	my $result = {};
+	my ($id, $url, $act);
+	my $add_res = sub {
+
+		die "Нет экшена `$act`" unless exists $main::_action{$act} or exists $main::_action_htm{$act};
+		
+		$result->{$act} = {
+			act => $act,
+			($id ? (id => $id): ()),
+			(exists $main::_action{$act}? (data => $main::_action{$act}->()): ()),
+			(exists $main::_forms{$act} && exists $main::_info->{$act}? (data => action_view($main::_action, $param)): ()),
+			(exists $main::_pages{$act}{template}? (template => $main::_pages{$act}{template}): ()),
+			(exists $main::_pages{$act}{layout_id}? (layout_id => $main::_pages{$act}{layout_id}): ()),
+			(exists $main::_layout{$act}? (layout => $main::_layout{$act}): ())
+		};
+		
+		action_load_forms($act) if $main::_pages{$act}{load_forms};
+	};
+
+	unless($param->{_noact_}) {
+		$act = $::_action;
+		#$act = 'index' if $act eq "/";
+		$layout_id = $param->{_layout_id_};
+		for(; $act; $act = $main::_layout{$act}) {
+			last if defined($layout_id) and $main::_pages{$act}{layout_id} eq $layout_id;
+			$add_res->();
+			unshift @$layout, $act;
+		}
+		$result->{"\@layout"} = $layout;
+		if(defined $layout_id and exists $main::_layout{$act}) {
+			$result->{$act=$main::_layout{$act}} = { act => $act, layout_id => $result->{$act}{layout_id} };
+			unshift @$layout, $act;
+		}
+	}
+
+	$frames = Utils::param($param->{_frames_}, qr/,/);
+
+	while(($id, $url) = each %$frames) {
+		if($url =~ /\?/) { ($act, $param) = ($`, Utils::param($')) } else { $act = $url; $param = {} }
+		$add_res->();
+	}
+
+	$result->{'@stash'} = \%_STASH;
+	$result->{'@url'} = $::_URL;
+
+	return $result;
+}
+
+
 1;

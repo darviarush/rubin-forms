@@ -167,7 +167,8 @@ sub ritter {
 		my $action_htm = $_action_htm{$_action};
 		my $ajax = $_HEAD->{Ajax} // "";
 		
-		if(defined $action or defined $action_htm and $ajax =~ /^|submit$/) {
+		if(defined $action or defined $action_htm and $ajax ~= /^(|submit)$/) {
+			my $submit = $1;
 			$_STATUS = 200;
 			$_user_id = auth();
 			%_STASH = (
@@ -179,30 +180,18 @@ sub ritter {
 				param => $param,
 			);
 			
-			if($action) {
-				@ret = $action->();
-				# редирект
-				if($_STATUS == 307 and $ajax and $_HEAD{'Location'} =~ /^$_RE_LOCATION$/o) {
-					$_URL = $1;
-					$_LOCATION = $2;
-					$_action = $3;
-					$_id = $4;
-					$_EXT = $5;
-					$param = $_GET = Utils::param($6);
-					$_POST = {};
-					my $ret = ritter();
-					$_STATUS = $ret->[0];
-					@_HEAD = @{$ret->[1]};
-					@ret = @{$ret->[2]};
-					return;
-				}
+			if($submit) {
+				@ret = action_submit()
+				return ajax_redirect(\@ret) if $_STATUS == 307 and $_HEAD{'Location'} =~ /^$_RE_LOCATION$/o;
 			}
-			
-			if($action_htm and $_STATUS == 200) {
-				@ret = $_action_htm{$_action}->($ret[0], $_action);
-				for(; my $_layout = $_layout{$_action}; $_action = $_layout) {
-					my $arg = ($action = $_action{$_layout})? $action->(): {};
-					@ret = $_action_htm{$_layout}->($arg, $_layout, @ret);
+			else {	
+				@ret = $action->() if $action;
+				if($action_htm and $_STATUS == 200) {
+					@ret = $_action_htm{$_action}->($ret[0], $_action);
+					for(; my $_layout = $_layout{$_action}; $_action = $_layout) {
+						my $arg = ($action = $_action{$_layout})? $action->(): {};
+						@ret = $_action_htm{$_layout}->($arg, $_layout, @ret);
+					}
 				}
 			}
 		} elsif(my $info = $_info->{$_action}) {
