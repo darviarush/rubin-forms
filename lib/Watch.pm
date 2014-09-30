@@ -50,6 +50,7 @@ sub watch {
 
 	my $watch;
 	for my $path ("qq", "main.ini", values %INC) {
+		next unless defined $path;
 		unless($watch=$_watch{$path}) { $_watch{$path} = mtime($path); }
 		elsif($watch < mtime($path)) {
 			msg stime()." - module $path";

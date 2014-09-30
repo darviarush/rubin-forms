@@ -142,6 +142,23 @@ new CTest "cls-CStream", """
 	@is "4", @w("result").text()
 
 	
+new CTest "obj-CStream-meta", """
+`meta emitFunction, [param]` - создаёт новое звено потока
+
+Метод `meta` создаёт экземпляр `CStream`, добавляет его в свойство `@fork`, устанавливает ему функцию реагирующую на данные, движущиеся по потоку и параметры, и возвращает.
+
+См. #maps, #mapAll
+""", ->
+	@count 4
+	self = this
+	
+	(s = new CStream)
+	.meta (channel) -> self.is channel.args[0], 30 ; channel.src = hi: "hello!"; channel.args = [10, 20]; @send channel
+	.then (x, y) -> self.is @hi, "hello!"; self.is x, 10 ; self.is y, 20
+	
+	s.emit 30
+	
+	
 new CTest "obj-CStream-emitter", """
 `emitter` - возвращает замыкание с этим потоком, которое используется как слушатель
 
@@ -168,6 +185,7 @@ new CTest "obj-CStream-map", """
 	(stream = new CStream).map((-> 13), 12).then((arg1) => @is arg1, 13 ; @is arguments.length, 1)
 	stream.emit 20, 30
 
+
 new CTest "obj-CStream-flatMap", """
 `flatMap fn` - заменяет поток на возвращённый функцией fn
 
@@ -192,6 +210,94 @@ new CTest "obj-CStream-flatMap", """
 	stream.emits this, 10
 	
 
+new CTest "obj-CStream-combine", """
+`combine streams...` - комбинирует несколько потоков в один
+
+См. #merge, #zip
+""", ->
+	@count 1
+
+	s1 = new CStream()
+	s2 = new CStream()
+	s3 = new CStream()
+	
+	s = s1.combine s2, s3
+	
+	s.then (x...) -> @is String(x), "10,20,30"
+	
+	s1.emit 10
+	s2.emit 20
+	s3.emits this, 30
+
+
+new CTest "obj-CStream-zip", """
+`zip n` - собирает n отправок в массив, который и отправляет
+
+См. #merge, #combine
+""", ->
+	@count 2
+	
+	s = new CStream
+	s.zip(2).then (x, y) -> @is x, 10 ; @is y, 20
+	
+	s.emit 10
+	s.emits this, 20
+
+
+new CTest "obj-CStream-repeat", """
+`repeat n, [ms], [map]` - повторяет данные n раз через ms миллисекунд
+
+- n - номер
+- n - объект - должен содержать from, to, by. from и by - необязательны. Заполняются 0-м и 1-й соотвестственно
+- ms - интервал в миллисекундах между повторениями
+- map - если положителен, то итератор будет мапиться
+
+См. #serial, #from
+""", ->
+	# @count 6
+	
+	# count = 0
+	
+	# s = CStream.unit 10
+	# s.repeat(3).then (x) -> count += x
+	# s.emit()
+	# @is count, 30
+	
+	# s.repeat(3, 13).then (x) -> count -= x; @is x, 10
+	# s.emits this
+	# @is count, 20
+	
+	# count = 0
+	# s.repeat(from: 10, to: 5, by: -3, 13).then -> count++
+	# .filter -> count == 2
+	# .then -> @is count, 2
+
+
+new CTest "obj-CStream-serial", """
+`serial serial, [ms]` - отправляет элементы серии через ms миллисекунд
+
+- serial - номер
+- serial - объект - должен содержать from, to, by. from и by - необязательны. Заполняются 0-м и 1-й соотвестственно. Аналог #repeat с установленным параметром ''map''
+- serial - массив - отправляет по одному
+- ms - интервал в миллисекундах между отправками
+
+См. #repeat, #from
+""", ->
+	CStream.serial([10, 20]).then (x) -> 
+	
+
+new CTest "obj-CStream-from", """
+`from n, [ms]` - повторяет данные n раз через ms миллисекунд
+
+- n - массив - отправляет элементы один за другим
+- n - объект - отправляет каждое ключ-значение в виде массива [key, val] 
+- ms - интервал в миллисекундах между отправками
+
+См. #repeat, #serial
+""", ->
+	CStream.from([10, 20]).then (x) -> 
+
+	
 
 CTest.category "модели"
 

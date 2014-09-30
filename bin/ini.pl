@@ -11,4 +11,4 @@ for($i=1; $i < @ARGV; $i++) {
 	$ini->{$key} = $val;
 }
 
-return [];
+require "$framework_dir/bin/qq.pl";

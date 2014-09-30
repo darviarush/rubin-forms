@@ -126,7 +126,6 @@
 # http://www.avalon.ru/OpenLessons/WebDev/Lessons/testing-tools/ - инструменты кроссбраузерной вёрстки
 
 
-
 unless window.console then window.console = notFound:1, log:->
 
 
@@ -441,12 +440,12 @@ CMath =
 	
 	# http://habrahabr.ru/company/nordavind/blog/209462/
 	# http://htmlbook.ru/css/transition-timing-function
-	cubicBezier: (p0, p1, p2, p3) -> do(p0, p1, p2, p3)-> (t)-> t_1=1-t; t2_1 = t_1*t_1; t3_1=t2_1*t_1; t2=t*t; t3=t2*t; t3_1*p0 + 3*t*t2_1*p1 + 3*t2*t_1*p2 + t3*p3
+	'cubic-bezier': cubicBezier = (p0, p1, p2, p3) -> do(p0, p1, p2, p3)-> (t)-> t_1=1-t; t2_1 = t_1*t_1; t3_1=t2_1*t_1; t2=t*t; t3=t2*t; t3_1*p0 + 3*t*t2_1*p1 + 3*t2*t_1*p2 + t3*p3
 	
 	ease: cubicBezier 0.25,0.1,0.25,1
-	ease_In: cubicBezier 0.42,0,1,1
-	ease_Out: cubicBezier 0,0,0.58,1
-	ease_InOut: cubicBezier 0.42,0,0.58,1
+	'ease-in': cubicBezier 0.42,0,1,1
+	'ease-out': cubicBezier 0,0,0.58,1
+	'ease-in-out': cubicBezier 0.42,0,0.58,1
 	
 	easeIn: (transition, pos, args...) -> transition(pos, args...)
 	easeOut: (transition, pos, args...) -> 1 - transition 1 - pos, args...
@@ -702,6 +701,9 @@ class CStream
 	@error: (args...) -> (new CStream).mapError args...
 	@later: (ms, args...) -> (new СStream).sleep(ms).emit args...
 	@fromPromise: (promise, args...) -> stream = new CStream; promise args..., stream.emitter(), stream.errorer()
+	@from: -> (stream = new CStream).from.apply stream, arguments
+	@repeat: -> (stream = new CStream).repeat.apply stream, arguments
+	@serial: -> (stream = new CStream).serial.apply stream, arguments
 	
 	constructor: -> @fork = []
 	emitter: -> stream = this ; fn = (do(stream)-> (args...)-> stream.emitValue src: this, args: args); fn._belong = this ; fn
@@ -780,6 +782,27 @@ class CStream
 	emitSkipCount = (channel) -> (unless @_count-- then @_count = @_n; @send channel); this
 	skipN: (n) -> @meta emitSkipCount, _n: n, _count: n
 	
+	emitRepeat = (channel) -> (for i in [@_from...@_to] by @_by then @send extend {}, channel); this
+	emitRepeatInterval = (channel) -> 
+		clear = setInterval (fn = do(channel, clear)=>=> if @_from > (i = arguments.callee.i+=@_by) >= @_to then clearInterval clear else channel = extend {}, channel; channel.args = [i] if @_map; @send channel), @_ms
+		fn.i = @_from
+		channel = extend {}, channel
+		channel.args = [@_from] if @_map
+		@send channel
+	repeat: (n, ms, map) -> (if typeof n == 'number' then n = to: n); @meta (if ms then emitRepeatInterval else emitRepeat), _ms: ms, _from: n.from || 0, _to: n.to, _by: n.by || 1, _map: map
+	
+	emitSerial = (channel) -> (for i in @_serial then @send extend {}, channel, args: [i]); this
+	emitSerialInterval = (channel) -> 
+		clear = setInterval (fn = do(channel, clear)=>=> if (i = ++arguments.callee.i) >= (serial = arguments.callee.serial).length then clearInterval clear; delete arguments.callee.serial else @send extend {}, channel, args: [serial[i]]), @_ms
+		fn.i = 0
+		fn.serial = @_serial
+		@send extend {}, channel, args: [@_serial[0]]
+	serial: (serial, ms) ->
+		if typeof serial == 'number' then serial = to: n
+		if serial instanceof Array then @meta (if ms then emitSerialInterval else emitSerial), _ms: ms, _serial: serial
+		else @repeat serial, ms, on
+	
+	from: (serial, ms) -> @serial (if serial instanceof Array then serial else ([i, serial[i]] for i of serial)), ms
 	
 	getEnds: (ends) -> (if @fork.length == 0 then ends.push this else for s in @fork then s.getEnds ends); this
 	getEndLast: (end) -> (if @fork.length == 0 then end.push this else @fork[@fork.length-1].getEndLast end); this
@@ -810,8 +833,8 @@ class CStream
 	
 	emitFindAssign = (channel) -> CRoot.find(@_object).invoke @_callback, @_args..., channel.args...; @send channel
 	emitAssign = (channel) -> @_object[@_callback] @_args..., channel.args...; @send channel
-	assign: (object, method, args...) ->
-		@meta (if typeof object == 'string' then emitFindAssign else emitAssign), _callback: method, _object: object, _args: args
+	emitAssignVar = (channel) -> @_object[@_callback] = channel.args[0]; @send channel
+	assign: (object, method, args...) -> @meta (if typeof object == 'string' then emitFindAssign else if typeof object[method] == 'function' then emitAssign else emitAssignVar), _callback: method, _object: object, _args: args
 
 	# объединяющие
 	merge: (streams...) -> @fork.push stream = new (@constructor)(); (for s in streams then s.fork.push stream); stream
@@ -820,28 +843,31 @@ class CStream
 	mapCombine = (channel) -> channel.idx = @_idx; @send channel
 	emitCombine = (channel) ->
 		(q = @_queue[channel.idx]).push channel
-		#delete channel.idx
-		if q.length == 0
+		if q.length == 1
 			@_len++
-			if @_len == @_queue.length-1
+			say @_len, @_queue.length, @_len == @_queue.length
+			if @_len == @_queue.length
 				args = []
 				for q in @_queue
 					args.push q.shift().args[0]
 					if q.length == 0 then @_len--
 				@send src: channel.src, args: args
+		this
 		
 	combine: (streams...) ->
 		streams.unshift this
 		len = streams.length
 		streams = (for s, i in streams then s.meta mapCombine, _idx: i)
 		stream = streams.shift()
-		stream = stream.merge sreams
+		stream = stream.merge streams...
 		stream.emitValue = emitCombine
 		stream._queue = q = []
-		for i in [0...len] then q.push []
+		stream._len = 0
+		for [0...len] then q.push []
 		stream
 	
-	zip: (streams...) ->
+	emitZip = (channel) -> (q=@_queue).push channel.args[0]; (if q.length == @_n then @_queue = []; @send src: channel.src, args: q); this
+	zip: (n) -> @meta emitZip, _queue: [], _n: n
 
 	#switch: ->
 	#	for i in [0...arguments] by 2
@@ -1445,7 +1471,7 @@ class CWidget
 				if ++j<len and h[j][0] == n then return j
 			return null
 	
-	change_history: (data) ->
+	history_change: (data) ->
 		w = @window()
 		if w.history.length + 1 == w.history$.length + w.history_before$ then w.history$.push [w.location.href, w.document.title, data]
 		else if w.history.length == w.history$.length + w.history_before$
@@ -3388,13 +3414,13 @@ class CLoaderWidget extends CWidget
 		$(document).clean()
 		do CRoot.initWidgets
 		
-		url = CUrl.from data["@url"]
+		say 'url = ', url = CUrl.from data["@url"]
 		
 		old = CUrl.from @window().location.href
 		#url = CUrl.from @request.url
-		url.pathname = url.param._layout_ || old.pathname
-		delete url.param._layout_
-		url.search = ""
+		#url.pathname = url.param._layout_ || old.pathname
+		#delete url.param._layout_
+		#url.search = ""
 		extend frames = {}, CParam.from(old.param._frames_, /,/), CParam.from url.param._frames_, /,/
 		url.param._frames_ = frames if frames = CParam.to frames, ","
 		url = CUrl.to url
@@ -3443,7 +3469,7 @@ class CRouterWidget extends CWidget
 				if url.hash then param._layout_id_ = url.hash; url.hash = ""
 				param._act = CUrl.to url
 				#if not a._loader and not a.attr 'cloader' then a.loader this
-				@submit param
+				a.submit param
 		this
 	
 	val: -> undefined

@@ -71,6 +71,7 @@ $SIG{USR1} = \&read_perm;
 # грузим экшены
 for_action \&load_action;
 
+
 # демонизируемся
 if($_site->{daemon}) {
 	my $path = dirname($0).'/rubin.log';
@@ -167,7 +168,7 @@ sub ritter {
 		my $action_htm = $_action_htm{$_action};
 		my $ajax = $_HEAD->{Ajax} // "";
 		
-		if(defined $action or defined $action_htm and $ajax ~= /^(|submit)$/) {
+		if(defined $action or defined $action_htm and $ajax =~ /^(|submit)$/) {
 			my $submit = $1;
 			$_STATUS = 200;
 			$_user_id = auth();
@@ -181,7 +182,7 @@ sub ritter {
 			);
 			
 			if($submit) {
-				@ret = action_submit()
+				@ret = action_submit();
 				return ajax_redirect(\@ret) if $_STATUS == 307 and $_HEAD{'Location'} =~ /^$_RE_LOCATION$/o;
 			}
 			else {	
@@ -194,7 +195,7 @@ sub ritter {
 					}
 				}
 			}
-		} elsif(my $info = $_info->{$_action}) {
+		} elsif(exists $_info->{$_action}) {
 			$_STATUS = 200;
 			$_user_id = auth();
 			@ret = action_main($_action);
@@ -211,7 +212,7 @@ sub ritter {
 		if(ref $error eq "Rubin::Raise") {
 			@ret = $error;
 		} else {
-			if(ref $error eq "Rubin::Exception") { $_STATUS = $error->{error}; $error = $error->{message} . $error->{trace} }
+			if(ref $error eq "Rubin::Exception") { $_STATUS = $error->{error}; $error = join "", $error->{error}, " ", $error->{message}, "\n\n", $error->{trace} }
 			else { $_STATUS = 500; }
 			
 			$error = ($is_io? "io: ": "").$error;

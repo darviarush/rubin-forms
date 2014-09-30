@@ -247,7 +247,7 @@ sub accept {
 			$main::_GET = Utils::param($SEARCH);
 			if($CONTENT_LENGTH) {
 				my $f;
-				my $body = $main::_HEAD->{'Request-Body-File'}
+				my $body = $main::_HEAD->{'Request-Body-File'};
 				$main::_POST = Utils::param_from_post($body? do {
 					open $f, $body or die "NOT OPEN REQUEST_BODY_FILE=$body $!"; $f
 				}: $env->{"psgi.input"}, $main::_HEAD->{'Content-Type'}, $CONTENT_LENGTH);

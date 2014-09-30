@@ -1,14 +1,17 @@
 use Data::Dumper;
-use Utils;
+use Term::ANSIColor qw(:constants);
 require Cwd;
 
+use Utils;
+
+
 sub msg (@) {
-	print STDERR join(", ", map { ref $_? Utils::Dump($_): $_ } @_)."\n";
+	print STDERR join(", ", map { !defined($_)? RED."undef".RESET: ref $_? Utils::Dump($_): $_ } @_)."\n";
 	return $_[$#_];
 }
 
 sub msg1 (@) {
-	print STDERR join(", ", map { ref $_? do { my($x)=Utils::Dump($_); $x=~s/\s+//g; $x}: $_ } @_)."\n";
+	print STDERR join(", ", map { !defined($_)? RED."undef".RESET: ref $_? do { my($x)=Utils::Dump($_); $x=~s/\s+//g; $x}: $_ } @_)."\n";
 	return $_[$#_];
 }
 
