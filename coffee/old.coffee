@@ -111,3 +111,15 @@ extend CWidget.prototype,
 		# setTimeout (=> win = @window(); if win._c_old_hash != h=win.location.hash then f h, win._c_old_hash; win._c_old_hash = h), 200
 	# http://learn.javascript.ru/onload-onerror
 	# http://snipplr.com/view/6029/domreadyjs/
+
+class CInputWidget extends CInputWidget
+	constructor: ->
+		super
+		say "CInputWidget ====> old!!!"
+		if @attr "placeholder" then @setHandler 'blur', 'focus'; @send 'onblur'
+		
+	val_: (val) -> if arguments.length then @element.value = val; this else @element.value
+	val: (args...) -> if @_save_type then (if arguments.length then @onfocus(); @val_ args...; @onblur() else "") else @val_ args...
+		
+	onblur: -> if @val_() == "" then @_save_type = @attr "type"; @attr "type", "text"; @val_ @attr "placeholder"; @addClass 'c-placeholder'
+	onfocus: -> if @_save_type then @attr "type", @_save_type; @removeClass 'c-placeholder'; @_save_type = null ; @val_ ""

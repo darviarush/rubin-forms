@@ -123,9 +123,11 @@ sub accept {
 		send $ns, "\n", 0;
 		send $ns, $_, 0 for @$out;
 		
-		$main::_action = $main::_id = $main::_VERSION = $main::_METHOD = $main::_LOCATION = $main::_URL = $main::_HEAD = $main::_COOKIE = $main::_GET = $main::_POST = $main::param = undef;
+		$main::_action = $main::_id = $main::_VERSION = $main::_METHOD = $main::_LOCATION = $main::_URL = $main::_HEAD = $main::_COOKIE = $main::_GET = $main::_POST = $main::param = $main::_user_id = undef;
 		
 		main::stat_end($RESPONSE, $head, $out) if $::_test;
+		
+		@main::_HEAD = %main::_HEAD = @main::_COOKIE = ();
 		@$out = ();
 	}
 }

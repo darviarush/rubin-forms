@@ -66,7 +66,7 @@ sub load_action ($$) {
 		if(not -e $p or -M $p >= -M $path) {
 	
 			my $action = Utils::read($path);
-			my @our = qw/$_COOKIE $_POST $_GET $_HEAD $param $ini %ENV %_STASH/;
+			my @our = qw/$_COOKIE $_POST $_GET $_HEAD $param $ini %ENV %_STASH $_id $_user_id/;
 			my %our = Utils::set(@our);
 			my %local = Utils::set(qw/@_ $_ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9 $a $b/);
 			my %my = ();
@@ -111,6 +111,19 @@ sub content ($) {
 	$::_HEAD[0] = "Content-Type: $_[0]$charset"
 }
 
+sub setcookie {
+	use HTTP::Date;
+	my ($name, $value, $expire, $path, $domain, $secure, $httponly) = @_;
+	my $val = join "", $name, "=", $value,
+		(defined($expire)? ("; Expires=" , time2str($expire)): ()),
+		(defined($path)? "; Path=$path": ()),
+		(defined($domain)? "; Domain=$domain": ()),
+		($secure? "; Secure": ()),
+		($httponly? "; HttpOnly": ());
+	header "Set-Cookie", $val;
+	push @::_COOKIE, $val;
+}
+
 sub redirect ($;$) {
 	$::_STATUS = 307;
 	header "Location", $_[0];
@@ -144,10 +157,14 @@ sub ajax_redirect {
 	our $_EXT = $5;
 	our $param = our $_GET = Utils::param($6);
 	our $_POST = {};
+	our %_HEAD = ();
+	my @COOKIE = @::_COOKIE;
+	@::_COOKIE = ();
 	my $ret = ritter();
 	our $_STATUS = $ret->[0];
 	our @_HEAD = @{$ret->[1]};
 	@{$_[0]} = @{$ret->[2]};
+	header "Set-Cookie", $_ for @COOKIE;
 }
 
 
@@ -157,7 +174,7 @@ sub action_submit {
 	my ($id, $url, $act);
 	my $add_res = sub {
 
-		die "Нет экшена `$act`" unless exists $main::_action{$act} or exists $main::_action_htm{$act};
+		die "Нет экшена `$act`" if not exists $main::_action{$act} and not $main::_action_htm{$act};
 		
 		$result->{$act} = {
 			act => $act,

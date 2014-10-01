@@ -2968,7 +2968,7 @@ new CTest 'key-CTemplate-compile', """
 	html = fn x: 0, y: 1
 	@is html, "10\n"
 
-	fn = CTemplate.compile '$xyz:raw'
+	fn = CTemplate.compile '$xyz:raw:raw'
 	html = fn xyz:"<>"
 	@is html, "<>"
 	

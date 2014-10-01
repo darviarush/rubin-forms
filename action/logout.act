@@ -1,3 +1,7 @@
-header "Set-Cookie", "sess=;path=/;max-age=-1";
-erase "sess", {user_id => auth()};
+
+setcookie "sess", "", 150723948, "/";
+erase "sess", {id => $_COOKIE->{sess}} if exists $_COOKIE->{sess};
+$_user_id = undef;
+delete $_COOKIE->{sess};
+
 return redirect "/";

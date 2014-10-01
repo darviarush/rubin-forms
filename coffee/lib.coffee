@@ -1008,6 +1008,7 @@ CTemplate =
 	compile: (i_html, forms = {}, form = {}) ->
 
 		code_begin = """function(dataset, id1, start) {
+	if(!dataset) dataset = []
 	var res = []
 	start = start || 0
 	for(var i=0, n=dataset.length; i<n; i++) {
@@ -1021,7 +1022,7 @@ CTemplate =
 	return html
 }"""
 
-		code_begin1 = "function(data, id) { return ['"
+		code_begin1 = "function(data, id) { if(!data) data = {}; return ['"
 		code_end1 = '\'].join("") }'
 		
 		RE_TYPE = "(\"(?:\\\\\"|[^\"])*\"|'(?:\\\\'|[^'])*'|-?\\d+(?:\\.\\d+)?(?:E[+-]\\d+)?)"
@@ -1032,7 +1033,7 @@ CTemplate =
 		RE_ELIF = new RegExp "^\\{%\\s*elif\\s+(?:\\$(%)?(\\w+)|#{RE_TYPE})"
 		
 		re_type = (s) -> if s? then s.replace(/\n/g, '\\n').replace /\r/g, '\\r'
-		_NO_ESCAPE_HTML = raw: 1, json: 1, dump: 1
+		_NO_ESCAPE_HTML = CHelper._NO_ESCAPE_HTML
 		
 		_tags = ///(?:input|meta)///i
 		tags =
@@ -1059,7 +1060,7 @@ CTemplate =
 
 				if not VAR and m = s.match ///^:(\w+)(\()?///
 					html[fn_idx] = "CHelper.#{m[1]}(" + html[fn_idx]
-					html.push (if m[2] then ++braket; ", " else ")")
+					html.push (if m[2] then ++braket; ", " else VAR = not VAR; ")")
 				else if VAR and m = s.match PARSE_CONST then fn_idxs.push fn_idx; fn_idx = html.length; html.push re_type m[0]
 				else if VAR and m = s.match ///^\$(%)?(\w+)/// then fn_idxs.push fn_idx; fn_idx = html.length; html.push var_x m[1], m[2]
 				else if not VAR and m = s.match ///^,\s*/// then fn_idx = fn_idxs.pop(); html.push m[0]
@@ -1193,6 +1194,7 @@ CTemplate =
 
 
 CHelper =
+	_NO_ESCAPE_HTML: raw: 1, json: 1, dump: 1, style: 1
 	json: toJSON
 	raw: (x) -> x
 	html: escapeHTML
@@ -1214,6 +1216,9 @@ CHelper =
 	ge: (a, b) -> a >= b
 	eq: (a, b) -> a == b
 	ne: (a, b) -> a != b
+	# атрибуты, классы, стили
+	visible: (a) -> if a then "" else 'display:none'
+	style: (a) -> if a then "style=\"#{a}\"" else ''
 	
 	
 CValid =
@@ -2816,9 +2821,10 @@ class CNode extends CWidget
 
 class CButtonWidget extends CWidget
 	constructor: -> super ; @setHandler "click"
-	val: -> undefined
+	val: ->
 	onclick: (e) -> (if act=@attr 'act' then this[act]()); e.stop(); off
 
+	
 class CSubmitWidget extends CButtonWidget
 	onclick: (e) -> @parent().submit(); e.stop(); off
 class CLoadWidget extends CButtonWidget
@@ -2836,17 +2842,13 @@ class CPingWidget extends CButtonWidget
 class CInputWidget extends CWidget
 	constructor: ->
 		super
-		if @attr "cplaceholder" then @setHandler 'blur', 'focus'; @send 'onblur'
 		if valid = @attr "cvalid" then @setHandler 'keyup'
-
-	val_: (val) -> if arguments.length then @element.value = val; this else @element.value
-	val: (args...) -> if @_save_type then (if arguments.length then @onfocus(); @val_ args...; @onblur() else "") else @val_ args...
-		
-	onblur: -> if @val_() == "" then @_save_type = @attr "type"; @attr "type", "text"; @val_ @attr "cplaceholder"; @addClass 'c-placeholder'
-	onfocus: -> if @_save_type then @attr "type", @_save_type; @removeClass 'c-placeholder'; @_save_type = null ; @val_ ""
-	onkeyup: -> (if m=@_model then m.model[m.slot] @val()); @onfocus(); v=@valid(); if v then @clear 'onInvalid'; @tooltip null else @timeout 1500, 'onInvalid'
 	
-	setModel: -> @setHandler 'onkeyup'; super
+	val: (val) -> if arguments.length then @element.value = val; this else @element.value
+	
+	onkeyup: -> (if m=@_model then m.model[m.slot] @val()); if v=@valid() then @clear 'onInvalid'; @tooltip null else @timeout 1500, 'onInvalid'
+	
+	setModel: -> @setHandler 'keyup'; super
 
 
 class CSelectWidget extends CInputWidget
@@ -3295,8 +3297,8 @@ class CLoaderWidget extends CWidget
 	_load: (type, param={}, customer, args) ->
 
 		if (req=@request) and not req.end
-			req.request.abort()
-			@loaded_error "Поступил load до того, как закончился предыдущий old_customer: " + req.customer + " new_customer: " + customer
+			req.request?.abort()
+			say "Поступил load до того, как закончился предыдущий. old_customer: " + req.customer + " new_customer: " + customer
 		
 		@request = type: type, param: param, args: args
 		return this if customer.send("onSubmit", param) is off or off is @ohSubmit param
@@ -3376,7 +3378,7 @@ class CLoaderWidget extends CWidget
 		@request = null
 
 	end_request: ->
-		@request.request.onreadystatechange = null
+		@request?.request.onreadystatechange = null
 		clearTimeout @request.timer
 		@request.end = on
 		

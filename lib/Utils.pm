@@ -612,9 +612,9 @@ sub TemplateStr {
 	
 	my $re_type = sub { my ($x)=@_; return unless defined $x; local($`, $', $1); $x=~s/^'(.*)'$/$1/, $x=~s/"/\\"/g, $x="\"$x\"" if $x =~ /^'/; $x};
 	
-	my $code_begin = 'sub {	my ($dataset, $id1) = @_; my ($i, @res) = 0; for my $data (@$dataset) { $i++; my $id = "$id1-".($data->{id} // $i); push @res, \'';
+	my $code_begin = 'sub {	my ($dataset, $id1) = @_; my ($i, @res) = 0; for my $data (@$dataset) { my $id = "$id1-".($data->{id} // $i); push @res, \'';
 	
-	my $code_end = '\';	}	return join "", @res;
+	my $code_end = '\';	$i++; }	return join "", @res;
 }';
 
 	my $code_begin1 = 'sub { my ($data, $id) = @_; return join "", \'';
@@ -650,7 +650,7 @@ sub TemplateStr {
 			pos() = $pos;
 
 			push @html, (
-			!$VAR && m!\G:(\w+)(\()?!? do { $html[$fn_idx] = "Helper::$1(".$html[$fn_idx]; if($2) { ++$braket;	", " }else { ")" } }:
+			!$VAR && m!\G:(\w+)(\()?!? do { $html[$fn_idx] = "Helper::$1(".$html[$fn_idx]; if($2) { ++$braket; ", " }else { $VAR = !$VAR; ")" } }:
 			$VAR && m!\G(?:\$(%)?(\w+)|$RE_TYPE)!? do { push @fn_idx, $fn_idx; $fn_idx = scalar @html; $vario->($1, $2, $3) }:
 			!$VAR && m!\G,\s*!? do { $fn_idx = pop @fn_idx; $& }:
 			m!\G\)!? do { $VAR = 1; --$braket; $fn_idx = pop @fn_idx; ")" }:

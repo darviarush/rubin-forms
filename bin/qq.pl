@@ -35,7 +35,7 @@ our (
 	$param, $_GET, $_POST, $_COOKIE, $_HEAD,
 	$_METHOD, $_LOCATION, $_URL, $_action, $_id, $_user_id, $_VERSION, $_EXT,
 	$_STATUS, %_STATUS, %_STASH,
-	@_HEAD, %_MIME, %_HEAD
+	@_HEAD, %_MIME, %_HEAD, @_COOKIE
 	);
 
 our $_RE_LOCATION = qr!((/([^\s\?]*?)(?:(-?\d+)|(\.\w+))?)(?:\?(\S+))?)!;
@@ -157,7 +157,7 @@ sub tan {
 
 # Подчинённый обработчик запросов
 sub ritter {
-	@_HEAD = ("Content-Type: text/html; charset=utf-8");
+	@_HEAD = "Content-Type: text/html; charset=utf-8";
 	
 	%_frames = ();
 	my @ret = ();
@@ -168,8 +168,7 @@ sub ritter {
 		my $action_htm = $_action_htm{$_action};
 		my $ajax = $_HEAD->{Ajax} // "";
 		
-		if(defined $action or defined $action_htm and $ajax =~ /^(|submit)$/) {
-			my $submit = $1;
+		if(defined $action or defined $action_htm and $ajax =~ /^(?:|submit)$/) {
 			$_STATUS = 200;
 			$_user_id = auth();
 			%_STASH = (
@@ -181,7 +180,7 @@ sub ritter {
 				param => $param,
 			);
 			
-			if($submit) {
+			if($ajax eq "submit") {
 				@ret = action_submit();
 				return ajax_redirect(\@ret) if $_STATUS == 307 and $_HEAD{'Location'} =~ /^$_RE_LOCATION$/o;
 			}

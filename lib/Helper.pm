@@ -1,13 +1,13 @@
+package Helper;
+
 use strict;
 use warnings;
-
-package Helper;
 
 use JSON;
 use Data::Dumper;
 use Utils;
 
-our %_NO_ESCAPE_HTML = Utils::set(qw(raw json dump));
+our %_NO_ESCAPE_HTML = Utils::set(qw(raw json dump style));
 
 sub json { JSON::to_json($_[0]) }
 
@@ -47,6 +47,8 @@ sub ge { if($_[0]=~$_FLOAT and $_[1]=~$_FLOAT) { $_[0] >= $_[1] } else { $_[0] g
 sub eq { if($_[0]=~$_FLOAT and $_[1]=~$_FLOAT) { $_[0] == $_[1] } else { $_[0] eq $_[1] } }
 sub ne { if($_[0]=~$_FLOAT and $_[1]=~$_FLOAT) { $_[0] != $_[1] } else { $_[0] ne $_[1] } }
 
-# 
+# атрибуты, классы, стили
+sub visible { $_[0]? "": "display: none" }
+sub style { $_[0]? "style=\"$_[0]\"": "" }
 
 1;

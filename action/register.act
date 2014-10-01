@@ -14,13 +14,18 @@ if($email) {
 
 	$mailer->send_email("register", {To=>$email}, {id=>$sess});
 
-	return {};
+	return { email => $email };
 }
 
 
 $id = $param->{id};
-$new_pass = query("sess", "new_pass", {id=>$id});
+if($id) {
+	$new_pass = query("sess", "new_pass", {id=>$id});
 
-if($new_pass) {
-	header "Set-Cookie", "sess=$id; path=/";
-} else { redirect "register_fail" }
+	if($new_pass) {
+		setcookie "sess", $id, undef, "/";
+	}
+	return { new_pass => $new_pass };
+}
+
+return {}

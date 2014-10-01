@@ -197,7 +197,7 @@ is $html, "'\n";
 $html = $fn->({x=>0, y=>1});
 is $html, "10\n";
 
-$fn = Utils::Template('$xyz:raw ');
+$fn = Utils::Template('$xyz:raw:raw ');
 $html = $fn->({xyz=>"<>"});
 is $html, "<> ";
 

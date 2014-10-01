@@ -1,0 +1,25 @@
+{% layout "layout" %}
+
+{% title =%}Регистрация{% end %}
+
+<h1>Регистрация</h1>
+
+{% if $email %}
+
+<p>На почту <b>$email</b> отправлено письмо с подтверждением регистрации</p>
+
+{% elif $new_pass %}
+
+<p>Введите пароль:</p>
+
+<div id=$+user>
+	<input id=$-pass placeholder="Введите пароль">
+	<input id=$-pass2 placeholder="Введите пароль ещё раз">
+	<a id=$-a href="#" ctype=save>Сохранить</a>
+</div>
+
+{% else %}
+
+<p>Время регистрации вышло. <a href="/">Зарегистрируйтесь</a> заново</p>
+
+{% fi %}
