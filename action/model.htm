@@ -25,7 +25,7 @@ function ping(td, opt) {
 	}, opt))
 }
 
-CListen.setListen.call(function(e) {
+$(document).on("click", function(e) {
 	var td = e.target(), role = td.attr("role")
 	if(role) {
 		if(/\b(?:noauth|user|self)\b/.test(role)) {
@@ -46,14 +46,14 @@ CListen.setListen.call(function(e) {
 			};
 		}
 	}
-}, "click", "document")
+})
 
-CListen.setListen.call(function(e) {
+$(document).on("mouseover", function(e) {
 	var td = e.target(), com
 	if(td && /^td|th$/i.test(td.tag()) && (com = td.down(0)).tag() == "#comment") {
 		td.tooltip({html: com.free().text(), append: 'prepend', open: 1, pos: 'bottom'})
 	}
-}, "mouseover", "document")
+})
 
 </script>
 

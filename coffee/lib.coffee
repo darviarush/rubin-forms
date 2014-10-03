@@ -888,25 +888,42 @@ class CModel
 	# _on: {} и on... - обработчики при изменении данных
 	# _at: {} и at... - обработчики при запросе данных
 	# _name: string - имя модели в ::_models
-	_models: {} # все модели по имени (@_name)
-	_counter: 0
-	constructor: (data = {}, cmp, name) ->
-		if typeof cmp == 'string' then name = cmp; cmp = {}
-		@constructor::_counter++
-		@_models[@_name = name || "[CModel ##{@_counter}]"] = this
+	#! _models: {} # все модели по имени (@_name)
+	#!_counter: 0
+	constructor: (data = {}, cmp = {}, @_name) ->
+		#@constructor::_counter++
+		#@_models[@_name = name || "[CModel ##{@_counter}]"] = this
 		@_ = data
 		@_cmp = cmp ||= {}
 		@_on = {}
 		@_at = {}
 		@_queue = {}
-		for key of data then @add key, data[key], cmp[key]
+		for key of data then @set key, data[key], cmp[key]
 		for key of cmp when not key of data then throw CRoot.raise "Нет ключа `#{key}` для функции сравнения"
+	
+	has: (key) -> key of @_
+	
+	set: (key, val, cmp) ->
+		if typeof val == 'function'
+			match = String(val).match /// ^function\s*[\$\w]*\s*\( ([^\(\)]*) \) ///
+			keys = match[1].split /// ,\s* ///
+			@on keys, do(key, val, keys)-> (v, old, key1)->
+				ret = new Array((len=keys.length)+2)
+				ret[len] = old
+				ret[len+1] = key1
+				for name, i in keys then say i, name, ret[i] = @retrive name
+				@change key, val.apply this, ret
+			val = undefined
+			say keys, @_on
+			fn = do(key)-> (val) -> if arguments.length then throw CRoot.raise "Попытка изменить вычислимое свойство модели `#{key}`" else @retrive key
+		else
+			fn = do(key)-> (val) -> if arguments.length then @change key, val else @retrive key
 		
-	add: (key, val, cmp) ->
 		@_[key] = val
-		@_cmp[key] = cmp if cmp
-		@["$"+key] = fn = do(key, cmp)-> (val) -> if arguments.length == 1 then @retrive key else @change key, val
-		@[key] = fn unless key of this
+		if arguments.length == 3
+			if cmp then @_cmp[key] = cmp else delete @_cmp[key]
+		@["$"+key] = fn
+		@[key] = fn unless key of this and not @hasOwnProperty key
 		this
 	
 	del: (key) -> @un key; @ut key; delete @_[key]; delete @_cmp[key]
@@ -935,6 +952,7 @@ class CModel
 	un: _off.inline "un", "_at"
 	
 	change: (key, val) ->
+		say 'change', key, val, @_[key]
 		throw CRoot.raise "Нет ключа `#{key}` в модели #{@constructor.getName()}.#{@_name}" unless key of @_
 		if arguments.length == 1 then val = !@_[key]
 		old=@_[key]
@@ -966,7 +984,7 @@ class CRepository	# Abstract, _: {} - ключи
 	constructor: (model, @_ = {}) ->
 		@model = model
 		for key of @_
-			unless key of model._ then model.add key, @_[key]
+			unless key of model._ then model.set key, @_[key]
 			if @save then model.on key, fn = ((val, old, key) => @save key, val); fn._belong = this
 			if @load then model.at key, fn = ((key) => @load key); fn._belong = this
 			
@@ -1046,7 +1064,7 @@ CTemplate =
 		form.fields = {}
 		form.forms = []
 			
-		T = []; html = []; pos = 0 ; s = i_html
+		T = []; html = []; pos = 0 ; s = i_html; ifST = []
 		
 		var_x = (_type, _var) -> if _type then (if _var == '_DATA' then "data" else if _var == "_STASH" then "CTemplate._STASH" else if _var == 'i' then "i" else if _var == 'i0' then "(i-1)" else "CTemplate._STASH.#{_var}") else "data['#{_var}']"
 		
@@ -1122,10 +1140,10 @@ CTemplate =
 			else if m = s.match ///^{%\s*(\w+)\s*=%\}/// then html.push "', (function() { CTemplate._STASH.#{m[1]} = ['"
 			else if m = s.match ///^{%\s*end\s*%\}/// then html.push "'].join(''); return '' })(), '"
 			
-			else if m = s.match RE_IF then s = s.slice len = m[0].length; pos += len; html.push "', ("; helper(m[1], m[2], m[3]); throw "Нет закрывающей `%}` для if" unless m = s.match ///^\s*%\}///; html.push "? ['"
-			else if m = s.match RE_ELIF then s = s.slice len = m[0].length; pos += len; html.push "'].join(''): "; helper(m[1], m[2], m[3]); throw "Нет закрывающей `%}` для elif" unless m = s.match ///^\s*%\}///; html.push "? ['"
-			else if m = s.match ///^\{%\s*else\s*%\}/// then html.push "'].join(''): ['"
-			else if m = s.match ///^\{%\s*fi\s*%\}/// then html.push "'].join('')), '"
+			else if m = s.match RE_IF then s = s.slice len = m[0].length; pos += len; html.push "', ("; helper(m[1], m[2], m[3]); throw "Нет закрывающей `%}` для if" unless m = s.match ///^\s*%\}///; ifST.push 1 ; html.push "? ['"
+			else if m = s.match RE_ELIF then s = s.slice len = m[0].length; pos += len; html.push "'].join(''): "; helper(m[1], m[2], m[3]); throw "Нет закрывающей `%}` для elif" unless m = s.match ///^\s*%\}///; throw "Нельзя использовать elif" if (n=ifST.length)==0 or ifST[n-1] != 1 ; html.push "? ['"
+			else if m = s.match ///^\{%\s*else\s*%\}/// then throw "Нельзя использовать else" if (n=ifST.length)==0 or ifST[n-1] != 1 ; ifST[n-1] = 2 ; html.push "'].join(''): ['"
+			else if m = s.match ///^\{%\s*fi\s*%\}/// then throw "Нельзя использовать fi" if (n=ifST.length)==0 ; html.push "'].join('')" + (if ifST[n-1] == 1 then ": ''" else "") + "), '"
 			
 			else if m = s.match CALL_FN then	
 			else if m = s.match PARSE_VAR
@@ -1151,7 +1169,7 @@ CTemplate =
 					html.push ", '" + (if open_span then "</span>" else "")
 					continue
 
-			else if open_tag and m = s.match ///^\$([*+])(\w+)?/// then t = [m[2], m[1]=='*']; html.push "', id, '" + (if m[2] then "-" + m[2] else "")
+			else if open_tag and m = s.match ///^\$([+*])(\w+)?(:load(?:\(%(\w+)\))?)?(?::model\((\w+)\))?/// then t = [m[2], m[1]=='*']; html.push "', id, '" + (if m[2] then "-" + m[2] else "")
 			else if m = s.match ///^[\\']/// then html.push "\\"+m[0]
 			else if m = s.match ///^\n/// then html.push "\\n"
 			else if m = s.match ///^\r/// then html.push "\\r"
@@ -1260,7 +1278,7 @@ unless window.$ then $ = (e) -> (if typeof e == 'function' then CRoot._init_func
 	
 class CWidget
 
-	model: new CModel()
+	model: new CModel({}, {}, "main")
 
 	constructor: (element, @_parent) ->
 		throw @raise "element не HTMLElement", element unless element and element.tagName
@@ -1614,15 +1632,19 @@ class CWidget
 	observeStream: (events) -> stream = new CStream; @observe events, stream.emitter(); stream
 	ajaxStream: -> stream = new CStream; @on 'Load', stream.emitter(); @on 'Error', stream.errorer(); stream
 
+	_default_assign: 'text'
+	assign: (slot, type = @_default_assign, attr = []) ->
+		model = @model
+		@_slot = slot
+		model.set slot, @[type] attr... unless model.has slot
+		model.on slot, fn = do(type, attr) => (v, old, key) => this[type] attr..., v
+		fn._belong = this
 	setModel: ->
 		if attr = @attr 'model'
-			[model, slot, type] = attr.split /:/
-			model = CModel.$models[model || 'noname']
-			slot ||= @name()
-			type ||= 'val'
-			@_model = model: model, slot: slot, type: type
-			@observe type, (fn, args...) -> (if args.length then m=@_model; m.model[m.slot] args[0]); fn.apply this, args
-			model.on slot, (v, old) => this[@_model.type] v
+			attr = attr.split /:/
+			slot = attr.shift()
+			type = attr.shift()
+			@assign slot, type, attr
 		this
 	setModelOnElements: (elem=@_elements) -> (for e in elem then @byName(e).setModel()); this
 	
@@ -2845,10 +2867,15 @@ class CInputWidget extends CWidget
 		if valid = @attr "cvalid" then @setHandler 'keyup'
 	
 	val: (val) -> if arguments.length then @element.value = val; this else @element.value
+	html: @::val
+	text: @::val
 	
-	onkeyup: -> (if m=@_model then m.model[m.slot] @val()); if v=@valid() then @clear 'onInvalid'; @tooltip null else @timeout 1500, 'onInvalid'
+	onkeyup: ->
+		if slot=@_slot then @model.change slot, @val()
+		if v=@valid() then @clear 'onInvalid'; @tooltip null else @timeout 1500, 'onInvalid'
+		this
 	
-	setModel: -> @setHandler 'keyup'; super
+	setModel: -> super ; (if @_slot then @setHandler 'keyup'); this
 
 
 class CSelectWidget extends CInputWidget
@@ -2903,6 +2930,7 @@ class CIframeWidget extends CImgWidget
 
 # формы
 class CFormWidget extends CWidget
+	_default_assign: 'val'
 	_method: 'POST'
 	
 	constructor: ->
@@ -2912,6 +2940,7 @@ class CFormWidget extends CWidget
 		do @defineHandlers if 0 == counter
 		do @setHandlers
 		do @setListens
+		do @setModel
 		do @initialize
 		#@attr "ctype", @className()
 		@send "onCreate", counter
@@ -2919,6 +2948,7 @@ class CFormWidget extends CWidget
 	initialize: ->
 		do @setHandlersOnElements
 		do @attachElements
+		do @setModelOnElements
 	dataType: (data) ->
 		if typeof data == 'string' then data = fromJSON data
 		if data.rows and data.fields

@@ -608,6 +608,8 @@ sub parse_frames {
 our %_STASH;
 sub TemplateStr {
 	
+	require Helper;
+	
 	my $RE_TYPE = qr/("(?:\\"|[^"])*"|'(?:\\'|[^'])*'|-?\d+(?:\.\d+)?(?:E[+-]\d+)?)/;
 	
 	my $re_type = sub { my ($x)=@_; return unless defined $x; local($`, $', $1); $x=~s/^'(.*)'$/$1/, $x=~s/"/\\"/g, $x="\"$x\"" if $x =~ /^'/; $x};
@@ -634,7 +636,7 @@ sub TemplateStr {
 	local ($_, $&, $`, $', $1, $2, $3, $4, $5);
 	($_) = @_;
 	
-	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id) = ($_, 0);
+	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id, @ifST) = ($_, 0);
 	my $page = my $form = {};
 	
 	my $get_id = sub { $open_id? ($form->{id}? "$form->{id}-$open_id": $open_id): /\bid=["']?([\w-]+)[^<]*\G/i && $1 };
@@ -661,7 +663,7 @@ sub TemplateStr {
 			
 		}
 		if($open_braket) { die "не закрыта `}`" unless m!\G\}!; }
-		die "не закрыты скобки ($braket)" if $braket;
+		die "не закрыты скобки ($braket) в шаблоне `$_`" if $braket;
 		
 		return $fn_idx;
 	};
@@ -677,7 +679,7 @@ sub TemplateStr {
 			if($cinit) { $template=~s/!/!!/g; $template=~s/-->/--!>/g; $html[$idx] .= "<!--$template-->" }
 			push @html, ($type? $code_end: $code_end1) . ")->(\$data".($name? "->{'$name'}": "").", \$id".($name? ".'-$name'": "")."), '";
 			$form->{template} = $template;
-			push @{$_form->{forms}}, $form;
+			push @{$_form->{forms}}, $form->{id};
 			$form = $_form;
 		}
 		$TAG = $tag->[0];
@@ -699,9 +701,12 @@ sub TemplateStr {
 				my (@ret, $type, $name);
 				if($T) {
 					local($&, $`, $'); my $m;
-					$T = [$open_tag, $pos+1, $name=$T->[0], $type=$T->[1], $m=/\bcinit[^<]*\G/i, scalar(@html), $form];
-					my $id = (exists $form->{id}? $form->{id} . "-": "") . (defined($name)? $name: "");
-					$forms->{$id} = $form = {id => $id, name => $name, is_list => $type};
+					my $frm = $T;
+					$T = [$open_tag, $pos+1, $name=$T->{name}, $type=$T->{is_list}, $m=/\bcinit[^<]*\G/i, scalar(@html), $form];
+					my $id = (exists($form->{id})? "$form->{id}-": "") . ($name // "");
+					$frm->{id} = $id;
+					$forms->{$id} = $form = $frm;
+					push @{$page->{load_forms}}, $frm->{id} if exists $frm->{load};
 					@ret=(">", "', (" . ($type? $code_begin: $code_begin1))
 				} else { $T = [$open_tag]; @ret = ">" }
 				push @T, $T;
@@ -719,13 +724,10 @@ sub TemplateStr {
 		m!\G\$&!? do { $page->{layout_id} = $get_id->(); "', \@_[2..\$#_], '" }:
 		m!\G\{%\s*(\w+)\s*=%\}!? do { "', do { \$_STASH{'$1'} = join '', ('" }:
 		m!\G\{%\s*end\s*%\}!? do { "'); () }, '" }:
-		m!\G\{%\s*if\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do { $pos += length $&; push @html, "', ("; $helper->($1, $2, $3); die "Нет закрывающей `%}` для if" unless m!\G\s*%\}!; $pos += length $&; push @html, "? ('"; next }:
-		m!\G\{%\s*elif\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do { $pos += length $&; push @html, "'): "; $helper->($1, $2, $3); die "Нет закрывающей `%}` для elif" unless m!\G\s*%\}!; $pos += length $&; push @html, "? ('"; next }:
-		m!\G\{%\s*else\s*%\}!? "'): ('":
-		m!\G\{%\s*fi\s*%\}!? "')), '":
-		m!\G\{%\s*load(?:\s+(\w+))?\s*%\}!? do { push @{$page->{load_forms}}, $form; $form->{load} = $1; my $id = $form->{id}; splice @html, $T[$#T][5]+1, 0, "', do { \$data->{'$open_id'} //= \$_STASH{'$id'}; () }, '"; () }:
-		m!\G\{%\s*model\s+(\w+)\s*%\}!? do { $form->{model} = $1; () }:
-		m!\G\{%\s*noload\s*%\}!? do { $form->{noload} = 1; () }:
+		m!\G\{%\s*if\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do { $pos += length $&; push @html, "', (("; $helper->($1, $2, $3); die "Нет закрывающей `%}` для if" unless m!\G\s*%\}!; push @ifST, 1; $pos += length $&; push @html, ")? ('"; next }:
+		m!\G\{%\s*elif\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do { die "Нельзя использовать elif" if @ifST==0 or $ifST[$#ifST] != 1 ; $pos += length $&; push @html, "'): ("; $helper->($1, $2, $3); die "Нет закрывающей `%}` для elif" unless m!\G\s*%\}!; $pos += length $&; push @html, ")? ('"; next }:
+		m!\G\{%\s*else\s*%\}!? do { die "Нельзя использовать else" if @ifST==0 or $ifST[$#ifST]!=1; $ifST[$#ifST] = 2; "'): ('" }:
+		m!\G\{%\s*fi\s*%\}!? do { die "Нельзя использовать fi" if @ifST==0; "')".($ifST[$#ifST] == 1? ": ()": "")."), '" }:
 		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)]; () }:
 		m!\G(?:\$|(#))(\{\s*)?(?:(%)?(\w+)|$RE_TYPE)!? do {
 			my $open_span = $1;
@@ -748,7 +750,19 @@ sub TemplateStr {
 				next;
 			}
 		}:
-		$open_tag && m!\G\$([+*])(\w+)?!? do { $T = [$2, $1 eq "*"]; "', \$id, '".($2? "-$2": "") }:
+		# m!\G\{%\s*load(?:\s+(\w+))?\s*%\}!? do { push @{$page->{load_forms}}, $form; $form->{load} = $1; my $id = $form->{id}; splice @html, $T[$#T][5]+1, 0, "', do { \$data->{'$open_id'} //= \$_STASH{'$id'}; () }, '"; () }:
+		# m!\G\{%\s*model\s+(\w+)\s*%\}!? do { $form->{model} = $1; () }:
+		# m!\G\{%\s*noload\s*%\}!? do { $form->{noload} = 1; () }:
+		$open_tag && m!\G\$([+*])(\w+)?(:load(?:\((%)?(\w+)\))?)?(?::model\((\w+)\))?!? do {
+			my ($type, $name, $load, $type_var, $var, $model) = ($1, $2, $3, $4, $5, $6);
+			$T = {
+				name => $name, 
+				is_list => $type eq "*",
+			};
+			$T->{model} = $model if $model;
+			$T->{load} = ($type_var? {stash => $var}: {var => $var}) if $load;
+			"', \$id, '".($name? "-$name": "");
+		}:
 		m!\G[\\']!? "\\$&":
 		m!\G.!s? $&:
 		last;

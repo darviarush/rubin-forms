@@ -4,7 +4,6 @@ use strict;
 use warnings;
 
 
-use File::Find;
 use File::Basename;
 use Time::HiRes qw//;
 use JSON;
@@ -33,12 +32,12 @@ our (
 	$ini, %_action, %_action_htm, %_frames, %_forms, %_pages, %_layout,
 	%_tab_rules, %_rules, $dbh, $_info,
 	$param, $_GET, $_POST, $_COOKIE, $_HEAD,
-	$_METHOD, $_LOCATION, $_URL, $_action, $_id, $_user_id, $_VERSION, $_EXT,
+	$_METHOD, $_LOCATION, $_URL, $_action, $_user_id, $_VERSION, $_EXT,
 	$_STATUS, %_STATUS, %_STASH,
 	@_HEAD, %_MIME, %_HEAD, @_COOKIE
 	);
 
-our $_RE_LOCATION = qr!((/([^\s\?]*?)(?:(-?\d+)|(\.\w+))?)(?:\?(\S+))?)!;
+our $_RE_LOCATION = qr!((/([^\s\?]*?)(?:(-?\d+)((?:_-?\d+)*)|(\.\w+))?)(?:\?(\S+))?)!;
 	
 our $_site = $ini->{site};
 our $_test = $_site->{test};
@@ -172,17 +171,13 @@ sub ritter {
 			$_STATUS = 200;
 			$_user_id = auth();
 			%_STASH = (
-				_id => $_id,
-				_user_id => $_user_id,
-				_COOKIE => $_COOKIE,
-				_GET => $_GET,
-				_POST => $_POST,
-				param => $param,
+				user_id => $_user_id,
 			);
-			
+						
 			if($ajax eq "submit") {
 				@ret = action_submit();
-				return ajax_redirect(\@ret) if $_STATUS == 307 and $_HEAD{'Location'} =~ /^$_RE_LOCATION$/o;
+				my @loc;
+				return ajax_redirect(\@ret, \@loc) if $_STATUS == 307 and @loc = $_HEAD{'Location'} =~ /^$_RE_LOCATION$/o;
 			}
 			else {	
 				@ret = $action->() if $action;
@@ -218,7 +213,7 @@ sub ritter {
 			
 			my $e = $error;
 			$e =~ s!\b((?:called )?at|line|thread)\b!CYAN.$1.RESET!ge;
-			msg RED."action-error `$_action".(defined($_id)? ".$_id": "")."`:".RESET." $e\n";
+			msg RED."action-error `$_action".($param->{id} // "")."`:".RESET." $e\n";
 			$error = $_test ? $error: "Внутренняя ошибка";
 			
 			if($_HEAD->{Accept} =~ /^text\/json\b/) {

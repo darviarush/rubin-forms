@@ -4,7 +4,7 @@ use warnings;
 
 use Data::Dumper;
 use Msg;
-use Test::More tests => 62;
+use Test::More tests => 75;
 
 use Msg;
 require_ok 'Utils';
@@ -92,6 +92,56 @@ is_deeply $param, {
   'file2' => ["x2\n"]
 };
 
+
+################################################# inject_ini #################################################
+
+my $ref = "
+[x]
+# коммент 2
+f = 1
+а1 = 3
+
+[x::y]
+# коммент
+z = 10
+z1 = 20
+x2 = 30
+";
+
+Utils::inject_ini($ref, "x::y", "z", 12);
+like $ref, qr/^z = 12\nz1/m;
+
+Utils::inject_ini($ref, "x::y", "n", 50, "z1");
+
+like $ref, qr/^z1 = 20\nn = 50$/m;
+
+Utils::inject_ini($ref, "x::y", "n", 60, "z1");
+
+like $ref, qr/^z1 = 20\nn = 60$/m;
+
+Utils::inject_ini($ref, "x::y", "r", 70, "z1", 1);
+
+like $ref, qr/^r = 70\nz1 = 20\nn = 60$/m;
+unlike $ref, qr/\br = 70\b.*\br = 70\b/ms;
+
+Utils::delete_ini($ref, "x::y", "r");
+
+unlike $ref, qr/^r = 70$/m;
+
+like $ref, qr/^f = 1$/m;
+
+Utils::delete_ini($ref, "x");
+
+unlike $ref, qr/^f = 1$/m;
+
+
+Utils::inject_ini($ref, "", "k1", 90);
+
+like $ref, qr/^k1 = 90\n/m;
+
+
+
+################################################# темплейты #################################################
 
 my $fn = Utils::Template("
 	<div id='\$+'>
@@ -203,7 +253,7 @@ is $html, "<> ";
 
 $r = <<'END';
 {% if $x:lt(10) %}
-1
+	{% if $y %}1{% fi %}
 {% elif $y:eq($z) %}
 2
 {% else %}
@@ -212,8 +262,8 @@ $r = <<'END';
 END
 
 $fn = Utils::Template($r);
-$html = $fn->({x=>1});
-is $html, "\n1\n\n";
+$html = $fn->({x=>1, y=>1});
+is $html, "\n\t1\n\n";
 $html = $fn->({x=>10, y=>13, z=>13});
 is $html, "\n2\n\n";
 $html = $fn->({x=>10, y=>1, z=>2});
@@ -237,47 +287,26 @@ $html = $fn->({abc=>1});
 is $html, '<tr tab="1"><div id="x1">';
 
 
+$code = Utils::TemplateStr('<div id=$+user:load(%user_id)>$s</div>', $forms, $page);
+is $page->{load_forms}[0], "user";
+$form = $forms->{$page->{load_forms}[0]};
+is $form->{id}, "user";
+is $form->{load}{stash}, "user_id";
+is $form->{load}{var}, undef;
+is $form->{model}, undef;
 
-my $ref = "
-[x]
-# коммент 2
-f = 1
-а1 = 3
-
-[x::y]
-# коммент
-z = 10
-z1 = 20
-x2 = 30
-";
-
-Utils::inject_ini($ref, "x::y", "z", 12);
-like $ref, qr/^z = 12\nz1/m;
-
-Utils::inject_ini($ref, "x::y", "n", 50, "z1");
-
-like $ref, qr/^z1 = 20\nn = 50$/m;
-
-Utils::inject_ini($ref, "x::y", "n", 60, "z1");
-
-like $ref, qr/^z1 = 20\nn = 60$/m;
-
-Utils::inject_ini($ref, "x::y", "r", 70, "z1", 1);
-
-like $ref, qr/^r = 70\nz1 = 20\nn = 60$/m;
-unlike $ref, qr/\br = 70\b.*\br = 70\b/ms;
-
-Utils::delete_ini($ref, "x::y", "r");
-
-unlike $ref, qr/^r = 70$/m;
-
-like $ref, qr/^f = 1$/m;
-
-Utils::delete_ini($ref, "x");
-
-unlike $ref, qr/^f = 1$/m;
+$code = Utils::TemplateStr('<div id=$+user:load>$s</div>', $forms, $page);
+$form = $forms->{$page->{load_forms}[0]};
+is $form->{id}, "user";
+is $form->{load}{var}, undef;
+is $form->{load}{stash}, undef;
+is $form->{model}, undef;
 
 
-Utils::inject_ini($ref, "", "k1", 90);
+$code = Utils::TemplateStr('<div id=$+user:load(var):model(useris)>$s</div>', $forms, $page);
+$form = $forms->{$page->{load_forms}[0]};
+is $form->{id}, "user";
+is $form->{model}, "useris";
+is $form->{load}{stash}, undef;
+is $form->{load}{var}, "var";
 
-like $ref, qr/^k1 = 90\n/m;

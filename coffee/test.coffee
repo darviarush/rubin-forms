@@ -299,15 +299,43 @@ new CTest "obj-CStream-from", """
 
 	
 
-CTest.category "модели"
+CTest.category "модель"
 
 new CTest "cls-CModel", """
-`CModel ` - модель имеет свойства и вызывает обработчики событий, если свойство изменилось
+`CModel properties, compares` - модель имеет свойства и вызывает обработчики событий, если свойство изменилось
 
-См. #maps, #mapWithSrc 
+Так же модель может обновить свойство, если его запросили
+
+У всех экземпляров класса CWidget или его наследников есть 
+
+- properties - ключ-значения, где ключ соответствуют названию свойства модели, а значение - начальному значению этого свойства
+- compares - функции сравнения. Когда приходит новое значение, то оно сравнивается со старым - если оно не изменилось, то и обработчики не изменяются. Если функция сравнения не указано, то используется жёсткое сравнение javascript (===)
+
+См. #CRouter
+""", """
+<div id=$name ctype=form>
+	<p>Имя: <input id=$name-input model=first>
+	<span id=$name-span model=first></span><br>
+	То же имя: <input id=$name-i2 model=first></p>
+	<p>Фамилия: <input id=$name-family model=second></p>
+	<p>Имя и фамилия: <span id=$name-fio model=compute></span></p>
+</div>
 """, ->
-	#@count 2
+	@w()
+	@w("input").val "Hello"
+	@w("input").fire "keyup"
 	
+	@is @w("span").text(), "Hello"
+	@is @w("i2").text(), "Hello"
+	
+	@is @w("fio").text(), ""
+	
+	CWidget::model.set "compute", (first, second) -> say arguments, this, first + ' ' + second
+	
+	CWidget::model.second "World!"
+	
+	@is @w("family").text(), "World!"
+	@is @w("fio").text(), "Hello World!"
 
 
 
@@ -2975,7 +3003,7 @@ new CTest 'key-CTemplate-compile', """
 	
 	r = """
 {% if $x:lt(10) %}
-1
+	{% if $y %}1{% fi %}
 {% elif $y:eq($z) %}
 2
 {% else %}
@@ -2984,8 +3012,8 @@ new CTest 'key-CTemplate-compile', """
 """
 
 	fn = CTemplate.compile r
-	html = fn x:1
-	@is html, "\n1\n"
+	html = fn x:1, y: 1
+	@is html, "\n\t1\n"
 	html = fn x:10, y:13, z:13
 	@is html, "\n2\n"
 	html = fn x:10, y:1, z:2

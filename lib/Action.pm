@@ -3,6 +3,7 @@ use warnings;
 
 use URI::Escape;
 use Term::ANSIColor qw(:constants);
+use Auth;
 
 # подгружаем экшены в %_action
 sub load_htm($) {
@@ -35,11 +36,19 @@ sub load_htm($) {
 				}
 			}
 			
+			if(exists $page->{forms}) {
+				$_ = "$index-$_" for @{$page->{forms}};
+			}
+			if(exists $page->{load_forms}) {
+				$_ = "$index-$_" for @{$page->{load_forms}};
+			}
+
 			while(my ($id, $form) = each %$forms) {
-				$form->{name} = $index unless defined $form->{name};
-				$form->{id} = $id = $index.$id;
-				$form->{query} = form_query $form;
+				$form->{name} = $index unless $form->{name};
+				$form->{id} = $id = "$index-$id";
+				$form->{query} = form_query $form, $forms;
 				push @write, "\$_forms{'$id'} = ".Utils::Dump($form).";\n\n";
+				$_ = "$index-$_" for @{$form->{forms}};
 			}
 			
 			$eval = join "", "use strict; use warnings; our(%_layout, %_forms, %_pages, %_action_htm, %_STASH); \$_pages{'$index'}{sub} = \$_action_htm{'$index'} = ", $eval, ";\n\n\$_pages{'$index'} = ", Utils::Dump($page), ";\n", @write, "\n\n1;";
@@ -66,7 +75,7 @@ sub load_action ($$) {
 		if(not -e $p or -M $p >= -M $path) {
 	
 			my $action = Utils::read($path);
-			my @our = qw/$_COOKIE $_POST $_GET $_HEAD $param $ini %ENV %_STASH $_id $_user_id/;
+			my @our = qw/$_COOKIE $_POST $_GET $_HEAD $param $ini %ENV %_STASH $_user_id/;
 			my %our = Utils::set(@our);
 			my %local = Utils::set(qw/@_ $_ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9 $a $b/);
 			my %my = ();
@@ -147,15 +156,21 @@ sub options ($;$&) {
 	return $ret;
 }
 
+# рассовывает после регэкспа
+sub parse_location {
+	my ($id, $ids);
+	($::_URL, $::_LOCATION, $::_action, $id, $ids, $::_EXT) = @_;
+	our $param = our $_GET = Utils::param($7);
+	$param = defined($id)? { %$_GET, id => $id }: $_GET;
+	if(defined $ids) {
+		my $i = 2;
+		$param->{"id" . ($i++)} = $_ for split /_/, substr $ids, 1;
+	}
+}
 
 # ajax-редирект
 sub ajax_redirect {
-	our $_URL = $1;
-	our $_LOCATION = $2;
-	our $_action = $3;
-	our $_id = $4;
-	our $_EXT = $5;
-	our $param = our $_GET = Utils::param($6);
+	parse_location(@{$_[1]});
 	our $_POST = {};
 	our %_HEAD = ();
 	my @COOKIE = @::_COOKIE;

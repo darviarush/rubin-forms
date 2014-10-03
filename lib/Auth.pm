@@ -6,7 +6,7 @@ use Data::Dumper;
 
 use Valid;
 
-our ($dbh, $_info, %_tab_selfcol, %_tab_validator, %_tab_update, %_tab_error, %_tab_valid, %_rules, %_tab_rules, %_alias_tab, $_user_id, $_COOKIE, $_HEAD, %_STASH, $param, $_id, %_pages, %_forms);
+our ($dbh, $_info, %_tab_selfcol, %_tab_validator, %_tab_update, %_tab_error, %_tab_valid, %_rules, %_tab_rules, %_alias_tab, $_user_id, $_COOKIE, $_HEAD, %_STASH, $param, %_pages, %_forms);
 
 # возвращает валидаторы или выбрасывает исключение
 sub get_validator {
@@ -190,14 +190,14 @@ sub check_role_view {
 
 # формирует запрос из формата Utils::Template
 sub form_query (@) {
-	my ($form) = @_;
+	my ($form, $forms) = @_;
 	local ($_);
-	my %names = map { $_->{name} => 1 } @{$form->{lists}}, @{$form->{forms}};
+	my @forms = map { $forms->{$_} } @{$form->{forms}};
+	my %names = map { $_->{name} => 1 } @forms;
 	return [
 		$form->{name}, 
 		[grep { not $names{$_} } keys %{$form->{fields}}],
-		map({ ('LEFT_JOIN', form_query($_)) } @{$form->{lists}}),
-		map({ ('LEFT_JOIN', form_query($_)) } @{$form->{forms}}),
+		map({ ('LEFT_JOIN', form_query($_)) } @forms),
 	];
 }
 
@@ -207,8 +207,6 @@ sub form_query (@) {
 sub action_main {
 	my ($_action) = @_;
 	my $method = $_HEAD->{'Ajax'};
-	
-	$param->{id} = $_id if defined $_id;
 	
 	my $p = {};
 	my $tab = $_info->{$_action};
@@ -310,14 +308,14 @@ sub action_form_view ($$) {
 # загружает данные для форм
 sub action_load_forms {
 	my ($action) = @_;
-	my $forms = $_pages{$action}{load_forms};
-	for my $form ($forms) {
-		my ($id, $valid) = $form->{id};
+	for my $id (@{$_pages{$action}{load_forms}}) {
 		next if $_STASH{$id};
+		my $form = $_forms{$id};
+		my $valid = {};
 		my $query = $form->{query};
-		my @query = check_role_view $valid, @$query, $param;
+		my @query = check_role_view $valid, @$query;
 		my $response = quick_rows(@query);
-		$response->{valid} = $valid;
+		$response->{_valid} = $valid if keys %$valid;
 		$_STASH{$id} = $response;
 	}
 }

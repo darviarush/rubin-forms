@@ -71,33 +71,26 @@ sub accept {
 		
 		main::stat_start() if $::_test;
 		
-		if($HTTP =~ m!^(\w+) $::_RE_LOCATION (HTTP\/\d\.\d)\r?$!o) {
-			my($METHOD, $URL, $LOCATION, $ACTION, $ID, $EXT, $SEARCH, $VERSION) = ($1, $2, $3, $4, $5, $6, $7, $8);
+		if(my @param = $HTTP =~ m!^(\w+) $::_RE_LOCATION (HTTP\/\d\.\d)\r?$!o) {
 					
-			$main::_METHOD = $METHOD;
-			$main::_URL = $URL;
-			$main::_LOCATION = $LOCATION;
-			$main::_action = $ACTION;
-			$main::_id = $ID;
-			$main::_EXT = $EXT;
-			$main::_VERSION = $VERSION;
+			$main::_METHOD = $param[0];
+			$main::_VERSION = $param[$#param];
+			
+			main::parse_location(@param[1..$#param-1]);
 			
 			# считываем заголовки
 			/: (.*?)\r?$/ and $main::_HEAD->{$`} = $1 while defined($_ = <$ns>) and !/^\r?$/;
 			
 			# считываем данные
-			$main::_GET = Utils::param($SEARCH);
 			if(my $CONTENT_LENGTH = $main::_HEAD->{"Content-Length"}) {
 				my $f;
 				$main::_POST = Utils::param_from_post($main::_HEAD->{'REQUEST_BODY_FILE'}? do {
 				open $f, $main::_HEAD->{'REQUEST_BODY_FILE'} or die "NOT OPEN REQUEST_BODY_FILE=".$main::_HEAD->{'REQUEST_BODY_FILE'}." $!"; $f
 				}: $ns, $main::_HEAD->{'Content-Type'}, $CONTENT_LENGTH);
 				close $f if defined $f;
-				$main::param = { %$main::_POST, %$main::_GET };
+				$main::param = keys(%$::param) == 0? $main::_POST: { %$main::_POST, %$main::param };
 			}
-			else {
-				$main::param = $main::_GET;
-			}
+
 			$main::_COOKIE = Utils::param($main::_HEAD->{"Cookie"}, qr/;\s*/);
 			
 			main::stat_begin() if $::_test;
@@ -123,7 +116,7 @@ sub accept {
 		send $ns, "\n", 0;
 		send $ns, $_, 0 for @$out;
 		
-		$main::_action = $main::_id = $main::_VERSION = $main::_METHOD = $main::_LOCATION = $main::_URL = $main::_HEAD = $main::_COOKIE = $main::_GET = $main::_POST = $main::param = $main::_user_id = undef;
+		$main::_action = $main::_VERSION = $main::_METHOD = $main::_LOCATION = $main::_URL = $main::_HEAD = $main::_COOKIE = $main::_GET = $main::_POST = $main::param = $main::_user_id = undef;
 		
 		main::stat_end($RESPONSE, $head, $out) if $::_test;
 		
@@ -163,26 +156,25 @@ sub accept {
 	for(;;) {
 		last if $self->{request}->Accept() < 0;
 	
+		main::stat_start() if $::_test;
+		
 		my $env = $self->{env};
 		
 		$main::_METHOD = $self->{env}{REQUEST_METHOD};
-		$main::_LOCATION = $self->{env}{DOCUMENT_URI};
-		$main::_URL = $self->{env}{REQUEST_URI};
-		
-		$main::_LOCATION =~ m!^/(.*(?:(-?\d+)|\.(\w+)))$!;
-		
-		$main::_action = $1;
-		$main::_id = $2;
-		$main::_EXT = $3;
+		#$main::_LOCATION = $self->{env}{DOCUMENT_URI};
+		#$main::_URL = $self->{env}{REQUEST_URI};
 		$main::_VERSION = $self->{env}{SERVER_PROTOCOL};
+		
+		main::parse_location(($self->{env}{DOCUMENT_URI} =~ /^$::_RE_LOCATION$/), $env->{'QUERY_STRING'});
 		
 		$main::_HEAD = { map { my $val = $self->{env}{$_}; s/^HTTP_//; $_=lc $_; s/_(.)/"-".uc $1/ge; ($_ => $val) } grep { /^HTTP_/ } keys %$env };
 		
-		$main::_GET = Utils::param($env->{'QUERY_STRING'}, qr/&/);
 		my $f;
-		$self->{post} = $env->{CONTENT_LENGTH}? Utils::param_from_post($env->{'REQUEST_BODY_FILE'}? do { open $f, $env->{'REQUEST_BODY_FILE'} or die "NOT OPEN REQUEST_BODY_FILE=".$env->{'REQUEST_BODY_FILE'}." $!"; $f }: $self->{stdin}, $env->{'CONTENT_TYPE'}, $env->{'CONTENT_LENGTH'}): {};
+		$::_POST = $env->{CONTENT_LENGTH}? Utils::param_from_post($env->{'REQUEST_BODY_FILE'}? do { open $f, $env->{'REQUEST_BODY_FILE'} or die "NOT OPEN REQUEST_BODY_FILE=".$env->{'REQUEST_BODY_FILE'}." $!"; $f }: $self->{stdin}, $env->{'CONTENT_TYPE'}, $env->{'CONTENT_LENGTH'}): {};
 		close $f if defined $f;
-		$self->{cookie} = Utils::param($env->{'HTTP_COOKIE'}, qr/;\s*/);
+		if(0 != keys %$::_POST) { $::param = { %$::POST, %$::param }; }
+		
+		$::_COOKIE = Utils::param($env->{'HTTP_COOKIE'}, qr/;\s*/);
 
 		my $ret = $app->();
 		my ($status, $head, $out) = @$ret;
@@ -192,6 +184,11 @@ sub accept {
 		print $stdout "\r\n";
 		print $stdout $_ for @$out;
 		
+		$main::_action = $main::_VERSION = $main::_METHOD = $main::_LOCATION = $main::_URL = $main::_HEAD = $main::_COOKIE = $main::_GET = $main::_POST = $main::param = $main::_user_id = undef;
+		
+		main::stat_end("", $head, $out) if $::_test;
+		
+		@main::_HEAD = %main::_HEAD = @main::_COOKIE = ();
 		@$out = ();
 	}
 }
@@ -219,19 +216,12 @@ sub accept {
 		return sub {
 			my $env = shift;
 			
-			my ($URL, $LOCATION, $ACTION, $ID, $EXT, $SEARCH) = $env->{REQUEST_URI} =~ /^$::_RE_LOCATION$/;
+			main::stat_start() if $::_test;
+			
+			main::parse_location(($env->{REQUEST_URI} =~ /^$::_RE_LOCATION$/), $env->{QUERY_STRING});
 			
 			$main::_METHOD = $env->{REQUEST_METHOD};
-			$main::_URL = $URL;
-			$main::_LOCATION = $LOCATION;
-			$main::_action = $ACTION;
-			$main::_id = $ID;
-			$main::_EXT = $EXT;
 			$main::_VERSION = $env->{SERVER_PROTOCOL};
-			
-			$SEARCH //= $env->{QUERY_STRING};
-			
-			
 			
 			# считываем заголовки
 			while(my($key, $val) = each %$env) {
@@ -246,7 +236,6 @@ sub accept {
 			$main::_HEAD->{"Content-Type"} = $env->{CONTENT_TYPE};
 			
 			# считываем данные
-			$main::_GET = Utils::param($SEARCH);
 			if($CONTENT_LENGTH) {
 				my $f;
 				my $body = $main::_HEAD->{'Request-Body-File'};
@@ -256,14 +245,19 @@ sub accept {
 				close $f if defined $f;
 				$main::param = { %$main::_POST, %$main::_GET };
 			}
-			else {
-				$main::param = $main::_GET;
-			}
 			$main::_COOKIE = Utils::param($main::_HEAD->{"Cookie"}, qr/;\s*/);
 			
 			my $ret = $app->();
 			my ($status, $head, $out) = @$ret;
 			$head = [map { /:\s*/; ($`, $') } @$head];
+			
+			$main::_action = $main::_VERSION = $main::_METHOD = $main::_LOCATION = $main::_URL = $main::_HEAD = $main::_COOKIE = $main::_GET = $main::_POST = $main::param = $main::_user_id = undef;
+
+			main::stat_end("", $head, $out) if $::_test;
+
+			@main::_HEAD = %main::_HEAD = @main::_COOKIE = ();
+			#@$out = ();
+			
 			[$status, $head, $out]
 		}
 	})->($app);
