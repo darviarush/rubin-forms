@@ -102,8 +102,8 @@
 # 73. Отложенное выполнение в модели. Как сработал send - пока из него не выйдет - другие обновления этого ключа не выполняются. А добавляются в очередь и начинают отправляться после. Добавить значение для ключа - нет - очередь будет отправлять для всех значений последовательно, 0 - очередь игнорируется, 1 - выполнится последнее значение из очереди
 # 74. update: keyup - для модели, style {...} anim?, разработать свой мини-язык
 # 75. Списки для модели
-# 76. Избавиться от методов onKey на модели (?)
-# 77. 
+#* 76. Избавиться от методов onKey на модели
+# 77. :load("where $user_id")
 
 # Ссылки:
 # http://docs.ractivejs.org/latest/observers - фреймворк с моделью данных и темплейтами
@@ -844,6 +844,7 @@ class CStream
 	merge: (streams...) -> @fork.push stream = new (@constructor)(); (for s in streams then s.fork.push stream); stream
 	
 	# ожидает пока все потоки не пришлют значение и объединяет их в массив
+	preCombine =  (args, channel) -> src: channel.src, args: for i in args then i.args[0]
 	mapCombine = (channel) -> channel.idx = @_idx; @send channel
 	emitCombine = (channel) ->
 		(q = @_queue[channel.idx]).push channel
@@ -853,25 +854,28 @@ class CStream
 			if @_len == @_queue.length
 				args = []
 				for q in @_queue
-					args.push q.shift().args[0]
+					args.push q.shift()
 					if q.length == 0 then @_len--
-				@send src: channel.src, args: args
+				@send @_callback args, channel
 		this
 		
 	combine: (streams...) ->
+		fn = if typeof streams[streams.length-1] == 'function' then streams.pop() else preCombine
 		streams.unshift this
 		len = streams.length
 		streams = (for s, i in streams then s.meta mapCombine, _idx: i)
 		stream = streams.shift()
 		stream = stream.merge streams...
 		stream.emitValue = emitCombine
-		stream._queue = q = []
+		stream._queue = q = new Array len
 		stream._len = 0
-		for [0...len] then q.push []
+		stream._callback = fn
+		for i in [0...len] then q[i] = []
 		stream
 	
-	emitZip = (channel) -> (q=@_queue).push channel.args[0]; (if q.length == @_n then @_queue = []; @send src: channel.src, args: q); this
-	zip: (n) -> @meta emitZip, _queue: [], _n: n
+	emitZipN = (channel) -> (q=@_queue).push channel; (if q.length == @_n then @_queue = []; @send @_zip q, channel); this
+	emitZip = (channel) -> (q=@_queue).push channel; (if @_n q, channel then @_queue = []; @send @_zip q, channel); this
+	zip: (n, zip) -> @meta (if typeof n == 'number' then emitZipN else emitZip), _queue: [], _n: n, _zip: zip || preCombine
 
 	#switch: ->
 	#	for i in [0...arguments] by 2
@@ -881,7 +885,7 @@ class CStream
 	off: (streams...) -> fork = @fork; (for s in streams when -1 != i=fork.indexOf s then fork.splice i, 1); this
 	
 	# управляющие
-	log: -> @constructor._log = 1 ; this
+	log: (flag = true) -> @config.log = flag ; this
 	
 
 # Модели
