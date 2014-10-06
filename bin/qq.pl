@@ -169,7 +169,7 @@ sub ritter {
 		
 		if(defined $action or defined $action_htm and $ajax =~ /^(?:|submit)$/) {
 			$_STATUS = 200;
-			$_user_id = auth();
+			$_user_id = $_COOKIE->{sess}? auth(): undef;
 			%_STASH = (
 				user_id => $_user_id,
 			);
@@ -180,7 +180,7 @@ sub ritter {
 				return ajax_redirect(\@ret, \@loc) if $_STATUS == 307 and @loc = $_HEAD{'Location'} =~ /^$_RE_LOCATION$/o;
 			}
 			else {	
-				@ret = $action->() if $action;
+				@ret = $action? $action->(): $param;
 				if($action_htm and $_STATUS == 200) {
 					@ret = $_action_htm{$_action}->($ret[0], $_action);
 					for(; my $_layout = $_layout{$_action}; $_action = $_layout) {

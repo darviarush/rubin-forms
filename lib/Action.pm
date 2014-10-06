@@ -16,7 +16,7 @@ sub load_htm($) {
 	eval {
 	
 		my $p = $path;
-		$p =~ s!\baction/!c_action/!;
+		$p =~ s!\baction/!action_c/!;
 		$p .= ".pl";
 		
 		if(not -e $p or -M $p >= -M $path) {
@@ -69,7 +69,7 @@ sub load_action ($$) {
 	eval {
 	
 		my $p = $path;
-		$p =~ s!\baction/!c_action/!;
+		$p =~ s!\baction/!action_c/!;
 		$p .= ".pl";
 		
 		if(not -e $p or -M $p >= -M $path) {
@@ -187,21 +187,26 @@ sub ajax_redirect {
 sub action_submit {
 	my $result = {};
 	my ($id, $url, $act);
+	
+	content "text/json";
+	
 	my $add_res = sub {
 
 		die "Нет экшена `$act`" if not exists $main::_action{$act} and not $main::_action_htm{$act};
 		
+		my $data;
+		
 		$result->{$act} = {
 			act => $act,
 			($id ? (id => $id): ()),
-			(exists $main::_action{$act}? (data => $main::_action{$act}->()): ()),
+			(exists $main::_action{$act}? (data => $data = $main::_action{$act}->()): ()),
 			(exists $main::_forms{$act} && exists $main::_info->{$act}? (data => action_view($main::_action, $main::param)): ()),
 			(exists $main::_pages{$act}{template}? (template => $main::_pages{$act}{template}): ()),
 			(exists $main::_pages{$act}{layout_id}? (layout_id => $main::_pages{$act}{layout_id}): ()),
 			(exists $main::_layout{$act}? (layout => $main::_layout{$act}): ())
 		};
 		
-		action_load_forms($act) if $main::_pages{$act}{load_forms};
+		action_load_forms($data // $main::param, $act) if $main::_pages{$act}{load_forms};
 	};
 
 	unless($::param->{_noact_}) {

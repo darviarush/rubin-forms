@@ -1,6 +1,6 @@
 #> очищает кэши
 
-for my $dir (dirs("c_action")) {
+for my $dir (dirs("action_c")) {
 	`rm -fr $dir`;
 }
 

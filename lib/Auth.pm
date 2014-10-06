@@ -117,7 +117,6 @@ sub error_param (@) { valids_param \%_tab_error, @_ }		# выполняется 
 sub check_role (@) {
 	my ($action, $tab, $param) = @_;
 	#$action = $param->{"id"}? "edit": "add" unless $action;
-	
 	my $user_id = auth();
 	my $role = $user_id? 'user': 'noauth';
 	my $check = sub {
@@ -169,10 +168,12 @@ sub check_role_view {
 	
 	my ($valid, $tab, $view, @args) = @_;
 	
-	check_role 'view', $tab, $view;
+	my @view = FIELDS_NAMES($view);
+	
+	check_role 'view', $tab, { Utils::set(@view) };
 	#valid_param 'view', $tab, $view;
 	my $v;
-	for my $col (FIELDS_NAMES($view)) {
+	for my $col (@view) {
 		$valid->{$col} = $v if $v = $_tab_valid{$tab}->{$col};
 	}
 
@@ -186,6 +187,24 @@ sub check_role_view {
 	}
 		
 	return @av;
+}
+
+# загружает данные для форм
+sub action_load_forms {
+	my ($data, $action) = @_;
+	for my $id (@{$_pages{$action}{load_forms}}) {
+		next if $_STASH{$id};
+		my $form = $_forms{$id};
+		my $valid = {};
+		my $query = $form->{query};
+		my $load = $form->{load};
+		my $where = exists $load->{stash}? { id => $_STASH{$load->{stash}} }: exists $load->{var}? { id => Utils::path($data, $load->{var})->[0] }: ();
+		my @query = check_role_view $valid, @$query, $where;
+		my $response = quick_rows(@query);
+		$response = $form->{is_list}? { body => $response }: $response->[0];
+		$response->{_valid} = $valid if keys %$valid;
+		$_STASH{$id} = $response;
+	}
 }
 
 # формирует запрос из формата Utils::Template
@@ -303,21 +322,6 @@ sub action_form_view ($$) {
 	$response = Utils::to_rows(quick_rows(@query));
 	$response->{valid} = $valid;
 	$response
-}
-
-# загружает данные для форм
-sub action_load_forms {
-	my ($action) = @_;
-	for my $id (@{$_pages{$action}{load_forms}}) {
-		next if $_STASH{$id};
-		my $form = $_forms{$id};
-		my $valid = {};
-		my $query = $form->{query};
-		my @query = check_role_view $valid, @$query;
-		my $response = quick_rows(@query);
-		$response->{_valid} = $valid if keys %$valid;
-		$_STASH{$id} = $response;
-	}
 }
 
 # удаляет просроченные сессии

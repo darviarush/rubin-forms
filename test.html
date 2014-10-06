@@ -204,7 +204,7 @@ var roll = function(r) {
 
 var init = 1
 
-model.onroll = function(r) {
+model.on('roll', function(r) {
 	var text = document.getElementById('menu-downup')
 	//var r = text.innerHTML=='свернуть'
 	text.innerHTML = r? 'развернуть': 'свернуть'
@@ -217,9 +217,9 @@ model.onroll = function(r) {
 		$(/#menu/).off("mouseenter mouseleave")
 	}*/
 	return false
-}
+})
 
-model.ontab = function(r) {
+model.on('tab', function(r) {
 	var text = document.getElementById('menu-showcomment')
 	var ogl = document.getElementById('menu-ogl')
 	//var r = text.innerHTML=='оглавление'
@@ -228,7 +228,7 @@ model.ontab = function(r) {
 	document.getElementById('CTest-category').style.display = r? '': 'none'
 	document.getElementById('menu-comment').style.display = r? 'none': ''
 	return false
-}
+})
 
 cookie_repository.sync()
 }()
