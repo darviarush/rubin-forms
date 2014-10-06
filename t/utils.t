@@ -4,17 +4,20 @@ use warnings;
 
 use Data::Dumper;
 use Msg;
-use Test::More tests => 75;
+use Test::More tests => 76;
 
 use Msg;
 require_ok 'Utils';
 require_ok 'Helper';
 
 
+my $ret = Utils::path({ s => [ { a => [ { x => 10 }, { x => 5 } ], b => 12 }, { a => [ { x => 20 } ], b => 13 } ] }, "s.a.x");
+is_deeply $ret, [10, 5, 20];
+
 is_deeply [qw/a c b/], [Utils::unique(qw/a c b c/)];
 
 
-my $ret = Utils::from_rows({
+$ret = Utils::from_rows({
 fields => ["id", "name", ["user", "id", ["sess", "id"], "name"]],
 rows => [
 	["id1", "name1", [["user.id1", [['user.sess.id1']], "user.name1"], ["user.id2", [['user.sess.id2']], "user.name2"]]]
@@ -309,4 +312,5 @@ is $form->{id}, "user";
 is $form->{model}, "useris";
 is $form->{load}{stash}, undef;
 is $form->{load}{var}, "var";
+
 

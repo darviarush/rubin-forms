@@ -891,15 +891,12 @@ class CModel
 	#! _models: {} # все модели по имени (@_name)
 	#!_counter: 0
 	constructor: (data = {}, cmp = {}, @_name) ->
-		#@constructor::_counter++
-		#@_models[@_name = name || "[CModel ##{@_counter}]"] = this
 		@_ = data
 		@_cmp = cmp ||= {}
 		@_on = {}
 		@_at = {}
 		@_queue = {}
 		for key of data then @set key, data[key], cmp[key]
-		for key of cmp when not key of data then throw CRoot.raise "Нет ключа `#{key}` для функции сравнения"
 	
 	has: (key) -> key of @_
 	
@@ -914,7 +911,6 @@ class CModel
 				for name, i in keys then say i, name, ret[i] = @retrive name
 				@change key, val.apply this, ret
 			val = undefined
-			say keys, @_on
 			fn = do(key)-> (val) -> if arguments.length then throw CRoot.raise "Попытка изменить вычислимое свойство модели `#{key}`" else @retrive key
 		else
 			fn = do(key)-> (val) -> if arguments.length then @change key, val else @retrive key
@@ -964,15 +960,13 @@ class CModel
 		#if q = @_queue[key] then q.push 
 		#else
 		#	@_queue[key] = []
-			
-		this['on'+key]? val, old, key
+
 		if ons = @_on[key]
 			for fn in ons then fn.call this, val, old, key
 		#delete @_queue[key]
 		this
 			
 	retrive: (key) ->
-		if fn = this['at'+key] then @change key, fn.call this, key
 		if at = @_at[key] then for fn in at then @change key, fn.call this, key
 		@_[key]
 		
@@ -1105,8 +1099,10 @@ CTemplate =
 				form.template = template
 				#form.code = html.slice(idx+2).join ""
 				_form.forms.push form
+				id = "id" + (if name then "+'-#{name}'" else "")
+				data = if form.load then "CTemplate._STASH["+id+"]" else "data" + (if name then "['#{name}']" else "")
+				html.push ")(", data, ", ", id, "), '"
 				form = _form
-				html.push ")(data", (if name then "['#{name}']" else ""), ", id", (if name then "+'-#{name}'" else ""), "), '"
 			tag[0]
 		
 		while 1
@@ -1123,9 +1119,10 @@ CTemplate =
 				if _tags.test TAG then TAG = open_id = undefined ; html.push ">"
 				else
 					if t
-						t = [open_tag, pos+1, name=t[0], type=t[1], ///\bcinit\b///i.test(i_html.slice open_pos, pos), html.length, form]
+						frm = t
+						t = [open_tag, pos+1, name=t.name, type=t.is_list, ///\bcinit\b///i.test(i_html.slice open_pos, pos), html.length, form]
 						id = if name? then form.id + "-" + name else ''
-						forms[id] = form = id: id, name: name, is_list: type, fields: {}, forms: []
+						forms[id] = form = extend frm, id: id, fields: {}, forms: []
 						html.push ">", "', (", (if type then code_begin else code_begin1)
 					else t = [open_tag]; html.push ">"
 					T.push t; t = open_tag = undefined
@@ -1169,7 +1166,10 @@ CTemplate =
 					html.push ", '" + (if open_span then "</span>" else "")
 					continue
 
-			else if open_tag and m = s.match ///^\$([+*])(\w+)?(:load(?:\(%(\w+)\))?)?(?::model\((\w+)\))?/// then t = [m[2], m[1]=='*']; html.push "', id, '" + (if m[2] then "-" + m[2] else "")
+			else if open_tag and m = s.match ///^\$([+*])(\w+)?(:load(?:\(%(\w+)\))?)?(?::model\((\w+)\))?///
+				t = name: m[2], is_list: m[1]=='*'
+				t.load = 1 if m[3]
+				html.push "', id, '" + (if m[2] then "-" + m[2] else "")
 			else if m = s.match ///^[\\']/// then html.push "\\"+m[0]
 			else if m = s.match ///^\n/// then html.push "\\n"
 			else if m = s.match ///^\r/// then html.push "\\r"
@@ -1495,13 +1495,15 @@ class CWidget
 			return null
 	
 	history_change: (data) ->
-		w = @window()
+		init_his$ w unless (w=@window()).history$
+		#say 'begin', w.history$.length, w.history_before$, w.history.length, w.history.length + 1 == w.history$.length + w.history_before$ 
 		if w.history.length + 1 == w.history$.length + w.history_before$ then w.history$.push [w.location.href, w.document.title, data]
 		else if w.history.length == w.history$.length + w.history_before$
 			if null == n = @history w.location.href then throw @raise "Невозможно определить позицию в истории - нет текущего url `#{w.location.href}`"
 			w.history_pos$ = n
 		else
-			w.histoey-pos$ = w.history$.length + w.history_before$ - w.history.length
+			w.history_pos$ = w.history$.length + w.history_before$ - w.history.length
+		#say 'end', w.history$.length
 		this
 
 	# методы работы с cookie
@@ -1625,6 +1627,7 @@ class CWidget
 			listener = do(self, key)-> (args...)-> self[key] args...
 			listener._belong = this
 			if fn = listens$[key] then fn.call this, listener
+			else if typeof @[who] != 'function' then @[who].on type, listener
 			else @wrap(@[who]()).on type, listener
 		this
 
@@ -1633,7 +1636,7 @@ class CWidget
 	ajaxStream: -> stream = new CStream; @on 'Load', stream.emitter(); @on 'Error', stream.errorer(); stream
 
 	_default_assign: 'text'
-	assign: (slot, type = @_default_assign, attr = []) ->
+	assign: (slot, type = @_default_assign, attr...) ->
 		model = @model
 		@_slot = slot
 		model.set slot, @[type] attr... unless model.has slot
@@ -1641,10 +1644,10 @@ class CWidget
 		fn._belong = this
 	setModel: ->
 		if attr = @attr 'model'
-			attr = attr.split /:/
+			attr = attr.split /:\s*/
 			slot = attr.shift()
 			type = attr.shift()
-			@assign slot, type, attr
+			@assign slot, type, attr...
 		this
 	setModelOnElements: (elem=@_elements) -> (for e in elem then @byName(e).setModel()); this
 	
@@ -2864,18 +2867,15 @@ class CPingWidget extends CButtonWidget
 class CInputWidget extends CWidget
 	constructor: ->
 		super
-		if valid = @attr "cvalid" then @setHandler 'keyup'
+		if valid = @attr "cvalid" then @on 'keyup', ->
+			if @valid() then @clear 'onInvalid'; @tooltip null else @timeout 1500, 'onInvalid'
+			this
 	
 	val: (val) -> if arguments.length then @element.value = val; this else @element.value
 	html: @::val
 	text: @::val
 	
-	onkeyup: ->
-		if slot=@_slot then @model.change slot, @val()
-		if v=@valid() then @clear 'onInvalid'; @tooltip null else @timeout 1500, 'onInvalid'
-		this
-	
-	setModel: -> super ; (if @_slot then @setHandler 'keyup'); this
+	setModel: -> super ; (if @_slot then @on 'keyup', -> @model.change slot, @val()); this
 
 
 class CSelectWidget extends CInputWidget
@@ -3354,8 +3354,8 @@ class CLoaderWidget extends CWidget
 		
 		for key of param when key[0] == '$' then headers[key.slice(1).upFirst()] = param[key]; delete param[key]
 			
-		extend @request, timer: timer, request: request, headers: headers, history: param._no_history, url: url, customer: (if t = customer.attr 'target' then @byId t else customer)
-		delete param._no_history
+		extend @request, timer: timer, request: request, headers: headers, history: param._history, url: url, customer: (if t = customer.attr 'target' then @byId t else customer)
+		delete param._history
 		
 		params = if method != "POST" then (if params then url = CUrl.from url; extend url.param, param; url = CUrl.to url); null
 		else if CInit.post == 'json' then toJSON param
@@ -3420,13 +3420,8 @@ class CLoaderWidget extends CWidget
 		error = if @request.request.status == 500 then @request.request.responseText else escapeHTML @request.error
 		@request.customer.tooltip ctype: 'tooltip', close: 1, html: "<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка</h3>"+error, open: 1, timeout: 5000, class: 'c-error'
 	
-	submit_manipulate: (data) ->
-		
-		#data = data.split /<!(\w*)>/
-		#pages = {}
-		#for i in [1...data.length] then pages[] = 
-		
-		data = fromJSON data
+	submit_manipulate: (data) ->		
+		data = fromJSON data if typeof data == 'string'
 		if stash = data['@stash'] then CTemplate._STASH = stash
 		if layout = data['@layout']
 			for i in [1...layout.length]
@@ -3446,18 +3441,12 @@ class CLoaderWidget extends CWidget
 		$(document).clean()
 		do CRoot.initWidgets
 		
-		say 'url = ', url = CUrl.from data["@url"]
-		
+		url = CUrl.from data['@url']
 		old = CUrl.from @window().location.href
-		#url = CUrl.from @request.url
-		#url.pathname = url.param._layout_ || old.pathname
-		#delete url.param._layout_
-		#url.search = ""
 		extend frames = {}, CParam.from(old.param._frames_, /,/), CParam.from url.param._frames_, /,/
 		url.param._frames_ = frames if frames = CParam.to frames, ","
-		url = CUrl.to url
-		#if data["@frames"] then url.param._frames_ = data["@frames"] else delete url.param._frames_
-		args = [url, title || @document().title]
+		
+		args = [CUrl.to(url), title || @document().title]
 		if @request.history then args.unshift 0
 		@navigate args...
 		say args..., window.history$, window.history_pos$
@@ -3514,7 +3503,7 @@ class CRouterWidget extends CWidget
 		href = @window().location.href
 		href = href.replace ///\#.*$///, ''
 		# # say 'popstate', href, old, pos, e
-		if prev_url$ != href then @_no_history = 1 ; @submit _act: href, _no_history: 1
+		if prev_url$ != href then @submit _act: href, _history: 1
 		prev_url$ = href
 		
 	onhashchange_window: pop$

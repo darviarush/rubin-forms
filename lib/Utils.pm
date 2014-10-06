@@ -598,7 +598,23 @@ sub to_rows ($) {
 }
 
 
-# парсит 
+# возвращает по ключу в дебрях данных массив [ [ key-1-key-1-1, data] ... ], где data - это хэш или array на уровень выше запрашиваемых данных
+sub path {
+	my ($data, $path, $val) = @_;
+	if(!ref $path) {
+		$path = [split /\./, $path];
+	}
+	$data = ref $data eq "ARRAY"? $data: [$data];
+	for my $key ( @$path ) {
+		NEXT:
+		return [] unless @$data;
+		if(ref $data->[0] eq "ARRAY") { $data = [ map { @$_ } @$data]; goto NEXT }
+		$data = [ map { $_->{$key} } @$data ];
+	}
+	return $data;
+}
+
+# парсит фреймы
 sub parse_frames {
 	my ($param) = @_;
 	map { /=/; $` => $' } split /,/, $param;
@@ -760,8 +776,9 @@ sub TemplateStr {
 				is_list => $type eq "*",
 			};
 			$T->{model} = $model if $model;
-			$T->{load} = ($type_var? {stash => $var}: {var => $var}) if $load;
-			"', \$id, '".($name? "-$name": "");
+			$T->{load} = ($type_var? {stash => $var}: {var => $var // "${name}_id" }) if $load;
+			my $n = ($name? "-$name": "");
+			"', ".($load? "(do { \$data->{'$name'} = \$_STASH{\$id.'$n'}; () }),": "")."\$id, '$n";
 		}:
 		m!\G[\\']!? "\\$&":
 		m!\G.!s? $&:
@@ -777,7 +794,7 @@ sub TemplateStr {
 	
 	$form->{template} = $_;
 	
-	my $x = join "", 'sub { my ($data, $id) = @_; '.($form->{load_forms}? 'action_load_forms($id); ': '').'return join "", \'', @html, $code_end1;
+	my $x = join "", 'sub { my ($data, $id) = @_; '.($form->{load_forms}? 'action_load_forms($data, $id); ': '').'return join "", \'', @html, $code_end1;
 	#our $rem++;
 	#Utils::write("$rem.pl", $x);
 	$x
