@@ -211,35 +211,48 @@ new CTest "obj-CStream-flatMap", """
 	
 
 new CTest "obj-CStream-combine", """
-`combine streams...` - комбинирует несколько потоков в один
+`combine streams..., [fn]` - комбинирует несколько потоков в один
+
+- fn args, channel - функция для комбинации. Получает массив [{src: this, args: аргументы}...] и последние пришедшие данные (channel), которые есть и в массиве. Должна вернуть {src: ..., args: ...}
 
 См. #merge, #zip
 """, ->
-	@count 1
+	@count 2
 
 	s1 = new CStream()
 	s2 = new CStream()
 	s3 = new CStream()
 	
 	s = s1.combine s2, s3
+	k = s1.combine s2, s3, (args, channel) -> src: channel.src, args: for ch in args then ch.args[1]
 	
 	s.then (x...) -> @is String(x), "10,20,30"
+	k.then (x...) -> @is String(x), "0,1,2"
 	
-	s1.emit 10
-	s2.emit 20
-	s3.emits this, 30
+	s1.emit 10, 0
+	s2.emit 20, 1
+	s3.emits this, 30, 2
 
 
 new CTest "obj-CStream-zip", """
-`zip n` - собирает n отправок в массив, который и отправляет
+`zip n, [fn]` - собирает n отправок в массив, который и отправляет дальше
+
+- n - может быть числом, функцией или строкой. Если это число, то собирает n отправок в массив
+- - Если функция, то отправляет 
+- - Если строка, то собирает отправки в течение указанного времени, после прихода первой посылки
+- fn args, channel - функция для комбинации. Получает массив [{src: this, args: аргументы}...] и последние пришедшие данные (channel), которые есть и в массиве. Должна вернуть {src: ..., args: ...}
 
 См. #merge, #combine
 """, ->
-	@count 2
+	@count 6
 	
 	s = new CStream
 	s.zip(2).then (x, y) -> @is x, 10 ; @is y, 20
+	s.zip((args) -> args.length == 3).then (x, y, z) -> @is x, 10 ; @is y, 20 ; @is z, 6
+	s.zip("30ms").then (args...) -> @is String(args), "10,20,6"
 	
+	(x = CStream.sleep(10)).then -> s.emits this, 6
+	x.emits this
 	s.emit 10
 	s.emits this, 20
 
@@ -306,7 +319,7 @@ new CTest "cls-CModel", """
 
 Так же модель может обновить свойство, если его запросили
 
-У всех экземпляров класса CWidget или его наследников есть 
+У всех экземпляров класса CWidget или его наследников есть свойство model, которое представляет главную модель
 
 - properties - ключ-значения, где ключ соответствуют названию свойства модели, а значение - начальному значению этого свойства
 - compares - функции сравнения. Когда приходит новое значение, то оно сравнивается со старым - если оно не изменилось, то и обработчики не изменяются. Если функция сравнения не указано, то используется жёсткое сравнение javascript (===)
@@ -314,30 +327,189 @@ new CTest "cls-CModel", """
 См. #CRouter
 """, """
 <div id=$name ctype=form>
-	<p>Имя: <input id=$name-input model=first>
-	<span id=$name-span model=first></span><br>
-	То же имя: <input id=$name-i2 model=first></p>
-	<p>Фамилия: <input id=$name-family model=second></p>
-	<p>Имя и фамилия: <span id=$name-fio model=compute></span></p>
+	<p>Имя: <input id=$name-input model=name>
+	<span id=$name-span model=name></span><br>
+	То же имя: <input id=$name-i2 model=name></p>
+	<p>Фамилия: <input id=$name-family model=family></p>
+	<p>Имя и фамилия: <span id=$name-fio model=fullName></span></p>
 </div>
 """, ->
-	@w()
+	w = @w()
 	@w("input").val "Hello"
 	@w("input").fire "keyup"
-	
+
 	@is @w("span").text(), "Hello"
 	@is @w("i2").text(), "Hello"
-	
+
 	@is @w("fio").text(), ""
-	
-	CWidget::model.set "compute", (first, second) -> say arguments, this, first + ' ' + second
-	
-	CWidget::model.second "World!"
-	
+
+	w.model.compute "fullName", (name, family) -> name + ' ' + family
+
+	w.model.family "World!"
+	@is w.model.family(), "World!"
+
 	@is @w("family").text(), "World!"
 	@is @w("fio").text(), "Hello World!"
 
+	
+new CTest "obj-CModel-compute", """
+`compute key, fn|options` - создаёт вычислимое свойство на модели или заменяет его
 
+- key - имя свойства
+- fn - функция чтения из свойства
+- options
+- - slave - зависимая от других свойств функция. Её параметры должны быть именами свойств от которых она зависит
+- - master - функция записи в свойство
+- - cmp - функция сравнения
+- - val - начальное значение
+
+См. #set, #del
+""", """
+<div id=$name ctype=form>
+	<input id=$name-name model=name>
+	<input id=$name-family model=family>
+	<input id=$name-fullname model=fullname>
+</div>
+""", ->
+	@w()
+
+	model = CRoot.model
+	.compute 'fullname',
+		slave: (name, family) -> name + ' ' + family
+		master: (val, old, key) -> match = val.match ///^ (\S+) \s+ (.+) ///; @name match[1]; @family match[2]
+		val: "abc"
+	.name 'Юля'
+	.family 'Малышева'
+
+	@is @w("fullname").text(), 'Юля Малышева'
+	@w("fullname").text('Вадим Дубровный').fire 'keyup'
+	@is @w("name").text(), 'Вадим'
+	@is @w("family").text(), 'Дубровный'
+	
+	
+new CTest "obj-CModel-set", """
+`set key, [val], [cmp]` - создаёт или заменяет свойство на модели
+
+- key - имя свойства
+- val - начальное значение
+- cmp - функция сравнения
+
+См. #compute, #del, #has
+""", ->
+	model = CRoot.model
+	@ok not model.has "test_key"
+	model.set "test_key", "abc"
+	@ok model.has "test_key"
+
+
+new CTest "obj-CModel-has", """
+`has key` - определяет, есть ли в модели свойство key
+
+- key - имя свойства
+
+См. #set, #compute
+""", ->
+	model = CRoot.model.set 'test_has'
+	@ok not model.has "test_key-xxx"
+	@ok model.has "test_has" # установлен в тесте obj-CModel-set
+	
+
+new CTest "obj-CModel-on", """
+`on key, observe` - ставит обозреватель на свойство key
+
+- key - имя свойства
+- observe - функция-обозреватель
+
+См. #off, #at
+""", ->
+	@count 3
+	CRoot.model.set 'test_on', "abc"
+	.on 'test_on', (val, old, key) => @is val, "a"; @is old, "abc"; @is key, "test_on"
+	.test_on "a"
+	
+	
+new CTest "obj-CModel-off", """
+`off key, [observe]` - удаляет обозреватель или все обозреватели со свойства key
+
+- key - имя свойства
+- observe - функция-обозреватель или свойство _belong обозревателя (не может быть функцией)
+
+См. #off, #at
+""", ->
+	model = CRoot.model.set 'test_off'
+	model.on "test_off", fn = ->
+	@is model._on.test_off[0], fn
+	model.off "test_off", fn
+	@ok not model._on.test_off
+	
+	model.on "test_off", fn = ->
+	fn._belong = 'что-то'
+	model.off "test_off", 'что-то'
+	@ok not model._on.test_off
+	
+
+new CTest "obj-CModel-at", """
+`at key, observe` - ставит обозреватель запроса на свойство key
+
+В отличие от #on обозреватель сработает при чтении из свойства
+
+- key - имя свойства
+- observe - функция-обозреватель
+
+См. #off, #at
+""", ->
+	@count 3
+	CRoot.model.set 'test_at', 'a'
+	.at 'test_at', (key, val) => @is key, "test_at"; @is val, "a"; "b"
+	@is CRoot.model.test_at(), "b"
+	
+	
+new CTest "obj-CModel-un", """
+`un key, [observe]` - удаляет обозреватель запроса или все обозреватели со свойства key
+
+- key - имя свойства
+- observe - функция-обозреватель или свойство _belong обозревателя (не может быть функцией)
+
+См. #off, #at
+""", ->
+	@count 0
+	model = CRoot.model.set "test_key"
+	model.at "test_key", fn = -> @ok off
+	model.un fn
+	model.test_key 1
+
+	
+new CTest "obj-CModel-del", """
+`del key` - удаляет свойство key
+
+- key - имя свойства
+
+См. #set, #compute, #has
+""", ->
+	model = CRoot.model
+	model.set "test_key"
+	model.on 'test_key', ->
+	model.at 'test_key', ->
+	
+	model.compute "test_key", (x, y) ->
+	@ok model._on.x
+	@ok model._on.y
+	
+	model.del "test_key"
+	@ok not model.has "test_key"
+	@ok not model._on.test_key
+	@ok not model._at.test_key
+	
+	@ok not model._on.x
+	@ok not model._on.y
+	
+	
+new CTest "obj-CModel-cmp", """
+`cmp key, [fn|null]` - устанавливает или возвращает функцию сравнения
+""", ->
+
+	
+	
 
 CTest.category "служебные методы"
 

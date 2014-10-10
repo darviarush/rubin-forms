@@ -324,6 +324,16 @@ sub action_form_view ($$) {
 	$response
 }
 
+sub action_form_load ($$) {
+	my ($action, $data) = @_;
+	my ($response, $valid);
+	my $form = $_forms{$action};
+	my @query = check_role_view $valid, @{ $_forms{$action}->{query} }, $param;
+	$response->{body} = quick_rows(@query);
+	$response->{valid} = $valid;
+	$response
+}
+
 # удаляет просроченные сессии
 sub delete_session {
 	my $now = strftime('%F %T', localtime time-3600);

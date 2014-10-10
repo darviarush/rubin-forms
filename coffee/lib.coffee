@@ -708,6 +708,7 @@ class CStream
 	@from: -> (stream = new CStream).from.apply stream, arguments
 	@repeat: -> (stream = new CStream).repeat.apply stream, arguments
 	@serial: -> (stream = new CStream).serial.apply stream, arguments
+	@sleep: -> (stream = new CStream).sleep.apply stream, arguments
 	
 	constructor: -> @fork = []
 	emitter: -> stream = this ; fn = (do(stream)-> (args...)-> stream.emitValue src: this, args: args); fn._belong = this ; fn
@@ -721,16 +722,21 @@ class CStream
 		# this
 		
 	# пути
-	send: (channel) ->
+	saveSend = (channel) ->
 		for f in @fork then f.emitValue.call f, channel
 		this
-		
-	sendError: (channel) ->
+	saveSendError = (channel) ->
 		for f in @fork then f.emitError.call f, channel
 		this
+	logSend = (channel) -> say "[", console.trace(), "]", channel; saveSend.call this, channel
+	logSendError = (channel) -> say "[", arguments.callee.caller, "]", channel; saveSendError.call this, channel
+	log: (flag = true) -> p = @constructor.prototype; (if flag then p.send = logSend; p.sendError = logSendError else p.send = saveSend; p.sendError = saveSendError); this
+	
+	send: saveSend
+	sendError: saveSendError
 		
-	emitValue: @::send
-	emitError: @::sendError
+	emitValue: saveSend
+	emitError: saveSendError
 	
 	emit: (args...) -> @emitValue src: null, args: args
 	error: (args...) -> @emitError src: null, args: args
@@ -850,7 +856,6 @@ class CStream
 		(q = @_queue[channel.idx]).push channel
 		if q.length == 1
 			@_len++
-			say @_len, @_queue.length, @_len == @_queue.length
 			if @_len == @_queue.length
 				args = []
 				for q in @_queue
@@ -875,7 +880,8 @@ class CStream
 	
 	emitZipN = (channel) -> (q=@_queue).push channel; (if q.length == @_n then @_queue = []; @send @_zip q, channel); this
 	emitZip = (channel) -> (q=@_queue).push channel; (if @_n q, channel then @_queue = []; @send @_zip q, channel); this
-	zip: (n, zip) -> @meta (if typeof n == 'number' then emitZipN else emitZip), _queue: [], _n: n, _zip: zip || preCombine
+	emitZipSleep = (channel) -> (q=@_queue).push channel; (if q.length == 1 then setTimeout((=> q = @_queue; @_queue = []; @send @_zip q, q[q.length-1]), @_n)); this
+	zip: (n, zip) -> @meta (if typeof n == 'number' then emitZipN else if typeof n == 'string' then n = (if /^\d+s$/.test n then 1000*parseInt n else parseInt n); emitZipSleep else emitZip), _queue: [], _n: n, _zip: zip || preCombine
 
 	#switch: ->
 	#	for i in [0...arguments] by 2
@@ -884,18 +890,16 @@ class CStream
 	# отключающие
 	off: (streams...) -> fork = @fork; (for s in streams when -1 != i=fork.indexOf s then fork.splice i, 1); this
 	
-	# управляющие
-	log: (flag = true) -> @config.log = flag ; this
-	
 
 # Модели
 class CModel
 	# _: {} - данные
 	# _cmp: {} - функции сравнения
-	# _queue: {} - очереди обрабатывающихся ключей
+	# !_queue: {} - очереди обрабатывающихся ключей
 	# _on: {} и on... - обработчики при изменении данных
 	# _at: {} и at... - обработчики при запросе данных
 	# _name: string - имя модели в ::_models
+	# _compute: {} - вычислимые ключи
 	#! _models: {} # все модели по имени (@_name)
 	#!_counter: 0
 	constructor: (data = {}, cmp = {}, @_name) ->
@@ -903,34 +907,49 @@ class CModel
 		@_cmp = cmp ||= {}
 		@_on = {}
 		@_at = {}
-		@_queue = {}
+		#@_queue = {}
+		@_compute = {}
 		for key of data then @set key, data[key], cmp[key]
 	
 	has: (key) -> key of @_
 	
-	set: (key, val, cmp) ->
-		if typeof val == 'function'
-			match = String(val).match /// ^function\s*[\$\w]*\s*\( ([^\(\)]*) \) ///
-			keys = match[1].split /// ,\s* ///
-			@on keys, do(key, val, keys)-> (v, old, key1)->
-				ret = new Array((len=keys.length)+2)
-				ret[len] = old
-				ret[len+1] = key1
-				for name, i in keys then say i, name, ret[i] = @retrive name
-				@change key, val.apply this, ret
-			val = undefined
-			fn = do(key)-> (val) -> if arguments.length then throw CRoot.raise "Попытка изменить вычислимое свойство модели `#{key}`" else @retrive key
-		else
-			fn = do(key)-> (val) -> if arguments.length then @change key, val else @retrive key
+	free_compute$ = (key) ->
+		c = @_compute[key]
+		if c.slave
+			for k in c.slave then @off k, c.fn
+		if c.master then @off key, master
+		delete @_compute[key]
+		this
 		
+	
+	set: (key, val, cmp) ->
+		if key of @_compute then free_compute$.call this, key
+		
+		fn = do(key)-> (val) -> if arguments.length then @change key, val else @retrive key
 		@_[key] = val
-		if arguments.length == 3
-			if cmp then @_cmp[key] = cmp else delete @_cmp[key]
+		if cmp then @_cmp[key] = cmp
 		@["$"+key] = fn
 		@[key] = fn unless key of this and not @hasOwnProperty key
 		this
 	
-	del: (key) -> @un key; @ut key; delete @_[key]; delete @_cmp[key]
+	compute: (key, opt) ->
+		if typeof opt == 'function' then opt = slave: opt
+		@set key, opt.val, opt.cmp
+		if slave = opt.slave
+			match = String(slave).match /// ^function\s*[\$\w]*\s*\( ([^\(\)]*) \) ///
+			keys = match[1].split /// ,\s* ///
+			@on keys, fn = do(key, slave, keys)-> (v, old, key1)->
+				ret = new Array((len=keys.length)+2)
+				ret[len] = old
+				ret[len+1] = key1
+				for name, i in keys then ret[i] = @retrive name
+				@change key, slave.apply this, ret
+		if master = opt.master then @on key, master
+		@_compute[key] = master: master, slave: keys, fn: fn
+		this
+		
+		
+	del: (key) -> (if key of @_compute then free_compute$.call this, key); @un key; @off key; delete @_[key]; delete @_cmp[key]
 	
 	cmp: (key, cmp) ->
 		if arguments.length == 1
@@ -945,9 +964,15 @@ class CModel
 		if arguments.length == 1
 			for key in $A key
 				delete @$0$[key]
+		else if typeof fn == 'function'
+			for key in $A key
+				if (ons = @$0$[key]) and -1 != idx=ons.indexOf fn
+					if ons.length == 1 then delete @$0$[key] else ons.splice idx, 1
 		else
 			for key in $A key
-				if (ons = @$0$[key]) and -1 != idx=ons.indexOf fn then ons.splice idx, 1
+				if ons = @$0$[key]
+					for i, idx in ons when i._belong == fn then ons.splice idx, 1 ; break
+					if ons.length == 0 then delete @$0$[key]
 		this
 	
 	on: _on.inline "on", "_on"
@@ -956,12 +981,10 @@ class CModel
 	un: _off.inline "un", "_at"
 	
 	change: (key, val) ->
-		say 'change', key, val, @_[key]
-		throw CRoot.raise "Нет ключа `#{key}` в модели #{@constructor.getName()}.#{@_name}" unless key of @_
+		#throw CRoot.raise "Нет ключа `#{key}` в модели #{@constructor.getName()}.#{@_name}" unless key of @_
 		if arguments.length == 1 then val = !@_[key]
 		old=@_[key]
-		if (if cmp=@_cmp[key] then !cmp.call this, val, old else val != old)
-			@send val, old, key; @_[key] = val
+		if (if cmp=@_cmp[key] then !cmp.call this, val, old else val != old) then @_[key] = val; @send val, old, key
 		this
 
 	send: (val, old, key) ->
@@ -975,7 +998,7 @@ class CModel
 		this
 			
 	retrive: (key) ->
-		if at = @_at[key] then for fn in at then @change key, fn.call this, key
+		if at = @_at[key] then for fn in at then @change key, fn.call this, key, @_[key]
 		@_[key]
 		
 	stream: (key) -> stream = new Stream; @on key, stream.emitter(); stream
@@ -1616,7 +1639,7 @@ class CWidget
 		this		
 
 	readyRun$ = 0
-	ready$ = (e) -> (if readyRun$ < 2 then readyRun$ = 2 ; (w=$(window)).send 'onReadyDom'; w.off 'load ReadyDom', ready$); this
+	ready$: ready$ = (e) -> (if readyRun$ < 2 then readyRun$ = 2 ; (w=$(window)).send 'onReadyDom'; w.off 'load ReadyDom', ready$); this
 	
 	listens$ =
 		onready_dom: (listener) ->
@@ -1625,7 +1648,8 @@ class CWidget
 				$(window).on 'ReadyDom', listener
 				if readyRun$ == 0
 					readyRun$ = 1
-					document.addEventListener? "DOMContentLoaded", ready$, false
+					if document.addEventListener then document.addEventListener "DOMContentLoaded", ready$, false
+					else @wrap("<script defer>\nCWidget.prototype.ready$()\n</script>").appendTo @body()
 					$(window).on 'load', ready$
 			this
 	
@@ -1644,18 +1668,19 @@ class CWidget
 	ajaxStream: -> stream = new CStream; @on 'Load', stream.emitter(); @on 'Error', stream.errorer(); stream
 
 	_default_assign: 'text'
-	assign: (slot, type = @_default_assign, attr...) ->
+	_default_update: undefined
+	assign: (key, type, update) ->
 		model = @model
-		@_slot = slot
-		model.set slot, @[type] attr... unless model.has slot
-		model.on slot, fn = do(type, attr) => (v, old, key) => this[type] attr..., v
+		[type, attr...] = $A type
+		model.set key, @[type] attr... unless model.has key
+		if update then @on update, do(key, type, attr)-> -> @model.change key, @[type] attr...
+		model.on key, fn = do(type, attr) => (val) => @[type] attr..., val
 		fn._belong = this
 	setModel: ->
 		if attr = @attr 'model'
-			attr = attr.split /:\s*/
-			slot = attr.shift()
-			type = attr.shift()
-			@assign slot, type, attr...
+			for ass in $A attr, /;\s*/
+				ass = $A ass, /:/
+				@assign ass[0], ass[1] || @_default_assign, ass[2] || @_default_update
 		this
 	setModelOnElements: (elem=@_elements) -> (for e in elem then @byName(e).setModel()); this
 	
@@ -2629,7 +2654,9 @@ class CWidget
 			next_animate$.call this
 			animate$.call this
 		this
-		
+
+	# http://cubic-bezier.com/#.34,1.49,.55,-0.57 - сравнение анимации
+	# http://daneden.github.io/animate.css/ - анимация css
 	morph: (param) ->
 		if typeof param == "string" then (if param of CEffect then param = CEffect[param] else throw @raise "Нет эффекта #{param}")
 		if typeof param.timeout == 'object' then extend param, param.timeout; (delete param.timeout if typeof param.timeout == 'object')
@@ -2671,9 +2698,10 @@ class CWidget
 
 	
 	# методы шейпов
-	shape: (shape) ->
-		unless @_shape ||= @up().filter('[cshape]').item 0 then @wrapIn @_shape = @wrap("<div cshape></div>").insertBefore this
+	shape: (shape) ->	# добавляет в шейп элемент
+		unless @_shape ||= @up().filter('[cshape]').item 0 then @wrapIn @_shape = @new(@tag(), shape: "shape").insertBefore this
 		@_shape.prepend shape
+		
 		this
 	
 	modal: (msg) -> @_modal ||= @wrap("<div cview=modal cargs='class=c-modal'></div>").appendTo @body(); if arguments.length then @_modal.html(msg).open(); this else @_modal
@@ -2873,6 +2901,7 @@ class CPingWidget extends CButtonWidget
 
 	
 class CInputWidget extends CWidget
+	_default_update: 'keyup'
 	constructor: ->
 		super
 		if valid = @attr "cvalid" then @on 'keyup', ->
@@ -2882,18 +2911,22 @@ class CInputWidget extends CWidget
 	val: (val) -> if arguments.length then @element.value = val; this else @element.value
 	html: @::val
 	text: @::val
-	
-	setModel: -> super ; (if @_slot then @on 'keyup', -> @model.change slot, @val()); this
-
-
-class CSelectWidget extends CInputWidget
-	#text: (text) -> if arguments.length then @element.options[@element.selectedIndex].text = text else @element.options[@element.selectedIndex].text
 
 
 class CTextareaWidget extends CInputWidget
+	
+class CSelectWidget extends CInputWidget
+	_default_update: 'change'
+	#text: (text) -> if arguments.length then @element.options[@element.selectedIndex].text = text else @element.options[@element.selectedIndex].text
 
+class CRadioWidget extends CInputWidget
+	_default_update: 'change'
+	
+class CCheckboxWidget extends CRadioWidget
 
 class CImgWidget extends CInputWidget
+	_default_update: undefined
+	_default_assign: 'src'
 	val: (val) -> undefined
 	src: (val) -> if arguments.length then @element.src = val; this else @element.src
 
@@ -2954,8 +2987,8 @@ class CFormWidget extends CWidget
 		@send "onCreate", counter
 
 	initialize: ->
-		do @setHandlersOnElements
 		do @attachElements
+		do @setHandlersOnElements
 		do @setModelOnElements
 	dataType: (data) ->
 		if typeof data == 'string' then data = fromJSON data
@@ -2992,7 +3025,7 @@ class CFormWidget extends CWidget
 			this
 	valid: -> err = []; (for i in @_elements then unless (e=this["$"+i]).valid() then err.push e); if err.length == 0 then on else @send 'onInvalid', err; off
 	
-	setValid: (valid = @data?.valid) ->
+	setValid: (valid = @data?._valid) ->
 		if valid
 			id = @id()
 			for name, v of valid then @["$"+name].setValid v
@@ -3000,6 +3033,9 @@ class CFormWidget extends CWidget
 
 
 class CTemplateWidget extends CFormWidget
+	#initializeContent: @::initialize
+	#initialize: ->
+
 	getTemplate: ->
 		if @hasClass 'c-template' then @removeClass 'c-template'; html = @html(); @html ""
 		else if @attr('cinit')? then html = @down(0).html().replace ///!(!)|!///g, "$1"
@@ -3023,8 +3059,7 @@ class CTemplateWidget extends CFormWidget
 			do @initTemplate unless @_template
 			@element.innerHTML = @_template @data=@dataType(data), @element.id
 			@removeClass "c-novid"
-			do @attachElements
-			do @setHandlersOnElements
+			do @initialize
 			do @setValid
 		else @param()
 		
@@ -3047,7 +3082,7 @@ class CListWidget extends CTemplateWidget
 		else html = @getTemplate()
 		@_template = CTemplate.compile html, @_templates = {}, is_list: 1
 
-	attachElements: -> # специально оставлена пустой. Т.к. только формы должны иметь элементы
+	attachElements: -> @_elements = []; this # специально оставлена пустой. Т.к. только формы должны иметь элементы
 	setValid: -> # специально оставлена пустой. Т.к. списки не имеют элементов
 	detach: (name) -> (if @frame == name || @frame == this[name] then delete @frame); super
 		
@@ -3457,7 +3492,7 @@ class CLoaderWidget extends CWidget
 		args = [CUrl.to(url), title || @document().title]
 		if @request.history then args.unshift 0
 		@navigate args...
-		say args..., window.history$, window.history_pos$
+		say 'submit_manipulate', args..., window.history$, window.history_pos$
 		this
 
 
