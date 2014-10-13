@@ -36,11 +36,15 @@ sub SQL_COL (@) {
 	join "", ($as? (SQL_WORD($as), "."): ()), SQL_WORD($col);
 }
 
+# возвращает алиас таблицы, когда нельзя 
 sub TAB_ref (@) {
 	my ($col) = @_;
 	$col =~ s/_id$//;
 	$_alias_tab{$col} || $col;
 }
+
+# квотирование
+sub quote { $dbh->quote($_[0]) }
 
 # формирует ключ=значение через запятую, для UPDATE SET или REPLACE SET
 sub DO_SET (@) {

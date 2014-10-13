@@ -631,11 +631,15 @@ sub TemplateStr {
 	my $re_type = sub { my ($x)=@_; return unless defined $x; local($`, $', $1); $x=~s/^'(.*)'$/$1/, $x=~s/"/\\"/g, $x="\"$x\"" if $x =~ /^'/; $x};
 	
 	my $code_begin = 'sub {	my ($dataset, $id1) = @_; my ($i, @res) = 0; for my $data (@$dataset) { my $id = "$id1-".($data->{id} // $i); push @res, \'';
-	
 	my $code_end = '\';	$i++; }	return join "", @res; }';
-
 	my $code_begin1 = 'sub { my ($data, $id) = @_; return join "", \'';
 	my $code_end1 = '\' }';
+	
+	my $code_begin_i = 'sub { my ($dataset, $id1) = @_; my $i = 0; for my $data (@$dataset) { my $id = "$id1-".($data->{id} // $i); ';
+	my $code_end_i = ' $i++; } }';
+	my $code_begin1_i = 'sub { my ($data, $id) = @_; ';
+	my $code_end1_i = ' }';
+
 
 	my $_tags = qr/(?:input|meta|br)/i;
 	my %tags = (
@@ -651,7 +655,7 @@ sub TemplateStr {
 	local ($_, $&, $`, $', $1, $2, $3, $4, $5);
 	($_) = @_;
 	
-	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id, @ifST) = ($_, 0);
+	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id, @ifST, @code) = ($_, 0);
 	my $page = my $form = {};
 	
 	my $get_id = sub { $open_id? ($form->{id}? "$form->{id}-$open_id": $open_id): /\bid=["']?([\w-]+)[^<]*\G/i && $1 };
@@ -687,15 +691,19 @@ sub TemplateStr {
 	
 	my $pop = sub {	# закрывается тег
 		my $tag = pop @T;
+		
 		if(@$tag > 2) {	# тег список - $* или форма - $+
 			local ($&, $`, $');
-			my ($open_tag, $begin, $name, $type, $cinit, $idx, $_form) = @$tag;
+			my ($tmp_open_tag, $begin, $name, $type, $cinit, $idx, $_form) = @$tag;
 			my $template = substr $_, $begin, $pos-$begin;
 			if($cinit) { $template=~s/!/!!/g; $template=~s/-->/--!>/g; $html[$idx] .= "<!--$template-->" }
-			push @html, ($type? $code_end: $code_end1) . ")->(\$data".($name? "->{'$name'}": "").", \$id".($name? ".'-$name'": "")."), '";
+			my $call = ")->(\$data".($name? "->{'$name'}": "").", \$id".($name? ".'-$name'": "");
+			push @html, ($type? $code_end: $code_end1) . $call . "), '";
+			
+			push @code, ['end', ($type? $code_end_i: $code_end1_i) . $call . ")"];
+			
 			$form->{template} = $template;
 			push @{$_form->{forms}}, $form->{id};
-			push @{$_form->{code}}, $form;
 			$form = $_form;
 		}
 		$TAG = $tag->[0];
@@ -710,7 +718,9 @@ sub TemplateStr {
 			$TAG = $1;
 			$open_tag = lc $TAG;
 			$NO=1 if $TAG =~ /^(?:script|style)$/;
-			if(my $re = $tags{$open_tag}) { $pop->() while @T and $T[$#T]->[0] !~ $re; } "<$TAG" }:
+			if(my $re = $tags{$open_tag}) { $pop->() while @T and $T[$#T]->[0] !~ $re; }
+			"<$TAG" 
+		}:
 		!$NO && m!\G>!? do {
 			die "Невалидный шаблон - обнаружена `<` без тега: `$_`" if not defined $TAG;
 			if($TAG =~ $_tags) { $TAG = $open_id = undef; ">" } else {
@@ -722,8 +732,16 @@ sub TemplateStr {
 					my $id = (exists($form->{id})? "$form->{id}-": "") . ($name // "");
 					$frm->{id} = $id;
 					$forms->{$id} = $form = $frm;
-					#push @{$page->{load_forms}}, $frm->{id} if exists $frm->{load};
-					@ret=(">", "', (" . ($type? $code_begin: $code_begin1))
+					my $load = "";
+					if($form->{load}) {
+						my $data = ($name? "\$data->{'$name'}": "\$_[0] = \$data");
+						my $where = exists $form->{where}? ", join '', $form->{where}": '';
+						$load = "$data = form_load(\$id.'-$name'$where) unless ref($data);";
+						push @code, ["load", $load];
+						$load = "do { $load () }, ";
+					}
+					push @code, ["begin", ($type? $code_begin_i: $code_begin1_i)];
+					@ret=(">", "', $load(" . ($type? $code_begin: $code_begin1))
 				} else { $T = [$open_tag]; @ret = ">" }
 				push @T, $T;
 				$T = $open_tag = undef;
@@ -748,7 +766,7 @@ sub TemplateStr {
 			die "Нет закрывающей `%}` для if" unless m!\G\s*%\}!;
 			push @ifST, 1;
 			$pos += length $&;
-			push @{$form->{code}}, ["if", join "", "if(", @html[$from..$#html], ") {"];
+			push @code, ["if", join "", "\nif(", @html[$from..$#html], ") {\n"];
 			push @html, ")? ('";
 			next
 		}:
@@ -759,12 +777,12 @@ sub TemplateStr {
 			$helper->($1, $2, $3);
 			die "Нет закрывающей `%}` для elif" unless m!\G\s*%\}!;
 			$pos += length $&;
-			push @{$form->{code}}, ["elsif", join "", "} elsif(", @html[$from..$#html], ") {"];
+			push @code, ["elif", join "", "\n} elsif(", @html[$from..$#html], ") {"];
 			push @html, ")? ('";
 			next
 		}:
-		m!\G\{%\s*else\s*%\}!? do { die "Нельзя использовать else" if @ifST==0 or $ifST[$#ifST]!=1; $ifST[$#ifST] = 2; push @{$form->{code}}, ["else", "} else {"]; "'): ('" }:
-		m!\G\{%\s*fi\s*%\}!? do { die "Нельзя использовать fi" if @ifST==0; push @{$form->{code}}, ["fi", "}"]; "')".($ifST[$#ifST] == 1? ": ()": "")."), '" }:
+		m!\G\{%\s*else\s*%\}!? do { die "Нельзя использовать else" if @ifST==0 or $ifST[$#ifST]!=1; $ifST[$#ifST] = 2; push @code, ["else", "\n} else {"]; "'): ('" }:
+		m!\G\{%\s*fi\s*%\}!? do { die "Нельзя использовать fi" if @ifST==0; push @code, ["fi", "}\n"]; "')".($ifST[$#ifST] == 1? ": ()": "")."), '" }:
 		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)]; () }:
 		m!\G(?:\$|(#))(\{\s*)?(?:(%)?(\w+)|$RE_TYPE)!? do {
 			my $open_span = $1;
@@ -800,9 +818,12 @@ sub TemplateStr {
 
 			$T->{model} = $model if $model;
 			$T->{noload} = 1 if $noload;
-			$T->{load} = 1 if defined $load and $load eq "load";
+			$load = $noload? 0: defined($load) && $load eq "load"? 1: $form->{load}? 2: 0;
+			$T->{load}  = $load if $load;
 			$T->{where} = $re_type->($where) if $where;
 			$T->{where} = "id=\$$var" if $var;
+			$T->{where} = "id=\$$form->{name}" . (exists $T->{where}? " AND ($T->{where})": "") if $load == 2;
+			$T->{where} =~ s!['\\]!\\$&!g, $T->{where} =~ s!\$(%)(\w+)!"', quote(" . $vario->($1, $2) . "), '"!ge, $T->{where} = "'$T->{where}'" if exists $T->{where};
 			#$T->{where} =~ s!\$(%)?(\w+)!"'".$vario->($1, $2)."'"!ge if exists $T->{where};
 			
 			my $n = ($name? "-$name": "");
@@ -821,6 +842,17 @@ sub TemplateStr {
 	$_[2] = $form;
 	
 	$form->{template} = $_;
+	
+	CODE: for(my $i=0; $i<@code; $i++) {
+		my ($code) = @{$code[$i]};
+		if($code eq "if") {
+			my $k = $i;
+			for(; $code[$i+1]->[0] =~ /^(?:elif|else)$/; $i++) {}
+			if($code[$i+1]->[0] eq "fi") { splice @code, $k, $i-$k+2; goto CODE; }
+		}
+		if($code eq "begin" and $code[$i+1]->[0] eq "end") { splice @code, $i, 2; goto CODE; }
+	}
+	$form->{code} = join "", $code_begin1_i, map({$_->[1]} @code), $code_end1_i;
 	
 	my $x = join "", $code_begin1, @html, $code_end1;
 	#our $rem++;

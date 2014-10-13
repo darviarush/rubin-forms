@@ -142,7 +142,6 @@ sub check_role (@) {
 			for my $col (@cols) {
 				my ($tab1, $col) = @$col;
 				die "not support `$action` for role `$role` in row $tab1.id=$id" unless $id;
-				
 				$id = query $tab1, $col, $id;
 			}
 		};
@@ -331,6 +330,27 @@ sub action_form_load ($$) {
 	my @query = check_role_view $valid, @{ $_forms{$action}->{query} }, $param;
 	$response->{body} = quick_rows(@query);
 	$response->{valid} = $valid;
+	$response
+}
+
+sub form_load {
+	my ($action, $where) = @_;
+	my ($response, $valid);
+	my $form = $_forms{$action};
+	my $tab = $form->{model} // $form->{name};
+	my $view = [keys $form->{fields}];
+	my @query = check_role_view $valid, $tab, $view;
+	if($form->{is_list}) {
+		$response = query_all($tab, $view, $where);
+		for my $row (@$response) {
+			$row->{_valid} = $valid;
+		}
+	}
+	else {
+		$response = query_ref($tab, $view, $where);
+		$response->{_valid} = $valid;
+	}
+	
 	$response
 }
 

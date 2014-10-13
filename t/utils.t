@@ -4,7 +4,7 @@ use warnings;
 
 use Data::Dumper;
 use Msg;
-use Test::More tests => 78;
+use Test::More tests => 65;
 
 use Msg;
 use Action;
@@ -291,35 +291,6 @@ $html = $fn->({abc=>1});
 is $html, '<tr tab="1"><div id="x1">';
 
 
-$code = Utils::TemplateStr('<div id=$+user:load(%user_id)>$s</div>', $forms, $page);
-$form = $page->{code}[0];
-is $form->{id}, "user";
-is $form->{where}, 'id=$%user_id';
-is $form->{load}, 1;
-
-$code = Utils::TemplateStr('{% if $%user_id %}<div id=$*aim:load("user_id=$%user_id")>$s</div>{% fi %}', $forms, $page);
-$form = $page->{code}[1];
-is $form->{id}, "aim";
-is $form->{where}, '"user_id=$%user_id"';
-is $form->{load}, 1;
-
-
-$code = Utils::TemplateStr('<div id=$+user:model(var)>$s</div> <div id=$+aim:load(aim1, var)>$s</div> <div id=$+a:noload>$s</div>', $forms, $page);
-$form = $page->{code}[0];
-is $form->{id}, "user";
-is $form->{where}, 'id=$var';
-is $form->{load}, undef;
-
-$form = $page->{code}[1];
-is $form->{id}, "aim";
-is $form->{where}, 'id=$var';
-is $form->{load}, 1;
-is $form->{model}, "aim1";
-
-$form = $page->{code}[2];
-is $form->{id}, "a";
-is $form->{noload}, 1;
-
 $code = Utils::TemplateStr('
 {% if 1 %}
 	{%if 2 %}
@@ -328,9 +299,9 @@ $code = Utils::TemplateStr('
 {% else %}
 	{% if 3 %}
 		<div id=$+user:load(var)>
-			<x id=f:noload>
+			<x id=$*f:noload>
 				{%if 5%}
-					<y id=m:load(v1)>
+					<y id=$+m:load(v1)>
 						yyyyy
 					</y>
 				{%fi%}
@@ -341,6 +312,37 @@ $code = Utils::TemplateStr('
 	{% fi %}
 {% fi %}', $forms, $page);
 
-msg $page;
+like $page->{code}, qr/form_load/;
+unlike $page->{code}, qr/if\(\s*2\s*\)/;
 
-is form_code($page), "if(1) { if(3) { form_load(); } }";
+
+
+# $code = Utils::TemplateStr('<div id=$+user:load(%user_id)>$s</div>', $forms, $page);
+# $form = $page->{code}[0];
+# is $form->{id}, "user";
+# is $form->{where}, 'id=$%user_id';
+# is $form->{load}, 1;
+
+# $code = Utils::TemplateStr('{% if $%user_id %}<div id=$*aim:load("user_id=$%user_id")>$s</div>{% fi %}', $forms, $page);
+# $form = $page->{code}[1];
+# is $form->{id}, "aim";
+# is $form->{where}, '"user_id=$%user_id"';
+# is $form->{load}, 1;
+
+
+# $code = Utils::TemplateStr('<div id=$+user:model(var)>$s</div> <div id=$+aim:load(aim1, var)>$s</div> <div id=$+a:noload>$s</div>', $forms, $page);
+# $form = $page->{code}[0];
+# is $form->{id}, "user";
+# is $form->{where}, 'id=$var';
+# is $form->{load}, undef;
+
+# $form = $page->{code}[1];
+# is $form->{id}, "aim";
+# is $form->{where}, 'id=$var';
+# is $form->{load}, 1;
+# is $form->{model}, "aim1";
+
+# $form = $page->{code}[2];
+# is $form->{id}, "a";
+# is $form->{noload}, 1;
+

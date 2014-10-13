@@ -5,44 +5,6 @@ use URI::Escape;
 use Term::ANSIColor qw(:constants);
 use Auth;
 
-# формируем функцию для ajax-запроса
-my $code_begin = '(sub { my ($dataset, $id1) = @_; %s my $i = 0; for my $data (@$dataset) { my $id = "$id1-".($data->{id} // $i); ';	
-my $code_end = ' $i++; } })';
-my $code_begin1 = '(sub { my ($data, $id) = @_; %s';
-my $code_end1 = ' })';
-
-sub form_code($;$) {
-	my ($form, $load) = @_;
-	
-	#main::msg $form->{id}, $load, $form->{code};
-	
-	$load = ($form->{noload}? 0: $form->{load} || $load);
-	my $begin = ($form->{is_list}? $code_begin: $code_begin1);
-	$begin = sprintf $begin, $load? ($form->{is_list}? "\$dataset = form_load() unless defined \$dataset;": "\$data = form_load() unless defined \$data;"): "";
-	
-	my @code = ["form", $begin, $load];
-	for my $code (@{$form->{code}}) {
-		if(ref $code eq "HASH") {
-			my $s = form_code($code, $code[$#code]->[2]);
-			if(defined($s)) {
-				my ($name, $type) = ($code->{name}, $code->{is_list});
-				$code[$#code]->[1] = join "", $code[$#code]->[1], $s, "->(\$data", (defined($name)? "['$name']": ()), ", \$id", (defined($name)? ".'-$name'": ()), ")";
-				$code[$#code]->[2] = 1;
-			}
-		} else {
-			if($code->[0] eq "if") { push @code, $code; }
-			elsif($code->[0] eq "fi") {
-				my $top = pop @code;
-				if($top->[2]) { $top->[1] .= $code->[1]; $code[$#code]->[1] .= $top->[1]; $code[$#code]->[2] = 1; }
-			}
-			else { $code[$#code]->[1] .= $code->[1] }
-		}
-	}
-	return unless $code[0]->[2];
-	join "", $code[0]->[1], ($form->{is_list}? $code_end: $code_end1);
-}
-
-
 # подгружаем экшены в %_action
 sub load_htm($) {
 	my ($path) = @_;
@@ -86,9 +48,10 @@ sub load_htm($) {
 				$_ = "$index-$_" for @{$form->{forms}};
 			}
 			
-			$page->{code} = form_code $page->{code};
+			my $code = $page->{code};
+			delete $page->{code};
 			
-			$eval = join "", "use strict; use warnings; our(%_layout, %_forms, %_pages, %_action_htm, %_STASH); \$_pages{'$index'}{sub} = \$_action_htm{'$index'} = ", $eval, ";\n\n\$_pages{'$index'} = ", Utils::Dump($page), ";\n", @write, "\n\n1;";
+			$eval = join "", "use strict; use warnings; our(%_layout, %_forms, %_pages, %_action_htm, %_STASH); \$_pages{'$index'}{sub} = \$_action_htm{'$index'} = ", $eval, ";\n\n\$_pages{'$index'} = ", Utils::Dump($page), ";\n\$_pages{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
 			
 			Utils::mkpath($p);
 			Utils::write($p, $eval);
@@ -231,19 +194,18 @@ sub action_submit {
 
 		die "Нет экшена `$act`" if not exists $main::_action{$act} and not $main::_action_htm{$act};
 		
-		my $data;
+		my $data = exists $main::_action{$act}? $main::_action{$act}->(): {};
+		$main::_pages{$act}{code}->($data, $act) if exists $main::_pages{$act}{code};
 		
 		$result->{$act} = {
 			act => $act,
 			($id ? (id => $id): ()),
-			(exists $main::_action{$act}? (data => $data = $main::_action{$act}->()): ()),
-			(exists $main::_forms{$act} && exists $main::_info->{$act}? (data => action_view($main::_action, $main::param)): ()),
+			#(exists $main::_forms{$act} && exists $main::_info->{$act}? (data => action_view($main::_action, $main::param)): ()),
+			(defined($data)? (data => $data): ()),
 			(exists $main::_pages{$act}{template}? (template => $main::_pages{$act}{template}): ()),
 			(exists $main::_pages{$act}{layout_id}? (layout_id => $main::_pages{$act}{layout_id}): ()),
 			(exists $main::_layout{$act}? (layout => $main::_layout{$act}): ())
 		};
-		
-		action_load_forms($data // $main::param, $act) if $main::_pages{$act}{load_forms};
 	};
 
 	unless($::param->{_noact_}) {
