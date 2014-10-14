@@ -84,8 +84,8 @@
 
 # -----------------------
 # 48. сделать в CInit параметр для создания стилей .w\d+ и .mobile, .pad, .computer
-# 49. @submit - как в обычной форме. Предусмотреть target=id
-# 50. предусмотреть изменение при изменении формы и url-а
+#* 49. @submit - как в обычной форме. Предусмотреть target=id
+#* 50. предусмотреть изменение при изменении формы и url-а
 # 60. Локализация (перевод) на другие языки
 #? 61. accept в div-ах
 # 62. Взять для описания документации из http://enepomnyaschih.github.io/jwidget/1.0/index.html#!/guide/ruphilosophy и подправить
@@ -1075,6 +1075,8 @@ CTemplate =
 		RE_IF = new RegExp "^\\{%\\s*if\\s+(?:\\$(%)?(\\w+)|#{RE_TYPE})"
 		RE_ELIF = new RegExp "^\\{%\\s*elif\\s+(?:\\$(%)?(\\w+)|#{RE_TYPE})"
 		
+		RE_FORM = new RegExp "^\\$([+*])(\\w+)?(?::(?:(noload)|(load|model)\\((?:(\\w+),\\s*)?(?:(%?\\w+)|(#{RE_TYPE}))\\)))?"
+		
 		re_type = (s) -> if s? then s.replace(/\n/g, '\\n').replace /\r/g, '\\r'
 		_NO_ESCAPE_HTML = CHelper._NO_ESCAPE_HTML
 		
@@ -1091,7 +1093,15 @@ CTemplate =
 			
 		T = []; html = []; pos = 0 ; s = i_html; ifST = []
 		
-		var_x = (_type, _var) -> if _type then (if _var == '_DATA' then "data" else if _var == "_STASH" then "CTemplate._STASH" else if _var == 'i' then "i" else if _var == 'i0' then "(i-1)" else "CTemplate._STASH.#{_var}") else "data['#{_var}']"
+		var_x = (_type, _var) ->
+			if _type
+				if _var == '_DATA' then "data"
+				else if _var == "_STASH" then "CTemplate._STASH"
+				else if _var == 'i' then "i"
+				else if _var == 'i0' then "(i-1)"
+				else if _var == 'id' then "id"
+				else "CTemplate._STASH.#{_var}"
+			else "data['#{_var}']"
 		
 		helper = (_type, _var, _const, open_braket) ->
 			braket = 0
@@ -1131,7 +1141,7 @@ CTemplate =
 				#form.code = html.slice(idx+2).join ""
 				_form.forms.push form
 				id = "id" + (if name then "+'-#{name}'" else "")
-				data = if form.load then "CTemplate._STASH["+id+"]" else "data" + (if name then "['#{name}']" else "")
+				data = "data" + (if name then "['#{name}']" else "")
 				html.push ")(", data, ", ", id, "), '"
 				form = _form
 			tag[0]
@@ -1197,9 +1207,10 @@ CTemplate =
 					html.push ", '" + (if open_span then "</span>" else "")
 					continue
 
-			else if open_tag and m = s.match ///^\$([+*])(\w+)?(:load(?:\(%(\w+)\))?)?(?::model\((\w+)\))?///
+			else if open_tag and m = s.match RE_FORM
 				t = name: m[2], is_list: m[1]=='*'
-				t.load = 1 if m[3]
+				load = m[4]
+				t.load = if m[3] then 0 else if load and load == "load" then 1 else if form.load then 2 else 0
 				html.push "', id, '" + (if m[2] then "-" + m[2] else "")
 			else if m = s.match ///^[\\']/// then html.push "\\"+m[0]
 			else if m = s.match ///^\n/// then html.push "\\n"
@@ -1377,7 +1388,7 @@ class CWidget
 		return CView[cview][0] if cview = element.getAttribute 'cview'
 		if id = element.id
 			if (a=id.match /// (?:^|-) ([a-z_]\w*) $ ///i) and (a=window[a[1]]) instanceof Function and /^C\w+Widget$/.test CWidget::className.call( constructor: a) then return a
-		if (tag = element.tagName) == "INPUT" and element.type of {button:1, submit:1, reset:1} then CButtonWidget else if (cls=window["C"+tag.toLowerCase().ucFirst()+"Widget"]) instanceof Function and CWidget::className.call( constructor: cls ) then cls else	CWidget
+		if (tag = element.tagName) == "INPUT" and cls=window['C'+element.type.uc()+'Widget'] then cls else if (cls=window["C"+tag.toLowerCase().ucFirst()+"Widget"]) instanceof Function and CWidget::className.call( constructor: cls ) then cls else	CWidget
 
 	toElements$ = (e) ->
 		x = []
@@ -1901,10 +1912,8 @@ class CWidget
 	normalize: -> @element.normalize(); this
 	update: (val, request) ->
 		if off != @send 'onBeforeUpdate', val
-			if request
-				if request.dopparam.script then @htmlscript val
-				else if ///^text/html\b///i.test request.request.getResponseHeader "Content-Type" then @html val
-				else @val val
+			if /^\{/.test val then val = toJSON val; @htmlscript CTemplate.compile(val.template)(val.data, @id())
+			else if request?.request and ///^text/html\b///i.test request.request.getResponseHeader "Content-Type" then @htmlscript val
 			else @val val
 			@send 'onUpdate', val
 		this
@@ -2801,10 +2810,8 @@ class CWidget
 	param: -> x={}; x[@name() || 'val'] = @val(); x
 	#buildQuery: -> [(p=@parent())._tab || p.name(), @name(), p.data?.id || p.$id?.val()]
 	load: (param, args...) -> @loader()._load 'load', param || {}, this, args
-	submit: (param, args...) ->
-		if @valid()
-			@loader()._load 'submit', extend(@param(), param || {}), this, args
-		this
+	submit: (param, args...) -> if @valid() then @loader()._load 'submit', extend(@param(), param || {}), this, args else this
+	reload: (param, args...) -> if @valid() then @loader()._load 'reload', extend(@param(), param || {}), this, args else this
 	save: (param, args...) -> if @valid() then @loader()._load 'save', extend(@param(), param || {}), this, args else this
 	ping: (param, args...) -> @loader()._load 'ping', param, this, args
 	erase: (param, args...) -> @loader()._load 'erase', extend(@param(), param || {}), this, args
@@ -2890,6 +2897,8 @@ class CSubmitWidget extends CButtonWidget
 	onclick: (e) -> @parent().submit(); e.stop(); off
 class CLoadWidget extends CButtonWidget
 	onclick: (e) -> @parent().load(); e.stop(); off
+class CReloadWidget extends CButtonWidget
+	onclick: (e) -> @parent().reload(); e.stop(); off
 class CUploadWidget extends CButtonWidget
 	onclick: (e) -> @parent().upload(); e.stop(); off
 class CSaveWidget extends CButtonWidget
@@ -2898,6 +2907,9 @@ class CEraseWidget extends CButtonWidget
 	onclick: (e) -> @parent().erase(); e.stop(); off
 class CPingWidget extends CButtonWidget
 	onclick: (e) -> @parent().ping(); e.stop(); off
+
+class CResetWidget extends CButtonWidget
+	onclick: (e) -> @parent().reset(); e.stop(); off
 
 	
 class CInputWidget extends CWidget
@@ -3368,7 +3380,6 @@ class CLoaderWidget extends CWidget
 		@loaded_error "Закончилось время ожидания ответа запроса `#{@request.url}`"
 
 	_load: (type, param={}, customer, args) ->
-
 		if (req=@request) and not req.end
 			req.request?.abort()
 			say "Поступил load до того, как закончился предыдущий. old_customer: " + req.customer + " new_customer: " + customer
@@ -3421,11 +3432,11 @@ class CLoaderWidget extends CWidget
 		args = @request.args
 		customer.send "onComplete", data, @request, args...
 		switch @request.type
+			when "reload"
+				@reload_manipulate data
 			when "upload"
 				customer.add data
-			when "submit"
-				@submit_manipulate data
-			when "load"
+			when "submit", "load"
 				customer.update data, @request
 			when "erase"
 				customer.remove()
@@ -3463,7 +3474,7 @@ class CLoaderWidget extends CWidget
 		error = if @request.request.status == 500 then @request.request.responseText else escapeHTML @request.error
 		@request.customer.tooltip ctype: 'tooltip', close: 1, html: "<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка</h3>"+error, open: 1, timeout: 5000, class: 'c-error'
 	
-	submit_manipulate: (data) ->		
+	reload_manipulate: (data) ->		
 		data = fromJSON data if typeof data == 'string'
 		if stash = data['@stash'] then CTemplate._STASH = stash
 		if layout = data['@layout']
@@ -3492,7 +3503,7 @@ class CLoaderWidget extends CWidget
 		args = [CUrl.to(url), title || @document().title]
 		if @request.history then args.unshift 0
 		@navigate args...
-		say 'submit_manipulate', args..., window.history$, window.history_pos$
+		say 'reload_manipulate', args..., window.history$, window.history_pos$
 		this
 
 
@@ -3533,7 +3544,7 @@ class CRouterWidget extends CWidget
 				if url.hash then param._layout_id_ = url.hash; url.hash = ""
 				param._act = CUrl.to url
 				#if not a._loader and not a.attr 'cloader' then a.loader this
-				a.submit param
+				a.reload param
 		this
 	
 	val: -> undefined
@@ -3546,7 +3557,7 @@ class CRouterWidget extends CWidget
 		href = @window().location.href
 		href = href.replace ///\#.*$///, ''
 		# # say 'popstate', href, old, pos, e
-		if prev_url$ != href then @submit _act: href, _history: 1
+		if prev_url$ != href then @reload _act: href, _history: 1
 		prev_url$ = href
 		
 	onhashchange_window: pop$

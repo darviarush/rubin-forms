@@ -1,5 +1,3 @@
-use strict;
-use warnings;
 
 use POSIX qw/strftime/;
 use Data::Dumper;
@@ -342,13 +340,13 @@ sub form_load {
 	my @query = check_role_view $valid, $tab, $view;
 	if($form->{is_list}) {
 		$response = query_all($tab, $view, $where);
-		for my $row (@$response) {
-			$row->{_valid} = $valid;
+		if($valid) {
+			$_->{_valid} = $valid for @$response;
 		}
 	}
 	else {
 		$response = query_ref($tab, $view, $where);
-		$response->{_valid} = $valid;
+		$response->{_valid} = $valid if $valid;
 	}
 	
 	$response

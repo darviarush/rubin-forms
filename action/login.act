@@ -14,7 +14,7 @@ if($user_id) {
 		add "sess", {id=>$sess, user_id=>$user_id};
 	}
 	
-	$::_user_id = $user_id;
+	$::_user_id = $::_STASH{user_id} = $user_id;
 	$_COOKIE->{sess} = $sess;
 	
 	$referer = !exists $_HEAD->{Referer}? "/profit": $_HEAD->{Referer};

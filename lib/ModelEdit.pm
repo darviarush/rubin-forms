@@ -1,6 +1,3 @@
-use strict;
-use warnings;
-
 our ($param, $ini, $_info);
 
 # изменяет модель. Изменяет $ini
@@ -24,9 +21,9 @@ sub model_edit {
 		my $key = "$tab.selfcol";
 		if($perm ne "") {
 			for my $col (split /,\s*/, $perm) {
-				return status 406, "`$col` не разделён \".\"" unless $col =~ /\./;
-				return status 406, "Нет таблицы $col в базе" unless exists $_info->{$`};
-				return status 406, "Нет столбца $col в базе" unless exists $_info->{$`}{$'};
+				return status(406, "`$col` не разделён \".\"") unless $col =~ /\./;
+				return status(406, "Нет таблицы $col в базе") unless exists $_info->{$`};
+				return status(406, "Нет столбца $col в базе") unless exists $_info->{$`}{$'};
 			}
 			$ini->{do}{$key} = $perm;
 			Utils::inject_ini($_[0], "", $key, $perm);

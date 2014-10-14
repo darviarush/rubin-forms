@@ -1,5 +1,3 @@
-use strict;
-use warnings;
 use DBI;
 
 our($dbh, $ini, %_alias_tab);

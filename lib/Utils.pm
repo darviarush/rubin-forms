@@ -1,8 +1,5 @@
 package Utils;
 
-use strict;
-use warnings;
-
 use Data::Dumper;
 
 # создаёт множество
@@ -635,10 +632,10 @@ sub TemplateStr {
 	my $code_begin1 = 'sub { my ($data, $id) = @_; return join "", \'';
 	my $code_end1 = '\' }';
 	
-	my $code_begin_i = 'sub { my ($dataset, $id1) = @_; my $i = 0; for my $data (@$dataset) { my $id = "$id1-".($data->{id} // $i); ';
-	my $code_end_i = ' $i++; } }';
-	my $code_begin1_i = 'sub { my ($data, $id) = @_; ';
-	my $code_end1_i = ' }';
+	my $code_begin_i = "sub { my (\$dataset, \$id1) = \@_; my \$i = 0; for my \$data (\@\$dataset) { my \$id = '\$id1-'.(\$data->{id} // \$i);\n";
+	my $code_end_i = "\$i++; } }\n";
+	my $code_begin1_i = "sub { my (\$data, \$id) = \@_; \n";
+	my $code_end1_i = "}\n";
 
 
 	my $_tags = qr/(?:input|meta|br)/i;
@@ -660,7 +657,7 @@ sub TemplateStr {
 	
 	my $get_id = sub { $open_id? ($form->{id}? "$form->{id}-$open_id": $open_id): /\bid=["']?([\w-]+)[^<]*\G/i && $1 };
 	
-	my $vario = sub { my ($type, $var, $const) = @_; defined($const)? $re_type->($const): defined($type)? ($var eq "_DATA"? "\$data": $var eq "_STASH"? "\\%_STASH": $var eq 'i'? "\$i": $var eq "i0"? "(\$i-1)": "\$_STASH{'$var'}"): "\$data->{'$var'}" };
+	my $vario = sub { my ($type, $var, $const) = @_; defined($const)? $re_type->($const): defined($type)? ($var eq "_DATA"? "\$data": $var eq "_STASH"? "\\%_STASH": $var eq 'i'? "\$i": $var eq "i0"? "(\$i-1)": $var eq "id"? "\$id": "\$_STASH{'$var'}"): "\$data->{'$var'}" };
 	my $helper = sub {
 		my ($type, $var, $const, $open_braket) = @_;
 		push @html, $vario->($type, $var, $const);
@@ -700,7 +697,7 @@ sub TemplateStr {
 			my $call = ")->(\$data".($name? "->{'$name'}": "").", \$id".($name? ".'-$name'": "");
 			push @html, ($type? $code_end: $code_end1) . $call . "), '";
 			
-			push @code, ['end', ($type? $code_end_i: $code_end1_i) . $call . ")"];
+			push @code, ['end', ($type? $code_end_i: $code_end1_i) . $call . ");\n"];
 			
 			$form->{template} = $template;
 			push @{$_form->{forms}}, $form->{id};
@@ -729,7 +726,7 @@ sub TemplateStr {
 					local($&, $`, $'); my $m;
 					my $frm = $T;
 					$T = [$open_tag, $pos+1, $name=$T->{name}, $type=$T->{is_list}, $m=/\bcinit[^<]*\G/i, scalar(@html), $form];
-					my $id = (exists($form->{id})? "$form->{id}-": "") . ($name // "");
+					my $id = (exists($form->{id})? "$form->{id}-": "") . $name;
 					$frm->{id} = $id;
 					$forms->{$id} = $form = $frm;
 					my $load = "";
@@ -737,10 +734,10 @@ sub TemplateStr {
 						my $data = ($name? "\$data->{'$name'}": "\$_[0] = \$data");
 						my $where = exists $form->{where}? ", join '', $form->{where}": '';
 						$load = "$data = form_load(\$id.'-$name'$where) unless ref($data);";
-						push @code, ["load", $load];
+						push @code, ["load", $load . "\n"];
 						$load = "do { $load () }, ";
 					}
-					push @code, ["begin", ($type? $code_begin_i: $code_begin1_i)];
+					push @code, ["begin", "(" . ($type? $code_begin_i: $code_begin1_i)];
 					@ret=(">", "', $load(" . ($type? $code_begin: $code_begin1))
 				} else { $T = [$open_tag]; @ret = ">" }
 				push @T, $T;
@@ -811,6 +808,7 @@ sub TemplateStr {
 		# load присваивает данным, но только если там их нет
 		$open_tag && m!\G\$([+*])(\w+)?(?::(?:(noload)|(load|model)\((?:(\w+),\s*)?(?:(%?\w+)|($RE_TYPE))\)))?!? do {
 			my ($type, $name, $noload, $load, $model, $var, $where) = ($1, $2, $3, $4, $5, $6, $7);
+			$name //= "";
 			$T = {
 				name => $name, 
 				is_list => $type eq "*",
@@ -822,8 +820,9 @@ sub TemplateStr {
 			$T->{load}  = $load if $load;
 			$T->{where} = $re_type->($where) if $where;
 			$T->{where} = "id=\$$var" if $var;
-			$T->{where} = "id=\$$form->{name}" . (exists $T->{where}? " AND ($T->{where})": "") if $load == 2;
-			$T->{where} =~ s!['\\]!\\$&!g, $T->{where} =~ s!\$(%)(\w+)!"', quote(" . $vario->($1, $2) . "), '"!ge, $T->{where} = "'$T->{where}'" if exists $T->{where};
+			$T->{tab} = $model // $name;
+			$T->{where} = "$form->{tab}_id=\$$form->{name}_id" . (exists $T->{where}? " AND ($T->{where})": "") if $load == 2;
+			$T->{where} =~ s!['\\]!\\$&!g, $T->{where} =~ s!\$(%)?(\w+)!"', quote(" . $vario->($1, $2) . "), '"!ge, $T->{where} = "'$T->{where}'" if exists $T->{where};
 			#$T->{where} =~ s!\$(%)?(\w+)!"'".$vario->($1, $2)."'"!ge if exists $T->{where};
 			
 			my $n = ($name? "-$name": "");

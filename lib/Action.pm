@@ -1,5 +1,3 @@
-use strict;
-use warnings;
 
 use URI::Escape;
 use Term::ANSIColor qw(:constants);
@@ -51,7 +49,7 @@ sub load_htm($) {
 			my $code = $page->{code};
 			delete $page->{code};
 			
-			$eval = join "", "use strict; use warnings; our(%_layout, %_forms, %_pages, %_action_htm, %_STASH); \$_pages{'$index'}{sub} = \$_action_htm{'$index'} = ", $eval, ";\n\n\$_pages{'$index'} = ", Utils::Dump($page), ";\n\$_pages{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
+			$eval = join "", "our(%_layout, %_forms, %_pages, %_action_htm, %_STASH); \$_pages{'$index'}{sub} = \$_action_htm{'$index'} = ", $eval, ";\n\n\$_pages{'$index'} = ", Utils::Dump($page), ";\n\$_pages{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
 			
 			Utils::mkpath($p);
 			Utils::write($p, $eval);
@@ -86,7 +84,7 @@ sub load_action ($$) {
 			my @my = keys %my;
 			my @local = grep { exists $local{$_} } @my;
 			@my = grep { not exists $our{$_} and not exists $local{$_} } @my;
-			my $eval = join("", "use strict; use warnings; our(", join(", ", @our), "); \$main::_action{'$index'} = sub {" , (@local? ("local(", join(", ", @local), "); "): ()), (@my? ("my(", join(", ", @my), "); "): ()), $action, "\n};\n\n1;");
+			my $eval = join("", "our(", join(", ", @our), "); \$main::_action{'$index'} = sub {" , (@local? ("local(", join(", ", @local), "); "): ()), (@my? ("my(", join(", ", @my), "); "): ()), $action, "\n};\n\n1;");
 			
 			Utils::mkpath($p);
 			Utils::write($p, $eval);
@@ -162,7 +160,7 @@ sub parse_location {
 	($::_URL, $::_LOCATION, $::_action, $id, $ids, $::_EXT) = @_;
 	our $param = our $_GET = Utils::param($7);
 	$param = defined($id)? { %$_GET, id => $id }: $_GET;
-	if(defined $ids) {
+	if(defined $ids and $ids ne "") {
 		my $i = 2;
 		$param->{"id" . ($i++)} = $_ for split /_/, substr $ids, 1;
 	}
@@ -188,13 +186,15 @@ sub action_submit {
 	my $result = {};
 	my ($id, $url, $act);
 	
+	$act = $::_action;
+	
 	content "text/json";
 	
 	my $add_res = sub {
 
 		die "Нет экшена `$act`" if not exists $main::_action{$act} and not $main::_action_htm{$act};
 		
-		my $data = exists $main::_action{$act}? $main::_action{$act}->(): {};
+		my $data = exists $main::_action{$act}? $main::_action{$act}->(): $::param;
 		$main::_pages{$act}{code}->($data, $act) if exists $main::_pages{$act}{code};
 		
 		$result->{$act} = {
@@ -208,8 +208,12 @@ sub action_submit {
 		};
 	};
 
+	if($_[0]) {
+		$add_res->();
+		return $result->{$act};
+	}
+	
 	unless($::param->{_noact_}) {
-		$act = $::_action;
 		#$act = 'index' if $act eq "/";
 		my $layout_id = $::param->{_layout_id_};
 		my $layout = [];
