@@ -1,3 +1,5 @@
+# 1. Трансформации css: http://www.useragentman.com/IETransformsTranslator/
+
 # for IE < 9 ONLY!
 
 
