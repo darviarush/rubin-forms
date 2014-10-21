@@ -1,6 +1,3 @@
-use strict;
-use warnings;
-
 sub Valid::image {
 	my ($val, $tab, $col, $op) = @_;
 	

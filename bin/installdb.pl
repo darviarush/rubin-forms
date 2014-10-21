@@ -2,24 +2,32 @@
 
 use ModelEdit;
 
-$packages = $ini->{package};
-$install = get_install_info(files "install.sql");
+#$packages = $ini->{package};
+#$install = get_install_info(files "install.sql");
 
-$ln = 0;
 
-eval {
-	print "install ";
-	($database) = $ini->{mysql}{DNS} =~ /\bdatabase=(\w+)/;
-	@query = ("DROP DATABASE `$database`", "CREATE DATABASE `$database` CHARACTER SET utf8 COLLATE utf8_unicode_ci", "USE `$database`", map {
-		$_ = Utils::read($_)
-		s!#[^\n]*|/\*.*?\*/?! !gms;
-		split /;/;
-	} files "install.sql");
-	
-	for (@query) {
+print "install ";
+($database) = $ini->{mysql}{DNS} =~ /\bdatabase=(\w+)/;
+@query = ({ file=> "@", q=>["DROP DATABASE `$database`", "CREATE DATABASE `$database` CHARACTER SET utf8 COLLATE utf8_unicode_ci", "USE `$database`"]},
+map {
+	$_ = Utils::read($file = $_);
+	s!#[^\n]*|/\*.*?\*/?! !gms;
+	{file=>$file, q=>[split /;/]};
+} files "install.sql");
+
+for $q (@query) {
+	$ln = 0;
+	for (@{$q->{q}}) {
 		$ln ++ while /\n/g;
-		$dbh->do($_), print "." if !/^\s*$/;
+		next if /^\s*$/;
+		eval { $dbh->do($_); };
+		print("\n\n$q->{file}:$ln:$_\n\nError: $@$!\n"), goto _END_ if $@ || $!;
+		print ".";
 	}
-	print " done\n";
-};
-print "\n$ln) Error: $@$!\n" if $@ || $!;
+}
+print " done\n";
+
+
+_END_:
+
+1;

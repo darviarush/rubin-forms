@@ -2,9 +2,6 @@
 
 #> спамер - отправляет e-mail-сообщения
 
-# use strict;
-# use warnings;
-
 use lib "../lib";
 use Utils;
 $ini = Utils::parse_ini("../lib/main.ini");

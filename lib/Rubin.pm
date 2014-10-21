@@ -1,6 +1,4 @@
 # драйверы для протокола qq: http, fcgi и psgi
-use strict;
-use warnings;
 
 package Rubin::HTTP;
 

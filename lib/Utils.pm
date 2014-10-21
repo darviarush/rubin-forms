@@ -1,8 +1,5 @@
 package Utils;
 
-use strict;
-use warnings;
-
 use Data::Dumper;
 
 # создаёт множество
@@ -631,14 +628,17 @@ sub TemplateStr {
 	my $re_type = sub { my ($x)=@_; return unless defined $x; local($`, $', $1); $x=~s/^'(.*)'$/$1/, $x=~s/"/\\"/g, $x="\"$x\"" if $x =~ /^'/; $x};
 	
 	my $code_begin = 'sub {	my ($dataset, $id1) = @_; my ($i, @res) = 0; for my $data (@$dataset) { my $id = "$id1-".($data->{id} // $i); push @res, \'';
-	
-	my $code_end = '\';	$i++; }	return join "", @res;
-}';
-
+	my $code_end = '\';	$i++; }	return join "", @res; }';
 	my $code_begin1 = 'sub { my ($data, $id) = @_; return join "", \'';
 	my $code_end1 = '\' }';
+	
+	my $code_begin_i = "sub { my (\$dataset, \$id1) = \@_; my \$i = 0; for my \$data (\@\$dataset) { my \$id = '\$id1-'.(\$data->{id} // \$i);\n";
+	my $code_end_i = "\$i++; } }\n";
+	my $code_begin1_i = "sub { my (\$data, \$id) = \@_; \n";
+	my $code_end1_i = "}\n";
 
-	my $_tags = qr/(?:input|meta)/i;
+
+	my $_tags = qr/(?:input|meta|br)/i;
 	my %tags = (
 		th => qr/^(?:tr|table|tbody|tfoot|thead)$/i,
 		td => qr/^(?:tr|table|tbody|tfoot|thead)$/i,
@@ -652,12 +652,12 @@ sub TemplateStr {
 	local ($_, $&, $`, $', $1, $2, $3, $4, $5);
 	($_) = @_;
 	
-	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id, @ifST) = ($_, 0);
+	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id, @ifST, @code) = ($_, 0);
 	my $page = my $form = {};
 	
 	my $get_id = sub { $open_id? ($form->{id}? "$form->{id}-$open_id": $open_id): /\bid=["']?([\w-]+)[^<]*\G/i && $1 };
 	
-	my $vario = sub { my ($type, $var, $const) = @_; defined($const)? $re_type->($const): defined($type)? ($var eq "_DATA"? "\$data": $var eq "_STASH"? "\\%_STASH": $var eq 'i'? "\$i": $var eq "i0"? "(\$i-1)": "\$_STASH{'$var'}"): "\$data->{'$var'}" };
+	my $vario = sub { my ($type, $var, $const) = @_; defined($const)? $re_type->($const): defined($type)? ($var eq "_DATA"? "\$data": $var eq "_STASH"? "\\%_STASH": $var eq 'i'? "\$i": $var eq "i0"? "(\$i-1)": $var eq "id"? "\$id": "\$_STASH{'$var'}"): "\$data->{'$var'}" };
 	my $helper = sub {
 		my ($type, $var, $const, $open_braket) = @_;
 		push @html, $vario->($type, $var, $const);
@@ -668,7 +668,7 @@ sub TemplateStr {
 			pos() = $pos;
 
 			push @html, (
-			!$VAR && m!\G:(\w+)(\()?!? do { $html[$fn_idx] = "Helper::$1(".$html[$fn_idx]; if($2) { ++$braket; ", " }else { $VAR = !$VAR; ")" } }:
+			!$VAR && m!\G:(\w+)(\()?!? do { $html[$fn_idx] = "Helper::$1(".$html[$fn_idx]; if($2) { ++$braket; ", " } else { $VAR = !$VAR; ")" } }:
 			$VAR && m!\G(?:\$(%)?(\w+)|$RE_TYPE)!? do { push @fn_idx, $fn_idx; $fn_idx = scalar @html; $vario->($1, $2, $3) }:
 			!$VAR && m!\G,\s*!? do { $fn_idx = pop @fn_idx; $& }:
 			m!\G\)!? do { $VAR = 1; --$braket; $fn_idx = pop @fn_idx; ")" }:
@@ -688,12 +688,17 @@ sub TemplateStr {
 	
 	my $pop = sub {	# закрывается тег
 		my $tag = pop @T;
+		
 		if(@$tag > 2) {	# тег список - $* или форма - $+
 			local ($&, $`, $');
-			my ($open_tag, $begin, $name, $type, $cinit, $idx, $_form) = @$tag;
+			my ($tmp_open_tag, $begin, $name, $type, $cinit, $idx, $_form) = @$tag;
 			my $template = substr $_, $begin, $pos-$begin;
 			if($cinit) { $template=~s/!/!!/g; $template=~s/-->/--!>/g; $html[$idx] .= "<!--$template-->" }
-			push @html, ($type? $code_end: $code_end1) . ")->(\$data".($name? "->{'$name'}": "").", \$id".($name? ".'-$name'": "")."), '";
+			my $call = ")->(\$data".($name? "->{'$name'}": "").", \$id".($name? ".'-$name'": "");
+			push @html, ($type? $code_end: $code_end1) . $call . "), '";
+			
+			push @code, ['end', ($type? $code_end_i: $code_end1_i) . $call . ");\n"];
+			
 			$form->{template} = $template;
 			push @{$_form->{forms}}, $form->{id};
 			$form = $_form;
@@ -710,7 +715,9 @@ sub TemplateStr {
 			$TAG = $1;
 			$open_tag = lc $TAG;
 			$NO=1 if $TAG =~ /^(?:script|style)$/;
-			if(my $re = $tags{$open_tag}) { $pop->() while @T and $T[$#T]->[0] !~ $re; } "<$TAG" }:
+			if(my $re = $tags{$open_tag}) { $pop->() while @T and $T[$#T]->[0] !~ $re; }
+			"<$TAG" 
+		}:
 		!$NO && m!\G>!? do {
 			die "Невалидный шаблон - обнаружена `<` без тега: `$_`" if not defined $TAG;
 			if($TAG =~ $_tags) { $TAG = $open_id = undef; ">" } else {
@@ -719,11 +726,19 @@ sub TemplateStr {
 					local($&, $`, $'); my $m;
 					my $frm = $T;
 					$T = [$open_tag, $pos+1, $name=$T->{name}, $type=$T->{is_list}, $m=/\bcinit[^<]*\G/i, scalar(@html), $form];
-					my $id = (exists($form->{id})? "$form->{id}-": "") . ($name // "");
+					my $id = (exists($form->{id})? "$form->{id}-": "") . $name;
 					$frm->{id} = $id;
 					$forms->{$id} = $form = $frm;
-					push @{$page->{load_forms}}, $frm->{id} if exists $frm->{load};
-					@ret=(">", "', (" . ($type? $code_begin: $code_begin1))
+					my $load = "";
+					if($form->{load}) {
+						my $data = ($name? "\$data->{'$name'}": "\$_[0] = \$data");
+						my $where = exists $form->{where}? ", join '', $form->{where}": '';
+						$load = "$data = form_load(\$id.'-$name'$where) unless ref($data);";
+						push @code, ["load", $load . "\n"];
+						$load = "do { $load () }, ";
+					}
+					push @code, ["begin", "(" . ($type? $code_begin_i: $code_begin1_i)];
+					@ret=(">", "', $load(" . ($type? $code_begin: $code_begin1))
 				} else { $T = [$open_tag]; @ret = ">" }
 				push @T, $T;
 				$T = $open_tag = undef;
@@ -740,10 +755,31 @@ sub TemplateStr {
 		m!\G\$&!? do { $page->{layout_id} = $get_id->(); "', \@_[2..\$#_], '" }:
 		m!\G\{%\s*(\w+)\s*=%\}!? do { "', do { \$_STASH{'$1'} = join '', ('" }:
 		m!\G\{%\s*end\s*%\}!? do { "'); () }, '" }:
-		m!\G\{%\s*if\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do { $pos += length $&; push @html, "', (("; $helper->($1, $2, $3); die "Нет закрывающей `%}` для if" unless m!\G\s*%\}!; push @ifST, 1; $pos += length $&; push @html, ")? ('"; next }:
-		m!\G\{%\s*elif\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do { die "Нельзя использовать elif" if @ifST==0 or $ifST[$#ifST] != 1 ; $pos += length $&; push @html, "'): ("; $helper->($1, $2, $3); die "Нет закрывающей `%}` для elif" unless m!\G\s*%\}!; $pos += length $&; push @html, ")? ('"; next }:
-		m!\G\{%\s*else\s*%\}!? do { die "Нельзя использовать else" if @ifST==0 or $ifST[$#ifST]!=1; $ifST[$#ifST] = 2; "'): ('" }:
-		m!\G\{%\s*fi\s*%\}!? do { die "Нельзя использовать fi" if @ifST==0; "')".($ifST[$#ifST] == 1? ": ()": "")."), '" }:
+		m!\G\{%\s*if\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do {
+			$pos += length $&;
+			push @html, "', ((";
+			my $from = @html;
+			$helper->($1, $2, $3);
+			die "Нет закрывающей `%}` для if" unless m!\G\s*%\}!;
+			push @ifST, 1;
+			$pos += length $&;
+			push @code, ["if", join "", "\nif(", @html[$from..$#html], ") {\n"];
+			push @html, ")? ('";
+			next
+		}:
+		m!\G\{%\s*elif\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do {
+			die "Нельзя использовать elif" if @ifST==0 or $ifST[$#ifST] != 1;
+			$pos += length $&; push @html, "'): (";
+			my $from = @html;
+			$helper->($1, $2, $3);
+			die "Нет закрывающей `%}` для elif" unless m!\G\s*%\}!;
+			$pos += length $&;
+			push @code, ["elif", join "", "\n} elsif(", @html[$from..$#html], ") {"];
+			push @html, ")? ('";
+			next
+		}:
+		m!\G\{%\s*else\s*%\}!? do { die "Нельзя использовать else" if @ifST==0 or $ifST[$#ifST]!=1; $ifST[$#ifST] = 2; push @code, ["else", "\n} else {"]; "'): ('" }:
+		m!\G\{%\s*fi\s*%\}!? do { die "Нельзя использовать fi" if @ifST==0; push @code, ["fi", "}\n"]; "')".($ifST[$#ifST] == 1? ": ()": "")."), '" }:
 		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)]; () }:
 		m!\G(?:\$|(#))(\{\s*)?(?:(%)?(\w+)|$RE_TYPE)!? do {
 			my $open_span = $1;
@@ -766,19 +802,31 @@ sub TemplateStr {
 				next;
 			}
 		}:
-		# m!\G\{%\s*load(?:\s+(\w+))?\s*%\}!? do { push @{$page->{load_forms}}, $form; $form->{load} = $1; my $id = $form->{id}; splice @html, $T[$#T][5]+1, 0, "', do { \$data->{'$open_id'} //= \$_STASH{'$id'}; () }, '"; () }:
-		# m!\G\{%\s*model\s+(\w+)\s*%\}!? do { $form->{model} = $1; () }:
-		# m!\G\{%\s*noload\s*%\}!? do { $form->{noload} = 1; () }:
-		$open_tag && m!\G\$([+*])(\w+)?(:load(?:\((%)?(\w+)\))?)?(?::model\((\w+)\))?!? do {
-			my ($type, $name, $load, $type_var, $var, $model) = ($1, $2, $3, $4, $5, $6);
+		
+		# :load([tab|model,] "where"|id|%id|5)
+		# шаблон для ajax - добавляет данные в load учитывая циклы и ифы
+		# load присваивает данным, но только если там их нет
+		$open_tag && m!\G\$([+*])(\w+)?(?::(?:(noload)|(load|model)\((?:(\w+),\s*)?(?:(%?\w+)|($RE_TYPE))\)))?!? do {
+			my ($type, $name, $noload, $load, $model, $var, $where) = ($1, $2, $3, $4, $5, $6, $7);
+			$name //= "";
 			$T = {
 				name => $name, 
 				is_list => $type eq "*",
 			};
+
 			$T->{model} = $model if $model;
-			$T->{load} = ($type_var? {stash => $var}: {var => $var // "${name}_id" }) if $load;
+			$T->{noload} = 1 if $noload;
+			$load = $noload? 0: defined($load) && $load eq "load"? 1: $form->{load}? 2: 0;
+			$T->{load}  = $load if $load;
+			$T->{where} = $re_type->($where) if $where;
+			$T->{where} = "id=\$$var" if $var;
+			$T->{tab} = $model // $name;
+			$T->{where} = "$form->{tab}_id=\$$form->{name}_id" . (exists $T->{where}? " AND ($T->{where})": "") if $load == 2;
+			$T->{where} =~ s!['\\]!\\$&!g, $T->{where} =~ s!\$(%)?(\w+)!"', quote(" . $vario->($1, $2) . "), '"!ge, $T->{where} = "'$T->{where}'" if exists $T->{where};
+			#$T->{where} =~ s!\$(%)?(\w+)!"'".$vario->($1, $2)."'"!ge if exists $T->{where};
+			
 			my $n = ($name? "-$name": "");
-			"', ".($load? "(do { \$data->{'$name'} = \$_STASH{\$id.'$n'}; () }),": "")."\$id, '$n";
+			"', \$id, '$n";
 		}:
 		m!\G[\\']!? "\\$&":
 		m!\G.!s? $&:
@@ -794,7 +842,18 @@ sub TemplateStr {
 	
 	$form->{template} = $_;
 	
-	my $x = join "", 'sub { my ($data, $id) = @_; '.($form->{load_forms}? 'action_load_forms($data, $id); ': '').'return join "", \'', @html, $code_end1;
+	CODE: for(my $i=0; $i<@code; $i++) {
+		my ($code) = @{$code[$i]};
+		if($code eq "if") {
+			my $k = $i;
+			for(; $code[$i+1]->[0] =~ /^(?:elif|else)$/; $i++) {}
+			if($code[$i+1]->[0] eq "fi") { splice @code, $k, $i-$k+2; goto CODE; }
+		}
+		if($code eq "begin" and $code[$i+1]->[0] eq "end") { splice @code, $i, 2; goto CODE; }
+	}
+	$form->{code} = join "", $code_begin1_i, map({$_->[1]} @code), $code_end1_i;
+	
+	my $x = join "", $code_begin1, @html, $code_end1;
 	#our $rem++;
 	#Utils::write("$rem.pl", $x);
 	$x

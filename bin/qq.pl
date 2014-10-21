@@ -1,8 +1,5 @@
 #> сервер - http, fcgi или psgi
 
-use strict;
-use warnings;
-
 
 use File::Basename;
 use Time::HiRes qw//;
@@ -167,15 +164,15 @@ sub ritter {
 		my $action_htm = $_action_htm{$_action};
 		my $ajax = $_HEAD->{Ajax} // "";
 		
-		if(defined $action or defined $action_htm and $ajax =~ /^(?:|submit)$/) {
+		if(defined $action or defined $action_htm and $ajax =~ /^(?:|submit|reload)$/) {
 			$_STATUS = 200;
 			$_user_id = $_COOKIE->{sess}? auth(): undef;
 			%_STASH = (
 				user_id => $_user_id,
 			);
 						
-			if($ajax eq "submit") {
-				@ret = action_submit();
+			if($ajax ne "") {
+				@ret = action_submit($ajax eq "submit");
 				my @loc;
 				return ajax_redirect(\@ret, \@loc) if $_STATUS == 307 and @loc = $_HEAD{'Location'} =~ /^$_RE_LOCATION$/o;
 			}

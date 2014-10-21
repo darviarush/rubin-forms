@@ -1,5 +1,3 @@
-use strict;
-use warnings;
 
 use POSIX qw/strftime/;
 use Data::Dumper;
@@ -142,7 +140,6 @@ sub check_role (@) {
 			for my $col (@cols) {
 				my ($tab1, $col) = @$col;
 				die "not support `$action` for role `$role` in row $tab1.id=$id" unless $id;
-				
 				$id = query $tab1, $col, $id;
 			}
 		};
@@ -321,6 +318,37 @@ sub action_form_view ($$) {
 	my @query = check_role_view $valid, @{ $_forms{$action}->{query} }, $param;
 	$response = Utils::to_rows(quick_rows(@query));
 	$response->{valid} = $valid;
+	$response
+}
+
+sub action_form_load ($$) {
+	my ($action, $data) = @_;
+	my ($response, $valid);
+	my $form = $_forms{$action};
+	my @query = check_role_view $valid, @{ $_forms{$action}->{query} }, $param;
+	$response->{body} = quick_rows(@query);
+	$response->{valid} = $valid;
+	$response
+}
+
+sub form_load {
+	my ($action, $where) = @_;
+	my ($response, $valid);
+	my $form = $_forms{$action};
+	my $tab = $form->{model} // $form->{name};
+	my $view = [keys $form->{fields}];
+	my @query = check_role_view $valid, $tab, $view;
+	if($form->{is_list}) {
+		$response = query_all($tab, $view, $where);
+		if($valid) {
+			$_->{_valid} = $valid for @$response;
+		}
+	}
+	else {
+		$response = query_ref($tab, $view, $where);
+		$response->{_valid} = $valid if $valid;
+	}
+	
 	$response
 }
 

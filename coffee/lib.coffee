@@ -84,8 +84,8 @@
 
 # -----------------------
 # 48. сделать в CInit параметр для создания стилей .w\d+ и .mobile, .pad, .computer
-# 49. @submit - как в обычной форме. Предусмотреть target=id
-# 50. предусмотреть изменение при изменении формы и url-а
+#* 49. @submit - как в обычной форме. Предусмотреть target=id
+#* 50. предусмотреть изменение при изменении формы и url-а
 # 60. Локализация (перевод) на другие языки
 #? 61. accept в div-ах
 # 62. Взять для описания документации из http://enepomnyaschih.github.io/jwidget/1.0/index.html#!/guide/ruphilosophy и подправить
@@ -717,6 +717,7 @@ class CStream
 	@from: -> (stream = new CStream).from.apply stream, arguments
 	@repeat: -> (stream = new CStream).repeat.apply stream, arguments
 	@serial: -> (stream = new CStream).serial.apply stream, arguments
+	@sleep: -> (stream = new CStream).sleep.apply stream, arguments
 	
 	constructor: -> @fork = []
 	emitter: -> stream = this ; fn = (do(stream)-> (args...)-> stream.emitValue src: this, args: args); fn._belong = this ; fn
@@ -730,16 +731,21 @@ class CStream
 		# this
 		
 	# пути
-	send: (channel) ->
+	saveSend = (channel) ->
 		for f in @fork then f.emitValue.call f, channel
 		this
-		
-	sendError: (channel) ->
+	saveSendError = (channel) ->
 		for f in @fork then f.emitError.call f, channel
 		this
+	logSend = (channel) -> say "[", console.trace(), "]", channel; saveSend.call this, channel
+	logSendError = (channel) -> say "[", arguments.callee.caller, "]", channel; saveSendError.call this, channel
+	log: (flag = true) -> p = @constructor.prototype; (if flag then p.send = logSend; p.sendError = logSendError else p.send = saveSend; p.sendError = saveSendError); this
+	
+	send: saveSend
+	sendError: saveSendError
 		
-	emitValue: @::send
-	emitError: @::sendError
+	emitValue: saveSend
+	emitError: saveSendError
 	
 	emit: (args...) -> @emitValue src: null, args: args
 	error: (args...) -> @emitError src: null, args: args
@@ -859,7 +865,6 @@ class CStream
 		(q = @_queue[channel.idx]).push channel
 		if q.length == 1
 			@_len++
-			say @_len, @_queue.length, @_len == @_queue.length
 			if @_len == @_queue.length
 				args = []
 				for q in @_queue
@@ -884,7 +889,8 @@ class CStream
 	
 	emitZipN = (channel) -> (q=@_queue).push channel; (if q.length == @_n then @_queue = []; @send @_zip q, channel); this
 	emitZip = (channel) -> (q=@_queue).push channel; (if @_n q, channel then @_queue = []; @send @_zip q, channel); this
-	zip: (n, zip) -> @meta (if typeof n == 'number' then emitZipN else emitZip), _queue: [], _n: n, _zip: zip || preCombine
+	emitZipSleep = (channel) -> (q=@_queue).push channel; (if q.length == 1 then setTimeout((=> q = @_queue; @_queue = []; @send @_zip q, q[q.length-1]), @_n)); this
+	zip: (n, zip) -> @meta (if typeof n == 'number' then emitZipN else if typeof n == 'string' then n = (if /^\d+s$/.test n then 1000*parseInt n else parseInt n); emitZipSleep else emitZip), _queue: [], _n: n, _zip: zip || preCombine
 
 	#switch: ->
 	#	for i in [0...arguments] by 2
@@ -893,18 +899,16 @@ class CStream
 	# отключающие
 	off: (streams...) -> fork = @fork; (for s in streams when -1 != i=fork.indexOf s then fork.splice i, 1); this
 	
-	# управляющие
-	log: (flag = true) -> @config.log = flag ; this
-	
 
 # Модели
 class CModel
 	# _: {} - данные
 	# _cmp: {} - функции сравнения
-	# _queue: {} - очереди обрабатывающихся ключей
+	# !_queue: {} - очереди обрабатывающихся ключей
 	# _on: {} и on... - обработчики при изменении данных
 	# _at: {} и at... - обработчики при запросе данных
 	# _name: string - имя модели в ::_models
+	# _compute: {} - вычислимые ключи
 	#! _models: {} # все модели по имени (@_name)
 	#!_counter: 0
 	constructor: (data = {}, cmp = {}, @_name) ->
@@ -912,34 +916,49 @@ class CModel
 		@_cmp = cmp ||= {}
 		@_on = {}
 		@_at = {}
-		@_queue = {}
+		#@_queue = {}
+		@_compute = {}
 		for key of data then @set key, data[key], cmp[key]
 	
 	has: (key) -> key of @_
 	
-	set: (key, val, cmp) ->
-		if typeof val == 'function'
-			match = String(val).match /// ^function\s*[\$\w]*\s*\( ([^\(\)]*) \) ///
-			keys = match[1].split /// ,\s* ///
-			@on keys, do(key, val, keys)-> (v, old, key1)->
-				ret = new Array((len=keys.length)+2)
-				ret[len] = old
-				ret[len+1] = key1
-				for name, i in keys then say i, name, ret[i] = @retrive name
-				@change key, val.apply this, ret
-			val = undefined
-			fn = do(key)-> (val) -> if arguments.length then throw CRoot.raise "Попытка изменить вычислимое свойство модели `#{key}`" else @retrive key
-		else
-			fn = do(key)-> (val) -> if arguments.length then @change key, val else @retrive key
+	free_compute$ = (key) ->
+		c = @_compute[key]
+		if c.slave
+			for k in c.slave then @off k, c.fn
+		if c.master then @off key, master
+		delete @_compute[key]
+		this
 		
+	
+	set: (key, val, cmp) ->
+		if key of @_compute then free_compute$.call this, key
+		
+		fn = do(key)-> (val) -> if arguments.length then @change key, val else @retrive key
 		@_[key] = val
-		if arguments.length == 3
-			if cmp then @_cmp[key] = cmp else delete @_cmp[key]
+		if cmp then @_cmp[key] = cmp
 		@["$"+key] = fn
 		@[key] = fn unless key of this and not @hasOwnProperty key
 		this
 	
-	del: (key) -> @un key; @ut key; delete @_[key]; delete @_cmp[key]
+	compute: (key, opt) ->
+		if typeof opt == 'function' then opt = slave: opt
+		@set key, opt.val, opt.cmp
+		if slave = opt.slave
+			match = String(slave).match /// ^function\s*[\$\w]*\s*\( ([^\(\)]*) \) ///
+			keys = match[1].split /// ,\s* ///
+			@on keys, fn = do(key, slave, keys)-> (v, old, key1)->
+				ret = new Array((len=keys.length)+2)
+				ret[len] = old
+				ret[len+1] = key1
+				for name, i in keys then ret[i] = @retrive name
+				@change key, slave.apply this, ret
+		if master = opt.master then @on key, master
+		@_compute[key] = master: master, slave: keys, fn: fn
+		this
+		
+		
+	del: (key) -> (if key of @_compute then free_compute$.call this, key); @un key; @off key; delete @_[key]; delete @_cmp[key]
 	
 	cmp: (key, cmp) ->
 		if arguments.length == 1
@@ -954,9 +973,15 @@ class CModel
 		if arguments.length == 1
 			for key in $A key
 				delete @$0$[key]
+		else if typeof fn == 'function'
+			for key in $A key
+				if (ons = @$0$[key]) and -1 != idx=ons.indexOf fn
+					if ons.length == 1 then delete @$0$[key] else ons.splice idx, 1
 		else
 			for key in $A key
-				if (ons = @$0$[key]) and -1 != idx=ons.indexOf fn then ons.splice idx, 1
+				if ons = @$0$[key]
+					for i, idx in ons when i._belong == fn then ons.splice idx, 1 ; break
+					if ons.length == 0 then delete @$0$[key]
 		this
 	
 	on: _on.inline "on", "_on"
@@ -965,12 +990,10 @@ class CModel
 	un: _off.inline "un", "_at"
 	
 	change: (key, val) ->
-		say 'change', key, val, @_[key]
-		throw CRoot.raise "Нет ключа `#{key}` в модели #{@constructor.getName()}.#{@_name}" unless key of @_
+		#throw CRoot.raise "Нет ключа `#{key}` в модели #{@constructor.getName()}.#{@_name}" unless key of @_
 		if arguments.length == 1 then val = !@_[key]
 		old=@_[key]
-		if (if cmp=@_cmp[key] then !cmp.call this, val, old else val != old)
-			@send val, old, key; @_[key] = val
+		if (if cmp=@_cmp[key] then !cmp.call this, val, old else val != old) then @_[key] = val; @send val, old, key
 		this
 
 	send: (val, old, key) ->
@@ -984,7 +1007,7 @@ class CModel
 		this
 			
 	retrive: (key) ->
-		if at = @_at[key] then for fn in at then @change key, fn.call this, key
+		if at = @_at[key] then for fn in at then @change key, fn.call this, key, @_[key]
 		@_[key]
 		
 	stream: (key) -> stream = new Stream; @on key, stream.emitter(); stream
@@ -1061,6 +1084,8 @@ CTemplate =
 		RE_IF = new RegExp "^\\{%\\s*if\\s+(?:\\$(%)?(\\w+)|#{RE_TYPE})"
 		RE_ELIF = new RegExp "^\\{%\\s*elif\\s+(?:\\$(%)?(\\w+)|#{RE_TYPE})"
 		
+		RE_FORM = new RegExp "^\\$([+*])(\\w+)?(?::(?:(noload)|(load|model)\\((?:(\\w+),\\s*)?(?:(%?\\w+)|(#{RE_TYPE}))\\)))?"
+		
 		re_type = (s) -> if s? then s.replace(/\n/g, '\\n').replace /\r/g, '\\r'
 		_NO_ESCAPE_HTML = CHelper._NO_ESCAPE_HTML
 		
@@ -1077,7 +1102,15 @@ CTemplate =
 			
 		T = []; html = []; pos = 0 ; s = i_html; ifST = []
 		
-		var_x = (_type, _var) -> if _type then (if _var == '_DATA' then "data" else if _var == "_STASH" then "CTemplate._STASH" else if _var == 'i' then "i" else if _var == 'i0' then "(i-1)" else "CTemplate._STASH.#{_var}") else "data['#{_var}']"
+		var_x = (_type, _var) ->
+			if _type
+				if _var == '_DATA' then "data"
+				else if _var == "_STASH" then "CTemplate._STASH"
+				else if _var == 'i' then "i"
+				else if _var == 'i0' then "(i-1)"
+				else if _var == 'id' then "id"
+				else "CTemplate._STASH.#{_var}"
+			else "data['#{_var}']"
 		
 		helper = (_type, _var, _const, open_braket) ->
 			braket = 0
@@ -1117,7 +1150,7 @@ CTemplate =
 				#form.code = html.slice(idx+2).join ""
 				_form.forms.push form
 				id = "id" + (if name then "+'-#{name}'" else "")
-				data = if form.load then "CTemplate._STASH["+id+"]" else "data" + (if name then "['#{name}']" else "")
+				data = "data" + (if name then "['#{name}']" else "")
 				html.push ")(", data, ", ", id, "), '"
 				form = _form
 			tag[0]
@@ -1183,9 +1216,10 @@ CTemplate =
 					html.push ", '" + (if open_span then "</span>" else "")
 					continue
 
-			else if open_tag and m = s.match ///^\$([+*])(\w+)?(:load(?:\(%(\w+)\))?)?(?::model\((\w+)\))?///
+			else if open_tag and m = s.match RE_FORM
 				t = name: m[2], is_list: m[1]=='*'
-				t.load = 1 if m[3]
+				load = m[4]
+				t.load = if m[3] then 0 else if load and load == "load" then 1 else if form.load then 2 else 0
 				html.push "', id, '" + (if m[2] then "-" + m[2] else "")
 			else if m = s.match ///^[\\']/// then html.push "\\"+m[0]
 			else if m = s.match ///^\n/// then html.push "\\n"
@@ -1363,7 +1397,7 @@ class CWidget
 		return CView[cview][0] if cview = element.getAttribute 'cview'
 		if id = element.id
 			if (a=id.match /// (?:^|-) ([a-z_]\w*) $ ///i) and (a=window[a[1]]) instanceof Function and /^C\w+Widget$/.test CWidget::className.call( constructor: a) then return a
-		if (tag = element.tagName) == "INPUT" and element.type of {button:1, submit:1, reset:1} then CButtonWidget else if (cls=window["C"+tag.toLowerCase().ucFirst()+"Widget"]) instanceof Function and CWidget::className.call( constructor: cls ) then cls else	CWidget
+		if (tag = element.tagName) == "INPUT" and cls=window['C'+element.type.uc()+'Widget'] then cls else if (cls=window["C"+tag.toLowerCase().ucFirst()+"Widget"]) instanceof Function and CWidget::className.call( constructor: cls ) then cls else	CWidget
 
 	toElements$ = (e) ->
 		x = []
@@ -1625,7 +1659,7 @@ class CWidget
 		this		
 
 	readyRun$ = 0
-	ready$ = (e) -> (if readyRun$ < 2 then readyRun$ = 2 ; (w=$(window)).send 'onReadyDom'; w.off 'load ReadyDom', ready$); this
+	ready$: ready$ = (e) -> (if readyRun$ < 2 then readyRun$ = 2 ; (w=$(window)).send 'onReadyDom'; w.off 'load ReadyDom', ready$); this
 	
 	listens$ =
 		onready_dom: (listener) ->
@@ -1634,7 +1668,8 @@ class CWidget
 				$(window).on 'ReadyDom', listener
 				if readyRun$ == 0
 					readyRun$ = 1
-					document.addEventListener? "DOMContentLoaded", ready$, false
+					if document.addEventListener then document.addEventListener "DOMContentLoaded", ready$, false
+					else @wrap("<script defer>\nCWidget.prototype.ready$()\n</script>").appendTo @body()
 					$(window).on 'load', ready$
 			this
 	
@@ -1653,18 +1688,19 @@ class CWidget
 	ajaxStream: -> stream = new CStream; @on 'Load', stream.emitter(); @on 'Error', stream.errorer(); stream
 
 	_default_assign: 'text'
-	assign: (slot, type = @_default_assign, attr...) ->
+	_default_update: undefined
+	assign: (key, type, update) ->
 		model = @model
-		@_slot = slot
-		model.set slot, @[type] attr... unless model.has slot
-		model.on slot, fn = do(type, attr) => (v, old, key) => this[type] attr..., v
+		[type, attr...] = $A type
+		model.set key, @[type] attr... unless model.has key
+		if update then @on update, do(key, type, attr)-> -> @model.change key, @[type] attr...
+		model.on key, fn = do(type, attr) => (val) => @[type] attr..., val
 		fn._belong = this
 	setModel: ->
 		if attr = @attr 'model'
-			attr = attr.split /:\s*/
-			slot = attr.shift()
-			type = attr.shift()
-			@assign slot, type, attr...
+			for ass in $A attr, /;\s*/
+				ass = $A ass, /:/
+				@assign ass[0], ass[1] || @_default_assign, ass[2] || @_default_update
 		this
 	setModelOnElements: (elem=@_elements) -> (for e in elem then @byName(e).setModel()); this
 	
@@ -1885,10 +1921,8 @@ class CWidget
 	normalize: -> @element.normalize(); this
 	update: (val, request) ->
 		if off != @send 'onBeforeUpdate', val
-			if request
-				if request.dopparam.script then @htmlscript val
-				else if ///^text/html\b///i.test request.request.getResponseHeader "Content-Type" then @html val
-				else @val val
+			if /^\{/.test val then val = toJSON val; @htmlscript CTemplate.compile(val.template)(val.data, @id())
+			else if request?.request and ///^text/html\b///i.test request.request.getResponseHeader "Content-Type" then @htmlscript val
 			else @val val
 			@send 'onUpdate', val
 		this
@@ -2524,6 +2558,7 @@ class CWidget
 	clear: (name) -> t=@_timers || {}; (if name then t[name]?(); delete t[name] else (for i in t then t[i]()); @_timers = {}); this
 
 	speeds$ = slow: 200, fast: 600, norm: 400
+
 	animate: (param, duration, ease, complete) ->
 		@_animate = p = if typeof duration == 'object' then duration else duration: duration, ease: ease, complete: complete
 		p.param = param
@@ -2542,6 +2577,10 @@ class CWidget
 			@send (p = @_animate).complete, p
 		@css param
 		
+
+	# http://cubic-bezier.com/#.34,1.49,.55,-0.57 - сравнение анимации
+	# http://daneden.github.io/animate.css/ - анимация css
+
 	morph: (param) ->
 		if typeof param == "string" then (if param of CEffect then param = CEffect[param] else throw @raise "Нет эффекта #{param}")
 		if typeof param.timeout == 'object' then extend param, param.timeout; (delete param.timeout if typeof param.timeout == 'object')
@@ -2553,9 +2592,10 @@ class CWidget
 
 	
 	# методы шейпов
-	shape: (shape) ->
-		unless @_shape ||= @up().filter('[cshape]').item 0 then @wrapIn @_shape = @wrap("<div cshape></div>").insertBefore this
+	shape: (shape) ->	# добавляет в шейп элемент
+		unless @_shape ||= @up().filter('[cshape]').item 0 then @wrapIn @_shape = @new(@tag(), shape: "shape").insertBefore this
 		@_shape.prepend shape
+		
 		this
 	
 	modal: (msg) -> @_modal ||= @wrap("<div cview=modal cargs='class=c-modal'></div>").appendTo @body(); if arguments.length then @_modal.html(msg).open(); this else @_modal
@@ -2655,10 +2695,8 @@ class CWidget
 	param: -> x={}; x[@name() || 'val'] = @val(); x
 	#buildQuery: -> [(p=@parent())._tab || p.name(), @name(), p.data?.id || p.$id?.val()]
 	load: (param, args...) -> @loader()._load 'load', param || {}, this, args
-	submit: (param, args...) ->
-		if @valid()
-			@loader()._load 'submit', extend(@param(), param || {}), this, args
-		this
+	submit: (param, args...) -> if @valid() then @loader()._load 'submit', extend(@param(), param || {}), this, args else this
+	reload: (param, args...) -> if @valid() then @loader()._load 'reload', extend(@param(), param || {}), this, args else this
 	save: (param, args...) -> if @valid() then @loader()._load 'save', extend(@param(), param || {}), this, args else this
 	ping: (param, args...) -> @loader()._load 'ping', param, this, args
 	erase: (param, args...) -> @loader()._load 'erase', extend(@param(), param || {}), this, args
@@ -2744,6 +2782,8 @@ class CSubmitWidget extends CButtonWidget
 	onclick: (e) -> @parent().submit(); e.stop(); off
 class CLoadWidget extends CButtonWidget
 	onclick: (e) -> @parent().load(); e.stop(); off
+class CReloadWidget extends CButtonWidget
+	onclick: (e) -> @parent().reload(); e.stop(); off
 class CUploadWidget extends CButtonWidget
 	onclick: (e) -> @parent().upload(); e.stop(); off
 class CSaveWidget extends CButtonWidget
@@ -2753,8 +2793,12 @@ class CEraseWidget extends CButtonWidget
 class CPingWidget extends CButtonWidget
 	onclick: (e) -> @parent().ping(); e.stop(); off
 
+class CResetWidget extends CButtonWidget
+	onclick: (e) -> @parent().reset(); e.stop(); off
+
 	
 class CInputWidget extends CWidget
+	_default_update: 'keyup'
 	constructor: ->
 		super
 		if valid = @attr "cvalid" then @on 'keyup', ->
@@ -2764,18 +2808,22 @@ class CInputWidget extends CWidget
 	val: (val) -> if arguments.length then @element.value = val; this else @element.value
 	html: @::val
 	text: @::val
-	
-	setModel: -> super ; (if @_slot then @on 'keyup', -> @model.change slot, @val()); this
-
-
-class CSelectWidget extends CInputWidget
-	#text: (text) -> if arguments.length then @element.options[@element.selectedIndex].text = text else @element.options[@element.selectedIndex].text
 
 
 class CTextareaWidget extends CInputWidget
+	
+class CSelectWidget extends CInputWidget
+	_default_update: 'change'
+	#text: (text) -> if arguments.length then @element.options[@element.selectedIndex].text = text else @element.options[@element.selectedIndex].text
 
+class CRadioWidget extends CInputWidget
+	_default_update: 'change'
+	
+class CCheckboxWidget extends CRadioWidget
 
 class CImgWidget extends CInputWidget
+	_default_update: undefined
+	_default_assign: 'src'
 	val: (val) -> undefined
 	src: (val) -> if arguments.length then @element.src = val; this else @element.src
 
@@ -2836,8 +2884,8 @@ class CFormWidget extends CWidget
 		@send "onCreate", counter
 
 	initialize: ->
-		do @setHandlersOnElements
 		do @attachElements
+		do @setHandlersOnElements
 		do @setModelOnElements
 	dataType: (data) ->
 		if typeof data == 'string' then data = fromJSON data
@@ -2874,7 +2922,7 @@ class CFormWidget extends CWidget
 			this
 	valid: -> err = []; (for i in @_elements then unless (e=this["$"+i]).valid() then err.push e); if err.length == 0 then on else @send 'onInvalid', err; off
 	
-	setValid: (valid = @data?.valid) ->
+	setValid: (valid = @data?._valid) ->
 		if valid
 			id = @id()
 			for name, v of valid then @["$"+name].setValid v
@@ -2882,6 +2930,9 @@ class CFormWidget extends CWidget
 
 
 class CTemplateWidget extends CFormWidget
+	#initializeContent: @::initialize
+	#initialize: ->
+
 	getTemplate: ->
 		if @hasClass 'c-template' then @removeClass 'c-template'; html = @html(); @html ""
 		else if @attr('cinit')? then html = @down(0).html().replace ///!(!)|!///g, "$1"
@@ -2905,8 +2956,7 @@ class CTemplateWidget extends CFormWidget
 			do @initTemplate unless @_template
 			@element.innerHTML = @_template @data=@dataType(data), @element.id
 			@removeClass "c-novid"
-			do @attachElements
-			do @setHandlersOnElements
+			do @initialize
 			do @setValid
 		else @param()
 		
@@ -2929,7 +2979,7 @@ class CListWidget extends CTemplateWidget
 		else html = @getTemplate()
 		@_template = CTemplate.compile html, @_templates = {}, is_list: 1
 
-	attachElements: -> # специально оставлена пустой. Т.к. только формы должны иметь элементы
+	attachElements: -> @_elements = []; this # специально оставлена пустой. Т.к. только формы должны иметь элементы
 	setValid: -> # специально оставлена пустой. Т.к. списки не имеют элементов
 	detach: (name) -> (if @frame == name || @frame == this[name] then delete @frame); super
 		
@@ -3215,7 +3265,6 @@ class CLoaderWidget extends CWidget
 		@loaded_error "Закончилось время ожидания ответа запроса `#{@request.url}`"
 
 	_load: (type, param={}, customer, args) ->
-
 		if (req=@request) and not req.end
 			req.request?.abort()
 			say "Поступил load до того, как закончился предыдущий. old_customer: " + req.customer + " new_customer: " + customer
@@ -3268,11 +3317,11 @@ class CLoaderWidget extends CWidget
 		args = @request.args
 		customer.send "onComplete", data, @request, args...
 		switch @request.type
+			when "reload"
+				@reload_manipulate data
 			when "upload"
 				customer.add data
-			when "submit"
-				@submit_manipulate data
-			when "load"
+			when "submit", "load"
 				customer.update data, @request
 			when "erase"
 				customer.remove()
@@ -3310,7 +3359,7 @@ class CLoaderWidget extends CWidget
 		error = if @request.request.status == 500 then @request.request.responseText else escapeHTML @request.error
 		@request.customer.tooltip ctype: 'tooltip', close: 1, html: "<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка</h3>"+error, open: 1, timeout: 5000, class: 'c-error'
 	
-	submit_manipulate: (data) ->		
+	reload_manipulate: (data) ->		
 		data = fromJSON data if typeof data == 'string'
 		if stash = data['@stash'] then CTemplate._STASH = stash
 		if layout = data['@layout']
@@ -3339,7 +3388,7 @@ class CLoaderWidget extends CWidget
 		args = [CUrl.to(url), title || @document().title]
 		if @request.history then args.unshift 0
 		@navigate args...
-		say args..., window.history$, window.history_pos$
+		say 'reload_manipulate', args..., window.history$, window.history_pos$
 		this
 
 
@@ -3380,7 +3429,7 @@ class CRouterWidget extends CWidget
 				if url.hash then param._layout_id_ = url.hash; url.hash = ""
 				param._act = CUrl.to url
 				#if not a._loader and not a.attr 'cloader' then a.loader this
-				a.submit param
+				a.reload param
 		this
 	
 	val: -> undefined
@@ -3393,7 +3442,7 @@ class CRouterWidget extends CWidget
 		href = @window().location.href
 		href = href.replace ///\#.*$///, ''
 		# # say 'popstate', href, old, pos, e
-		if prev_url$ != href then @submit _act: href, _history: 1
+		if prev_url$ != href then @reload _act: href, _history: 1
 		prev_url$ = href
 		
 	onhashchange_window: pop$
