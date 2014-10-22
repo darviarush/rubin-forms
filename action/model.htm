@@ -28,7 +28,18 @@ function ping(td, opt) {
 $(document).on("click", function(e) {
 	var td = e.target(), role = td.attr("role")
 	if(role) {
-		if(/\b(?:noauth|user|self)\b/.test(role)) {
+		if(role == "+") {
+			td.onLoad = function(data) {
+				this.byId('modal-fg-area').val(data)
+				this.byId('modal').open()
+				this.byId('modal-fg').line.val( td.attr("line") )
+				this.byId('modal-fg').end.val( td.attr("end") )
+				this.byId('modal-fg').onLoad = function() {
+					this.byId('modal').close()
+				}
+			};
+			td.ping({method: '+', tab: td.up().up().attr("tab")})
+		} else if(/\b(?:noauth|user|self)\b/.test(role)) {
 			ping(td)
 		} else if(role == 'valid' || role == 'selfcol') {
 			if(role == 'selfcol') { td.html(td.html().replace(/^self(?:: )?/, '')) }
@@ -51,7 +62,7 @@ $(document).on("click", function(e) {
 $(document).on("mouseover", function(e) {
 	var td = e.target(), com
 	if(td && /^td|th$/i.test(td.tag()) && (com = td.down(0)).tag() == "#comment") {
-		td.tooltip({html: com.free().text(), append: 'prepend', open: 1, pos: 'bottom'})
+		say(td.tooltip({html: com.free().text(), append: 'prepend', display: 1, pos: 'bottom'}).tooltip().className())
 	}
 })
 
@@ -66,8 +77,11 @@ table {border-collapse: collapse; }
 .red { background: IndianRed; font-waight: 700; color: white }
 .grey { background: lavender }
 .w { width: 132px }
+.oh { height: 1em; overflow: hidden }
 .is { background: Honeydew; }
 .no { background: Bisque; }
+
+.upr {color: red; font-family: arial; font-weight: 900; }
 
 .is_odd { background: GhostWhite }
 .no_odd { background: lavender }
@@ -75,13 +89,27 @@ table {border-collapse: collapse; }
 .click { cursor: pointer !important }
 
 .c-tip { background: Cornsilk; border: solid 1px grey; padding: 4px; color: black }
+.c-fg { padding: 40px; background: white; min-width: 800px; }
 </style>
+
+<div id=modal ctype=center-modal style='display:none'>
+	<div id=modal-fg class=c-fg ctype="form" action="/model">
+		<div style="float:right"><a id=modal-fg-save ctype="save" href="#">Сохранить</a></div>
+		<input type="hidden" id=modal-fg-line>
+		<input type="hidden" id=modal-fg-end>
+		<textarea id=modal-fg-area style='width:700px; height:400px'></textarea>
+	</div>
+</div>
 
 <center>
 
 <table id=$*tables class=tab>
 <tbody tab="$name">
-	<tr><th rowspan=3 class="$is_install:bool($is_sql:bool('is', 'no'), 'no')">$name<th colspan=12>Права<th rowspan=3 class=w>Валидаторы<th rowspan=2 class=w>Пакет
+	<tr><th rowspan=3 class="click $is_install:bool($is_sql:bool('is', 'no'), 'no')" role="+">$name
+		<th colspan=12>Права
+		<th rowspan=3 class=w>Валидаторы
+		<th rowspan=3>SQL
+		<th rowspan=2 class=w>Пакет
 	<tr><th class="w red" colspan=4>noauth
 		<th class="w yellow" colspan=4>user
 		<th class="w click $selfcol:bool('green', 'red')" colspan=4 role=selfcol>self$selfcol:bool(": ")$selfcol
@@ -104,13 +132,7 @@ table {border-collapse: collapse; }
 
 <tbody id=$*col tab="$name">
 	<tr col="$name">
-		<td class="$is_install:bool($is_sql:bool('is', 'no'), 'no')">$"<!--":raw
-			<table>
-			<tr><th>в файле<td>$install
-			<tr><th>в базе<td>$sql:bool("", "нет")$sql
-			</table>
-		$"-->":raw
-		$name
+		<td class="$is_install:bool($is_sql:bool('is', 'no'), 'no')">$name
 		<td class="click $noauth_view:bool('is', 'no')" role="noauth">view
 		<td class="click $noauth_add:bool('is', 'no')" role="noauth">add
 		<td class="click $noauth_edit:bool('is', 'no')" role="noauth">edit
@@ -124,6 +146,13 @@ table {border-collapse: collapse; }
 		<td class="click $self_edit:bool('is', 'no')" role="self">edit
 		<td class="grey">rm
 		<td class="click is" role="valid">$valid:join(", ")
+		<td class="click oh $sql:eq($install):bool('is', 'no')">{% if $sql:ne($install) %}$"<!--":raw
+			<table>
+			<tr><th>в файле<td>$install
+			<tr><th>в базе<td>$sql:bool("", "нет")$sql
+			</table>
+		$"-->":raw{% fi %}
+		$sql
 		<td class="click $package:bool('is', 'no')">$package
 </tbody>
 </table>

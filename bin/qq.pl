@@ -45,7 +45,6 @@ our $_req = $ini->{req} // 0;
 
 our %_HIDDEN_EXT = Utils::set(qw/pl pm act htm/, ($_site->{hidden_ext} or ()));
 
-
 our $_socket;
 
 # при завершении сервера
@@ -164,28 +163,32 @@ sub ritter {
 		my $action_htm = $_action_htm{$_action};
 		my $ajax = $_HEAD->{Ajax} // "";
 		
-		if(defined $action or defined $action_htm and $ajax =~ /^(?:|submit|reload)$/) {
+		if(defined $action_htm and $ajax eq "reload") {
 			$_STATUS = 200;
 			$_user_id = $_COOKIE->{sess}? auth(): undef;
-			%_STASH = (
-				user_id => $_user_id,
-			);
+			%_STASH = (user_id => $_user_id);
+			
+			@ret = action_submit($ajax eq "submit");
+			my @loc;
+			return ajax_redirect(\@ret, \@loc) if $_STATUS == 307 and @loc = $_HEAD{'Location'} =~ /^$_RE_LOCATION$/o;
+		}
+		elsif(defined $action_htm and $ajax eq "") {
+			$_STATUS = 200;
+			$_user_id = $_COOKIE->{sess}? auth(): undef;
+			%_STASH = (user_id => $_user_id);
 						
-			if($ajax ne "") {
-				@ret = action_submit($ajax eq "submit");
-				my @loc;
-				return ajax_redirect(\@ret, \@loc) if $_STATUS == 307 and @loc = $_HEAD{'Location'} =~ /^$_RE_LOCATION$/o;
-			}
-			else {	
-				@ret = $action? $action->(): $param;
-				if($action_htm and $_STATUS == 200) {
-					@ret = $_action_htm{$_action}->($ret[0], $_action);
-					for(; my $_layout = $_layout{$_action}; $_action = $_layout) {
-						my $arg = ($action = $_action{$_layout})? $action->(): {};
-						@ret = $_action_htm{$_layout}->($arg, $_layout, @ret);
-					}
+			@ret = $action? $action->(): $param;
+			if($action_htm and $_STATUS == 200) {
+				@ret = $_action_htm{$_action}->($ret[0], $_action);
+				for(; my $_layout = $_layout{$_action}; $_action = $_layout) {
+					my $arg = ($action = $_action{$_layout})? $action->(): {};
+					@ret = $_action_htm{$_layout}->($arg, $_layout, @ret);
 				}
 			}
+		} elsif(defined $action) {
+			$_STATUS = 200;
+			$_user_id = $_COOKIE->{sess}? auth(): undef;
+			@ret = $action->();
 		} elsif(exists $_info->{$_action}) {
 			$_STATUS = 200;
 			$_user_id = auth();

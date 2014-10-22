@@ -64,8 +64,8 @@ extend CWidget.prototype,
 			unless isBody element
 			
 				while element and not isBody element
-					x += element.offsetLeft
-					y += element.offsetTop
+					x += element.offsetLeft()
+					y += element.offsetTop()
 
 					if CNavigator.FF
 						if 'border-box' != element.css 'box-sizing'
@@ -81,7 +81,7 @@ extend CWidget.prototype,
 						x += element.px 'border-left-width'
 						y += element.px 'border-top-width'
 
-					element = @wrap @element.offsetParent
+					element = element.floor()
 				
 				if CNavigator.FF and 'border-box' != element.css 'box-sizing'
 					x -= @px 'border-left-width'

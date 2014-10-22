@@ -5,110 +5,131 @@ use ModelEdit;
 return status 401 unless $ini->{site}{test};
 
 
+if(exists $param->{area}) {
+	$install = get_install_info(files("install.sql"));
+	$install = $install->{$param->{tab}};
+	open $f, $install->{file} or die "Нет файла $install->{file}:$!";
+	@lines = <$f>;
+	close $f;
+	splice @lines, $install->{line}, $install->{line} - $install->{end}, $param->{area};
+	Utils::write($install->{file}, join "", @lines);
+}
+
 if($param->{method}) {
+
+	if($param->{method} eq "+") {
+		$install = get_install_info(files("install.sql"));
+		$tab = $param->{tab};
+		return $install->{$tab}->{install} . $install->{$tab}->{after};
+	}
+
 	Utils::replace("main_do.ini", \&model_edit);
 	for my $thr (threads->list()) { $thr->kill("USR1");  }
 	return;
 }
 
+$table_info = sub {
+	$install = get_install_info(files("install.sql"));
+	$_info = get_info();
+	$info = get_ini_info();
+	$rules = $info->{rules};
 
-$install = get_install_info("install.sql", "../rubin/install.sql");
-$_info = get_info();
-$info = get_ini_info();
-$rules = $info->{rules};
+	%tab = Utils::set(keys(%$_info), keys(%$install), map { keys(%$_) } values %$info);
 
-%tab = Utils::set(keys(%$_info), keys(%$install), map { keys(%$_) } values %$info);
+	# tab_selfcol 
+	# tab_validator 
+	# tab_update
+	# tab_error 
+	# tab_valid 
+	# rules 
+	# tab_rules
 
-# tab_selfcol 
-# tab_validator 
-# tab_update
-# tab_error 
-# tab_valid 
-# rules 
-# tab_rules
+	for $tab (keys %tab) {
 
-for my $tab (keys %tab) {
-	
-	$perm = $info->{tab_rules}{$tab};
-	$noauth = $perm->{noauth};
-	$user = $perm->{user};
-	$self = $perm->{self};
-	
-	push @table, $table = {
-		name => $tab,
-		
-		selfcol => join(" &rarr ", map { $_->[0].".".$_->[1] } @{$info->{tab_selfcol}{$tab}}),
-		
-		noauth_add => $noauth->{add},
-		noauth_view => $noauth->{view},
-		noauth_rm => $noauth->{rm},
-		noauth_edit => $noauth->{edit},
-		
-		user_add => $user->{add},
-		user_view => $user->{view},
-		user_rm => $user->{rm},
-		user_edit => $user->{edit},
-		
-		self_add => $self->{add},
-		self_view => $self->{view},
-		self_rm => $self->{rm},
-		self_edit => $self->{edit},
-		
-		is_sql => exists($_info->{$tab}),
-		is_install => exists($install->{$tab}),
-		
-		package => $install->{$tab}{package},
-		
-		order => $install->{$tab}{order} // 100000
-	};
-	
-	%col = Utils::set(keys(%{$_info->{$tab}}), keys(%{$rules->{$tab}}), keys(%{$info->{tab_valid}{$tab}}), keys(%{$install->{$tab}{cols}}) );
-	for $col (keys %col) {
-	
-		$sql = $_info->{$tab}{$col};
-		$ins = $install->{$tab}{cols}{$col};
-		
-		$perm = $info->{rules}{$tab}{$col};
+		$perm = $info->{tab_rules}{$tab};
 		$noauth = $perm->{noauth};
 		$user = $perm->{user};
 		$self = $perm->{self};
-	
-		push @{$table->{col}}, {
 		
-			name => $col,
+		$i = 0;
+		@selfcol = map { $i++ == 0 && $_->[0] eq $tab? $_->[1]: $_->[0].".".$_->[1] } @{$info->{tab_selfcol}{$tab}};
+		
+		push @table, $table = {
+			name => $tab,
+			
+			selfcol => join(", ", @selfcol),
 			
 			noauth_add => $noauth->{add},
 			noauth_view => $noauth->{view},
-			#noauth_rm => $noauth->{rm},
+			noauth_rm => $noauth->{rm},
 			noauth_edit => $noauth->{edit},
 			
 			user_add => $user->{add},
 			user_view => $user->{view},
-			#user_rm => $user->{rm},
+			user_rm => $user->{rm},
 			user_edit => $user->{edit},
 			
 			self_add => $self->{add},
 			self_view => $self->{view},
-			#self_rm => $self->{rm},
+			self_rm => $self->{rm},
 			self_edit => $self->{edit},
-
-			is_sql => !!$sql,
-			is_install => !!$ins,
-
-			package => $ins->{package} // "",
-			install => $ins->{install} // "",
-			sql => sql_from_info($sql),
-			valid => $info->{tab_valid}{$tab}{$col},
 			
-			order => $sql->{ordinal_position} || $ins->{order} || "",
+			is_sql => exists($_info->{$tab}),
+			is_install => exists($install->{$tab}),
+			
+			package => $install->{$tab}{package},
+			
+			order => $install->{$tab}{order} // 100000
 		};
-	}
-	
-	$table->{col} = [ sort { $a->{order} <=> $b->{order} } @{$table->{col}} ];
-	#msg $table->{col};
-}
+		
+		%col = Utils::set(keys(%{$_info->{$tab}}), keys(%{$rules->{$tab}}), keys(%{$info->{tab_valid}{$tab}}), keys(%{$install->{$tab}{cols}}) );
+		for $col (keys %col) {
+		
+			$sql = $_info->{$tab}{$col};
+			$ins = $install->{$tab}{cols}{$col};
+			
+			$perm = $info->{rules}{$tab}{$col};
+			$noauth = $perm->{noauth};
+			$user = $perm->{user};
+			$self = $perm->{self};
+		
+			push @{$table->{col}}, {
+			
+				name => $col,
+				
+				noauth_add => $noauth->{add},
+				noauth_view => $noauth->{view},
+				noauth_rm => $noauth->{rm},
+				noauth_edit => $noauth->{edit},
+				
+				user_add => $user->{add},
+				user_view => $user->{view},
+				user_rm => $user->{rm},
+				user_edit => $user->{edit},
+				
+				self_add => $self->{add},
+				self_view => $self->{view},
+				self_rm => $self->{rm},
+				self_edit => $self->{edit},
 
-@table = sort {  $a->{order} <=> $b->{order} } @table;
+				is_sql => !!$sql,
+				is_install => !!$ins,
+
+				package => $ins->{package} // "",
+				install => $ins->{install} // "",
+				sql => sql_from_info($sql),
+				valid => $info->{tab_valid}{$tab}{$col},
+				
+				order => $sql->{ordinal_position} || $ins->{order} || "",
+			};
+		}
+		
+		$table->{col} = [ sort { $a->{order} <=> $b->{order} } @{$table->{col}} ];
+		#msg $table->{col};
+	}
+
+	@table = sort {  $a->{order} <=> $b->{order} } @table;
+};
 
 {
 tables => \@table

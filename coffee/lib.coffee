@@ -104,6 +104,15 @@
 # 75. Списки для модели
 #* 76. Избавиться от методов onKey на модели
 # 77. :load("where $user_id")
+# 78. Перейти на http://learnboost.github.io/stylus/
+# 79. Добавить команду qq compile - которая будет перекомпиливать всё - stylus, coffeescript, шаблоны и спрайты: qq css + qq sprite + qq coffee + qq action
+# 78. qq watch - висит и перекомпиливает. qq с test в ini - добавляет qq watch
+# 79. встроенный crontab - использует 
+# 80. parent заменить на form. Исключить установку _form в конструкторе, использовать атрибут cform (?)
+# 81. использовать в проекте: http://www.git-tower.com/blog/css3-transforms/
+# 82. new as emmet
+# 83. функция options, для опций. Если тип следующего операнда не подходит, то он пропускается: options "x:io y:s f:f", (opt) ->
+
 
 # Ссылки:
 # http://docs.ractivejs.org/latest/observers - фреймворк с моделью данных и темплейтами
@@ -147,7 +156,7 @@ IE = if '\v'=='v' or document.documentMode?
 CTraceback = -> f = arguments.callee; i=0 ; [f.name || '<anonimous function>' while (f = f.caller && i++ < 10)].reverse().join(' → ')
 
 $A = (n, sep) -> if n instanceof Array then n else if typeof n == 'object' then Array::slice.call n else String(n).split sep || /\s+/
-$H = (n) -> if n instanceof Array then x={}; (for i in [0...n] when i % 2 == 0 then x[n[i]] = n[i+1]) else if n instanceof Object then n else x = {}; (for i in String(n).split /s*;\s*/ then m=i.split /\s*:\s*/; x[m[0]]=m[1]); x
+$H = (n, sep = /s*;\s*/, eq = /\s*:\s*/) -> if n instanceof Array then x={}; (for i in [0...n] when i % 2 == 0 then x[n[i]] = n[i+1]) else if n instanceof Object then n else x = {}; (for i in String(n).split sep then m=i.split eq; x[m[0]]=m[1]); x
 say = (args...) -> console.log(args...); args[args.length-1]
 escapeHTML = (s) -> String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/\'/g, '&#39;')
 unescapeHTML = if (escapeHTML.div$ = document.createElement 'div').textContent? then (s) -> (div=escapeHTML.div$).innerHTML = s; x=div.textContent; div.innerHTML = ''; x else (s) -> (div=escapeHTML.div$).innerHTML = s; x=div.innerText; div.innerHTML = ''; x
@@ -633,8 +642,6 @@ CSend = (element, event) ->
 	if ret2? then ret2 else if ret3? then ret3 else ret1
 
 extend CSend,
-
-	#send: (e, widget) -> widget._tooltip?.send 'on'+e.type+'_parent', e; widget.send 'on'+e.type, e
 	
 	setHandler: (element, type) -> element.setAttribute 'on'+(CSend[type+'_type'] || type), "return CSend(this, event)"
 	removeHandler: (element, type) -> element.removeAttribute 'on'+(CSend[type+'_type'] || type)
@@ -644,7 +651,7 @@ extend CSend,
 	click: -> CEvent::left = on
 	click_end: -> CEvent::left = off
 
-#unless 'onmouseenter' of document then extend CSend,
+unless 'onmouseenter' of document then extend CSend,
 	mouseenter_type: 'mouseover'
 	mouseover: (e, widget) ->
 		to=e.relatedTarget()
@@ -1070,7 +1077,7 @@ CTemplate =
 		
 		RE_TYPE = "(\"(?:\\\\\"|[^\"])*\"|'(?:\\\\'|[^'])*'|-?\\d+(?:\\.\\d+)?(?:E[+-]\\d+)?)"
 		CALL_FN = new RegExp "^\\{%\\s*(\\w+)\\s+#{RE_TYPE}(?:\\s*,\\s*#{RE_TYPE})?(?:\\s*,\\s*#{RE_TYPE})?(?:\\s*,\\s*#{RE_TYPE})?(?:\\s*,\\s*#{RE_TYPE})?\\s*%\\}"
-		PARSE_VAR = new RegExp "^(?:\\$|(#))(\\{\\s*)?(?:(%)?(\\w+)|#{RE_TYPE})"
+		PARSE_VAR = new RegExp "^(?:\\$(\\{\\s*)?(?:(%)?(\\w+)|#{RE_TYPE})|(#)(\\{\\s*)?(%)?(\\w+))"
 		PARSE_CONST = new RegExp "^#{RE_TYPE}"
 		RE_IF = new RegExp "^\\{%\\s*if\\s+(?:\\$(%)?(\\w+)|#{RE_TYPE})"
 		RE_ELIF = new RegExp "^\\{%\\s*elif\\s+(?:\\$(%)?(\\w+)|#{RE_TYPE})"
@@ -1183,17 +1190,18 @@ CTemplate =
 			else if m = s.match ///^\{%\s*else\s*%\}/// then throw "Нельзя использовать else" if (n=ifST.length)==0 or ifST[n-1] != 1 ; ifST[n-1] = 2 ; html.push "'].join(''): ['"
 			else if m = s.match ///^\{%\s*fi\s*%\}/// then throw "Нельзя использовать fi" if (n=ifST.length)==0 ; html.push "'].join('')" + (if ifST[n-1] == 1 then ": ''" else "") + "), '"
 			
-			else if m = s.match CALL_FN then	
+			else if m = s.match CALL_FN then
+			else if m = s.match ///^&#?\w+;?/// then html.push m[0]
 			else if m = s.match PARSE_VAR
-				open_span = m[1]
+				open_span = m[5]
+				open_braket = m[1] || m[6]
+				_type = m[2] || m[7]
+				_var = m[3] || m[8]
+				_const = if m[4]? then re_type m[4]
+				
 				if open_span and (open_tag or /^(?:script|style)$/i.test TAG) then html.push m[0]
 				else
 					s = s.slice len = m[0].length; pos += len
-					
-					open_braket = !!m[2]
-					_type = m[3]
-					_var = m[4]
-					_const = re_type m[5]
 					
 					form.fields[_var] = 1 if _var and not type
 					
@@ -1241,7 +1249,7 @@ CTemplate =
 		html = cview[1]
 		content=element.innerHTML
 		html = html.replace /\$@/, content
-		html = CTemplate.compile(html)($H(element.getAttribute 'cargs'), id)
+		html = CTemplate.compile(html)($H(element.getAttribute('cargs'), ///\s+///, ///=///), id)
 		html = html.replace /\$&/, content
 		element.removeAttribute "cview"
 		element.removeAttribute "cargs"
@@ -2788,12 +2796,13 @@ class CWidget
 			self._edit = null
 			self.send "onEdit"
 		
-		@_edit = @wrap(if opt.line then "<input>" else "<textarea></textarea>").val(@val())
-		.css(@css 'display font text-align vertical-align border width height padding vertical-align'.split ' ')
-		.css('position', 'absolute')
-		.css(opt.css || {})
-		.on('keydown', (e) -> (if e.code() == 13 then @onblur()); this)
-		.on('blur', edt).prependTo(this).focus().relative this, 'left top before before'
+		@_edit = @wrap(if opt.line then "<input>" else "<textarea></textarea>").val @val()
+		.css @css 'display font text-align vertical-align border width height padding vertical-align'.split ' '
+		.css 'position', 'absolute'
+		.css opt.css || {}
+		.on 'keydown', (e) -> (if e.code() == 13 then @send 'onblur'); this
+		.on 'blur', edt
+		.prependTo(this).focus().relative this, 'left top before before'
 		this
 	
 	type$.all 'edit arrow arrow_border'
@@ -3249,12 +3258,18 @@ class CModalWidget extends CFormWidget
 	open: ->
 		if off isnt @send 'onBeforeOpen'
 			zIndex+=2
-			(prev=@get_prev_modal()).css 'overflow', 'hidden'
-			@css position: 'absolute', left: @viewLeft(), top: @viewTop(), overflow: 'auto', width: '100%', height: '100%', 'z-index': zIndex
+			prev=@get_prev_modal()
+			prev.prop 'c-overflow', prev.saveCss 'overflow'
+			prev.css 'overflow', 'hidden'
+			
 			@constructor::fog = @body().append("<div style='background: black; display: none'></div>").last() unless @fog
-			@fog.css position: 'fixed', width: '100%', height: '100%', top: 0, left: 0, 'z-index': zIndex-1, opacity: @opacity, display: 'block'
+			@fog.css position: 'absolute', width: '100%', height: '100%', top: t=@viewTop(), left: l=@viewLeft(), 'z-index': zIndex-1, opacity: @opacity, display: 'block'
+			
+			@css position: 'absolute', left: l, top: t, overflow: 'auto', width: '100%', height: '100%', 'z-index': zIndex
+			
 			if @_toTop then @vscroll 0 ; @hscroll 0 
 			@show()
+			
 			@_modals.push this
 			@send 'onOpen'
 		this
@@ -3263,7 +3278,8 @@ class CModalWidget extends CFormWidget
 			@hide()
 			zIndex-=2
 			@_modals.pop()
-			@get_prev_modal().css overflow: 'auto'
+			prev = @get_prev_modal()
+			prev.css 'overflow', prev.prop 'c-overflow'  #'auto'
 			if @_modals.length == 0 || this.hasOwnProperty 'fog' then @fog.hide()
 			else @fog.css 'z-index', zIndex-1
 			@send 'onClose'
@@ -3276,7 +3292,7 @@ class CCenterModalWidget extends CModalWidget
 		if 300 < h=@viewHeight() - height then @fg.css 'margin-top': h / 2 else @fg.css 'margin-top': 150, 'margin-bottom': 150
 		if 300 < h=@viewWidth() - width then @fg.css 'margin-left': h / 2 else @fg.css 'margin-left': 150, 'margin-right': 150
 		this
-	onCreate: -> @center()
+	onBeforeOpen: -> @center()
 	
 	
 class CTooltipWidget extends CWidget

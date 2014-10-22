@@ -781,15 +781,17 @@ sub TemplateStr {
 		m!\G\{%\s*else\s*%\}!? do { die "Нельзя использовать else" if @ifST==0 or $ifST[$#ifST]!=1; $ifST[$#ifST] = 2; push @code, ["else", "\n} else {"]; "'): ('" }:
 		m!\G\{%\s*fi\s*%\}!? do { die "Нельзя использовать fi" if @ifST==0; push @code, ["fi", "}\n"]; "')".($ifST[$#ifST] == 1? ": ()": "")."), '" }:
 		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)]; () }:
-		m!\G(?:\$|(#))(\{\s*)?(?:(%)?(\w+)|$RE_TYPE)!? do {
-			my $open_span = $1;
-			if($open_span && ($open_tag || $TAG =~ /^(?:script|style)$/i)) { $& }
+		m!\G&#?\w+;?!? $&:
+		m!\G(?:\$(\{\s*)?(?:(%)?(\w+)|$RE_TYPE)|(#)(\{\s*)?(%)?(\w+))!? do {
+			my $open_span = $5;
+			my $open_braket = $1 // $6;
+			my $type = $2 // $7;
+			my $var = $3 // $8;
+			my $const = $4;
+			my $content = $&;
+			if($open_span && ($open_tag || $TAG =~ /^(?:script|style)$/i)) { $content }
 			else {
-				$pos += length $&;
-				my $open_braket = !!$2;
-				my $type = $3;
-				my $var = $4;
-				my $const = $5;
+				$pos += length $content;
 
 				$form->{fields}{$var} = 1 if defined $var and not $type;
 				push @html, "<span id=', \$id, '-$var>" if $open_span;

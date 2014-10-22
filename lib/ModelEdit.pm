@@ -20,7 +20,9 @@ sub model_edit {
 	if($action eq "selfcol") {
 		my $key = "$tab.selfcol";
 		if($perm ne "") {
+			$i = 0;
 			for my $col (split /,\s*/, $perm) {
+				if($i++ == 0 && $col !~ /\./) { $col = "$tab.$col"; }
 				return status(406, "`$col` не разделён \".\"") unless $col =~ /\./;
 				return status(406, "Нет таблицы $col в базе") unless exists $_info->{$`};
 				return status(406, "Нет столбца $col в базе") unless exists $_info->{$`}{$'};
@@ -47,7 +49,7 @@ sub model_edit {
 	}
 }
 
-# выбирает информацию из sql
+# выбирает информацию из sql-файла
 sub get_install_info {
 	my ($order, $prev, $install, $tab, $col) = (1, "\@", {});
 	my $f;
@@ -64,30 +66,38 @@ sub get_install_info {
 					name => $tab,
 					package => $package,
 					file => $file,
-					order => $order++
+					order => $order++,
+					line => $.,
+					install => $_
 				};
 			} elsif(!$tab) {
-				push @{ $install->{$prev}{"after"} }, $_;
+				$install->{$prev}{"after"} .= $_;
+				$install->{$prev}{"end"} .= $.;
 			} elsif(/^\s*(?:`([^`]*)`|(\w+))\s+(\w+)/) {
 				my $ins = $3.$';
 				$col = $1 // $2;
 				$ins =~ s/,?\s*$//;
 				$install->{$tab}{cols}{$col} = {name => $col, package => $package, install => $ins, order => $order++};
+				$install->{$tab}{install} .= $_;
 			} elsif(/^\s*(INDEX|UNIQUE)/i) {
 				my $ins = $1.$';
 				$ins =~ s/,?\s*$/\n/;
 				$install->{$tab}{indexes} .= $ins;
+				$install->{$tab}{install} .= $_;
 			} elsif(/^\s*\)/) {
 				my $ins = $';
 				$ins =~ s/;?\s*$//;
 				$install->{$tab}{options} = $ins;
+				$install->{$tab}{install} .= $_;
 				$prev = $tab;
 				$tab = undef;
 			} elsif(/^--\s*\[(.*?)\]/) {
 				$package = $1;
 			} elsif(/^\s*--/ || /^\s*$/) {
+				$install->{$tab}{install} .= $_;
 			} else {
-				die "что-то нераспознанное `$_` в таблице `$tab`";
+				$install->{$tab}{install} .= $_;
+				warn "что-то нераспознанное `$_` в таблице `$tab`";
 			}
 		}
 		close $f;
