@@ -10,24 +10,24 @@ BEGIN {
 }
 
 use File::Basename qw/dirname/;
-#chdir dirname($0);
-our $framework_dir = dirname($0)."/../rubin";
+use Cwd qw/abs_path/;
+
+chdir dirname($0);
+our $framework_dir;
 use lib dirname($0)."/lib";
-use lib dirname($0)."/../rubin/lib";
 use Msg;
 use Utils;
 our $ini = Utils::parse_ini("main.ini");
-if($ini and exists $ini->{"mysql"}{"DNS"}) {
-	require Connect;
+if($ini) {
+	if(exists $ini->{"rubin"}{"path"}) { $framework_dir = abs_path($ini->{rubin}{path}); use lib "$framework_dir/lib" }
+	if($ini->{"mysql"}{"DNS"}) { require Connect; }
 }
 
-my @av = @ARGV;
-_START_:
-@av = "qq" unless @av;
-my $path = "bin/$av[0].pl";
+@ARGV = "qq" unless @ARGV;
+my $path = "bin/$ARGV[0].pl";
 my $ret;
 if(-e $path) { require $path; }
-elsif(-e "$framework_dir/$path") { require "$framework_dir/$path"; }
+elsif($framework_dir && -e "$framework_dir/$path") { require "$framework_dir/$path"; }
 else { die "Команда `$path` не найдена" }
 
 1;

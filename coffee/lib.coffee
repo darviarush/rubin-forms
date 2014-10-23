@@ -83,7 +83,7 @@
 #* 47. Переделать send - вызывать обработчики для всех уровней. Обработчики вызываются начиная от верхнего parent-а. Если нужно остановить - то @stopHandlersQueue = on. Значение от предыдущего обработчика передаётся в @return - не сделано, т.к. зачем?
 
 # -----------------------
-# 48. сделать в CInit параметр для создания стилей .w\d+ и .mobile, .pad, .computer
+#* 48. сделать в CInit параметр для создания стилей .w\d+ и .mobile, .pad, .computer
 #* 49. @submit - как в обычной форме. Предусмотреть target=id
 #* 50. предусмотреть изменение при изменении формы и url-а
 # 60. Локализация (перевод) на другие языки
@@ -95,26 +95,36 @@
 #* 66. Оптимизировать send и добавить очередь слушателей, которые должны иметь метод emit - вместо слушателей - замыкания с _belong указывающим на поместившего замыкание в очередь объект
 #* 67. CListen заменить на слушатели виджетов $(window) и $(document)
 #* 68. Добавить потоки
-# 69. Переделать animate - через css. @keyframes. В old - старую или переделать на классах или на потоках
+# 69. Переделать animate - через css. @keyframes. В old - старую или переделать на классах или на потоках. Добавить в setCss и css. Использовать options
 #* 70. В модель добавить функции для сравнения данных
 #- 71. Переопределить __bind на нормальное наследование метаклассов - невозможно
 # 72. Протестировать удаление элементов из памяти, так как все они имеют перекрёстные ссылки
 # 73. Отложенное выполнение в модели. Как сработал send - пока из него не выйдет - другие обновления этого ключа не выполняются. А добавляются в очередь и начинают отправляться после. Добавить значение для ключа - нет - очередь будет отправлять для всех значений последовательно, 0 - очередь игнорируется, 1 - выполнится последнее значение из очереди
 # 74. update: keyup - для модели, style {...} anim?, разработать свой мини-язык
-# 75. Списки для модели
+# 75. списки для модели (?)
 #* 76. Избавиться от методов onKey на модели
-# 77. :load("where $user_id")
-# 78. Перейти на http://learnboost.github.io/stylus/
-# 79. Добавить команду qq compile - которая будет перекомпиливать всё - stylus, coffeescript, шаблоны и спрайты: qq css + qq sprite + qq coffee + qq action
-# 78. qq watch - висит и перекомпиливает. qq с test в ini - добавляет qq watch
-# 79. встроенный crontab - использует 
+# 77. :load("where $user_id order by 1 limit 10") - limit, если не указан - 10. count - если есть - доп. запрос. Так же - уникальное id для кеша (можно взять формы)
+# 78. Перейти на http://learnboost.github.io/stylus/. В main.ini создать секцию watch с описанием таких штук
+#	Добавить команду qq compile - которая будет перекомпиливать всё - stylus, coffeescript, шаблоны и спрайты: qq css + qq sprite + qq coffee + qq action
+#	qq watch - висит и перекомпиливает. qq с test в ini - добавляет qq watch
+# 79. встроенный crontab - R::Cron->new->on(1, sub {}); и для сигналов: 
 # 80. parent заменить на form. Исключить установку _form в конструкторе, использовать атрибут cform (?)
 # 81. использовать в проекте: http://www.git-tower.com/blog/css3-transforms/
 # 82. new as emmet
 # 83. функция options, для опций. Если тип следующего операнда не подходит, то он пропускается: options "x:io y:s f:f", (opt) ->
+# 84. создать в CInit параметр для средств разработчика: висящая (fixed) менюха с цветами html. Пипеткой и возможностью закрашивать всё (?). Панелька может сворачиваться. Показывает стили на выбранном элементе.
+# 85. функция options которая вернёт параметры: animate: (param, duration, ease, complete) -> options arguments, 'param duration:si ease:si complete:f
+# 86. загрузчик в 1-м лайоуте: создаёт iframe в котором проходит индикатор загрузки. Индикатор можно реализовать как 
+#* 87. one
+#- 88. в stream добавить все методы widget. widget.stream() - выдаёт поток с этим виджетом(и). eventStream(obj) - для on - кто установил
+# 89. form target=id - указывает до какого id разворачивать layout. Сервер смотрит: если id принадлежит инклуду, то возвращает одну страницу и указатель - изменить только параметр _f=id=url,...
+# 90. css - распознавание префиксов срабатывает только при запросе: get/set/hasCss. Префиксы на обработчики событий
+# 91. widget.type - createWidget должен короткие имена классов собирать в ассоциативный массив (?). C*Widget и html-xs = HtmlXs
+# 92. fly - делает виджет плавающим в окне. @fly top|bottom, [без_ограничений]
 
 
 # Ссылки:
+# https://developer.mozilla.org/ru/docs/Web/JavaScript/Reference/Global_Objects/Array/indexOf - справочник мозилла на русском
 # http://docs.ractivejs.org/latest/observers - фреймворк с моделью данных и темплейтами
 # http://jsfiddle.net/C3WeM/5/ - анимация основанная на css3 - http://habrahabr.ru/post/209140/
 # http://todomvc.com/ - блог на разных фреймворках
@@ -196,7 +206,7 @@ extend_uniq Array.prototype, CArray =
 extend_uniq Function.prototype, CFunction =
 	code: (name, args...) -> a = (String(this).replace /// \$(\d+)\$ ///g, (a, idx) -> if typeof (x=args[parseInt idx])=='function' then String(x).replace /// function (\s+ [\$\w]+)? \s* \( [^\)]* \) \s* \{ | \} $ ///, '' else x); a=a.replace ///function(\s+[\$\w]+)?///, 'code$=function '+name+"$inline"; a
 	inline: (args...) -> code$=null; eval @code args...; code$
-	rename: (name) -> f=null ; eval String(this).replace ///function(\s+[\$\w]+)?///, 'f=function '+name; f
+	rename: (name) -> code$=null ; eval String(this).replace ///function(\s+[\$\w]+)?///, 'code$=function '+name; code$
 	getName: if escape.name then -> @name else -> String(this).match(/// function\s+(\w+) ///)?[1] || ""
 	getMethodName: (obj) -> (for name, fn of obj when fn == this then return name); null
 	init: (args...) -> CRoot._init_widgets.push [this, args || [this.getName().lc()]]
@@ -214,7 +224,8 @@ extend_uniq Function.prototype, CFunction =
 			p = interFace.prototype
 			for own i of p then n[replace[i] || i] = p[i]
 		this
-			
+	extend: (param) -> extend @prototype, param
+
 
 
 # http://browserhacks.com/
@@ -690,212 +701,6 @@ class CEvent
 	viewY: -> @event.clientY
 	offsetX: -> (CEvent::offsetX = if @event.offsetX? then -> @event.offsetX else -> @event.clientX - (t=@target()).viewPos().left - t.px 'border-left-width'); @offsetX()
 	offsetY: -> (CEvent::offsetY = if @event.offsetY? then -> @event.offsetY else -> @event.clientY - (t=@target()).viewPos().top - t.px 'border-top-width'); @offsetY()
-
-	
-	
-# Потоки
-# http://pozadi.github.io/kefir/
-# http://baconjs.github.io/api.html
-# https://rxjs.codeplex.com/
-# http://xgrommx.github.io/rx-book/index.html
-# http://habrahabr.ru/post/237495/
-# http://dimoneverything.blogspot.ru/2013/11/blog-post.html - пример подробный
-# http://habrahabr.ru/post/237733/ - трансдьюсеры
-class CStream
-	# конструкторы
-	#@callback: (f, args...) -> stream = new CStream; f (do(stream, args)->-> stream.emit ); stream
-	@fromCallback: (fn, args...) -> stream = new СStream; fn stream.emitter(args...); stream
-	
-	emitEmpty = ->
-	@nothing: -> stream = new CStream; stream.emitValue = emitEmpty; stream
-	@unit: (args...) -> (new CStream).map args...
-	@error: (args...) -> (new CStream).mapError args...
-	@later: (ms, args...) -> (new СStream).sleep(ms).emit args...
-	@fromPromise: (promise, args...) -> stream = new CStream; promise args..., stream.emitter(), stream.errorer()
-	@from: -> (stream = new CStream).from.apply stream, arguments
-	@repeat: -> (stream = new CStream).repeat.apply stream, arguments
-	@serial: -> (stream = new CStream).serial.apply stream, arguments
-	@sleep: -> (stream = new CStream).sleep.apply stream, arguments
-	
-	constructor: -> @fork = []
-	emitter: -> stream = this ; fn = (do(stream)-> (args...)-> stream.emitValue src: this, args: args); fn._belong = this ; fn
-	errorer: -> stream = this ; fn = (do(stream)-> (args...)-> stream.emitError src: this, args: args); fn._belong = this ; fn
-	
-	# emitInterval = (channel, args...) ->
-		# setInterval do(channel, args)=>
-			# @_callback.apply channel, args
-			# @send arguments
-		# , @_ms
-		# this
-		
-	# пути
-	saveSend = (channel) ->
-		for f in @fork then f.emitValue.call f, channel
-		this
-	saveSendError = (channel) ->
-		for f in @fork then f.emitError.call f, channel
-		this
-	logSend = (channel) -> say "[", console.trace(), "]", channel; saveSend.call this, channel
-	logSendError = (channel) -> say "[", arguments.callee.caller, "]", channel; saveSendError.call this, channel
-	log: (flag = true) -> p = @constructor.prototype; (if flag then p.send = logSend; p.sendError = logSendError else p.send = saveSend; p.sendError = saveSendError); this
-	
-	send: saveSend
-	sendError: saveSendError
-		
-	emitValue: saveSend
-	emitError: saveSendError
-	
-	emit: (args...) -> @emitValue src: null, args: args
-	error: (args...) -> @emitError src: null, args: args
-	
-	emits: (src, args...) -> @emitValue src: src, args: args
-	errors: (src, args...) -> @emitError src: src, args: args
-	
-	# мета
-	meta: (emit, param) -> @fork.push stream = new (@constructor)(); stream.emitValue = emit; (if param then for i of param then stream[i] = param[i]); stream
-	
-	metaError: (emit, param) -> @fork.push stream = new (@constructor)(); stream.emitError = emit; (if param then for i of param then stream[i] = param[i]); stream
-	
-	# ошибки
-	emitFail = (channel) -> @_callback.apply channel.src, channel.args; @sendError channel
-	fail: (onError) -> @metaError emitFail, onError
-	
-	mapError: -> @metaError @send
-	
-	# модифицирующие
-	emitMap = (channel) -> channel.args = [@_callback.apply channel.src, channel.args]; @send channel
-	emitMapTo = (channel) -> channel.args = @_args; @send channel
-	map: (args...) -> if typeof (map = args[0]) == 'function' then @meta emitMap, _callback: map else @meta emitMapTo, _args: args
-	
-	emitMaps = (channel) ->	channel.args = @_callback.apply channel.src, channel.args; @send channel
-	maps: (args...) -> if typeof (map = args[0]) == 'function' then @meta emitMaps, _callback: map else @meta emitMapTo, _args: args
-	
-	emitMapAll = (channel) -> @send @_callback channel
-	emitMapAllTo = (channel) -> @send extend channel, @_map
-	mapAll: (args...) -> if typeof (map = args[0]) == 'function' then @meta emitMapAll, _callback: map else @meta emitMapAllTo, _map: args[0], _args: args.slice 1
-	
-	emitMapChannel = (channel) -> channel.args = [extend {}, channel]; @send channel
-	mapChannel: (map) -> @meta emitMapChannel
-	
-	emitFilter = (channel) -> (if @_callback.apply channel.src, channel.args then @send channel); this
-	filter: (filter) -> @meta emitFilter, _callback: filter
-	
-	emitFilterNot = (channel) -> (unless @_callback.apply channel.src, channel.args then @send channel); this
-	filterNot: (filter) -> @meta emitFilterNot, _callback: filter
-	
-	emitReduce = (channel) -> @_acc = @_callback.apply channel.src, [@_acc].concat channel.args; channel.args = [@_acc]; @send channel
-	reduce: (arg, fn) -> (if arguments.length == 1 then fn = arg; arg = 0); @meta emitReduce, _callback: fn, _acc: arg
-	
-	emitSkipDuplicates = (channel) -> (if '_prev' of this and @_prev != channel.args[0] or not '_prev' of this then @_prev = channel.args[0]; @send channel); this
-	emitSkipDuplicatesCmp = (channel) -> (if '_prev' of this and @_callback @_prev, channel.args[0] or not '_prev' of this then @_prev = channel.args[0]; @send channel); this
-	skipDuplicates: (cmp) -> @meta (if cmp then emitSkipDuplicatesCmp else emitSkipDuplicates), _callback: cmp
-	
-	emitSleep = (channel) -> setTimeout (do(channel) => => @send channel), @_ms; this
-	sleep: (ms) -> @meta emitSleep, _ms: ms
-	
-	emitSkip = (channel) -> (if @_skip < t = new Date().getTime() then @_skip = t+@_ms; @send channel); this
-	skip: (ms) -> @meta emitSkip, _ms: ms, _skip: 0
-	
-	emitSkipCount = (channel) -> (unless @_count-- then @_count = @_n; @send channel); this
-	skipN: (n) -> @meta emitSkipCount, _n: n, _count: n
-	
-	emitRepeat = (channel) -> (for i in [@_from...@_to] by @_by then @send extend {}, channel); this
-	emitRepeatInterval = (channel) -> 
-		clear = setInterval (fn = do(channel, clear)=>=> if @_from > (i = arguments.callee.i+=@_by) >= @_to then clearInterval clear else channel = extend {}, channel; channel.args = [i] if @_map; @send channel), @_ms
-		fn.i = @_from
-		channel = extend {}, channel
-		channel.args = [@_from] if @_map
-		@send channel
-	repeat: (n, ms, map) -> (if typeof n == 'number' then n = to: n); @meta (if ms then emitRepeatInterval else emitRepeat), _ms: ms, _from: n.from || 0, _to: n.to, _by: n.by || 1, _map: map
-	
-	emitSerial = (channel) -> (for i in @_serial then @send extend {}, channel, args: [i]); this
-	emitSerialInterval = (channel) -> 
-		clear = setInterval (fn = do(channel, clear)=>=> if (i = ++arguments.callee.i) >= (serial = arguments.callee.serial).length then clearInterval clear; delete arguments.callee.serial else @send extend {}, channel, args: [serial[i]]), @_ms
-		fn.i = 0
-		fn.serial = @_serial
-		@send extend {}, channel, args: [@_serial[0]]
-	serial: (serial, ms) ->
-		if typeof serial == 'number' then serial = to: n
-		if serial instanceof Array then @meta (if ms then emitSerialInterval else emitSerial), _ms: ms, _serial: serial
-		else @repeat serial, ms, on
-	
-	from: (serial, ms) -> @serial (if serial instanceof Array then serial else ([i, serial[i]] for i of serial)), ms
-	
-	getEnds: (ends) -> (if @fork.length == 0 then ends.push this else for s in @fork then s.getEnds ends); this
-	getEndLast: (end) -> (if @fork.length == 0 then end.push this else @fork[@fork.length-1].getEndLast end); this
-	getEndFirst: (end) -> (if @fork.length == 0 then end.push this else @fork[0].getEndFirst end); this
-	
-	emitFlatMap = (channel) ->
-		stream = @_callback.apply channel.src, channel.args
-		stream.getEnds ends = []
-		for end in ends then end.fork = @fork
-		stream.emitValue channel
-		this
-	flatMap: (map) -> @meta emitFlatMap, _callback: map
-	
-	emitFlatMapLast = (channel) ->
-		stream = @_callback.apply channel.src, channel.args
-		stream.getEndLast end = []
-		end[0].fork = @fork
-		stream.emitValue channel
-		this
-	emitFlatMapFirst = "emitFlatMapFirst="+String(emitFlatMapLast).replace /\bgetEndLast\b/, 'getEndFirst'
-	eval emitFlatMapFirst
-	flatMapLast: (map) -> @meta emitFlatMapLast, _callback: map
-	flatMapFirst: (map) -> @meta emitFlatMapFirst, _callback: map
-	
-	# связывающие
-	emitThen = (channel) -> @_callback.apply channel.src, channel.args; @send channel
-	then: (onValue) -> @meta emitThen, _callback: onValue
-	
-	emitFindAssign = (channel) -> CRoot.find(@_object).invoke @_callback, @_args..., channel.args...; @send channel
-	emitAssign = (channel) -> @_object[@_callback] @_args..., channel.args...; @send channel
-	emitAssignVar = (channel) -> @_object[@_callback] = channel.args[0]; @send channel
-	assign: (object, method, args...) -> @meta (if typeof object == 'string' then emitFindAssign else if typeof object[method] == 'function' then emitAssign else emitAssignVar), _callback: method, _object: object, _args: args
-
-	# объединяющие
-	merge: (streams...) -> @fork.push stream = new (@constructor)(); (for s in streams then s.fork.push stream); stream
-	
-	# ожидает пока все потоки не пришлют значение и объединяет их в массив
-	preCombine =  (args, channel) -> src: channel.src, args: for i in args then i.args[0]
-	mapCombine = (channel) -> channel.idx = @_idx; @send channel
-	emitCombine = (channel) ->
-		(q = @_queue[channel.idx]).push channel
-		if q.length == 1
-			@_len++
-			if @_len == @_queue.length
-				args = []
-				for q in @_queue
-					args.push q.shift()
-					if q.length == 0 then @_len--
-				@send @_callback args, channel
-		this
-		
-	combine: (streams...) ->
-		fn = if typeof streams[streams.length-1] == 'function' then streams.pop() else preCombine
-		streams.unshift this
-		len = streams.length
-		streams = (for s, i in streams then s.meta mapCombine, _idx: i)
-		stream = streams.shift()
-		stream = stream.merge streams...
-		stream.emitValue = emitCombine
-		stream._queue = q = new Array len
-		stream._len = 0
-		stream._callback = fn
-		for i in [0...len] then q[i] = []
-		stream
-	
-	emitZipN = (channel) -> (q=@_queue).push channel; (if q.length == @_n then @_queue = []; @send @_zip q, channel); this
-	emitZip = (channel) -> (q=@_queue).push channel; (if @_n q, channel then @_queue = []; @send @_zip q, channel); this
-	emitZipSleep = (channel) -> (q=@_queue).push channel; (if q.length == 1 then setTimeout((=> q = @_queue; @_queue = []; @send @_zip q, q[q.length-1]), @_n)); this
-	zip: (n, zip) -> @meta (if typeof n == 'number' then emitZipN else if typeof n == 'string' then n = (if /^\d+s$/.test n then 1000*parseInt n else parseInt n); emitZipSleep else emitZip), _queue: [], _n: n, _zip: zip || preCombine
-
-	#switch: ->
-	#	for i in [0...arguments] by 2
-			
-	
-	# отключающие
-	off: (streams...) -> fork = @fork; (for s in streams when -1 != i=fork.indexOf s then fork.splice i, 1); this
 	
 
 # Модели
@@ -1007,9 +812,6 @@ class CModel
 	retrive: (key) ->
 		if at = @_at[key] then for fn in at then @change key, fn.call this, key, @_[key]
 		@_[key]
-		
-	stream: (key) -> stream = new Stream; @on key, stream.emitter(); stream
-	retriveStream: (key) -> stream = new Stream; @at key, stream.emitter(); stream
 
 
 class CRepository	# Abstract, _: {} - ключи
@@ -1337,6 +1139,7 @@ class CWidget
 		element.widget = this
 
 	_slice$ = Array::slice
+		
 	div$ = document.createElement "div"
 	wdiv$ = new CWidget div$
 		
@@ -1433,7 +1236,7 @@ class CWidget
 		else if (type=typeof element) == "string"
 			div = text2elem$ element
 			if div.childNodes.length==1 then element = div.firstChild; div.innerHTML = ""; @createWidget element, parent
-			else widget=new CWidgets _slice$.call div.childNodes; div.innerHTML = ""; widget
+			else widget = new CWidgets _slice$.call div.childNodes; div.innerHTML = ""; widget
 		else if element instanceof Array then toElements$.call this, element
 		else if type == "number" then new CNode document.createTextNode(element), parent
 		else if element instanceof RegExp then @wrap(@document()).find String(element).slice 1, -1
@@ -1592,22 +1395,30 @@ class CWidget
 			q = @_sendQueue['on'+type] ||= []
 			if phase then q.unshift listen else q.push listen
 		this
+	one: (type, listen, phase) ->
+		for type in $A type
+			@on type, (do(type, listen, phase)->-> @off type, arguments.callee, phase; listen.apply this, arguments), phase
+		this
 
 	rmEventAndHandler$ = (type) -> delete @_sendQueue[t='on'+type]; if not t of this and /^[a-z]+$/.test type then @removeHandler type
 	rmEvent$ = (type) -> delete @_sendQueue['on'+type]
 	rmHandler$ = rmEventAndHandler$
-		
+	
+	rmEvt$ = (type, listen, phase) ->
+		phase ||= -1
+		for type in $A type when ons = @_sendQueue['on'+type]
+			for fn, i in ons by phase when $0$ == listen then ons.splice i, 1 ; break
+			if ons.length == 0 then rmHandler$.call this, type
+		this
+	code$ = null
+	eval rmEvt$.code 'rmEvtByListen$', 'fn'; rmEvtByListen$ = code$
+	eval rmEvt$.code 'rmEvtByListen$', 'fn._belong'; rmEvtByBelong$ = code$
+	
 	off: (type, listen) ->
 		unless listen?
 			for type in $A type then rmHandler$.call this, type
-		else if typeof listen != 'function'
-			for type in $A type when ons = @_sendQueue['on'+type]
-				for fn, i in ons when fn._belong == listen then ons.splice i, 1 ; break
-				if ons.length == 0 then rmHandler$.call this, type
-		else
-			for type in $A type when ons = @_sendQueue['on'+type]
-				if -1 != idx=ons.indexOf listen then ons.splice idx, 1
-				if ons.length == 0 then rmHandler$.call this, type
+		else if typeof listen != 'function' then rmEvtByBelong$.apply this, arguments
+		else rmEvtByListen$.apply this, arguments
 		this
 	
 	clean: ->
@@ -1626,7 +1437,10 @@ class CWidget
 		for key of this when match = key.match /^(?:(.+)_)?on([a-z0-9]+)(?:_([a-z0-9]+))?$/i
 			[a, names, type, who] = match
 			if names and who then throw @raise "Устанавливать listens на элементы нельзя"
-			if who then listens[key] = [who, type] else unless names then (if /^[a-z]+$/.test type then selfHandlers.push type) else
+			if who then listens[key] = [who, type]
+			else unless names
+				if type!='e' and /^[a-z]+$/.test type then selfHandlers.push type
+			else
 				h = handlers
 				for name in names = names.split /__/
 					unless x=h[name] then h[name] = x = {}
@@ -1681,10 +1495,6 @@ class CWidget
 			else if typeof @[who] != 'function' then @[who].on type, listener
 			else @wrap(@[who]()).on type, listener
 		this
-
-	stream: (events) -> stream = new CStream; @on events, stream.emitter(); stream
-	observeStream: (events) -> stream = new CStream; @observe events, stream.emitter(); stream
-	ajaxStream: -> stream = new CStream; @on 'Load', stream.emitter(); @on 'Error', stream.errorer(); stream
 
 	_default_assign: 'text'
 	_default_update: undefined
@@ -2215,7 +2025,10 @@ class CWidget
 	
 	toCssCase = if isCase$ then (s) -> with_css_prefix[s] || s else (s) -> with_css_prefix[s] || s.toCamelCase()
 	
-	hasCss: (key, val) -> if fn = css_has_fn[key] then fn.call this, key, val else if arguments.length == 1 then 'string' == typeof @getCss key else div$.style[key = toCssCase key]=''; div$.style[key] = val; !!div$.style[key]
+	hasCss: (key, val) ->
+		if fn = css_has_fn[key] then fn.call this, key, val
+		else if arguments.length == 1 then 'string' == typeof @getCss key
+		else div$.style[key = toCssCase key]=''; div$.style[key] = val; !!div$.style[key]
 	setCss: (key, val, important) ->
 		if (fn=css_set_fn[key]) and off != fn.call this, key, val, important then return this
 		key = toCssCase old=key
@@ -2229,7 +2042,7 @@ class CWidget
 		style = (@_pseudoElement || @element).style
 		if important then style.setProperty key.lc(), val, "!important" else style[key] = val
 		this
-	getCssStyle: (key, pseudoClass) -> if p=@_pseudoElement then p.style else if @htm().contains this then getComputedStyle @element, pseudoClass else @element.style
+	getCssStyle: (key, pseudoClass) -> if p=@_pseudoElement then p.style else if @document().contains this then getComputedStyle @element, pseudoClass else @element.style
 	getCssValue: (key, pseudoClass) -> @getCssStyle(key, pseudoClass).getPropertyCSSValue toCssCase key
 	getCss: (key, pseudoClass) ->
 		if (fn=css_get_fn[key]) and off != ret=fn.call this, key, pseudoClass then return ret
@@ -2320,6 +2133,11 @@ class CWidget
 	pxvector: (val, percent_val, ci='px') -> (if /^[a-z]/i.test val then val = @getCss val); for v in val.split /\s+/ then @[ci] v, percent_val
 	
 	#cssText: (text) -> if arguments.length then @element.style.cssText = text else @element.style.cssText
+	
+	fly: (flag) ->
+		if flag then from = @new("div").css width: 'auto', height: 'auto', margin: 0, padding: 0
+		@on 'scroll', if flag == 1 then do(from)->->
+			if 
 	
 	toggle$ = (args, s) -> args[if (i=args.indexOf s) != -1 then (i+1) % args.length else 0]
 	
@@ -2548,7 +2366,7 @@ class CWidget
 	_timeout = (set, clear) -> do (set, clear) -> (time, name, args...) ->
 		unless @_timers then @_timers = {}
 		@_timers[name]?()
-		fn = do(name, args)=> if typeof name == 'string' then => this[name] args... else => name.apply this, args
+		fn = do(name, args) => => @send name, args...
 		ret = set fn, time
 		@_timers[name] = do(ret, clear)-> -> clear ret
 		this
@@ -2556,18 +2374,26 @@ class CWidget
 	interval: _timeout setInterval, clearInterval
 	clear: (name) -> t=@_timers || {}; (if name then t[name]?(); delete t[name] else (for i in t then t[i]()); @_timers = {}); this
 
-	#http://www.linkexchanger.su/2008/61.html
-	#http://habrahabr.ru/post/43379/
-	# http://habrahabr.ru/post/104618/ - анимационные эффекты
-	# http://madrobby.github.io/scriptaculous/combination-effects-demo/
-	#http://dev.1c-bitrix.ru/api_help/main/js_lib/animation/easing_prototype_animateprogress.php
-	# width: '[+=|-=]10[em] [[in|io] fn]'
-	
-	#class CAnimate
-	#	constructor: (@param) ->
-	#	compile: ->
-	
-	
+	speeds$ = slow: 200, fast: 600, norm: 400
+
+	# animate: (param, duration, ease, complete) ->
+		# @_animate = p = if typeof duration == 'object' then duration else duration: duration, ease: ease, complete: complete
+		# p.param = param
+		# duration = p.duration || p.timeout
+		# duration = speeds$[duration] || duration || 400
+		# if typeof duration == 'number' then duration = duration+'ms'
+		# if typeof (delay = p.delay) == 'number' then delay = delay+'ms'
+		# transition = [Object.keys(param).join(",") || 'all', duration]
+		# if ease = p.ease then transition.push ease
+		# if delay
+			# if ease then transition.push delay else @css 'transition-delay', delay
+		# @css 'transition', transition.join " "
+		# @on 'transitionend', ->
+			# @off 'transitionend', arguments.callee
+			# @css transition: null, 'transition-delay': null
+			# @send (p = @_animate).complete, p
+		# @css param
+
 	animate$ = ->
 		anim = @_animqueue[0]
 		if anim.this_param then @_animqueue[0] = anim = anim.call this ; next_animate$.call this 
@@ -2671,9 +2497,7 @@ class CWidget
 			next_animate$.call this
 			animate$.call this
 		this
-
-	# http://cubic-bezier.com/#.34,1.49,.55,-0.57 - сравнение анимации
-	# http://daneden.github.io/animate.css/ - анимация css
+		
 	morph: (param) ->
 		if typeof param == "string" then (if param of CEffect then param = CEffect[param] else throw @raise "Нет эффекта #{param}")
 		if typeof param.timeout == 'object' then extend param, param.timeout; (delete param.timeout if typeof param.timeout == 'object')
@@ -2711,7 +2535,7 @@ class CWidget
 		anim
 
 	
-	type$.all 'timeout interval clear animate'
+	type$.all 'timeout interval clear animate morph'
 
 	
 	# методы шейпов
@@ -2852,6 +2676,7 @@ class CWidgets extends CWidget
 	for name, prop of CWidget.prototype when prop instanceof Function and prop.type$ != 0 then this::[name] = ((args...) -> @$0$ "$1$", args...).inline name, [prop.type$ || '$result'], name
 
 	_slice$ = Array::slice
+	
 	constructor: (a) -> @length = a.length; @_all = if a instanceof Array then a else _slice$.call a
 	
 	all: -> @_all

@@ -1,4 +1,6 @@
 # 1. кросс-браузерные трансформации http://www.useragentman.com/blog/2010/03/09/cross-browser-css-transforms-even-in-ie/
+# 2. трансформации css: http://www.useragentman.com/IETransformsTranslator/
+
 
 # for IE < 9 ONLY!
 

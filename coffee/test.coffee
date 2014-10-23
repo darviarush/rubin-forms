@@ -801,6 +801,67 @@ new CTest 'obj-CWidget-send', """
 	ex.fld.send 'onclick', 22
 	
 
+new CTest "obj-CWidget-on", """
+`on type, listen, [phase]` - ставит обработчик на события
+
+- type - названия одного или нескольких событий. Без префикса "on"
+- listen - функция-обработчик
+- phase - фаза - добавить в конец или в начало очереди обработчиков. По умолчанию - в конец
+
+См. #one, #off
+""", ->
+	@count 2
+
+	w = CRoot.new 'div'
+	w.on 'MyEvent1 MyEvent2', (a) => @is a, 10 
+	w.send 'onMyEvent1', 10
+	w.send 'onMyEvent2', 10
+
+
+new CTest "obj-CWidget-off", """
+`off type, [listen], [phase]` - ставит обработчик на события
+
+- type - названия одного или нескольких событий. Без префикса "on"
+- listen - функция-обработчик или значение свойства _belong функции-обработчика. Если не указан - удаляется. _belong не может быть функцией
+- phase - фаза - удалять из конеца или из начала очереди обработчиков. По умолчанию - из конца
+
+См. #one, #off
+""", ->
+	w = CRoot.new 'div'
+	w.on 'MyEvent1', fn1 = ->
+	w.on 'MyEvent1', fn2 = ->
+	w.on 'MyEvent1', (fn3 = ->), 1
+	
+	@is w._sendQueue.onMyEvent1[0], fn3
+	@is w._sendQueue.onMyEvent1[1], fn1
+	@is w._sendQueue.onMyEvent1[2], fn2
+	
+	w.on 'MyEvent1', fn3
+	@is w._sendQueue.onMyEvent1[3], fn3
+	
+	w.off 'MyEvent1', fn3, 1
+	@is w._sendQueue.onMyEvent1[0], fn1
+	
+	fn3._belong = 6
+	w.off 'MyEvent1', 6
+	
+	@is w._sendQueue.onMyEvent1.length, 2
+	@is w._sendQueue.onMyEvent1[0], fn1
+	@is w._sendQueue.onMyEvent1[1], fn2
+	
+
+new CTest "obj-CWidget-one", """
+`one type, listen, [phase]` - ставит обработчик на события, аналогично #on. Но как только обработчик выполниться на событии он сразу же удаляется
+""", ->
+	@count 2
+	w = CRoot.new 'div'
+	w.one 'MyEvent1 MyEvent2', (a) => @is a, 10 
+	w.send 'onMyEvent1', 10
+	w.send 'onMyEvent2', 10
+	w.send 'onMyEvent1', 20
+	w.send 'onMyEvent2', 20
+	
+	
 new CTest 'obj-CWidget-defineHandlers', """
 `defineHandlers` - пробегает по всем методам объекта и запоминает методы-события
 
