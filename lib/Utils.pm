@@ -311,9 +311,10 @@ sub Dump { substr(Dumper($_[0]), 8, -2) }
 
 # читает весь файл
 sub read {
-	my ($path) = @_;
+	my ($path, $encode) = @_;
 	return "" unless -e $path;
-	open my($f), $path or die("Utils::read: Не могу открыть $path: $!\n");
+	open my($f), "<", $path or die("Utils::read: Не могу открыть $path: $!\n");
+	binmode $f, ":encoding($encode)" if $encode;
 	read $f, my($body), -s $f;
 	close $f;
 	return $body;

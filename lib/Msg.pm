@@ -20,8 +20,8 @@ sub mtime {
 	$mtime
 }
 
-sub files ($) { map { <$_/$_[0]> } dirs("."); }
-sub dirs ($) { if(Cwd::abs_path(".") =~ /\/rubin\/?$/) { $_[0] } else { ("../rubin/$_[0]", $_[0]) } }
-
+our $framework;
+sub dirs ($) { my $path = $_[0]; ((-e $path? abs_path($path): ()), ($framework && -e ($path="$framework/$path")? $path: ())) }
+sub files ($) { dirs(@_); }
 
 1;

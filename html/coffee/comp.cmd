@@ -1,3 +1,3 @@
 @rem coffee -cwbm -o ../js ../coffee
-cd ..
+cd ../..
 coffee bin\comp.coffee

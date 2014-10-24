@@ -124,6 +124,7 @@
 
 
 # Ссылки:
+# http://habrahabr.ru/post/237671/ - слепой набор
 # https://developer.mozilla.org/ru/docs/Web/JavaScript/Reference/Global_Objects/Array/indexOf - справочник мозилла на русском
 # http://docs.ractivejs.org/latest/observers - фреймворк с моделью данных и темплейтами
 # http://jsfiddle.net/C3WeM/5/ - анимация основанная на css3 - http://habrahabr.ru/post/209140/
@@ -165,8 +166,14 @@ IE = if '\v'=='v' or document.documentMode?
 	
 CTraceback = -> f = arguments.callee; i=0 ; [f.name || '<anonimous function>' while (f = f.caller && i++ < 10)].reverse().join(' → ')
 
-$A = (n, sep) -> if n instanceof Array then n else if typeof n == 'object' then Array::slice.call n else String(n).split sep || /\s+/
-$H = (n, sep = /s*;\s*/, eq = /\s*:\s*/) -> if n instanceof Array then x={}; (for i in [0...n] when i % 2 == 0 then x[n[i]] = n[i+1]) else if n instanceof Object then n else x = {}; (for i in String(n).split sep then m=i.split eq; x[m[0]]=m[1]); x
+$A = (n, sep) ->
+	if n instanceof Array then n
+	else if typeof n == 'object' then Array::slice.call n
+	else String(n).split sep || /\s+/
+$H = (n, sep = /s*;\s*/, eq = /\s*:\s*/) ->
+	if n instanceof Object then n
+	else if n instanceof Array then x={}; (for i in [0...n] when i % 2 == 0 then x[n[i]] = n[i+1]); x
+	else x = {}; (for i in String(n).split sep then m=i.split eq; x[m[0]]=m[1]); x
 say = (args...) -> console.log(args...); args[args.length-1]
 escapeHTML = (s) -> String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/\'/g, '&#39;')
 unescapeHTML = if (escapeHTML.div$ = document.createElement 'div').textContent? then (s) -> (div=escapeHTML.div$).innerHTML = s; x=div.textContent; div.innerHTML = ''; x else (s) -> (div=escapeHTML.div$).innerHTML = s; x=div.innerText; div.innerHTML = ''; x

@@ -9,25 +9,33 @@ BEGIN {
 	use Data::Dumper;
 }
 
+our $framework;
 use File::Basename qw/dirname/;
 use Cwd qw/abs_path/;
 
 chdir dirname($0);
-our $framework_dir;
 use lib dirname($0)."/lib";
+
+use lib do {
+	open my($f), "main.ini" or die "Нет main.ini: $!";
+	read $f, my($ini), -s $f;
+	close $f;
+
+	if($ini =~ /^\s*\[rubin\]\s*path\s*=\s*(.*)/) { $framework = abs_path($1); "$framework/lib"; }
+	else { dirname($0)."/lib" }
+};
+
 use Msg;
 use Utils;
-our $ini = Utils::parse_ini("main.ini");
-if($ini) {
-	if(exists $ini->{"rubin"}{"path"}) { $framework_dir = abs_path($ini->{rubin}{path}); use lib "$framework_dir/lib" }
-	if($ini->{"mysql"}{"DNS"}) { require Connect; }
-}
+
+$ini = Utils::parse_ini(undef, $ini);
+if($ini->{"mysql"}{"DNS"}) { require Connect; }
 
 @ARGV = "qq" unless @ARGV;
 my $path = "bin/$ARGV[0].pl";
 my $ret;
 if(-e $path) { require $path; }
-elsif($framework_dir && -e "$framework_dir/$path") { require "$framework_dir/$path"; }
+elsif($framework && -e "$framework/$path") { require "$framework/$path"; }
 else { die "Команда `$path` не найдена" }
 
 1;

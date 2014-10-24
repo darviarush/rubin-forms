@@ -2,36 +2,32 @@
 #> возвращает список команд
 
 use Term::ANSIColor qw(:constants);
+use File::Find;
+use utf8;
+use Cwd qw/cwd/;
+
+binmode STDOUT, ":utf8";
 
 $name = $ARGV[1];
 if($name) {
-	for $path (dirs("bin")) {
-		$f="$path/$name.pl";
-		if(-e $f) {
-			$_ = Utils::read($f);
-			($args) = /#= (.*)/;
-			print "$name $args\n\n";
-			print "$1\n" while /^#> (.*)/gm;
-		}
-	}
+	($path) = dirs("bin/$name.pl");
+	$_ = Utils::read($path, 'utf-8');
+	$name .= " $1" if /^#= ([^\r\n]+)/m;
+	print BOLD . BLACK . "$name\n\n" . RESET;
+	print "$1\n" while /^#> ([^\r\n]+)/gm;
 	exit;
 }
 
-for $path (dirs("bin")) {
-	opendir dir, $path;
-	while( $file = readdir dir ) {
-		if(not exists $files{$file} and $file =~ /\.pl$/) {
-			$name = $`;
-			$_ = Utils::read("$path/$file");
-			($args) = /^#= (.*)/m;
-			($help) = /^#> (.*)/m;
-			$name .= MAGENTA." $args" if defined $args;
-			utf8::encode($name);
-			$len = length $name;
-			utf8::decode($name);
-			#print "$file `$name`\n";
-			print CYAN.$name .RESET. (" " x  (20 - $len)) ." ". $help . "\n";
-			$files{$file} = 1;
-		}
-	}
-}
+find({ no_chdir=>1, wanted=> sub {
+	return unless $File::Find::name =~ /([^\/]+)\.pl$/;
+	$name = $1;
+	$_ = Utils::read($File::Find::name, 'UTF-8');
+	($args) = /^#= ([^\r\n]+)/m;
+	($help) = /^#> ([^\r\n]+)/m;
+	$name .= " $args" if defined $args;
+	$len = length $name;
+	print BOLD . BLACK . $name . RESET . (" " x  (20 - $len)) . ($help? " ".$help: "") . "\n";
+	
+}}, dirs "bin");
+
+1;

@@ -7,8 +7,10 @@ use warnings;
 use File::Find;
 use POSIX qw(strftime);
 
+use Msg;
+
 # конструктор: dirs = dir:mtime, watch = file:mtime, file = file:callback, scan = dir: [ext, callback]
-sub new { my ($cls); bless { dirs => {}, watch => {}, file => {} }, $cls }
+sub new { my ($cls) = @_; bless { dirs => {}, watch => {}, file => {} }, $cls }
 
 
 # указываем за изменением файлов с каким расширением в каких директориях следить
@@ -21,19 +23,20 @@ sub on {
 		$self->{scan}{$dir} = [$ext, $callback];
 		$self->scan($dir);
 	}
-	
+	$self
 }
 
 # удаление директории
 sub erase {
 	my ($self, $dir) = @_;
 	for my $key (keys %{$self->{file}}) {
-		delete($self->{file}{$key}), delete delete $self->{watch}{$key} if $dir eq substr $key, 0, length $dir;
+		delete($self->{file}{$key}), delete $self->{watch}{$key} if $dir eq substr $key, 0, length $dir;
 	}
 	
 	for my $key (keys %{$self->{dirs}}) {
 		delete $self->{dirs}{$key} if $dir eq substr $key, 0, length $dir;
 	}
+	$self
 }
 
 # создание информации
@@ -54,28 +57,30 @@ sub scan {
 		wanted => sub {
 			my $path = $File::Find::name;
 			if(-d $path) {
-				$self->{dirs}{$path} = mtime($path);
+				$self->{dirs}{$path} = main::mtime($path);
 			}
 			elsif($path =~ $ext) {
-				$self->{watch}{$path} = mtime($path);
+				$self->{watch}{$path} = main::mtime($path);
 				$self->{file}{$path} = $callback;
 			}			
 		}
 	}, $dir);
+	$self
 }
 
 # проверка
-sub watch {
+sub run {
 	my ($self) = @_;
 	while(my($dir, $mtime) = each %{$self->{dirs}}) {
-		$self->erase($dir), $self->scan($dir) if $mtime < mtime($dir);
+		$self->erase($dir), $self->scan($dir) if $mtime < main::mtime($dir);
 	}
 	while(my($file, $mtime) = each %{$self->{watch}}) {
-		$self->{file}->($file), $self->{watch}{$file} = mtime($file) if $mtime < mtime($file);
+		$self->{file}{$file}->($file), $self->{watch}{$file} = main::mtime($file) if $mtime < main::mtime($file);
 	}
+	$self
 }
 
 # цикл слежения
-sub loop { my ($self) = @_; for(;;) { $self->watch(); sleep 1; } }
+sub loop { my ($self) = @_; for(;;) { $self->run(); sleep 1; } }
 
 1;
