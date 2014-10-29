@@ -59,10 +59,13 @@ sub load_htm($) {
 	if(my $error = $! || $@) { msg RED."load_htm `$path`:".RESET." $error"; $path =~ s/\//_/g; $main::_action_htm{$index} = sub { die raise(501) }; }
 }
 
-sub load_action ($$) {
-	my ($path, $index) = @_;
+sub load_action ($) {
+	my ($path) = @_;
 	
-	return load_htm $path if $path =~ /\.htm$/;
+	#return load_htm $path if $path =~ /\.htm$/;
+	
+	$path =~ /\baction\/(.*)\.htm$/;
+	my $index = $1;
 	
 	eval {
 	

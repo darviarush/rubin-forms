@@ -1,4 +1,4 @@
-CTest.category "Расширения встроенных классов"
+CTest.category "Расширения встроенных классов" 
 
 new CTest 'key-CFunction-implements', """
 `implements Class` - переписывает методы из указанного класса
@@ -3703,3 +3703,10 @@ new CTest 'obj-CModalWidget-show', """
 
 
 do CTest.main_loop
+
+
+
+
+
+
+

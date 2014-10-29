@@ -372,6 +372,23 @@ sub tee {
 	select STDOUT; $| = 1;  # make unbuffered
 }
 
+# делает файл внеблоковым
+use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK O_NDELAY);
+sub nonblock {
+    for my $file (@_) {
+		my $flags = fcntl($file, F_GETFL, 0) or die "Can't get flags: $!\n";
+		fcntl($file, F_SETFL, $flags | O_NONBLOCK) or die "Can't make file nonblocking: $!\n";
+	}
+}
+
+# делает файл блоковым
+sub block {
+    for my $file (@_) {
+		my $flags = fcntl($file, F_GETFL, 0) or die "Can't get flags: $!\n";
+		fcntl($file, F_SETFL, $flags &~ O_NONBLOCK) or die "Can't make file blocking: $!\n";
+	}
+}
+
 # эскейпит для url
 sub uri_escape {
 	my ($v, $re) = @_;

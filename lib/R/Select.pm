@@ -12,6 +12,7 @@ sub on {
 	vec($self->{rin} ||= '', $fileno, 1) = 1 if $ioe =~ /r/;
 	vec($self->{win} ||= '', $fileno, 1) = 1 if $ioe =~ /w/;
 	vec($self->{ein} ||= '', $fileno, 1) = 1 if $ioe =~ /e/;
+	Utils::nonblock($file) if $ioe !~ /b/;
 	$self
 }
 
@@ -68,20 +69,5 @@ sub loop {
 		$rtime = $timeout;
 	}
 }
-
-sub nonblock {
-    my ($self, $fileno) = @_;
-	$fileno = fileno $fileno if ref $fileno;
-    my $flags = fcntl($fileno, F_GETFL, 0) or die "Can't get flags for #$fileno: $!\n";
-    fcntl($fileno, F_SETFL, $flags | O_NONBLOCK) or die "Can't make socket nonblocking: $!\n";
-}
-
-sub block {
-    my ($self, $fileno) = @_;
-	$fileno = fileno $fileno if ref $fileno;
-    my $flags = fcntl($fileno, F_GETFL, 0) or die "Can't get flags for #$fileno: $!\n";
-    fcntl($fileno, F_SETFL, $flags &~ O_NONBLOCK) or die "Can't make socket nonblocking: $!\n";
-}
-
 
 1;

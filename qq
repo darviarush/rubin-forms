@@ -9,7 +9,7 @@ BEGIN {
 	use Data::Dumper;
 }
 
-our $framework;
+our ($framework, $ini);
 use File::Basename qw/dirname/;
 use Cwd qw/abs_path/;
 
@@ -18,9 +18,9 @@ use lib dirname($0)."/lib";
 
 use lib do {
 	open my($f), "main.ini" or die "Нет main.ini: $!";
-	read $f, my($ini), -s $f;
+	read $f, $ini, -s $f;
 	close $f;
-
+	
 	if($ini =~ /^\s*\[rubin\]\s*path\s*=\s*(.*)/) { $framework = abs_path($1); "$framework/lib"; }
 	else { dirname($0)."/lib" }
 };

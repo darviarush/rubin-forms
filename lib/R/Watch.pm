@@ -10,7 +10,7 @@ use POSIX qw(strftime);
 use Msg;
 
 # конструктор: dirs = dir:mtime, watch = file:mtime, file = file:callback, scan = dir: [ext, callback]
-sub new { my ($cls) = @_; bless { dirs => {}, watch => {}, file => {} }, $cls }
+sub new { my ($cls) = @_; bless { dirs => {}, watch => {}, file => {}, scan => {} }, $cls }
 
 
 # указываем за изменением файлов с каким расширением в каких директориях следить
@@ -18,11 +18,19 @@ sub on {
 	my ($self, $ext, $dirs, $callback) = @_;
 
 	$dirs = [split /\s+/, $dirs] unless ref $dirs;
+	my @files = grep { -f $_ } @$dirs;
+	my @dirs = grep { -d $_ or !-e $_ } @$dirs;
 
-	for my $dir (@$dirs) {
+	for my $dir (@dirs) {
 		$self->{scan}{$dir} = [$ext, $callback];
 		$self->scan($dir);
 	}
+
+	for my $file (@files) {
+		$self->{watch}{$file} = main::mtime($file);
+		$self->{file}{$file} = $callback;
+	}
+	
 	$self
 }
 
@@ -62,7 +70,7 @@ sub scan {
 			elsif($path =~ $ext) {
 				$self->{watch}{$path} = main::mtime($path);
 				$self->{file}{$path} = $callback;
-			}			
+			}
 		}
 	}, $dir);
 	$self
@@ -72,10 +80,23 @@ sub scan {
 sub run {
 	my ($self) = @_;
 	while(my($dir, $mtime) = each %{$self->{dirs}}) {
-		$self->erase($dir), $self->scan($dir) if $mtime < main::mtime($dir);
+		main::msg('watch_dir', $dir), $self->erase($dir), $self->scan($dir) if $mtime < main::mtime($dir);
 	}
 	while(my($file, $mtime) = each %{$self->{watch}}) {
-		$self->{file}{$file}->($file), $self->{watch}{$file} = main::mtime($file) if $mtime < main::mtime($file);
+		main::msg('watch_file', $file), $self->{file}{$file}->($file), $self->{watch}{$file} = main::mtime($file) if $mtime < main::mtime($file);
+	}
+	$self
+}
+
+# вызывает срабатывание всех слушатилей на файлах, соответвующих маске или, если файл не указан - то на всех
+sub fire {
+	my($self, $path) = @_;
+	if(!defined $path) {
+		while(my($file, $cb) = each %{$self->{file}}) { $cb->($file); }
+	}
+	elsif(!ref($path) and exists $self->{watch}{$path}) { $self->{file}{$path}->($path) }
+	else {
+		while(my($file, $cb) = each %{$self->{file}}) { $cb->($file) if $file =~ $path; }
 	}
 	$self
 }

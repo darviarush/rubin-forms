@@ -17,9 +17,10 @@ use Carp::Trace qw/trace/;
 use Carp 'verbose';
 $SIG{ __DIE__ } = \&Carp::confess; #sub { print STDERR RED, $_[0] , GREEN, trace(), RESET;  };
 $SIG{ __WARN__ } = sub { print STDERR YELLOW, (ref($_[0])? Dumper($_[0]): $_[0]), CYAN, trace(), RESET; };
+
+use R::Watch;
 use HttpStatus;
 use MimeType;
-use Watch;
 use Auth;
 use Helper;
 use Rubin;
@@ -41,7 +42,7 @@ our $_test = $_site->{test};
 our $_port = $_site->{port};
 our $_watch = $_site->{watch};
 our $_lords = $_site->{lords};
-our $_req = $ini->{req} // 0;
+our $_req = $ini->{req} // $_site->{log} // 0;
 
 our %_HIDDEN_EXT = Utils::set(qw/pl pm act htm/, ($_site->{hidden_ext} or ()));
 
@@ -63,8 +64,37 @@ read_perm();
 # перечитывает main_do.ini по сигналу
 $SIG{USR1} = \&read_perm;
 
+# перезагружает сервер
+sub _reload {
+	#print STDERR `nginx -s reload`;
+	my $res = `perl -c $0`;
+	if($? == 0) {
+		end_server();
+		exec $0, @ARGV;
+	} else {
+		print STDERR $res;
+	}
+}
+
 # грузим экшены
-for_action \&load_action;
+#for_action \&load_action;
+my $_show_action;
+
+my $watch = R::Watch->new->on(qr/\.act$/, [dirs("action")], sub {
+	my ($path) = @_;
+	msg strftime("%T", localtime)." - ".RED."action".RESET." $path" if $_show_action;
+	load_action $path;
+})->on(qr/\.htm$/, [dirs("action")], sub {
+	my ($path) = @_;
+	msg strftime("%T", localtime)." - ".RED."htm".RESET." $path" if $_show_action;
+	load_htm $path;
+})->fire()->on(qr//, ["qq", "main.ini", grep { defined $_ and -e $_ and m!/action/.*\.(?:htm|act)\.pl$! } values %INC], sub {
+my ($path) = @_;
+	msg strftime("%T", localtime)." - ".RED."module".RESET." $path";
+	_reload();
+});
+
+$_show_action = 1;
 
 
 # демонизируемся
@@ -100,7 +130,7 @@ for(;;) {
 	# задачи по крону
 	eval {
 		delete_session() if time() % 3600 == 0;	# раз в час
-		watch() if $_watch;
+		$watch->run() if $_watch;
 	};
 	msg("Збойнула задача крона: ".($@ || $!)), $@ = $! = undef if $@ || $!;
 	
