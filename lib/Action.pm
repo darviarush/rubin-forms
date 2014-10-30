@@ -5,7 +5,7 @@ use Auth;
 
 # подгружаем экшены в %_action
 sub load_htm($) {
-	my ($path) = @_;
+	my ($path, $no_require) = @_;
 	local ($_, $`, $');
 	
 	$path =~ /\baction\/(.*)\.htm$/;
@@ -54,13 +54,13 @@ sub load_htm($) {
 			Utils::mkpath($p);
 			Utils::write($p, $eval);
 		}
-		require $p;
+		require $p unless $no_require;
 	};
-	if(my $error = $! || $@) { msg RED."load_htm `$path`:".RESET." $error"; $path =~ s/\//_/g; $main::_action_htm{$index} = sub { die raise(501) }; }
+	if(my $error = $! || $@) { msg RED."load_htm `$path`:".RESET." $error"; $path =~ s/\//_/g; $main::_action_htm{$index} = sub { die raise(501) }; return 1; }
 }
 
 sub load_action ($) {
-	my ($path) = @_;
+	my ($path, $no_require) = @_;
 	
 	#return load_htm $path if $path =~ /\.htm$/;
 	
@@ -93,10 +93,10 @@ sub load_action ($) {
 			Utils::write($p, $eval);
 		}
 		
-		require $p;
+		require $p unless $no_require;
 	};
 	
-	if(my $error=$! || $@) { msg RED."load_action `$path`:".RESET." $error"; $::_action{$index} = sub { die raise(501) }; }
+	if(my $error=$! || $@) { msg RED."load_action `$path`:".RESET." $error"; $::_action{$index} = sub { die raise(501) }; return 1; }
 }
 
 

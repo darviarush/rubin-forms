@@ -64,38 +64,56 @@ read_perm();
 # перечитывает main_do.ini по сигналу
 $SIG{USR1} = \&read_perm;
 
+
+# тестирует
+sub _test {
+	my $test = shift // $0;
+	my $res = `perl -c $test`;
+	return $? == 0? undef: $res;
+}
+
 # перезагружает сервер
 sub _reload {
 	#print STDERR `nginx -s reload`;
-	my $res = `perl -c $0`;
-	if($? == 0) {
+	my $res;
+	if($res = _test()) {
+		print STDERR RED.$res.RESET;
+	} else {
 		end_server();
 		exec $0, @ARGV;
-	} else {
-		print STDERR $res;
 	}
 }
 
 # грузим экшены
-#for_action \&load_action;
-my $_show_action;
-
-my $watch = R::Watch->new->on(qr/\.act$/, [dirs("action")], sub {
+msg BOLD . BLACK . "load action..." . RESET;
+R::Watch->new->on(qr/\.act$/, [dirs("action")], sub {
 	my ($path) = @_;
-	msg strftime("%T", localtime)." - ".RED."action".RESET." $path" if $_show_action;
 	load_action $path;
 })->on(qr/\.htm$/, [dirs("action")], sub {
 	my ($path) = @_;
-	msg strftime("%T", localtime)." - ".RED."htm".RESET." $path" if $_show_action;
 	load_htm $path;
-})->fire()->on(qr//, ["qq", "main.ini", grep { defined $_ and -e $_ and m!/action/.*\.(?:htm|act)\.pl$! } values %INC], sub {
-my ($path) = @_;
-	msg strftime("%T", localtime)." - ".RED."module".RESET." $path";
-	_reload();
-});
+})->fire();
 
-$_show_action = 1;
-
+my $watch;
+if($_watch) {
+	$watch = R::Watch->new->on(qr/\.act$/, [dirs("action")], sub {
+		my ($path) = @_;
+		msg strftime("%T", localtime)." - ".RED."action".RESET." $path";
+		_reload() unless load_action $path, 1;
+	})->on(qr/\.htm$/, [dirs("action")], sub {
+		my ($path) = @_;
+		msg strftime("%T", localtime)." - ".RED."htm".RESET." $path";
+		_reload() if load_htm $path, 1;
+	})->on(qr//, ["qq", "main.ini", grep { defined $_ and -e $_ and m!/action/.*\.(?:htm|act)\.pl$! } values %INC], sub {
+		my ($path) = @_;
+		msg strftime("%T", localtime)." - ".RED."module".RESET." $path";
+		_reload();
+	});
+	
+	#run_bin "watch", { ini => $ini, no_loop => 1, watching => $watch };
+	my $no_
+	require do { dirs "bin/watch.pl" };
+}
 
 # демонизируемся
 if($_site->{daemon}) {
