@@ -9,9 +9,10 @@ sub AUTOLOAD {
 	$AUTOLOAD =~ /([^:]+)$/;
 	my $prop = $1;
 	
-	if(@_ == 1) {
-		my $new = "R::".ucfirst($prop);
-		my ($load) = main::dirs "lib/R/".ucfirst($prop).".pm";
+	if(@_ == 1) {		
+		my $new = $prop; $new =~ s![A-Z]!::$&!g; $new = "R::".ucfirst($prop);
+		my $load = $prop; $load =~ s![A-Z]!/$&!g;
+		$load = main::file "lib/R/".ucfirst($load).".pm";
 		require $load;
 		$_[0]->{$prop} = $new->new($_[0]);
 	}

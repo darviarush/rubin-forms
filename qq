@@ -1,6 +1,5 @@
 #!perl -w
 
-
 BEGIN {
 	use Carp 'verbose';
 	$SIG{ __DIE__ } = \&Carp::confess;
@@ -8,34 +7,30 @@ BEGIN {
 	#use Cwd qw/cwd/;
 	use File::Basename qw/dirname/;
 	use Cwd qw/abs_path/;
-	#use Data::Dumper;
-	our ($framework);
+	our $_FRAMEWORK;
 
 	chdir dirname($0);
 	open my($f), "main.ini" or die "Нет main.ini: $!";
 	read $f, my($ini), -s $f;
 	close $f;
 	
-	if($ini =~ /^\s*\[rubin\]\s*path\s*=\s*(.*)/) { $framework = abs_path($1); }
+	if($ini =~ /^\s*\[rubin\]\s*path\s*=\s*(.*)/) { $_FRAMEWORK = abs_path($1); }
 }
 
 use lib dirname($0)."/lib";
-use lib "$framework/lib";
+use lib "$_FRAMEWORK/lib";
 
 use Msg;
-use Utils;
-
 use R::App;
-
 our $app = R::App->new;
 
 #$ini = Utils::parse_ini(undef, $ini);
 #if($ini->{"mysql"}{"DNS"}) { require Connect; }
 
+
 @ARGV = "qq" unless @ARGV;
-my $path = "bin/$ARGV[0].pl";
-if(-e $path) { require $path; }
-elsif($framework && -e "$framework/$path") { require "$framework/$path"; }
+my $path = file("bin/$ARGV[0].pl");
+if($path) { require $path; }
 else { die "Команда `$path` не найдена" }
 
 1;

@@ -1,7 +1,3 @@
-
-use Data::Dumper;
-require Cwd;
-
 use Utils;
 
 my $_LOG = 1;
@@ -12,11 +8,18 @@ sub msg (@) {
 		require Term::ANSIColor;
 		my ($sep, $next, $reset) = ", ";
 		my $msg = join($sep, map {
-			my @ret = !defined($_)? Term::ANSIColor::RED."undef".Term::ANSIColor::RESET:
+			my @ret = !defined($_)? Term::ANSIColor::colored("undef", "red"):
 			ref $_? do { my($x)=Utils::Dump($_); $x=~s/\s+//g if $_MSG_INLINE; $x}:
 			$_ eq ":space"? do { $sep = " "; () }:
 			$_ eq ":empty"? do { $sep = ""; () }:
-			/^:([\w ]+)$/? do { $reset = 1; $next = Term::ANSIColor::color($1); () }:
+			/^:([\w ]+)$/? do {
+				local $_ = $1;
+				if(s!^space$! ! or s!^empty$!!) { $sep = $_ } else {
+					$reset = 1;
+					$next = Term::ANSIColor::color($_);
+				}
+				()
+			}:
 			$_;
 			if(defined $next and @ret) { $ret[0] = "$next$ret[0]"; $next = undef }
 			@ret
@@ -39,8 +42,9 @@ sub mtime {
 	$mtime
 }
 
-sub dirs ($) { my ($path) = @_; ((-e $path? $path: ()), ($::framework && (-e ($path="$::framework/$path"))? $path: ())) }
-sub files ($) { dirs($_[0]); }
+sub file ($) { my ($path) = @_; -e $path? $path: ($::_FRAMEWORK && -e ($path="$::_FRAMEWORK/$path"))? $path: undef }
+sub dirs (@) { map { (glob($_), ($::_FRAMEWORK? glob("$::_FRAMEWORK/$_") : ())) } @_ }
+sub files (@) { map { -e $_? $_: () } dirs(@_) }
 
 sub run_bin ($$) {
 	my ($run, $our) = @_;

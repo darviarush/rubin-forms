@@ -38,18 +38,20 @@ sub new {
 			out($_) for read_nonblock($out, 0.25);
 		}
 		
-		$watching->on(qr/\.(?:$watch->{ext})$/, [map { main::dirs($_) } @in], (sub { my @args = @_; sub { inset($_[0], @args) }})->($watch, $ext, $out));
+		$watching->on(qr/\.(?:$watch->{ext})$/, [main::files(@in)], (sub { my @args = @_; sub { inset($_[0], @args) }})->($watch, $ext, $out));
+		
 	}
 
-	$app->log(":BOLD BLACK", "\ncompiling...");
-	$watching->fire();
+	#$app->log(":BOLD BLACK", "\ncompiling...");
+	#$watching->fire();
 	$app->log(":BOLD BLACK", "\nwatching...");	
 	
 	$self;
 }
 
 sub loop {
-	$_[0]->app->watch->loop();
+	msg $_[0]->{app}->watch
+	#->loop();
 }
 
 sub inset {
