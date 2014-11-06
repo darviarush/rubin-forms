@@ -1,4 +1,5 @@
 use Utils;
+use POSIX qw//;
 
 my $_LOG = 1;
 my $_MSG_INLINE = 0;
@@ -6,18 +7,18 @@ my $_MSG_INLINE = 0;
 sub msg (@) {
 	if($_LOG == 1) {
 		require Term::ANSIColor;
-		my ($sep, $next, $reset) = ", ";
+		my ($sep, $next, $reset, $inline) = ", ";
 		my $msg = join($sep, map {
 			my @ret = !defined($_)? Term::ANSIColor::colored("undef", "red"):
-			ref $_? do { my($x)=Utils::Dump($_); $x=~s/\s+//g if $_MSG_INLINE; $x}:
+			ref $_? do { my($x)=Utils::Dump($_); $x=~s/\s+//g if $_MSG_INLINE or $inline; $x}:
 			$_ eq ":space"? do { $sep = " "; () }:
 			$_ eq ":empty"? do { $sep = ""; () }:
+			$_ eq ":inline"? do { $inline = 1; () }:
+			$_ eq ":inline_end"? do { $inline = 0; () }:
+			$_ eq ":time"? do { POSIX::strftime("%T", localtime) }:
 			/^:([\w ]+)$/? do {
-				local $_ = $1;
-				if(s!^space$! ! or s!^empty$!!) { $sep = $_ } else {
-					$reset = 1;
-					$next = Term::ANSIColor::color($_);
-				}
+				$reset = 1;
+				$next = Term::ANSIColor::color($1);
 				()
 			}:
 			$_;

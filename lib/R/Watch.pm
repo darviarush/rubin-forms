@@ -102,6 +102,6 @@ sub fire {
 }
 
 # цикл слежения
-sub loop { my ($self) = @_; for(;;) { $self->run(); sleep 1; } }
+sub loop { my ($self, $sub) = @_; for(;;) { $sub->() if $sub; $self->run(); sleep 1; } }
 
 1;

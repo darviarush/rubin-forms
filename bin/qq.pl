@@ -5,18 +5,13 @@ use File::Basename;
 use Time::HiRes qw//;
 use JSON;
 use Cwd 'abs_path';
-use Term::ANSIColor qw(:constants);
+
 use POSIX ":sys_wait_h";
 use threads ('yield',
 	'stack_size' => 64*4096,
 	'exit' => 'threads_only',
 	'stringify');
 use threads::shared;
-#use Devel::Confess  qw/color/;
-use Carp::Trace qw/trace/;
-use Carp 'verbose';
-$SIG{ __DIE__ } = \&Carp::confess; #sub { print STDERR RED, $_[0] , GREEN, trace(), RESET;  };
-$SIG{ __WARN__ } = sub { print STDERR YELLOW, (ref($_[0])? Dumper($_[0]): $_[0]), CYAN, trace(), RESET; };
 
 use R::Watch;
 use HttpStatus;
@@ -35,9 +30,9 @@ our (
 	@_HEAD, %_MIME, %_HEAD, @_COOKIE
 	);
 
-our $_RE_LOCATION = qr!((/([^\s\?]*?)(?:(-?\d+)((?:_-?\d+)*)|(\.\w+))?)(?:\?(\S+))?)!;
+
 	
-our $_site = $ini->{site};
+our $_site = $app->ini->{site};
 our $_test = $_site->{test};
 our $_port = $_site->{port};
 our $_watch = $_site->{watch};
@@ -85,7 +80,7 @@ sub _reload {
 }
 
 # грузим экшены
-msg BOLD . BLACK . "load action..." . RESET;
+msg ":bold black", "load action...";
 R::Watch->new->on(qr/\.act$/, [dirs("action")], sub {
 	my ($path) = @_;
 	load_action $path;
@@ -98,15 +93,15 @@ my $watch;
 if($_watch) {
 	$watch = R::Watch->new->on(qr/\.act$/, [dirs("action")], sub {
 		my ($path) = @_;
-		msg strftime("%T", localtime)." - ".RED."action".RESET." $path";
+		msg ":empty", ":time", " - ", ":red", "action", ":reset", " $path";
 		_reload() unless load_action $path, 1;
 	})->on(qr/\.htm$/, [dirs("action")], sub {
 		my ($path) = @_;
-		msg strftime("%T", localtime)." - ".RED."htm".RESET." $path";
+		msg ":empty", ":time", " - ", ":red", "htm", ":reset", " $path";
 		_reload() if load_htm $path, 1;
 	})->on(qr//, ["qq", "main.ini", grep { defined $_ and -e $_ and m!/action/.*\.(?:htm|act)\.pl$! } values %INC], sub {
 		my ($path) = @_;
-		msg strftime("%T", localtime)." - ".RED."module".RESET." $path";
+		msg ":empty", ":time", " - ", ":red", "module", ":reset", " $path";
 		_reload();
 	});
 	
@@ -133,7 +128,7 @@ if($_site->{daemon}) {
 my $drv = $_site->{drv} // "";
 $_socket = $drv =~ /^fcgi$/i? Rubin::FCGI->new($_port): $drv =~ /^psgi$/i? Rubin::PSGI->new($_port): Rubin::HTTP->new($_port);
 
-msg "Слушаем ".GREEN.$_port.RESET;
+msg ":empty", "Слушаем ", ":green", $_port;
 
 # расщепляем процесс
 for(my $i=0; $i<$_lords; $i++) {
@@ -150,7 +145,7 @@ for(;;) {
 		delete_session() if time() % 3600 == 0;	# раз в час
 		$watch->run() if $_watch;
 	};
-	msg("Збойнула задача крона: ".($@ || $!)), $@ = $! = undef if $@ || $!;
+	msg(":red", "Збойнула задача крона: ".($@ || $!)), $@ = $! = undef if $@ || $!;
 	
 	eval {
 		my @joinable = threads->list(threads::joinable);
@@ -162,13 +157,13 @@ for(;;) {
 			#	print RED."Завершился крон № $tid\n".RESET."$error";
 			#	$cron = threads->create(*cron::run)->tid();
 			#} else {
-				msg RED."Завершился лорд № $tid".RESET.($error? "\nС ошибкой: $error": "").(@return? "\nВернул: ": "");
+				msg ":empty", ":red", "Завершился лорд № $tid", ":reset", ($error? "\nС ошибкой: $error": "").(@return? "\nВернул: ": "");
 				msg \@return if @return;
 				threads->create(*lord);
 			#}
 		}
 	};
-	msg("Лорд завершился с ошибкой: ".($@ || $!)), $@ = $! = undef if $@ || $!;
+	msg(":red", "Лорд завершился с ошибкой: ".($@ || $!)), $@ = $! = undef if $@ || $!;
 }
 
 # Обработчик запросов
@@ -261,7 +256,7 @@ sub ritter {
 			
 			my $e = $error;
 			$e =~ s!\b((?:called )?at|line|thread)\b!CYAN.$1.RESET!ge;
-			msg RED."action-error `$_action".($param->{id} // "")."`:".RESET." $e\n";
+			msg ":empty", ":red", "action-error `$_action".($param->{id} // "")."`:", ":reset", " $e\n";
 			$error = $_test ? $error: "Внутренняя ошибка";
 			
 			if($_HEAD->{Accept} =~ /^text\/json\b/) {
@@ -293,25 +288,3 @@ $x
 }
 
 
-# распечатывают статистику. Используются в драйверах
-my %_STAT = ();
-
-sub stat_start {
-	$_STAT{time} = Time::HiRes::time();
-}
-
-sub stat_begin {
-	msg "\n".RED."$_METHOD".RESET." $_URL ".RED."$_VERSION ".CYAN."tid".RESET.": ".threads->tid().CYAN." from ".RESET.join(", ", threads->list());
-	if($_req > 0) { msg MAGENTA.$_.RESET.": ".CYAN.$_HEAD->{$_}.RESET for keys %{$_HEAD} };
-	if($_req > 1) { msg CYAN.$_.RESET.": ".(!defined($_POST->{$_})? RED."null".RESET: ref $_POST->{$_} eq "JSON::XS::Boolean"? RED.$_POST->{$_}.RESET: ref $_POST->{$_}? Utils::Dump($_POST->{$_}): $_POST->{$_} ) for keys %$_POST };
-}
-
-sub stat_end {
-	my ($RESPONSE, $head, $out) = @_;
-	$RESPONSE =~ s/\s*$//;
-	msg $RESPONSE;
-	/: /, msg GREEN.$`.RESET.": ".YELLOW.$'.RESET for @$head;
-	if($_req > 1) { msg $_ for @$out }
-	my $time = Time::HiRes::time() - $_STAT{time};
-	msg MAGENTA."sec".RESET." $time";
-}

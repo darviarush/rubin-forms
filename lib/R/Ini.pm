@@ -12,7 +12,7 @@ our $setnew = sub {
 	}
 	elsif(ref $s eq "ARRAY") {
 		for my $val (@$s) { $setnew->($val) }
-		bless $s, R::Ini::Array;
+		#bless $s, R::Ini;
 	}
 	$s
 };
@@ -28,17 +28,16 @@ sub new {
 }
 
 sub AUTOLOAD {
-	$AUTOLOAD =~ /([^:]+)$/;
-	if(@_ == 1) { $_[0]->{$1} } else { $_[0]->{$1} = $setnew->($_[1]); $_[0] }
+	$AUTOLOAD =~ /([^:]+)$/; my $prop = $1;
+	
+	my $sub = (sub { my ($prop) = @_; sub { my ($self, $val) = @_; if(@_ == 1) { $self->{$prop} } else { $self->{$prop} = $setnew->($val); $self }}})->($prop);
+	#no strict 'refs';
+	*{$AUTOLOAD} = $sub;
+	#use strict 'refs';
+	
+	goto &$sub;
 }
 
 sub DESTROY {}
-
-package R::Ini::Array;
-
-sub AUTOLOAD {
-	$AUTOLOAD =~ /([^:]+)$/;
-	if(@_ == 1) { $_[0]->[$1] } else { $_[0]->[$1] = $R::Ini::setnew->($_[1]); $_[0] }
-}
 
 1;

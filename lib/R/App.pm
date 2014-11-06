@@ -9,17 +9,20 @@ sub AUTOLOAD {
 	$AUTOLOAD =~ /([^:]+)$/;
 	my $prop = $1;
 	
-	if(@_ == 1) {		
+	my $sub = (sub { my ($prop) = @_; sub { my ($self, $val) = @_; if(@_ == 1) { $self->{$prop} } else { $self->{$prop} = $val; $self }}})->($prop);
+	#no strict 'refs';
+	*{$AUTOLOAD} = $sub;
+	#use strict 'refs';
+
+	if(@_ == 1) {
 		my $new = $prop; $new =~ s![A-Z]!::$&!g; $new = "R::".ucfirst($prop);
 		my $load = $prop; $load =~ s![A-Z]!/$&!g;
 		$load = main::file "lib/R/".ucfirst($load).".pm";
 		require $load;
 		$_[0]->{$prop} = $new->new($_[0]);
 	}
-	
-	eval "sub $AUTOLOAD { my (\$self, \$val) = \@_; if(\@_ == 1) { \$self->{'$prop'} } else { \$self->{'$prop'} = \$val; \$self } }";
-	
-	$AUTOLOAD->(@_);
+		
+	goto &$sub;
 }
 
 sub DESTROY {}

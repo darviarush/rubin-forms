@@ -157,17 +157,6 @@ sub options ($;$&) {
 	return $ret;
 }
 
-# рассовывает после регэкспа
-sub parse_location {
-	my ($id, $ids);
-	($::_URL, $::_LOCATION, $::_action, $id, $ids, $::_EXT) = @_;
-	our $param = our $_GET = Utils::param($7);
-	$param = defined($id)? { %$_GET, id => $id }: $_GET;
-	if(defined $ids and $ids ne "") {
-		my $i = 2;
-		$param->{"id" . ($i++)} = $_ for split /_/, substr $ids, 1;
-	}
-}
 
 # ajax-редирект
 sub ajax_redirect {

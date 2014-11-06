@@ -1,4 +1,6 @@
-our %_STATUS = (
+package R::Server::Http::Status;
+
+sub new { return {
 
 # 1xx: Informational (информационные):
 100 => "Continue", # («продолжить»)[1][3].
@@ -72,6 +74,6 @@ our %_STATUS = (
 510 => "Not Extended", # («не расширено»).
 511 => "Network Authentication Required", # («требуется сетевая аутентификация»)
 
-);
+}}
 
 1;

@@ -1,7 +1,8 @@
 #> следит за изменением файлов и перекомпилирует их
-#> а именно, применяет команды: stylus, coffee, sprite, action
+#> настройки в watch::* в main.ini
 
-$app->hung->loop;
+
+$app->hung->loop(sub { exit if eof STDIN });
 
 
 1;
