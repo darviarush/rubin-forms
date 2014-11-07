@@ -1,16 +1,22 @@
 # базовый класс для серверов
 package R::Server::Base;
 
+use Time::HiRes qw//;
+
 # распечатывают статистику. Используются в драйверах
 my %_STAT = ();
 
 sub stat_start {
-	$_STAT{time} = Time::HiRes::time();
+	my ($self) = @_;
+	$self->{_STAT}{time} = Time::HiRes::time();
 }
 
 sub stat_begin {
-	msg ":empty", "\n", ":red", "$_METHOD", ":reset", " $_URL ", ":red", "$_VERSION ", ":cyan", "tid", ":reset", ":", " ".threads->tid(), ":cyan", " from ", ":reset", join(", ", threads->list());
-	if($_req > 0) { msg ":empty", ":magenta", $_ ":reset", ":", " ", ":cyan", $_HEAD->{$_} for keys %{$_HEAD} };
+	my ($self) = @_;
+	my $app = $self->{app};
+	my $request = $app->request;
+	msg ":empty", "\n", ":red", $request->method, ":reset", " ", $request->url, " ", ":red", $request->version, " ", ":cyan", "tid", ":reset", ":", " ", threads->tid(), ":cyan", " from ", ":reset", join(", ", threads->list());
+	if($_req > 0) { msg ":empty", ":magenta", $_ ":reset", ":", " ", ":cyan", $request->{head}->{$_} for keys %{$request->{head}} };
 	if($_req > 1) { msg ":empty", ":CYAN", $_, ":RESET", ":", " ", (!defined($_POST->{$_})? (":RED", "null", ":RESET"): ref $_POST->{$_} eq "JSON::XS::Boolean"? (":RED", $_POST->{$_}, ":RESET"): ref $_POST->{$_}? Utils::Dump($_POST->{$_}): $_POST->{$_} ) for keys %$_POST };
 }
 

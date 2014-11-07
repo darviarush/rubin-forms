@@ -10,67 +10,54 @@ sub compile {
 }
 
 # подгружаем экшены в %_action
-sub load_htm($) {
-	my ($path, $no_require) = @_;
+sub compile_htm {
+	my ($self, $path) = @_;
 	local ($_, $`, $');
 	
 	$path =~ /\baction\/(.*)\.htm$/;
 	my $index = $1;
 	
-	eval {
-	
-		my $p = $path;
-		$p =~ s!\baction/!action_c/!;
-		$p .= ".pl";
 		
-		if(not -e $p or -M $p >= -M $path) {
-				
-			my $tmpl = Utils::read($path);
-			my $eval = Utils::TemplateStr($tmpl, my $forms, my $page);
-			
-			#our %_forms; our %_pages;
-			#$_pages{$index} = $page;
-			
-			my @write;
-			
-			if(exists $page->{options}) {
-				for my $option (@{$page->{options}}) {
-					if($option->[0] eq 'layout') { push @write, "\$_layout{'$index'} = '$option->[1]';\n\n"; }
-					else { die "Неизвестная опция `$option->[0]` на странице `$index.htm`" }
-				}
-			}
-			
-			if(exists $page->{forms}) {
-				$_ = "$index-$_" for @{$page->{forms}};
-			}
-
-			while(my ($id, $form) = each %$forms) {
-				$form->{name} = $index unless $form->{name};
-				$form->{id} = $id = "$index-$id";
-				#$form->{query} = form_query $form, $forms;
-				push @write, "\$_forms{'$id'} = ".Utils::Dump($form).";\n\n";
-				$_ = "$index-$_" for @{$form->{forms}};
-			}
-			
-			my $code = $page->{code};
-			delete $page->{code};
-			
-			$eval = join "", "our(%_layout, %_forms, %_pages, %_action_htm, %_STASH); \$_pages{'$index'}{sub} = \$_action_htm{'$index'} = ", $eval, ";\n\n\$_pages{'$index'} = ", Utils::Dump($page), ";\n\$_pages{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
-			
-			Utils::mkpath($p);
-			Utils::write($p, $eval);
+	my $tmpl = Utils::read($path);
+	my $eval = Utils::TemplateStr($tmpl, my $forms, my $page);
+	
+	#our %_forms; our %_pages;
+	#$_pages{$index} = $page;
+	
+	my @write;
+	
+	if(exists $page->{options}) {
+		for my $option (@{$page->{options}}) {
+			if($option->[0] eq 'layout') { push @write, "\$_layout{'$index'} = '$option->[1]';\n\n"; }
+			else { die "Неизвестная опция `$option->[0]` на странице `$index.htm`" }
 		}
-		require $p unless $no_require;
-	};
-	if(my $error = $! || $@) { msg RED."load_htm `$path`:".RESET." $error"; $path =~ s/\//_/g; $main::_action_htm{$index} = sub { die raise(501) }; return 1; }
+	}
+	
+	if(exists $page->{forms}) {
+		$_ = "$index-$_" for @{$page->{forms}};
+	}
+
+	while(my ($id, $form) = each %$forms) {
+		$form->{name} = $index unless $form->{name};
+		$form->{id} = $id = "$index-$id";
+		#$form->{query} = form_query $form, $forms;
+		push @write, "\$_forms{'$id'} = ".Utils::Dump($form).";\n\n";
+		$_ = "$index-$_" for @{$form->{forms}};
+	}
+	
+	my $code = $page->{code};
+	delete $page->{code};
+	
+	$eval = join "", "our(%_layout, %_forms, %_pages, %_action_htm, %_STASH); \$_pages{'$index'}{sub} = \$_action_htm{'$index'} = ", $eval, ";\n\n\$_pages{'$index'} = ", Utils::Dump($page), ";\n\$_pages{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
+	
+	Utils::mkpath($p);
+	Utils::write($p, $eval);
 }
 
-sub load_action ($) {
-	my ($path, $no_require) = @_;
+sub compile_action {
+	my ($self, $path) = @_;
 	
-	#return load_htm $path if $path =~ /\.htm$/;
-	
-	$path =~ /\baction\/(.*)\.htm$/;
+	$path =~ /([^\/]+)\.htm$/;
 	my $index = $1;
 	
 	eval {

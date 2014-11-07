@@ -71,6 +71,9 @@ sub param {
 	my ($self, $name) = @_;
 	my $param = $self->{param};
 	unless(defined $param) {
+		if(defined $name) {
+			return $self->{ids}{$name} // $self->get($name) // $self->post($name);
+		}
 		$self->{param} = $param = {%{$self->post}, %{$self->get}, %{$self->{ids}}};
 	}
 	defined($name)? $get->{$name}: $get;

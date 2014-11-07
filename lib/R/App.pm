@@ -1,6 +1,5 @@
 package R::App;
 # содержит различные объекты, необходимые для приложения
-use Utils;
 
 sub new { my ($cls) = @_; bless {}, $cls }
 
