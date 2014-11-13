@@ -1,22 +1,31 @@
 package R::App;
 # содержит различные объекты, необходимые для приложения
 
-sub new { my ($cls) = @_; bless {}, $cls }
+use AnyEvent;
+
+sub new {
+	my ($cls) = @_;
+	my $app = bless {}, $cls;
+	$app->event(AnyEvent);
+	$app
+}
 
 
 sub AUTOLOAD {
 	$AUTOLOAD =~ /([^:]+)$/;
 	my $prop = $1;
 	
-	my $sub = (sub { my ($prop) = @_; sub { my ($self, $val) = @_; if(@_ == 1) { $self->{$prop} } else { $self->{$prop} = $val; $self }}})->($prop);
+	#my $sub = (sub { my ($prop) = @_; sub { my ($self, $val) = @_; if(@_ == 1) { $self->{$prop} } else { $self->{$prop} = $val; $self }}})->($prop);
 	#no strict 'refs';
-	*{$AUTOLOAD} = $sub;
+	eval "sub $AUTOLOAD { my (\$self, \$val) = \@_; if(\@_ == 1) { \$self->{'$prop'} } else { \$self->{'$prop'} = \$val; \$self }}";
+	die $@ // $! if $@ // $!;
+	my $sub = *{$AUTOLOAD}{CODE};
 	#use strict 'refs';
-
+	
 	if(@_ == 1) {
-		my $new = $prop; $new =~ s![A-Z]!::$&!g; $new = "R::".ucfirst($prop);
+		my $new = $prop; $new =~ s![A-Z]!::$&!g; $new = "R::".ucfirst $new;
 		my $load = $prop; $load =~ s![A-Z]!/$&!g;
-		$load = main::file "lib/R/".ucfirst($load).".pm";
+		$load = "R/".ucfirst($load).".pm";
 		require $load;
 		$_[0]->{$prop} = $new->new($_[0]);
 	}
@@ -25,18 +34,5 @@ sub AUTOLOAD {
 }
 
 sub DESTROY {}
-
-
-sub log {
-	my ($app, @args) = @_;
-	main::msg(@args);
-	return $app;
-}
-
-sub log1 {
-	my ($app, @args) = @_;
-	main::msg1(@args);
-	return $app;
-}
 
 1;

@@ -8,6 +8,15 @@ sub set { map { $_=>1 } @_ }
 # удаляет дубликаты
 sub unique { my %x; map { if(exists $x{$_}) { () } else { $x{$_} = 1; $_ } } @_ }
 
+# замыкание
+sub closure {
+	my $sub = pop;
+	my ($obj, @args) = @_;
+	sub {
+		$sub->($obj, @args, @_);
+	}
+}
+
 # сортирует по свойству
 sub order_by {
 	my ($sort, $arr, $desc) = @_;
@@ -422,13 +431,12 @@ sub form_param {
 # отправляет запрос http-пост
 sub post {
 	require LWP::UserAgent;
-	my ($url, $param) = @_;
+	my ($url, $param, @headers) = @_;
 	my $ua = LWP::UserAgent->new;
 	$ua->timeout(10);
-	my $response = $ua->post($url, Content => form_param($param));
-	my ($service) = caller 1;
-	die(error505($service, $response->status_line)) unless $response->is_success;
-	$response->content;
+	my $response = $ua->post($url, @headers, Content => form_param($param));
+	die $response->status_line unless $response->is_success;
+	wantarray? ($response->content, $response): $response->content;
 }
 
 # превращает файл в массив
@@ -452,15 +460,21 @@ sub DESTROY { close $_[0]->{file} }
 
 package Utils;
 
-our @_BODY;
+#our @_BODY;
 
 # создаёт array для файла
+# sub file2array {
+	# my ($path, $buf_size) = @_;
+	# tie @_BODY, 'Utils::requestTieArray', $path, $buf_size;
+	# return \@_BODY;
+# }
+
 sub file2array {
 	my ($path, $buf_size) = @_;
-	tie @_BODY, 'Utils::requestTieArray', $path, $buf_size;
-	return \@_BODY;
+	my $body = [];
+	tie @$body, 'Utils::requestTieArray', $path, $buf_size;
+	return $body;
 }
-
 
 # для вставки в html
 sub escapeHTML {

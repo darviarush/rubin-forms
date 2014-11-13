@@ -1,3 +1,24 @@
+BEGIN {
+	use Carp 'verbose';
+	use Term::ANSIColor qw//;
+	#$SIG{ __DIE__ } = \&Carp::confess;
+
+	sub R::color_error {
+		my ($error, $color_error, $color_words) = @_;
+		my $e = Carp::longmess(Term::ANSIColor::colored($error, $color_error));
+		#$e =~ s!^ at .*$!!m;
+		$e =~ s!\b(require|called at|at|line)\b!Term::ANSIColor::colored($1, $color_words)!ge;
+		print STDERR $e;
+	}
+
+	$SIG{ __DIE__ } = sub { R::color_error($_[0], 'red', 'cyan'); exit; };
+	$SIG{ __WARN__ } = sub { R::color_error("Warning: $_[0]", 'yellow', 'green') };
+}
+
+
+use R::App;
+our $app = R::App->new;
+
 use Utils;
 use POSIX qw//;
 

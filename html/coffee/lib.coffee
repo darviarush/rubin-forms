@@ -113,7 +113,7 @@
 # 82. new as emmet
 # 83. функция options, для опций. Если тип следующего операнда не подходит, то он пропускается: options "x:io y:s f:f", (opt) ->
 # 84. создать в CInit параметр для средств разработчика: висящая (fixed) менюха с цветами html. Пипеткой и возможностью закрашивать всё (?). Панелька может сворачиваться. Показывает стили на выбранном элементе.
-# 85. функция options которая вернёт параметры: animate: (param, duration, ease, complete) -> options arguments, 'param duration:si ease:si complete:f
+# 85. функция options которая вернёт параметры: animate: (param, duration, ease, complete) -> options arguments, 'param duration:si ease:si complete:f - сделать кешируемую. То есть в методе обернуть метод: x:-> $O arguments, 'p:i ...' -> ... Когда вызывается оптионс, то она генерит метод и заменяет метод "x:->".
 # 86. загрузчик в 1-м лайоуте: создаёт iframe в котором проходит индикатор загрузки. Индикатор можно реализовать как 
 #* 87. one
 #- 88. в stream добавить все методы widget. widget.stream() - выдаёт поток с этим виджетом(и). eventStream(obj) - для on - кто установил
@@ -122,6 +122,7 @@
 # 91. widget.type - createWidget должен короткие имена классов собирать в ассоциативный массив (?). C*Widget и html-xs = HtmlXs
 # 92. fly - делает виджет плавающим в окне. @fly top|bottom, [без_ограничений]
 # 93. переделать CTemplate.compile
+# 94. CBox
 
 
 # Ссылки:

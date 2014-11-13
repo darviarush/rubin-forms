@@ -1,12 +1,62 @@
-# управл€ет компилл€цией экшенов
 package R::Action;
+# управл€ет компилл€цией экшенов
 
+
+
+# конструктор
 sub new {
 	my($cls, $app) = @_;
-	bless {app => $app, action_dir => 'action', action_c => 'action_c', action_require => 'action.pl' }, $cls;
+	bless {app => $app}, $cls;
 }
 
+# удал€ет директорию co скомпиленными темплейтами
+sub erase {
+	my ($self) = @_;
+	Utils::rm($self->{dir_c});
+}
+
+# ставит на watch
+sub watch {
+	my ($self, $watch) = @_;
+	my $dir = [dirs($self->{dir})];
+	($watch // $self->{app}->watch)->on(qr/\.act$/, $dir, Utils::closure($self, sub {
+		my ($self, $path) = @_;
+		$self->compile_action($path);
+	}))->on(qr/\.htm$/, $dir, Utils::closure($self, sub {
+		my ($self, $path) = @_;
+		$self->compile_htm($path);
+	}))
+}
+
+# компилирует нужные и добавл€ет их в 
 sub compile {
+	my ($self, $dir, $dir_c) = @_;
+	if(@_>1) {
+		$self->{dir} = $dir;
+		$self->{dir_c} = $dir_c;
+	}
+	
+	unless($self->{dir}) {
+		$self->{dir} = 'action';
+		$self->{dir_c} = 'action_c';
+	}
+	
+	my $watch = R::Watch->new;
+	$self->watch($watch);
+	$watch->fire;
+	$self
+}
+
+sub write {
+	my ($self, $file) = @_;
+	my $dir = [dirs($self->{dir_c})];
+	open my $f, "<", $file or die $!;
+	R::Watch->new->on(qr/\.(act|htm)\.pl$/, $dir, sub {
+		my ($path) = @_;
+		print $f "require '$path';\n";
+	})->fire;
+	close $f;
+	$self
 }
 
 # подгружаем экшены в %_action
@@ -19,7 +69,7 @@ sub compile_htm {
 	
 		
 	my $tmpl = Utils::read($path);
-	my $eval = Utils::TemplateStr($tmpl, my $forms, my $page);
+	my $eval = Utils::TemplateBare($tmpl, my $forms, my $page);
 	
 	#our %_forms; our %_pages;
 	#$_pages{$index} = $page;
@@ -48,7 +98,7 @@ sub compile_htm {
 	my $code = $page->{code};
 	delete $page->{code};
 	
-	$eval = join "", "our(%_layout, %_forms, %_pages, %_action_htm, %_STASH); \$_pages{'$index'}{sub} = \$_action_htm{'$index'} = ", $eval, ";\n\n\$_pages{'$index'} = ", Utils::Dump($page), ";\n\$_pages{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
+	$eval = join "", "my(%_layout, %_forms, %_pages, %_action_htm, %_STASH); \$_action_htm{'$index'} = ", $eval, ";\n\n\$_pages{'$index'} = ", Utils::Dump($page), ";\n\$_pages{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
 	
 	Utils::mkpath($p);
 	Utils::write($p, $eval);

@@ -5,22 +5,26 @@ use FCGI;
 # создаёт подключение
 sub new {
 	my ($cls, $_port) = @_;
-	bless { socket => FCGI::OpenSocket(":$_port", 5) }, $cls;
+	my $socket = FCGI::OpenSocket(":$_port", 5);
+	bless {	socket => $socket }, $cls;
 }
 
-sub bind {
-	my ($self) = @_;
+# инициализация в новом треде
+sub accept {
+	my ($self, $ritter) = @_;
+	
 	my ($env, $in, $out, $x, $y) = {};
+	my $request = FCGI::Request($in, $out, $out, $env, $self->{socket});
 	open $in, "<", \$x;
 	open $out, ">", \$y;
-	$self->{request} = FCGI::Request($in, $out, $out, $env, $self->{socket});
-	$self->{stdin} = $in;
-	$self->{stdout} = $out;
-	$self->{env} = $env;
-}
-
-sub accept {
-	my ($self, $app) = @_;
+	%$self = (%$self, 
+		request => $request,
+		stdin => $in,
+		stdout => $out,
+		env => $env
+	);
+	
+	
 	for(;;) {
 		last if $self->{request}->Accept() < 0;
 	
@@ -44,7 +48,7 @@ sub accept {
 		
 		$::_COOKIE = Utils::param($env->{'HTTP_COOKIE'}, qr/;\s*/);
 
-		my $ret = $app->();
+		my $ret = $ritter->();
 		my ($status, $head, $out) = @$ret;
 		my $stdout = $self->{stdout};
 		push @$head, "Status: $status $main::_STATUS{$status}\r\n";

@@ -5,24 +5,21 @@ use base R::Utils::Object;
 
 use IO::String;
 
-sub new {
-	my ($cls, $app) = @_;
-	bless {}, $cls;
-}
 
 # для разбора url. Используется вместе с reset
 our $RE_LOCATION = qr!((/([^\s\?]*?)(?:(-?\d+)((?:_-?\d+)*)|(\.\w+))?)(?:\?(\S+))?)!;
 
 # устанавливает новые значения
 sub reset {
-	my ($self, @any) = @_;
+	my ($self) = @_;
 	my ($ids);
-	($self->{method}, $self->{url}, $self->{location}, $self->{action}, $self->{ids}{id}, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}) = @any;
+	($self, $self->{method}, $self->{url}, $self->{location}, $self->{action}, $self->{ids}{id}, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body}) = @_;
 	
 	if(defined $ids and $ids ne "") {
 		my $i = 2;
 		$self->{ids}{"id" . ($i++)} = $_ for split /_/, substr $ids, 1;
 	}
+	$self
 }
 
 sub head {
@@ -53,15 +50,19 @@ sub post {
 	my ($self, $name) = @_;
 	my $post = $self->{post};
 	unless(defined $post) {
-		my $head = $self->{head};
-		my ($type, $len, $rbfile) = ($head->{'Content-Type'}, $head->{'Content-Length'}, $head->{'REQUEST_BODY_FILE'});
-		if(defined $rbfile) {
-			my $f;
-			open $f, $rbfile or die "NOT OPEN REQUEST_BODY_FILE=$rbfile $!";
-			$self->{post} = $post = Utils::param_from_post($f, $type, $len);
-			close $f;
+		if(defined $self->{body}) {
+			my $head = $self->{head};
+			my ($type, $len, $rbfile) = ($head->{'Content-Type'}, $head->{'Content-Length'}, $head->{'REQUEST_BODY_FILE'});
+			if(defined $rbfile) {
+				my $f;
+				open $f, $rbfile or die "NOT OPEN REQUEST_BODY_FILE=$rbfile $!";
+				$self->{post} = $post = Utils::param_from_post($f, $type, $len);
+				close $f;
+			} else {
+				$self->{post} = $post = Utils::param_from_post(IO::String->new($self->{body}), $type, $len);
+			}
 		} else {
-			$self->{post} = $post = Utils::param_from_post(IO::String->new($self->{body}), $type, $len);
+			$self->{post} = {};
 		}
 	}
 	defined($name)? $post->{$name}: $post;
@@ -72,11 +73,22 @@ sub param {
 	my $param = $self->{param};
 	unless(defined $param) {
 		if(defined $name) {
-			return $self->{ids}{$name} // $self->get($name) // $self->post($name);
+			my $val = $self->{ids}{$name} // $self->{get}{$name} // $self->get($name);
+			return $val if defined $val;
 		}
 		$self->{param} = $param = {%{$self->post}, %{$self->get}, %{$self->{ids}}};
 	}
-	defined($name)? $get->{$name}: $get;
+	defined($name)? $param->{$name}: $param;
+}
+
+# путь к html-файлам
+sub html {
+	my ($self) = @_;
+	"html" . $self->{location};
+}
+
+sub action {
+	$_action = 'index' if $_action eq "";
 }
 
 1;

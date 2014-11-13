@@ -1,47 +1,23 @@
 #!perl -w
 
 BEGIN {
-	use Carp 'verbose';
-	use Term::ANSIColor qw//;
-	#$SIG{ __DIE__ } = \&Carp::confess;
-	
-	my $color = sub {
-		my ($error, $color_error, $color_words) = @_;
-		my $e = Carp::longmess(Term::ANSIColor::colored($error, $color_error));
-		#$e =~ s!^ at .*$!!m;
-		$e =~ s!\b(require|called at|at|line)\b!Term::ANSIColor::colored($1, $color_words)!ge;
-		print STDERR $e;
-	};
-	
-	$SIG{ __DIE__ } = sub { $color->($_[0], 'red', 'cyan'); exit; };
-	$SIG{ __WARN__ } = sub { $color->("Warning: $_[0]", 'yellow', 'green') };
-
+	use Cwd;
 	use File::Basename qw/dirname/;
-	use Cwd qw/abs_path/;
 	our $_FRAMEWORK;
-
-	chdir dirname($0);
-	open my($f), "main.ini" or die "Нет main.ini: $!";
-	read $f, my($ini), -s $f;
-	close $f;
 	
-	if($ini =~ /^\s*\[rubin\]\s*path\s*=\s*(.*)/) { $_FRAMEWORK = abs_path($1); }
+	my $root = dirname($0);
+	chdir $root;
+	my $frame = dirname(__FILE__);
+	if($frame ne $root) { $_FRAMEWORK = $frame; unshift @INC, "$_FRAMEWORK/lib"; }
 }
 
 use lib dirname($0)."/lib";
-use lib "$_FRAMEWORK/lib";
-
 use Msg;
-use R::App;
-our $app = R::App->new;
-
-#$ini = Utils::parse_ini(undef, $ini);
-#if($ini->{"mysql"}{"DNS"}) { require Connect; }
 
 
 @ARGV = "qq" unless @ARGV;
 my $path = file("bin/$ARGV[0].pl");
 if($path) { require $path; }
-else { die "Команда `$path` не найдена" }
+#else { msg ":empty", "Команда `", ":red", $ARGV[0], ":reset", "` не найдена"; }
 
 1;

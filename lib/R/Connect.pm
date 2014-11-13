@@ -42,14 +42,20 @@ sub reconnect {
 # возвращает имя базы данных
 sub basename {
 	my ($self) = @_;
-	$self->ini->{mysql}{DNS} =~ /database=(\w+)/ and $1
+	$self->{app}->ini->{mysql}{DNS} =~ /database=(\w+)/ and $1
 }
+
+# возвращает dbh
+sub dbh {
+	my ($self) = @_;
+	$self->{dbh}
+}
+
 
 # кеширует инф. о таблицах
 sub info {
 	my ($self) = @_;
-	return $self->{info} if exists $self->{info};
-	$self->{info} = $self->get_info;
+	$self->{info} //= $self->get_info;
 }
 
 # возвращает информацию о таблицах

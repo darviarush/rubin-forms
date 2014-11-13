@@ -1,41 +1,28 @@
 #!/usr/bin/perl
 
-#= add [[file] name|*] | t
+#= add file | t [verbosity] [tests ...]
 #> тесты
 #> add - добавить скелетон теста
 
 ($cmd, @ARGS) = @ARGV;
 
-# if($cmd eq "add") {
-	# $file = $#ARGV == 2? 'app.coffee': $ARGV[1];
-	# $file .= ".coffee" unless $file =~ /\.coffee$/;
-	# $old_file = $file;
-	# die "$old_file не найден" if not -e $file and not -e $file="coffee/$file";
-	# open f, $file or die $!;
-	# while(<f>) {
-		
-	# }
-	# close f;
-	
-	# if($ARGV[$#ARGV] eq "*") {
-		
-	# } else {
-		
-	# }
-	# exit;
-# }
+if($cmd eq "add") {
+	main::msg ":red", "Укажите файл. qq t add <file>" unless @ARGS;
+	Utils::write("t/$ARGS[0].t", "use strict;
+use warnings;
+
+use Msg;
+use Test::More tests => 1;
+
+our \$app;
+");
+	exit;
+}
 
 $verbosity = 1;
 $verbosity = shift @ARGS if $ARGS[0] =~ /^-?\d+$/;
 
 @tests = files(@ARGS? map({ "t/$_.t" } @ARGS): "t/*.t");
 
-use TAP::Harness;
-my $harness = TAP::Harness->new({
-	color=>1,
-	verbosity => $verbosity,
-	lib => [files('lib')],
-	failures => 1
-});
-$harness->runtests(@tests);
+$app->test->verbosity($verbosity)->run(@tests);
 

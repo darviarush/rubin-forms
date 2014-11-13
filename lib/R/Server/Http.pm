@@ -1,10 +1,11 @@
 package R::Server::Http;
 # драйвер для протокола qq: http
 
-use base R::Server::Base;
+use base R::Server;
 
-use R::Request;
 use Socket;
+
+use R::Request; # из него получаем $R::Request::RE_LOCATION
 
 # создаёт подключение
 sub new {
@@ -28,11 +29,14 @@ sub new {
 	bless { sd => $sd, app => $app }, $cls;
 }
 
-sub bind {
-	my ($self) = @_;
-	close $self->{ns} if $self->{ns};
-}
+# инициализация в новом треде
+# sub bind {
+	# my ($self) = @_;
+	# close $self->{ns} if $self->{ns};
+	# $self
+# }
 
+# бесконечный цикл ожидания и выполнения запросов
 sub accept {
 	my ($self, $ritter) = @_;
 	
@@ -78,54 +82,57 @@ sub accept {
 		if(my @param = $HTTP =~ m!^(\w+) $R::Request::RE_LOCATION (HTTP\/\d\.\d)\r?$!o) {
 			
 			# считываем заголовки
-			my (%head, $body);
-			/: (.*?)\r?$/ and $head{$`} = $1 while defined($_ = <$ns>) and !/^\r?$/;
+			my ($head, $body);
+			/: (.*?)\r?$/ and $head->{$`} = $1 while defined($_ = <$ns>) and !/^\r?$/;
 			
 			# считываем данные
-			if(my $CONTENT_LENGTH = $head{"Content-Length"} and not exists $head{'REQUEST_BODY_FILE'}) {
+			if(my $CONTENT_LENGTH = $head->{"Content-Length"} and not exists $head->{'REQUEST_BODY_FILE'}) {
 				read $ns, $body, $CONTENT_LENGTH;
 			}
 			
-			$request->reset(@param, \%head, $body);
-			
+			$request->reset(@param, $head, $body);
+			$response->reset();
+			#main::msg ":cyan", $request;
 			$self->stat_begin() if $_test;
-			
+
 			# настраиваем сессионное подключение (несколько запросов на соединение, если клиент поддерживает)
-			$keep_alive = (lc $head{Connection} eq 'keep-alive');
+			$keep_alive = (lc $head->{Connection} eq 'keep-alive');
 			
-			$ritter->();
+			$ritter->($self);
 		} else {
-			$response->status(400);
-			#$ret = [400, ["Content-Type: text/plain; charset=utf-8"], ["400 Bad Request"]]
+			$response->error(400)
+			->type("text/plain")
+			->body("400 $http_status->{400}");
 		}
 		
-		
-		my $status = $response->status;
+		my $status = $response->{status};
 		
 		my $RESPONSE = "HTTP/1.1 $status $http_status->{$status}\n";
-		my $body = $response->body;
-
-		my $len = 0;
-		$len += length $_ for @$body;
-		$response->head("Content-Length" => $len);
-		$response->head("Connection" => "keep-alive") if $keep_alive;
+		my $body = $response->{body};
 		
-		$response->type;
-		my $head = $response->{head};
+		unless(exists $response->{head}{"Content-Length"}) {
+			my $len = 0;
+			for my $text (@$body) {
+				$text = JSON::to_json($text) if ref $text;
+				$len += length $text;
+			}
+			$response->{head}{"Content-Length"} = $len;
+		}
 		
+		$response->{head}{Connection} = "keep-alive" if $keep_alive;
+		
+		my ($k, $v);
+		my $out_head = $response->{head};
 		send $ns, $RESPONSE, 0;
-		send $ns, "$_\n", 0 for @$head;
+		send $ns, "$k: $v\n", 0 while ($k, $v) = each %$out_head;
 		send $ns, "\n", 0;
 		send $ns, $_, 0 for @$body;
 		
-		# $main::_action = $main::_VERSION = $main::_METHOD = $main::_LOCATION = $main::_URL = $main::_HEAD = $main::_COOKIE = $main::_GET = $main::_POST = $main::param = $main::_user_id = undef;
-		
 		$self->stat_end($RESPONSE) if $_test;
 		
-		# @main::_HEAD = %main::_HEAD = @main::_COOKIE = ();
-		# @$out = ();
-		%$request = ();
-		%$response = ();
+		%$request = (app=>$app);
+		%$response = (app=>$app);
+		($k, $v) = ();
 	}
 }
 

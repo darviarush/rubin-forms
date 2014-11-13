@@ -9,12 +9,11 @@ sub new {
 sub AUTOLOAD {
 	$AUTOLOAD =~ /([^:]+)$/; my $prop = $1;
 	
-	#die "В объекте $_[0] ещё нет ключа $prop" if not exists $_[0]->{$prop};
+	die "В объекте $_[0] ещё нет ключа $prop" if not exists $_[0]->{$prop};
 	
-	my $sub = (sub { my ($prop) = @_; sub { my ($self, $val) = @_; if(@_ == 1) { $self->{$prop} } else { $self->{$prop} = $val; $self }}})->($prop);
-	#no strict 'refs';
-	*{$AUTOLOAD} = $sub;
-	#use strict 'refs';
+	eval "sub $AUTOLOAD { my (\$self, \$val) = \@_; if(\@_ == 1) { \$self->{'$prop'} } else { \$self->{'$prop'} = \$val; \$self }}";
+	die $@ // $! if $@ // $!;
+	my $sub = *{$AUTOLOAD}{CODE};
 	
 	goto &$sub;
 }

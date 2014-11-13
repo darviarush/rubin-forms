@@ -10,23 +10,16 @@ sub AUTOLOAD {
 	$AUTOLOAD =~ /([^:]+)$/;
 	my $prop = $1;
 	
-	my $sub = (sub {
-		my ($tab) = @_;
-		sub {
-			my ($self) = @_;
-		}
-	})->($prop);
-	#no strict 'refs';
-	*{$AUTOLOAD} = $sub;
-	#use strict 'refs';
+	eval "sub $AUTOLOAD { my (\$self, \@a) = \@_; ; \$self }}";
+	die $@ // $! if $@ // $!;
+	my $sub = *{$AUTOLOAD}{CODE};
 
 
 	my $cls = "${AUTOLOAD}::$prop";
 	my $load = $prop; $load =~ s![A-Z]!/$&!g;
-	$load = main::file "lib/R/Query/".ucfirst($load).".pm";
-	require $load if -e $load;
-	#$_[0]->{$prop} = $new->new($_[0]);
-		
+	$load = "R/Query/".ucfirst($load).".pm";
+	require $load if main::file("lib/$load");
+
 	goto &$sub;
 }
 
