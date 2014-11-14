@@ -22,7 +22,7 @@ $SIG{USR1} = my $read_perm = Utils::closure($app, sub {
 	my ($app) = @_;
 	#msg RED.'signal USR1 thr='.threads->tid().RESET;
 	my $ini = Utils::parse_ini("main_do.ini");
-	$app->ini->do($ini)
+	$app->ini->{do} = $ini;
 	$app->auth->parse($ini); # parse_perm
 });
 $read_perm->();

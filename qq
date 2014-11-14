@@ -18,6 +18,6 @@ use Msg;
 @ARGV = "qq" unless @ARGV;
 my $path = file("bin/$ARGV[0].pl");
 if($path) { require $path; }
-#else { msg ":empty", "Команда `", ":red", $ARGV[0], ":reset", "` не найдена"; }
+else { msg ":empty", "Команда `", ":red", $ARGV[0], ":reset", "` не найдена"; }
 
 1;
