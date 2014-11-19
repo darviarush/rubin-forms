@@ -10,9 +10,19 @@ BEGIN {
 		$e =~ s!\b(require|called at|at|line)\b!Term::ANSIColor::colored($1, $color_words)!ge;
 		print STDERR $e;
 	}
-
-	$SIG{ __DIE__ } = sub { R::color_error($_[0], 'red', 'cyan'); exit; };
+	
+	$SIG{ __DIE__ } = sub { die @_ if $^S; R::color_error($_[0], 'red', 'cyan'); exit };
 	$SIG{ __WARN__ } = sub { R::color_error("Warning: $_[0]", 'yellow', 'green') };
+	
+	use Cwd;
+	#use File::Basename qw/dirname/;
+	our $_FRAMEWORK;
+	
+	my $root = "."; #getcwd();
+	#chdir $root;
+	my @frame = split /\//, __FILE__;
+	my $frame = join("/", @frame[0..@frame-3]) || ".";
+	if($frame ne $root) { $_FRAMEWORK = $frame; unshift @INC, "$root/lib"; }
 }
 
 

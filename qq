@@ -1,19 +1,8 @@
 #!perl -w
 
-BEGIN {
-	use Cwd;
-	use File::Basename qw/dirname/;
-	our $_FRAMEWORK;
-	
-	my $root = dirname($0);
-	chdir $root;
-	my $frame = dirname(__FILE__);
-	if($frame ne $root) { $_FRAMEWORK = $frame; unshift @INC, "$_FRAMEWORK/lib"; }
-}
-
-use lib dirname($0)."/lib";
+use File::Basename qw/dirname/;
+use lib dirname(__FILE__)."/lib";
 use Msg;
-
 
 @ARGV = "qq" unless @ARGV;
 my $path = file("bin/$ARGV[0].pl");

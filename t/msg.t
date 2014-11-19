@@ -6,8 +6,9 @@ use Msg;
 
 our $_FRAMEWORK = "t";
 
+
 like file("t/msg.t"), qr!t/msg\.t$!;
-like file("t/msg.t"), "t/msg.t";
+#like file("t/msg.t"), "t/msg.t";
 is file("msg.tttt"), undef;
 
 is_deeply [files("msg.t")], ["t/msg.t"];

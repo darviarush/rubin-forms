@@ -3,16 +3,13 @@
 # ; * - все поля
 
 
-BEGIN {
 use strict;
 use warnings;
 
-use Test::More tests => 5;
-use Utils;
+use Test::More tests => 3;
 use Msg;
-use Connect;
 
-our $ini = Utils::parse_ini(undef, <<'END');
+my $ini = Utils::parse_ini(undef, <<'END');
 
 [do]
 
@@ -29,21 +26,18 @@ main.int = v1,v2
 main.float = v3
 
 END
+our $app;
 
-require_ok "Valid";
-require_ok "Auth";
-parse_perm($ini->{do});
-}
-
-
-eval { check_role "view", "main", {'v1'=>1, 'v2'=>1} };
+$app->ini($ini);
+$app->auth;
+eval { $app->auth->check_role("view", "main", {'v1'=>1, 'v2'=>1}) };
 ok $@;
-our $_user_id = 1;
-is "main", check_role "view", "main", {'v2'=>1, 'v3'=>1};
-valid_param "view", "main", {'v1'=>1, 'v2'=>1};
+$app->session->user_id(1);
+is "R::Auth", ref $app->auth->check_role("view", "main", {'v2'=>1, 'v3'=>1});
+$app->auth->valid_param("", "view", "main", {'v1'=>1, 'v2'=>1});
 
-valid_param "view", 'main', {'v1'=>12, 'v2'=>10};
-eval { valid_param "view", 'main', {'v1'=>12, 'v2'=>'xxx'} };
+$app->auth->valid_param("", "view", 'main', {'v1'=>12, 'v2'=>10});
+eval { $app->auth->valid_param("", "view", 'main', {'v1'=>12, 'v2'=>'xxx'}) };
 ok $@;
 
 
@@ -57,7 +51,7 @@ Utils::Template('
 <div id=$*logo>
 #name
 </div>
-', $forms, $formlist);
+', my $forms, my $formlist);
 
 #warn Dumper($form);
 #$query = form_query($formlist->[0]);

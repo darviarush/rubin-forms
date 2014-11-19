@@ -15,12 +15,9 @@ sub AUTOLOAD {
 	$AUTOLOAD =~ /([^:]+)$/;
 	my $prop = $1;
 	
-	#my $sub = (sub { my ($prop) = @_; sub { my ($self, $val) = @_; if(@_ == 1) { $self->{$prop} } else { $self->{$prop} = $val; $self }}})->($prop);
-	#no strict 'refs';
 	eval "sub $AUTOLOAD { my (\$self, \$val) = \@_; if(\@_ == 1) { \$self->{'$prop'} } else { \$self->{'$prop'} = \$val; \$self }}";
 	die $@ // $! if $@ // $!;
 	my $sub = *{$AUTOLOAD}{CODE};
-	#use strict 'refs';
 	
 	if(@_ == 1) {
 		my $new = $prop; $new =~ s![A-Z]!::$&!g; $new = "R::".ucfirst $new;

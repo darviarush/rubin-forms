@@ -79,47 +79,46 @@ sub ritter {
 	my $request = $app->request;
 	my $response = $app->response;
 
-	my $_action = $app->action->{act};
-	my $_action_htm = $app->action->{htm};
+	$app->session->reset;
+	
+	my $act = $app->action;
+	my $_action = $act->{act};
+	my $_action_htm = $act->{htm};
+	my $_HEAD = $request->head;
 	
 	eval {
 		my $action = $_action{$_action};
 		my $action_htm = $_action_htm{$_action};
-		my $ajax = $request->head("Ajax");
+		my $ajax = $_HEAD->{"Ajax"};
 		
 		if(defined $action_htm and $ajax eq "reload") {
 			
 			#$_user_id = $_COOKIE->{sess}? auth(): undef;
 			#%_STASH = (user_id => $_user_id);
 			
-			@ret = action_submit($ajax eq "submit");
+			@ret = $act->action_submit($ajax eq "submit");
 			my @loc;
-			return ajax_redirect(\@ret, \@loc) if $_STATUS == 307 and @loc = $_HEAD{'Location'} =~ /^$_RE_LOCATION$/o;
+			return $act->ajax_redirect(\@ret, \@loc) if $_STATUS == 307 and @loc = $_HEAD->{'Location'} =~ /^$_RE_LOCATION$/o;
 		}
 		elsif(defined $action_htm and $ajax eq "") {
 			$_STATUS = 200;
 			$_user_id = $_COOKIE->{sess}? auth(): undef;
 			%_STASH = (user_id => $_user_id);
 						
-			@ret = $action? $action->(): $param;
+			@ret = $action? $action->($app, $request, $response): $param;
 			if($action_htm and $_STATUS == 200) {
-				@ret = $_action_htm{$_action}->($ret[0], $_action);
+				@ret = $_action_htm{$_action}->($app, $ret[0], $_action);
 				for(; my $_layout = $_layout{$_action}; $_action = $_layout) {
-					my $arg = ($action = $_action{$_layout})? $action->(): {};
-					@ret = $_action_htm{$_layout}->($arg, $_layout, @ret);
+					my $arg = ($action = $_action{$_layout})? $action->($app, $request, $response): {};
+					@ret = $_action_htm{$_layout}->($app, $arg, $_layout, @ret);
 				}
 			}
 		} elsif(defined $action) {
-			$_STATUS = 200;
-			$_user_id = $_COOKIE->{sess}? auth(): undef;
-			@ret = $action->();
+			@ret = $action->($app, $request, $response);
 		} elsif(exists $_info->{$_action}) {
-			$_STATUS = 200;
-			$_user_id = auth();
-			@ret = action_main($_action);
+			@ret = $act->action_main($_action);
 		} else {
-			$_STATUS = 404;
-			@ret = "404 Not Found";
+			$response->error(404);
 		}
 		@ret = map { ref($_)? to_json($_): $_ } @ret;
 	};
@@ -159,7 +158,7 @@ sub ritter {
 $x
 ", $error);
 			}
-			dbh_connect() unless $dbh and $dbh->ping;
+			$conn->reconnect;
 		}
 	}
 	

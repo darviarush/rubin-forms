@@ -1,14 +1,6 @@
 #> сервер - http, fcgi или psgi
 
 
-use File::Basename;
-use Time::HiRes qw//;
-use JSON;
-use Cwd 'abs_path';
-use AnyEvent;
-
-use Helper;
-
 # при завершении сервера
 $app->process->end_server(sub {
 	my ($app) = @_;
@@ -23,7 +15,7 @@ $SIG{USR1} = my $read_perm = Utils::closure($app, sub {
 	#msg RED.'signal USR1 thr='.threads->tid().RESET;
 	my $ini = Utils::parse_ini("main_do.ini");
 	$app->ini->{do} = $ini;
-	$app->auth->parse($ini); # parse_perm
+	$app->auth->parse;
 });
 $read_perm->();
 

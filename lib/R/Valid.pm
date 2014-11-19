@@ -1,8 +1,12 @@
-package Valid;
+package R::Valid;
 # методы для валидации параметров
 
+use base R::Utils::Main;
+
 sub image {
-	my ($val, $app, $tab, $col, $op) = @_;
+	my ($self, $val, $tab, $col, $op) = @_;
+	
+	my $app = $self->{app};
 	
 	if($op =~ /^(?:add|edit)$/ and $val !~ /^\d+$/) {	
 		my $id = $app->connect->push('img');
@@ -11,7 +15,6 @@ sub image {
 		Utils::write('original', $val);
 		return $id;
 	}
-	$val;
 }
 
 #sub Valid::update_image {
@@ -25,14 +28,13 @@ sub image {
 
 
 sub ref {
-	my ($val, $app, $tab, $col, $op) = @_;
-	return $app->auth->valid('replace', $app->connect->TAB_ref($col), $val) if ref $val;
+	my ($self, $val, $tab, $col, $op) = @_;
+	return $self->app->auth->replace($app->connect->TAB_ref($col), $val) if ref $val;
 	die "Значение $tab.$col не может быть ссылкой, т.к. оно не число и не HASH" if $val =~ /^-?\d+$/;
-	$val;
 }
 
 
-sub int { die "не int ".join(", ", @_) if $_[0]!~/^-?\d+$/; $_[0] }
-sub float { my ($val) = @_; die "не float" if $val !~ /^-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?$/; $val }
+sub int { die "не int ".join(", ", @_[1..$#_]) if $_[1]!~/^-?\d+$/; $_[1] }
+sub float { my ($self, $val) = @_; die "не float" if $val !~ /^-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?$/; }
 
 1;

@@ -6,7 +6,7 @@ sub new {
 	bless {app => $app}, $cls;
 }
 
-sub app { $_[0]->{app} }
+sub app { if(@_>1) { $_[0]->{app} = $_[1]; $_[0] } else { $_[0]->{app} } }
 
 
 1;

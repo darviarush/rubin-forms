@@ -1,28 +1,31 @@
 
 
-$email = $param->{email};
-$pass = $param->{pass};
+$email = $request->param("email");
+$pass = $request->param("pass");
+$conn = $app->connect;
 
-$user_id = query "user", "id", {email=>$email, pass=>$pass};
+$user_id = $conn->query("user", "id", {email=>$email, pass=>$pass});
 if($user_id) {
-	if($::_user_id and $user_id == $::_user_id) {
-		$sess = $_COOKIE->{sess};
+	$uid = $app->session->user_id;
+	if($user_id == $uid) {
+		$sess = $request->cookie("sess");
 	} else {
 		$sess = Utils::unic_id(20);
-		setcookie "sess", $sess, undef, "/";
-		erase "sess", {user_id=>$user_id};
-		add "sess", {id=>$sess, user_id=>$user_id};
+		$response->cookie("sess", $sess, path => "/");
+		$conn->erase("sess", {user_id=>$user_id});
+		$conn->add("sess", {id=>$sess, user_id=>$user_id});
 	}
 	
-	$::_user_id = $::_STASH{user_id} = $user_id;
-	$_COOKIE->{sess} = $sess;
+	$app->session->user_id($app->stash->{user_id} = $user_id);
+	$response->cookie(sess => $sess);
 	
-	$referer = !exists $_HEAD->{Referer}? "/profit": $_HEAD->{Referer};
+	$head = $request->head;
+	$referer = !exists $head->{Referer}? "/profit": $head->{Referer};
 	$referer =~ s!^\w+://[^/]+!!;
-	redirect $referer eq "/" ? '/profit': $referer;
+	$response->redirect($referer eq "/" ? '/profit': $referer);
 	#{sess => $sess, user_id => $user_id}
 } else {
-	status 403, "Логин или пароль неверен";
+	$response->status(403, "Логин или пароль неверен");
 	{error => "Логин или пароль неверен"}
 }
 

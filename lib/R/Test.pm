@@ -17,7 +17,8 @@ sub run {
 		color=>1,
 		verbosity => $self->{verbosity} // $self->{app}->ini->{test}{verbosity} // 0,
 		lib => [main::files('lib')],
-		failures => 1
+		failures => 1,
+		timer => 0
 	});
 	$harness->runtests(@tests);
 	$self

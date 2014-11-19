@@ -17,11 +17,11 @@ sub new {
 	
 	die "Нет конфигурации watch в ini-файле. Смотрите пример в main.sample.ini" unless exists $app->ini->{watch};
 
-	$app->log(":BOLD BLACK", "starting...");
+	main::msg(":BOLD BLACK", "starting...");
 
 	my $watching = $app->watch;
 	
-	while(my ($key, $watch) = each %{$app->ini->watch}) {
+	while(my ($key, $watch) = each %{$app->ini->{watch}}) {
 		
 		next if !$watch->{enable} or $watch->{enable} !~ /^yes$/i;
 		
@@ -43,9 +43,9 @@ sub new {
 		
 	}
 
-	$app->log(":BOLD BLACK", "\ncompiling...");
+	main::msg(":BOLD BLACK", "\ncompiling...");
 	$watching->fire();
-	$app->log(":BOLD BLACK", "\nwatching...");
+	main::msg(":BOLD BLACK", "\nwatching...");
 	$self;
 }
 
@@ -90,7 +90,9 @@ sub out {
 sub read_bk {
 	my ($out) = @_;
 	my @out;
+	#main::msg "read_bk";
 	until(@out = read_nonblock($out, 0.25)) {}
+	#main::msg "read_bk out";
 	@out
 }
 

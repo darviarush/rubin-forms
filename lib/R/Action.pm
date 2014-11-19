@@ -1,7 +1,7 @@
 package R::Action;
 # управляет компилляцией экшенов
 
-
+use R::Watch;
 
 # конструктор
 sub new {
@@ -18,7 +18,7 @@ sub erase {
 # ставит на watch
 sub watch {
 	my ($self, $watch) = @_;
-	my $dir = [dirs($self->{dir})];
+	my $dir = [main::dirs($self->{dir})];
 	($watch // $self->{app}->watch)->on(qr/\.act$/, $dir, Utils::closure($self, sub {
 		my ($self, $path) = @_;
 		$self->compile_action($path);
@@ -28,7 +28,7 @@ sub watch {
 	}))
 }
 
-# компилирует нужные и добавляет их в 
+# компилирует указанные экшены
 sub compile {
 	my ($self, $dir, $dir_c) = @_;
 	if(@_>1) {
@@ -40,7 +40,7 @@ sub compile {
 		$self->{dir} = 'action';
 		$self->{dir_c} = 'action_c';
 	}
-	
+
 	my $watch = R::Watch->new;
 	$self->watch($watch);
 	$watch->fire;
@@ -49,11 +49,14 @@ sub compile {
 
 sub write {
 	my ($self, $file) = @_;
-	my $dir = [dirs($self->{dir_c})];
-	open my $f, "<", $file or die $!;
+	$self->{require} = $file // $self->{require};
+	my $dir = [main::dirs($self->{dir_c})];
+	open my $f, ">", $file or die $!;
+	print $f "use Helper;\n\n";
 	R::Watch->new->on(qr/\.(act|htm)\.pl$/, $dir, sub {
 		my ($path) = @_;
 		print $f "require '$path';\n";
+		#$::_action{$index} = sub { die raise(501) }
 	})->fire;
 	close $f;
 	$self
@@ -64,7 +67,7 @@ sub compile_htm {
 	my ($self, $path) = @_;
 	local ($_, $`, $');
 	
-	$path =~ /\baction\/(.*)\.htm$/;
+	$path =~ /\b$self->{dir}\/(.*)\.htm$/;
 	my $index = $1;
 	
 		
@@ -78,7 +81,7 @@ sub compile_htm {
 	
 	if(exists $page->{options}) {
 		for my $option (@{$page->{options}}) {
-			if($option->[0] eq 'layout') { push @write, "\$_layout{'$index'} = '$option->[1]';\n\n"; }
+			if($option->[0] eq 'layout') { push @write, "\$app->action->{layout}{'$index'} = '$option->[1]';\n\n"; }
 			else { die "Неизвестная опция `$option->[0]` на странице `$index.htm`" }
 		}
 	}
@@ -91,55 +94,52 @@ sub compile_htm {
 		$form->{name} = $index unless $form->{name};
 		$form->{id} = $id = "$index-$id";
 		#$form->{query} = form_query $form, $forms;
-		push @write, "\$_forms{'$id'} = ".Utils::Dump($form).";\n\n";
+		push @write, "\$app->action->form{'$id'} = ".Utils::Dump($form).";\n\n";
 		$_ = "$index-$_" for @{$form->{forms}};
 	}
 	
 	my $code = $page->{code};
 	delete $page->{code};
 	
-	$eval = join "", "my(%_layout, %_forms, %_pages, %_action_htm, %_STASH); \$_action_htm{'$index'} = ", $eval, ";\n\n\$_pages{'$index'} = ", Utils::Dump($page), ";\n\$_pages{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
+	$eval = join "", "\$app->action->{htm}{'$index'} = sub { my (\$app, \$data, \$id) = \@_; my \$_STASH = \$app->stash; return join \"\", '", $eval, "'};\n\n\$app->action->{page}{'$index'} = ", Utils::Dump($page), ";\n\$app->action->{page}{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
+	
+	my $p = $path;
+	$p =~ s!\b$self->{dir}/!$self->{dir_c}/!;
+	$p .= ".pl";
 	
 	Utils::mkpath($p);
 	Utils::write($p, $eval);
+	$self;
 }
 
 sub compile_action {
 	my ($self, $path) = @_;
 	
-	$path =~ /([^\/]+)\.htm$/;
+	$path =~ /\b$self->{dir}\/(.*)\.act$/;
 	my $index = $1;
+
+	my $action = Utils::read($path);
+	my @our = qw/%ENV @INC %INC @ISA/;
+	my %our = Utils::set(@our);
+	my %local = Utils::set(qw/@_ $_ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9 $a $b/);
+	my %my = Utils::set(qw/$app $request $response/);
+	while($action =~ /\$(\w+)(::\w+)*\s*(\{|\[)|([\%\$\@]\w+)(::\w+)*/g) {
+		next if $2 // $5;$my{$4} = 1 if $4;
+		$my{($3 eq "{"? "%": "@").$1} = 1 if $1;
+	}
+	my @my = keys %my;
+	my @local = grep { exists $local{$_} } @my;
+	@my = grep { not exists $our{$_} and not exists $local{$_} } @my;
+	my $eval = join("", "our(", join(", ", @our), "); \$app->action->{act}{'$index'} = sub {" , (@local? ("local(", join(", ", @local), "); "): ()), (@my? ("my(", join(", ", @my), "); "): ()), "(\$app, \$request, \$response) = \@_; ", $action, "\n};\n\n1;");
+
+	my $p = $path;
+	$p =~ s!\b$self->{dir}/!$self->{dir_c}/!;
+	$p .= ".pl";
 	
-	eval {
-	
-		my $p = $path;
-		$p =~ s!\baction/!action_c/!;
-		$p .= ".pl";
-		
-		if(not -e $p or -M $p >= -M $path) {
-	
-			my $action = Utils::read($path);
-			my @our = qw/$_COOKIE $_POST $_GET $_HEAD $param $ini %ENV %_STASH $_user_id/;
-			my %our = Utils::set(@our);
-			my %local = Utils::set(qw/@_ $_ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9 $a $b/);
-			my %my = ();
-			while($action =~ /\$(\w+)(::\w+)*\s*(\{|\[)|([\%\$\@]\w+)(::\w+)*/g) {
-				next if $2 // $5;$my{$4} = 1 if $4;
-				$my{($3 eq "{"? "%": "@").$1} = 1 if $1;
-			}
-			my @my = keys %my;
-			my @local = grep { exists $local{$_} } @my;
-			@my = grep { not exists $our{$_} and not exists $local{$_} } @my;
-			my $eval = join("", "our(", join(", ", @our), "); \$main::_action{'$index'} = sub {" , (@local? ("local(", join(", ", @local), "); "): ()), (@my? ("my(", join(", ", @my), "); "): ()), $action, "\n};\n\n1;");
-			
-			Utils::mkpath($p);
-			Utils::write($p, $eval);
-		}
-		
-		require $p unless $no_require;
-	};
-	
-	if(my $error=$! || $@) { msg RED."load_action `$path`:".RESET." $error"; $::_action{$index} = sub { die raise(501) }; return 1; }
+	Utils::mkpath($p);
+	Utils::write($p, $eval);
+
+	$self
 }
 
 

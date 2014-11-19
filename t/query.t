@@ -9,9 +9,9 @@ our $app;
 $app->ini(Utils::parse_ini(__FILE__ . "/../main.ini"));
 
 # инсерт
-$app->query->user({ name=>'Иваныч',  })->id;
+is $app->query->user({ name=>'Иваныч' })->id, 1;
 # апдейт
-$app->query->user({ name=>'Иваныч' }, id__between => [1,2]);
+$app->query->user({ name=>'Иваныч', id => 1 }, id__between => [1,2]);
 # выборка
 $app->query->user([
 	"name",

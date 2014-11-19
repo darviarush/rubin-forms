@@ -113,9 +113,8 @@ sub DO_SET {
 	my ($self, $p, $as) = @_;
 	my @set = ();
 	while(my($a, $b) = each %$p) {
-		my $op = $a=~s/__ne$//? "<>": $a=~s/__lt$//? "<": $a=~s/__gt$//? ">": $a=~s/__le$//? "<=": $a=~s/__ge$//? ">=": $a=~s/__like$//? " like ": "=";
-		push @set, join("", 
-			$self->SQL_COL($a, $as), $op, (
+		push @set, join("",
+			$self->SQL_COL($a, $as), "=", (
 				ref $b eq 'HASH'? scalar($self->replace($self->TAB_ref($a), $b)):
 				ref $b eq "SCALAR"? (ref $$b eq "SCALAR"? $$$b: $self->SQL_COL($$b, $as)):
 				$self->{dbh}->quote($b)
@@ -129,8 +128,25 @@ sub DO_SET {
 sub DO_WHERE {
 	my ($self, $where, $as) = @_;
 
+	my $dbh = $self->{dbh};
+	
 	if(ref $where) {
-		my @SET = $self->DO_SET($where, $as);
+		my @SET;
+		$where = [%$where] if ref $where eq "HASH";
+		for(my $i = 0; $i<@$where; $i+=2) {
+			my($a, $b) = ($where->[$i], $where->[$i+1]);
+			my $op = $a=~s/__ne$//? "<>": $a=~s/__lt$//? "<": $a=~s/__gt$//? ">": $a=~s/__le$//? "<=": $a=~s/__ge$//? ">=": $a=~s/__like$//? " like ": s/__unlike$//? " not like ": s/__isnt$//? " is not ": $a=~s/__between//? " BETWEEN ": !defined($b)? " is ": "=";
+			push @SET, join("", 
+				$self->SQL_COL($a, $as), $op, (
+					!defined($b)? "null":
+					ref $b eq "ARRAY"? ($op eq " BETWEEN "? $dbh->quote($b->[0])." AND ".$dbh->quote($b->[1]): do { $op = " IN " if $op eq '='; join "", "(", join(", ", map { $dbh->quote($_) } @$b), ")" } ):
+					ref $b eq 'HASH'? scalar($self->replace($self->TAB_ref($a), $b)):
+					ref $b eq "SCALAR"? (ref $$b eq "SCALAR"? $$$b: $self->SQL_COL($$b, $as)):
+					$dbh->quote($b)
+				)
+			);
+		}
+		return join(" AND ", @SET)." AND ".$where->[$#$where] if @$where % 2;
 		return join(" AND ", @SET);
 	}
 
@@ -220,13 +236,13 @@ sub query_join {
 	($arg->{limit}? ("${sep}LIMIT ", $arg->{limit}): ())
 }
 
-sub flat2volume { my ($self, $join, @args) = @_; my ($tab) = @args; my ($as); ($as, $tab) = $self->TAB($tab); return {tab => $self->SQL_WORD($tab), as => $self->SQL_WORD($as), args=>[@args], join=>$join}, $cls; }
+sub flat2volume { my ($self, $join, @args) = @_; my ($tab) = @args; my ($as); ($as, $tab) = $self->TAB($tab); return {tab => $self->SQL_WORD($tab), as => $self->SQL_WORD($as), args=>[@args], join=>$join}; }
 
 # выборки
 sub sel_join {
 	my ($self, @any) = @_;
 	my (@st, @where, @view, @join, $push);
-	my ($as_table, $table) = $self->TAB($_[0]);
+	my ($as_table, $table) = $self->TAB($_[1]);
 	my ($fields, $real_fields, $real_new, @cols) = ([], []);
 	@st = [[], \@any, $real_fields];
 	
@@ -234,6 +250,7 @@ sub sel_join {
 		my ($path, $args, $real) = @{ pop @st };
 		my ($tab, $view, @args) = @$args;
 		my ($as); ($as, $tab) = $self->TAB($tab);
+		
 		push @view, $self->FOR_TAB_FIELDS($view, $as);
 		push @$fields, [$path, [ @cols = $self->FIELDS_NAMES($view) ] ];
 		push @$real, @cols;

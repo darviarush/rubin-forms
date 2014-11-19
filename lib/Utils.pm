@@ -650,25 +650,24 @@ sub parse_frames {
 }
 
 # темплейт, аналогичный из js-библиотеки CTemplate::compile. Возвращает текст функции
-our %_STASH;
-sub TemplateStr {
+my $code_begin = 'sub {	my ($dataset, $id1) = @_; my ($i, @res) = 0; for my $data (@$dataset) { my $id = "$id1-".($data->{id} // $i); push @res, \'';
+my $code_end = '\';	$i++; }	return join "", @res; }';
+my $code_begin1 = 'sub { my ($data, $id) = @_; return join "", \'';
+my $code_end1 = '\' }';
+
+my $code_begin_i = "sub { my (\$dataset, \$id1) = \@_; my \$i = 0; for my \$data (\@\$dataset) { my \$id = '\$id1-'.(\$data->{id} // \$i);\n";
+my $code_end_i = "\$i++; } }\n";
+my $code_begin1_i = "sub { my (\$data, \$id) = \@_; \n";
+my $code_end1_i = "}\n";
+
+
+sub TemplateBare {
 	
 	require Helper;
 	
 	my $RE_TYPE = qr/("(?:\\"|[^"])*"|'(?:\\'|[^'])*'|-?\d+(?:\.\d+)?(?:E[+-]\d+)?)/;
 	
 	my $re_type = sub { my ($x)=@_; return unless defined $x; local($`, $', $1); $x=~s/^'(.*)'$/$1/, $x=~s/"/\\"/g, $x="\"$x\"" if $x =~ /^'/; $x};
-	
-	my $code_begin = 'sub {	my ($dataset, $id1) = @_; my ($i, @res) = 0; for my $data (@$dataset) { my $id = "$id1-".($data->{id} // $i); push @res, \'';
-	my $code_end = '\';	$i++; }	return join "", @res; }';
-	my $code_begin1 = 'sub { my ($data, $id) = @_; return join "", \'';
-	my $code_end1 = '\' }';
-	
-	my $code_begin_i = "sub { my (\$dataset, \$id1) = \@_; my \$i = 0; for my \$data (\@\$dataset) { my \$id = '\$id1-'.(\$data->{id} // \$i);\n";
-	my $code_end_i = "\$i++; } }\n";
-	my $code_begin1_i = "sub { my (\$data, \$id) = \@_; \n";
-	my $code_end1_i = "}\n";
-
 
 	my $_tags = qr/(?:input|meta|br)/i;
 	my %tags = (
@@ -887,10 +886,14 @@ sub TemplateStr {
 	}
 	$form->{code} = join "", $code_begin1_i, map({$_->[1]} @code), $code_end1_i;
 	
-	my $x = join "", $code_begin1, @html, $code_end1;
+	my $x = join "", @html;
 	#our $rem++;
 	#Utils::write("$rem.pl", $x);
 	$x
+}
+
+sub TemplateStr {
+	join "", $code_begin1, TemplateBare, $code_end1;
 }
 
 # возвращает функцию
