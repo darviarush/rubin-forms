@@ -1,20 +1,31 @@
-our ($param, $ini, $_info);
+package ModelEdit;
+
+sub new {
+	my ($cls, $app) = @_;
+	bless {app => $app}, $cls;
+}
+
+sub app { $_[0]->{app} }
 
 # изменяет модель. Изменяет $ini
-sub model_edit {
+sub edit {
+	my ($self) = @_;
 
-	my $erase = $param->{method} eq 'erase';
-	my $action = $param->{action};
-	my $tab = $param->{tab};
-	my $col = $param->{col};
-	my $role = $param->{role};
-	my $perm = $param->{perm};
+	my $request = $self->{app}->request;
+	my $response = $self->{app}->response;
+	
+	my $erase = $request->param("method") eq 'erase';
+	my $action = $request->param("action");
+	my $tab = $request->param("tab");
+	my $col = $request->param("col");
+	my $role = $request->param("role");
+	my $perm = $request->param("perm");
 	
 	my $inject = sub {
 		my ($arg, $key, $col) = @_;
 		my $val = $ini->{do}{$key}? join ",", sort { $a cmp $b } ($erase || !$col? (): $col), grep {$_ ne $col} (split /,\s*/, $ini->{do}{$key}): $col;
 		$ini->{do}{$key} = $val;
-		if($val ne "") { Utils::inject_ini($_[0], "", $key, $val) } else { msg "in $key delete"; Utils::delete_ini($_[0], "", $key); delete $ini->{do}{$key} }
+		if($val ne "") { Utils::inject_ini($_[0], "", $key, $val) } else { main::msg "in $key delete"; Utils::delete_ini($_[0], "", $key); delete $ini->{do}{$key} }
 	};
 	
 	if($action eq "selfcol") {
@@ -23,9 +34,9 @@ sub model_edit {
 			$i = 0;
 			for my $col (split /,\s*/, $perm) {
 				if($i++ == 0 && $col !~ /\./) { $col = "$tab.$col"; }
-				return status(406, "`$col` не разделён \".\"") unless $col =~ /\./;
-				return status(406, "Нет таблицы $col в базе") unless exists $_info->{$`};
-				return status(406, "Нет столбца $col в базе") unless exists $_info->{$`}{$'};
+				return $response->error(406, "`$col` не разделён \".\"") unless $col =~ /\./;
+				return $response->error(406, "Нет таблицы $col в базе") unless exists $_info->{$`};
+				return $response->error(406, "Нет столбца $col в базе") unless exists $_info->{$`}{$'};
 			}
 			$ini->{do}{$key} = $perm;
 			Utils::inject_ini($_[0], "", $key, $perm);
@@ -34,7 +45,7 @@ sub model_edit {
 	}
 	elsif($action eq "valid") {
 		my @roles = split /,\s*/, $perm;
-		get_validator($_, "$tab.$_", $col) for @roles; # тестируем, чтобы были такие валидаторы
+		$self->app->auth->get_validator($_, "$tab.$_", $col) for @roles; # тестируем, чтобы были такие валидаторы
 		$inject->($_[0], "$tab.$_", $col) for @roles;
 		$inject->($_[0], "$tab.$_") unless @roles;
 	}

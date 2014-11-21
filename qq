@@ -1,5 +1,8 @@
 #!perl -w
 
+#use warnings "all";
+#no warnings qw/uninitialized/;
+
 use File::Basename qw/dirname/;
 use lib dirname(__FILE__)."/lib";
 use Msg;

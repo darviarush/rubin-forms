@@ -10,20 +10,20 @@ $app->process->end_server(sub {
 
 # перечитывает main_do.ini по сигналу
 # считывает права на таблицы и их столбцы
-$SIG{USR1} = my $read_perm = Utils::closure($app, sub {
+$SIG{USR1} = Utils::closure($app, sub {
 	my ($app) = @_;
 	#msg RED.'signal USR1 thr='.threads->tid().RESET;
 	my $ini = Utils::parse_ini("main_do.ini");
 	$app->ini->{do} = $ini;
 	$app->auth->parse;
 });
-$read_perm->();
+$SIG{USR1}->();
 
 
 # грузим экшены
 msg ":bold black", "load action...";
-$app->action->compile("action", "action_c")->write("action.pl");
-require "action.pl";
+$app->action->compile("action", "watch/action_c")->write("watch/action.pl");
+require "watch/action.pl";
 
 
 # Открываем сокет

@@ -2,11 +2,11 @@ use ModelEdit;
 
 
 # авторизируемся
-return status 401 unless $ini->{site}{test};
+return $request->status(401) unless $ini->{site}{test};
 
 
 if(exists $param->{area}) {
-	$install = get_install_info(files("install.sql"));
+	$install = get_install_info(main::files("install.sql"));
 	$install = $install->{$param->{tab}};
 	open $f, $install->{file} or die "Нет файла $install->{file}:$!";
 	@lines = <$f>;

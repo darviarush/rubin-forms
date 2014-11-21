@@ -96,17 +96,12 @@ sub ritter {
 			#$_user_id = $_COOKIE->{sess}? auth(): undef;
 			#%_STASH = (user_id => $_user_id);
 			
-			@ret = $act->action_submit($ajax eq "submit");
-			my @loc;
-			return $act->ajax_redirect(\@ret, \@loc) if $_STATUS == 307 and @loc = $_HEAD->{'Location'} =~ /^$_RE_LOCATION$/o;
+			$self->submit($ajax eq "submit");
+			return $self->ajax_redirect if $response->{status} == 307;
 		}
 		elsif(defined $action_htm and $ajax eq "") {
-			$_STATUS = 200;
-			$_user_id = $_COOKIE->{sess}? auth(): undef;
-			%_STASH = (user_id => $_user_id);
-						
 			@ret = $action? $action->($app, $request, $response): $param;
-			if($action_htm and $_STATUS == 200) {
+			if(!defined $response->{body}) {
 				@ret = $_action_htm{$_action}->($app, $ret[0], $_action);
 				for(; my $_layout = $_layout{$_action}; $_action = $_layout) {
 					my $arg = ($action = $_action{$_layout})? $action->($app, $request, $response): {};
@@ -115,21 +110,21 @@ sub ritter {
 			}
 		} elsif(defined $action) {
 			@ret = $action->($app, $request, $response);
-		} elsif(exists $_info->{$_action}) {
-			@ret = $act->action_main($_action);
+		} elsif(exists $_info->{$action}) {
+			@ret = $self->update;
 		} else {
 			$response->error(404);
 		}
-		@ret = map { ref($_)? to_json($_): $_ } @ret;
+		$request->body( map { ref($_)? to_json($_): $_ } @ret );
 	};
 
 	if(my $error = $@ || $!) {
 		my $is_io = $!;
 		$@ = $! = undef;
 		if(ref $error eq "Rubin::Raise") {
-			@ret = $error;
+			$request->body($error);
 		} else {
-			if(ref $error eq "Rubin::Exception") { $_STATUS = $error->{error}; $error = join "", $error->{error}, " ", $error->{message}, "\n\n", $error->{trace} }
+			if(ref $error eq "Rubin::Exception") { $request->{status} = $error->{error}; $error = join "", $error->{error}, " ", $error->{message}, "\n\n", $error->{trace} }
 			else { $_STATUS = 500; }
 			
 			$error = ($is_io? "io: ": "").$error;
@@ -140,10 +135,10 @@ sub ritter {
 			$error = $_test ? $error: "Внутренняя ошибка";
 			
 			if($_HEAD->{Accept} =~ /^text\/json\b/) {
-				@_HEAD = "Content-Type: text/plain; charset=utf-8";
+				$response->type("text/plain");
 				@ret = to_json({error=> $error});
 			} else {
-				@_HEAD = "Content-Type: text/html; charset=utf-8";
+				$response->type("text/html");
 				my ($i, $x) = 0;
 				$error =~ s!\b((?:called )?at|line|thread)\b!<font color=LightSlateGray>$1</font>!g;
 				$error =~ s/^(.*)/$x = $1; ""/e;
@@ -162,9 +157,6 @@ $x
 		}
 	}
 	
-	%_STASH = ();
-	
-	return [$_STATUS, \@_HEAD, \@ret];
 }
 
 
