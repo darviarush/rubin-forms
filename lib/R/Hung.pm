@@ -62,7 +62,7 @@ use Cwd qw/abs_path/;
 sub new {
 	my ($cls, $watch) = @_;
 	my ($in, $out) = ();
-	my $pid = open3($in, $out, $out, $watch->{hang}) or die $!;
+	my $pid = open3($in, $out, $out, $watch->{hang}) or die "Не запустился процесс `$watch->{hang}`. $!";
 	
 	#Utils::nonblock($in);
 	#Utils::nonblock($out);

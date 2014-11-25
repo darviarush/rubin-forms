@@ -1,7 +1,8 @@
+# Выход пользователя
 
-setcookie "sess", "", 150723948, "/";
-erase "sess", {id => $_COOKIE->{sess}} if exists $_COOKIE->{sess};
-$_user_id = undef;
-delete $_COOKIE->{sess};
+$response->cookie("sess", "", expires => 150723948, path => "/");
+$app->connect->erase("sess", {id => $sess}) if defined($sess = $request->cookie("sess"));
+$app->session->user_id(undef);
+delete $request->{cookie}{sess};
 
-return redirect "/";
+return $response->redirect("/");

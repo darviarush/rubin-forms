@@ -1,4 +1,4 @@
-package R::Select;
+﻿package R::Select;
 
 use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK O_NDELAY);
 

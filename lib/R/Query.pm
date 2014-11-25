@@ -1,4 +1,4 @@
-package R::Query;
+﻿package R::Query;
 
 sub new {
 	my ($cls, $app) = @_;

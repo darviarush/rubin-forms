@@ -1,5 +1,5 @@
-package R::Test;
-# óïğàâëÿåò òåñòàìè
+ï»¿package R::Test;
+# ÑƒĞ¿Ñ€Ğ°Ğ²Ğ»ÑĞµÑ‚ Ñ‚ĞµÑÑ‚Ğ°Ğ¼Ğ¸
 
 use base R::Utils::Main;
 
@@ -26,7 +26,7 @@ sub run {
 
 sub watch {
 	my ($self, @tests) = @_;
-	$app->watch->on(qr/\.t$/, [dirs("t")], sub {
+	$self->{app}->watch->on(qr/\.t$/, [main::files("t")], sub {
 		my ($path, $app) = @_;
 		$app->test->run($path);
 	});

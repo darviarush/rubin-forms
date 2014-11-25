@@ -1,13 +1,6 @@
 #> сервер - http, fcgi или psgi
 
 
-# при завершении сервера
-$app->process->end_server(sub {
-	my ($app) = @_;
-	$app->process->close;
-	$app->server->close;
-});
-
 # перечитывает main_do.ini по сигналу
 # считывает права на таблицы и их столбцы
 $SIG{USR1} = Utils::closure($app, sub {
@@ -23,6 +16,7 @@ $SIG{USR1}->();
 # грузим экшены
 msg ":bold black", "load action...";
 $app->action->compile("action", "watch/action_c")->write("watch/action.pl");
+$app->stash({});
 require "watch/action.pl";
 
 
@@ -35,8 +29,11 @@ msg ":empty", "Слушаем ", ":green", $app->ini->{site}{port};
 # демонизируемся
 $app->process->daemon if $app->ini->{site}{daemon};
 
-# расщепляем процесс
+# порождаем потоки
 $app->process->fork(*lord);
+
+# перекомпиливать сторонние файлы проекта
+$app->hung if $app->ini->{site}{hung};
 
 # перезагружать сервер, если изменился какой-то из модулей проекта
 if($app->ini->{site}{watch}) {
@@ -44,13 +41,10 @@ if($app->ini->{site}{watch}) {
 	$app->test->watch;
 }
 
-# перекомпиливать сторонние файлы проекта
-$app->hung if $app->ini->{site}{hung};
-
 # бесконечный цикл с cron
 $app->process->loop(sub {	# будет вызываться раз в секунду
-	$app->session->delete() if time() % 3600 == 0;	# раз в час
-	$app->process->watch, $app->watch->run() if $app->ini->{site}{watch};
+	$app->session->delete if time % 3600 == 0;	# раз в час
+	$app->process->watch, $app->watch->run if $app->ini->{site}{watch};
 });
 
 

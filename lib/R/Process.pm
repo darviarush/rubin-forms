@@ -1,5 +1,5 @@
 package R::Process;
-# ‡·ÓÚ‡ÂÚ Ò ÔÓˆÂÒÒ‡ÏË Ë ÌËÚˇÏË
+# —Ä–∞–±–æ—Ç–∞–µ—Ç —Å –ø—Ä–æ—Ü–µ—Å—Å–∞–º–∏ –∏ –Ω–∏—Ç—è–º–∏
 
 use POSIX ":sys_wait_h";
 use threads ('yield',
@@ -9,28 +9,35 @@ use threads ('yield',
 use threads::shared;
 
 
+
 sub new {
 	my ($cls, $app) = @_;
-	bless {app=>$app}, $cls;
+	bless {app=>$app, end_server=>sub {
+		my ($app) = @_;
+		$app->process->close;
+		$app->server->close;
+		main::msg "server close";
+	}}, $cls;
 }
 
-# ‰ÂÏÓÌËÁËÛÂÚ
+# –¥–µ–º–æ–Ω–∏–∑–∏—Ä—É–µ—Ç
 sub daemon {
 	my ($self, $path) = @_;
 	$path //= dirname($0).'/rubin.log';
-	open STDOUT, '>', $path or die $!;
-	open STDERR, '>>', $path or die $!;
-	open STDIN, "<", "/dev/null" or die $!;
+	open STDOUT, '>', $path or die "–ù–µ –º–æ–≥—É –ø–µ—Ä–µ–Ω–∞–ø—Ä–∞–≤–∏—Ç—å STDOUT. $!";
+	open STDERR, '>>', $path or die "–ù–µ –º–æ–≥—É –ø–µ—Ä–µ–Ω–∞–ø—Ä–∞–≤–∏—Ç—å STDERR. $!";
+	open STDIN, "<", "/dev/null" or die "–ù–µ –º–æ–≥—É –ø–µ—Ä–µ–Ω–∞–ø—Ä–∞–≤–∏—Ç—å STDIN. $!";
 	my $pid = fork;
-	die "ÕÂ ÏÓ„Û ‚˚ÔÓÎÌËÚ¸ fork\n" if $pid<0;
-	exit if $pid;	# ˝ÚÓ Ó‰ËÚÂÎ¸ÒÍËÈ ÔÓˆÂÒÒ - Û·Ë‚‡ÂÏ Â„Ó
-	die "ÕÂ Û‰‡ÎÓÒ¸ ÓÚÒÓÂ‰ËÌËÚÒˇ ÓÚ ÚÂÏËÌ‡Î‡\n" if POSIX::setsid() == -1;
+	die "–ù–µ –º–æ–≥—É –≤—ã–ø–æ–ª–Ω–∏—Ç—å fork. Error #$pid\n" if $pid<0;
+	exit if $pid;	# —ç—Ç–æ —Ä–æ–¥–∏—Ç–µ–ª—å—Å–∫–∏–π –ø—Ä–æ—Ü–µ—Å—Å - —É–±–∏–≤–∞–µ–º –µ–≥–æ
+	die "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç—Å–æ–µ–¥–∏–Ω–∏—Ç—Å—è –æ—Ç —Ç–µ—Ä–º–∏–Ω–∞–ª–∞\n" if POSIX::setsid() == -1;
 	$self
 }
 
-# ‡Ò˘ÂÔÎˇÂÏ ÔÓˆÂÒÒ 
+# —Ä–∞—Å—â–µ–ø–ª—è–µ–º –ø—Ä–æ—Ü–µ—Å—Å 
 sub fork {
 	my ($self, $lord, $lords) = @_;
+	$self->{lord} = $lord;
 	$lords //= $self->{app}->ini->{site}{lords};
 	for(my $i=0; $i<$lords; $i++) {
 		threads->create($lord) or die $!;
@@ -40,61 +47,76 @@ sub fork {
 }
 
 
-# „Î‡‚Ì˚È ÔÓˆÂÒÒ - ÒÎÂ‰ËÚ Á‡ ÓÒÚ‡Î¸Ì˚ÏË Ë ‚˚ÔÓÎÌˇÂÚ ‰ÂÈÒÚ‚Ëˇ ÔÓ ÍÓÌÛ
+# –≥–ª–∞–≤–Ω—ã–π –ø—Ä–æ—Ü–µ—Å—Å - —Å–ª–µ–¥–∏—Ç –∑–∞ –æ—Å—Ç–∞–ª—å–Ω—ã–º–∏ –∏ –≤—ã–ø–æ–ª–Ω—è–µ—Ç –¥–µ–π—Å—Ç–≤–∏—è –ø–æ –∫—Ä–æ–Ω—É
 sub loop {
 	my ($self, $cron) = @_;
-	$SIG{INT} = $SIG{TERM} = sub { my ($self) = @_; sub { $self->end_server; exit; }};
+	$SIG{INT} = $SIG{TERM} = Utils::closure($self, sub { $_[0]->end_server; exit; });
 	for(;;) {
 		sleep 1;
-		# Á‡‰‡˜Ë ÔÓ ÍÓÌÛ
+		# –∑–∞–¥–∞—á–∏ –ø–æ –∫—Ä–æ–Ω—É
 		eval {
 			$cron->($self->{app});
 		};
-		main::msg(":red", "«·ÓÈÌÛÎ‡ Á‡‰‡˜‡ ÍÓÌ‡: ".($@ || $!)), $@ = $! = undef if $@ || $!;
+		main::msg(":red", "–°–±–æ–π–Ω—É–ª–∞ –∑–∞–¥–∞—á–∞ –∫—Ä–æ–Ω–∞: ".($@ || $!)), $@ = $! = undef if $@ || $!;
 		
 		eval {
 			my @joinable = threads->list(threads::joinable);
-			for my $thr (@joinable) {		# ÔÓ‚ÂˇÂÏ Ì‡¯Ëı ÎÓ‰Ó‚
+			for my $thr (@joinable) {		# –ø—Ä–æ–≤–µ—Ä—è–µ–º –Ω–∞—à–∏—Ö –ª–æ—Ä–¥–æ–≤
 				my @return = $thr->join();
 				my $tid = $thr->tid();
 				my $error = $thr->error();
 				#if($tid == $cron) {
-				#	print RED."«‡‚Â¯ËÎÒˇ ÍÓÌ π $tid\n".RESET."$error";
+				#	print RED."–ó–∞–≤–µ—Ä—à–∏–ª—Å—è –∫—Ä–æ–Ω ‚Ññ $tid\n".RESET."$error";
 				#	$cron = threads->create(*cron::run)->tid();
 				#} else {
-					main::msg ":empty", ":red", "«‡‚Â¯ËÎÒˇ ÎÓ‰ π $tid", ":reset", ($error? "\n— Ó¯Ë·ÍÓÈ: $error": "").(@return? "\n¬ÂÌÛÎ: ": "");
+					main::msg ":empty", ":red", "–ó–∞–≤–µ—Ä—à–∏–ª—Å—è –ª–æ—Ä–¥ ‚Ññ $tid", ":reset", ($error? "\n–° –æ—à–∏–±–∫–æ–π: $error": "").(@return? "\n–í–µ—Ä–Ω—É–ª: ": "");
 					main::msg \@return if @return;
 					threads->create(*lord);
 				#}
 			}
 		};
-		main::msg(":red", "ÀÓ‰ Á‡‚Â¯ËÎÒˇ Ò Ó¯Ë·ÍÓÈ: ".($@ || $!)), $@ = $! = undef if $@ || $!;
+		main::msg(":red", "–õ–æ—Ä–¥ –∑–∞–≤–µ—Ä—à–∏–ª—Å—è —Å –æ—à–∏–±–∫–æ–π: ".($@ || $!)), $@ = $! = undef if $@ || $!;
 	}
 }
 
-# Á‡‚Â¯‡ÂÚ ‡·ÓÚÛ Ò ÔÓˆÂÒÒ‡ÏË
+# –∑–∞–≤–µ—Ä—à–∞–µ—Ç —Ä–∞–±–æ—Ç—É —Å –ø—Ä–æ—Ü–µ—Å—Å–∞–º–∏
 sub close {
-	for my $thr (threads->list()) { $thr->detach();  }
+	my ($self) = @_;
+	for my $thr (threads->list) { $thr->detach; }
 	$self
 }
 
-# ÚÂÒÚËÛÂÚ - ÏÓÊÌÓ ÎË ÔÂÂÁ‡„ÛÊ‡Ú¸
+# —Ç–µ—Å—Ç–∏—Ä—É–µ—Ç - –º–æ–∂–Ω–æ –ª–∏ –ø–µ—Ä–µ–∑–∞–≥—Ä—É–∂–∞—Ç—å
 sub test {
-	my $test = shift // $0;
+	my ($self, $test) = @_;
+	$test //= $0;
 	my $res = `perl -c $test`;
 	return $? == 0? undef: $res;
 }
 
-# ÔÂÂÁ‡„ÛÊ‡ÂÚ ÒÂ‚Â
+# –ø–µ—Ä–µ–∑–∞–≥—Ä—É–∂–∞–µ—Ç —Å–µ—Ä–≤–µ—Ä
 sub reload {
 	my ($self) = @_;
 	#print STDERR `nginx -s reload`;
-	if(my $res = $self->test) {
-		main::msg ":RED", $res, ":RESET";
-	} else {
+	$self->{app}->server->close;
+	my $pid = CORE::fork;
+	die "–ù–µ –º–æ–≥—É —Å–æ–∑–¥–∞—Ç—å –ø—Ä–æ—Ü–µ—Å—Å. $!" if $pid < 0;
+	exec $0, @ARGV unless $pid;	# –ø—Ä–æ—Ü–µ—Å—Å
+
+	sleep 3;
+	if(kill 0, $pid) {	# –∑–∞–≤–µ—Ä—à–∞–µ–º—Å—è
 		$self->end_server;
-		exec $0, @::ARGV;
-	}
+		exit;
+	} 
+	
+	waitpid $pid, WNOHANG;	# —É–¥–∞–ª—è–µ–º –∑–æ–º–±–∏
+	
+	# if(my $res = $self->test) {
+		# main::msg ":RED", $res, ":RESET";
+	# } else {
+		# $self->end_server;
+		# exec $0, @ARGV;
+	# }
 	$self
 }
 
@@ -108,12 +130,13 @@ sub end_server {
 	$self
 }
 
-# ÔÂÂÁ‡„ÛÊ‡Ú¸ ÒÂ‚Â, ÂÒÎË ËÁÏÂÌËÎÒˇ Í‡ÍÓÈ-ÚÓ ËÁ ÏÓ‰ÛÎÂÈ ÔÓÂÍÚ‡
+# –ø–µ—Ä–µ–∑–∞–≥—Ä—É–∂–∞—Ç—å —Å–µ—Ä–≤–µ—Ä, –µ—Å–ª–∏ –∏–∑–º–µ–Ω–∏–ª—Å—è –∫–∞–∫–æ–π-—Ç–æ –∏–∑ –º–æ–¥—É–ª–µ–π –ø—Ä–æ–µ–∫—Ç–∞
 sub watch {
 	my ($self) = @_;
-	$self->{app}->watch->on(qr//, ["qq", "main.ini", grep { defined $_ and -e $_ and m!/action/.*\.(?:htm|act)\.pl$! } values %INC], sub {
+	my $watch = $self->{app}->watch;
+	$watch->on(qr//, [ grep { defined $_ and !exists $watch->{file}{$_} and -e $_ } "qq", "main.ini", values %INC], sub {
 		my ($path, $app) = @_;
-		my $module = m!/.*\.(?:(act)|htm)\.pl$!? ($1? "action": "htm"): "module";
+		my $module = m!/.*\.(\w+)\.pl$!? ($1 eq "act"? "action": $1): "module";
 		main::msg ":empty", ":time", " - ", ":red", $module, ":reset", " $path";
 		$app->process->reload;
 	});

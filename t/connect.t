@@ -1,3 +1,5 @@
+# тестирует R::Connect
+
 use strict;
 use warnings;
 

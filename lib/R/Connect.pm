@@ -374,7 +374,7 @@ sub query_ref {
 # id последней добавленной записи
 sub last_id {
 	my ($self) = @_;
-	return $self->{dbh}->selectrow_array("SELECT LAST_INSERT_ID()");
+	return $self->{last_id} // $self->{dbh}->selectrow_array("SELECT LAST_INSERT_ID()");
 }
 
 # количество изменённых строк последней операцией редактирования
@@ -400,13 +400,14 @@ sub add {
 		$sql = join "", "INSERT INTO ", $self->SQL_WORD($tab), " () VALUES ()";
 	}
 	$self->{last_count} = $dbh->do($sql) + 0;
+	$self->{last_id} = undef;
 	$self
 }
 
 # добавляет одну запись в таблицу и возвращает её id
 sub push {
 	my ($self, $tab, $param) = @_;
-	$self->add($tab, $param)->last_id();
+	$self->add($tab, $param)->last_id;
 }
 
 
@@ -429,8 +430,8 @@ sub update {
 	$self
 }
 
-# добавляет или изменяет запись
-sub replace {
+# добавляет или изменяет запись основываясь на наличии id в параметрах
+sub save {
 	my ($self, $tab, $param) = @_;
 	if(my $id = $param->{id}) {
 		delete $param->{id};
@@ -440,6 +441,21 @@ sub replace {
 	}
 	return $self;
 }
+
+# добавляет или изменяет первую попавщуюся запись
+sub replace {
+	my ($self, $tab, $param) = @_;
+	my $id = $self->query($tab, "id", $param, "LIMIT 1");
+	if($id) {
+		delete $param->{id};
+		$self->update($tab, $param, $id);
+		$self->{last_id} = $id;
+	} else {
+		$self->add($tab, $param);
+	}
+	return $self;
+}
+
 
 # поиск
 our $ABC = {qw(а А б Б в В г Г д Д е Е ё Е Ё Е ж Ж з З и И й Й к К л Л м М н Н о О п П р Р с С т Т у У ф Ф х Х ц Ц ч Ч ш Ш щ Щ ъ Ъ ы Ы ь Ь э Э ю Ю я Я)};

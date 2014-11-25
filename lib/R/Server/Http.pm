@@ -1,21 +1,27 @@
 package R::Server::Http;
-# äðàéâåð äëÿ ïðîòîêîëà qq: http
+# Ð´Ñ€Ð°Ð¹Ð²ÐµÑ€ Ð´Ð»Ñ Ð¿Ñ€Ð¾Ñ‚Ð¾ÐºÐ¾Ð»Ð° qq: http
 
 use base R::Server;
 
 use Socket;
 
-use R::Request; # èç íåãî ïîëó÷àåì $R::Request::RE_LOCATION
+use R::Request; # Ð¸Ð· Ð½ÐµÐ³Ð¾ Ð¿Ð¾Ð»ÑƒÑ‡Ð°ÐµÐ¼ $R::Request::RE_LOCATION
 
-# ñîçäà¸ò ïîäêëþ÷åíèå
+# ÐºÐ¾Ð½ÑÑ‚Ñ€ÑƒÐºÑ‚Ð¾Ñ€
 sub new {
 	my ($cls, $app) = @_;
-	
-	my ($_port, $sd) = $app->ini->{site}{port};
+	my $self = bless { app => $app }, $cls;
+	$self->create;
+}
+
+# ÑÐ¾Ð·Ð´Ð°Ñ‘Ñ‚ Ð¿Ð¾Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸Ðµ
+sub create {
+	my ($self) = @_;
+	my ($_port, $sd) = $self->{app}->ini->{site}{port};
 	
 	if($_port =~ /^\d+$/) {
 		socket $sd, AF_INET, SOCK_STREAM, getprotobyname("tcp") or die "socket: $!\n";
-		setsockopt $sd, SOL_SOCKET, SO_REUSEADDR, pack("l", 1) or die "setsockopt: $!\n"; # çàõâàòûâàåì ñîêåò, åñëè îí çàíÿò äðóãèì ïðîöåññîì
+		setsockopt $sd, SOL_SOCKET, SO_REUSEADDR, pack("l", 1) or die "setsockopt: $!\n"; # Ð·Ð°Ñ…Ð²Ð°Ñ‚Ñ‹Ð²Ð°ÐµÐ¼ ÑÐ¾ÐºÐµÑ‚, ÐµÑÐ»Ð¸ Ð¾Ð½ Ð·Ð°Ð½Â¤Ñ‚ Ð´Ñ€ÑƒÐ³Ð¸Ð¼ Ð¿Ñ€Ð¾Ñ†ÐµÑÑÐ¾Ð¼
 		bind $sd, sockaddr_in($_port, INADDR_ANY) or die "bind: $!\n";
 		listen $sd, SOMAXCONN or die "listen: $!\n";
 	} else {
@@ -24,19 +30,19 @@ sub new {
 		bind $sd, sockaddr_un($_port) or die "bind: $!\n";
 		listen $sd, SOMAXCONN  or die "listen: $!\n";
 	}
-
 	
-	bless { sd => $sd, app => $app }, $cls;
+	$self->{sd} = $sd;
+	$self
 }
 
-# èíèöèàëèçàöèÿ â íîâîì òðåäå
+# Ð¸Ð½Ð¸Ñ†Ð¸Ð°Ð»Ð¸Ð·Ð°Ñ†Ð¸Ð¸ Ð² Ð½Ð¾Ð²Ð¾Ð¼ Ñ‚Ñ€ÐµÐ´Ðµ
 # sub bind {
 	# my ($self) = @_;
 	# close $self->{ns} if $self->{ns};
 	# $self
 # }
 
-# áåñêîíå÷íûé öèêë îæèäàíèÿ è âûïîëíåíèÿ çàïðîñîâ
+# Ð±ÐµÑÐºÐ¾Ð½ÐµÑ‡Ð½Ñ‹Ð¹ Ñ†Ð¸ÐºÐ» Ð¾Ð¶Ð¸Ð´Ð°Ð½Ð¸Â¤ Ð¸ Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¸Â¤ Ð·Ð°Ð¿Ñ€Ð¾ÑÐ¾Ð²
 sub accept {
 	my ($self, $ritter) = @_;
 	
@@ -49,7 +55,7 @@ sub accept {
 	#my $sel = IO::Socket->new($_socket);
 	#$sel->add();
 	
-	# äîáàâëÿåì â âåêòîðû ñîêåò
+	# Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÐ¼ Ð² Ð²ÐµÐºÑ‚Ð¾Ñ€Ñ‹ ÑÐ¾ÐºÐµÑ‚
 	# my ($vec, $out, $err) = ("", "", "");
 	# my $sd = fileno($self->{sd});
 	# vec($vec, $sd, 1) = 1;
@@ -81,11 +87,11 @@ sub accept {
 		
 		if(my @param = $HTTP =~ m!^(\w+) $R::Request::RE_LOCATION (HTTP\/\d\.\d)\r?$!o) {
 			
-			# ñ÷èòûâàåì çàãîëîâêè
+			# ÑÑ‡Ð¸Ñ‚Ñ‹Ð²Ð°ÐµÐ¼ Ð·Ð°Ð³Ð¾Ð»Ð¾Ð²ÐºÐ¸
 			my ($head, $body);
 			/: (.*?)\r?$/ and $head->{$`} = $1 while defined($_ = <$ns>) and !/^\r?$/;
 			
-			# ñ÷èòûâàåì äàííûå
+			# ÑÑ‡Ð¸Ñ‚Ñ‹Ð²Ð°ÐµÐ¼ Ð´Ð°Ð½Ð½Ñ‹Ðµ
 			if(my $CONTENT_LENGTH = $head->{"Content-Length"} and not exists $head->{'REQUEST_BODY_FILE'}) {
 				read $ns, $body, $CONTENT_LENGTH;
 			}
@@ -95,7 +101,7 @@ sub accept {
 			#main::msg ":cyan", $request;
 			$self->stat_begin() if $_test;
 
-			# íàñòðàèâàåì ñåññèîííîå ïîäêëþ÷åíèå (íåñêîëüêî çàïðîñîâ íà ñîåäèíåíèå, åñëè êëèåíò ïîääåðæèâàåò)
+			# Ð½Ð°ÑÑ‚Ñ€Ð°Ð¸Ð²Ð°ÐµÐ¼ ÑÐµÑÑÐ¸Ð¾Ð½Ð½Ð¾Ðµ Ð¿Ð¾Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸Ðµ (Ð½ÐµÑÐºÐ¾Ð»ÑŒÐºÐ¾ Ð·Ð°Ð¿Ñ€Ð¾ÑÐ¾Ð² Ð½Ð° ÑÐ¾ÐµÐ´Ð¸Ð½ÐµÐ½Ð¸Ðµ, ÐµÑÐ»Ð¸ ÐºÐ»Ð¸ÐµÐ½Ñ‚ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶Ð¸Ð²Ð°ÐµÑ‚)
 			$keep_alive = (lc $head->{Connection} eq 'keep-alive');
 			
 			$ritter->($self);

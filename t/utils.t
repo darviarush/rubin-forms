@@ -24,11 +24,11 @@ rows => [
 	["id1", "name1", [["user.id1", [['user.sess.id1']], "user.name1"], ["user.id2", [['user.sess.id2']], "user.name2"]]]
 ]});
 
-is_deeply $ret, [{"id"=>"id1","name"=>"name1","user"=>[{"id"=>"user.id1","name"=>"user.name1","sess"=>[{"id"=>"user.sess.id1"}]},{"id"=>"user.id2","name"=>"user.name2","sess"=>[{"id"=>"user.sess.id2"}]}]}];
+is_deeply $ret, [{"id"=>"id1","name"=>"name1","user"=>[{"id"=>"user.id1","name"=>"user.name1","sess"=>[{"id"=>"user.sess.id1"}]},{"id"=>"user.id2","name"=>"user.name2","sess"=>[{"id"=>"user.sess.id2"}]}]}], "Приведение к [{...}...]";
 
 my $data = Utils::to_rows([{id=> "id1", name=> "name1", user=> [{sess=> [{id=> 'user.sess.id1'}], id=> 'user.id1', name=> 'user.name1'}, {id=> 'user.id2', name=> 'user.name2', sess=> [{id=> 'user.sess.id2'}]}]}]);
 
-is_deeply $data, {"fields"=>[["user","name","id",["sess","id"]],"name","id"],"rows"=>[[[["user.name1","user.id1",[["user.sess.id1"]]],["user.name2","user.id2",[["user.sess.id2"]]]],"name1","id1"]]};
+is_deeply $data, {"fields"=>[["user","name","id",["sess","id"]],"name","id"],"rows"=>[[[["user.name1","user.id1",[["user.sess.id1"]]],["user.name2","user.id2",[["user.sess.id2"]]]],"name1","id1"]]}, "Приведение к строкам";
 
 
 my $example = << 'END';
@@ -113,7 +113,7 @@ x2 = 30
 ";
 
 Utils::inject_ini($ref, "x::y", "z", 12);
-like $ref, qr/^z = 12\nz1/m;
+like $ref, qr/^z = 12\nz1/m, 'inject';
 
 Utils::inject_ini($ref, "x::y", "n", 50, "z1");
 
@@ -141,7 +141,7 @@ unlike $ref, qr/^f = 1$/m;
 
 Utils::inject_ini($ref, "", "k1", 90);
 
-like $ref, qr/^k1 = 90\n/m;
+like $ref, qr/^k1 = 90\n/m, 'inject end';
 
 
 

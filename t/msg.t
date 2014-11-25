@@ -1,14 +1,18 @@
+# тестирование Msg.pm
 use strict;
 use warnings;
-use Test::More tests => 65;
+use Test::More tests => 7;
 
 use Msg;
 
-our $_FRAMEWORK = "t";
+our $_FRAMEWORK;
+chdir $_FRAMEWORK;
 
+$_FRAMEWORK = "t";
 
-like file("t/msg.t"), qr!t/msg\.t$!;
-#like file("t/msg.t"), "t/msg.t";
+#like file("t/msg.t"), qr!t/msg\.t$!;
+is file("t/msg.t"), "t/msg.t";
+is file("msg.t"), "t/msg.t";
 is file("msg.tttt"), undef;
 
 is_deeply [files("msg.t")], ["t/msg.t"];

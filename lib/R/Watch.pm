@@ -1,5 +1,5 @@
-package R::Watch;
-# ñëåäèò çà èçìåíåíèÿìè ôàéëîâ è ïàïîê
+ï»¿package R::Watch;
+# ÑÐ»ÐµÐ´Ð¸Ñ‚ Ð·Ð° Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸ÑÐ¼Ð¸ Ñ„Ð°Ð¹Ð»Ð¾Ð² Ð¸ Ð¿Ð°Ð¿Ð¾Ðº
 
 use strict;
 use warnings;
@@ -9,11 +9,12 @@ use POSIX qw(strftime);
 
 use Msg;
 
-# êîíñòðóêòîð: dirs = dir:mtime, watch = file:mtime, file = file:callback, scan = dir: [ext, callback]
-sub new { my ($cls) = @_; bless { dirs => {}, watch => {}, file => {}, scan => {} }, $cls }
+# ÐºÐ¾Ð½ÑÑ‚Ñ€ÑƒÐºÑ‚Ð¾Ñ€: dirs = dir:mtime, watch = file:mtime, file = file:callback, scan = dir: [ext, callback]
+sub new { my ($cls, $app) = @_; bless { app => $app, dirs => {}, watch => {}, file => {}, scan => {} }, $cls }
 
+sub app { $_[0]->{app} }
 
-# óêàçûâàåì çà èçìåíåíèåì ôàéëîâ ñ êàêèì ðàñøèðåíèåì â êàêèõ äèðåêòîðèÿõ ñëåäèòü
+# ÑƒÐºÐ°Ð·Ñ‹Ð²Ð°ÐµÐ¼ Ð·Ð° Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸ÐµÐ¼ Ñ„Ð°Ð¹Ð»Ð¾Ð² Ñ ÐºÐ°ÐºÐ¸Ð¼ Ñ€Ð°ÑÑˆÐ¸Ñ€ÐµÐ½Ð¸ÐµÐ¼ Ð² ÐºÐ°ÐºÐ¸Ñ… Ð´Ð¸Ñ€ÐµÐºÑ‚Ð¾Ñ€Ð¸ÑÑ… ÑÐ»ÐµÐ´Ð¸Ñ‚ÑŒ
 sub on {
 	my ($self, $ext, $dirs, $callback) = @_;
 
@@ -34,7 +35,7 @@ sub on {
 	$self
 }
 
-# óäàëåíèå äèðåêòîðèè
+# ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ðµ Ð´Ð¸Ñ€ÐµÐºÑ‚Ð¾Ñ€Ð¸Ð¸
 sub erase {
 	my ($self, $dir) = @_;
 	for my $key (keys %{$self->{file}}) {
@@ -47,7 +48,7 @@ sub erase {
 	$self
 }
 
-# ñîçäàíèå èíôîðìàöèè
+# ÑÐ¾Ð·Ð´Ð°Ð½Ð¸Ðµ Ð¸Ð½Ñ„Ð¾Ñ€Ð¼Ð°Ñ†Ð¸Ð¸
 sub scan {
 	my ($self, $dir) = @_;
 	my $scan;
@@ -76,19 +77,19 @@ sub scan {
 	$self
 }
 
-# ïðîâåðêà
+# Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ°
 sub run {
 	my ($self) = @_;
 	while(my($dir, $mtime) = each %{$self->{dirs}}) {
 		main::msg('watch_dir', $dir), $self->erase($dir), $self->scan($dir) if $mtime < main::mtime($dir);
 	}
 	while(my($file, $mtime) = each %{$self->{watch}}) {
-		main::msg('watch_file', $file), $self->{file}{$file}->($file), $self->{watch}{$file} = main::mtime($file) if $mtime < main::mtime($file);
+		main::msg('watch_file', $file), $self->{file}{$file}->($file, $self->{app}), $self->{watch}{$file} = main::mtime($file) if $mtime < main::mtime($file);
 	}
 	$self
 }
 
-# âûçûâàåò ñðàáàòûâàíèå âñåõ ñëóøàòèëåé íà ôàéëàõ, ñîîòâåòâóþùèõ ìàñêå èëè, åñëè ôàéë íå óêàçàí - òî íà âñåõ
+# Ð²Ñ‹Ð·Ñ‹Ð²Ð°ÐµÑ‚ ÑÑ€Ð°Ð±Ð°Ñ‚Ñ‹Ð²Ð°Ð½Ð¸Ðµ Ð²ÑÐµÑ… ÑÐ»ÑƒÑˆÐ°Ñ‚Ð¸Ð»ÐµÐ¹ Ð½Ð° Ñ„Ð°Ð¹Ð»Ð°Ñ…, ÑÐ¾Ð¾Ñ‚Ð²ÐµÑ‚Ð²ÑƒÑŽÑ‰Ð¸Ñ… Ð¼Ð°ÑÐºÐµ Ð¸Ð»Ð¸, ÐµÑÐ»Ð¸ Ñ„Ð°Ð¹Ð» Ð½Ðµ ÑƒÐºÐ°Ð·Ð°Ð½ - Ñ‚Ð¾ Ð½Ð° Ð²ÑÐµÑ…
 sub fire {
 	my($self, $path) = @_;
 	if(!defined $path) {
@@ -101,7 +102,7 @@ sub fire {
 	$self
 }
 
-# öèêë ñëåæåíèÿ
-sub loop { my ($self, $sub) = @_; for(;;) { $sub->() if $sub; $self->run(); sleep 1; } }
+# Ñ†Ð¸ÐºÐ» ÑÐ»ÐµÐ¶ÐµÐ½Ð¸Ñ
+sub loop { my ($self, $sub) = @_; for(;;) { $sub->() if $sub; $self->run; sleep 1; } }
 
 1;

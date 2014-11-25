@@ -22,7 +22,7 @@ sub watch {
 	($watch // $self->{app}->watch)->on(qr/\.act$/, $dir, Utils::closure($self, sub {
 		my ($self, $path) = @_;
 		$self->compile_action($path);
-	}))->on(qr/\.htm$/, $dir, Utils::closure($self, sub {
+	}))->on(qr/\.htm$/, $dir, Utils::closure($self, sub { 
 		my ($self, $path) = @_;
 		$self->compile_htm($path);
 	}))
@@ -51,7 +51,7 @@ sub write {
 	my ($self, $file) = @_;
 	$self->{require} = $file // $self->{require};
 	my $dir = [main::dirs($self->{dir_c})];
-	open my $f, ">", $file or die $!;
+	open my $f, ">", $file or die "Нет файла `$file` для записи: $!";
 	print $f "use Helper;\n\n";
 	R::Watch->new->on(qr/\.(act|htm)\.pl$/, $dir, sub {
 		my ($path) = @_;
@@ -94,14 +94,14 @@ sub compile_htm {
 		$form->{name} = $index unless $form->{name};
 		$form->{id} = $id = "$index-$id";
 		#$form->{query} = form_query $form, $forms;
-		push @write, "\$app->action->form{'$id'} = ".Utils::Dump($form).";\n\n";
+		push @write, "\$app->action->{form}{'$id'} = ".Utils::Dump($form).";\n\n";
 		$_ = "$index-$_" for @{$form->{forms}};
 	}
 	
 	my $code = $page->{code};
 	delete $page->{code};
 	
-	$eval = join "", "\$app->action->{htm}{'$index'} = sub { my (\$app, \$data, \$id) = \@_; my \$_STASH = \$app->stash; return join \"\", '", $eval, "'};\n\n\$app->action->{page}{'$index'} = ", Utils::Dump($page), ";\n\$app->action->{page}{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
+	$eval = join "", "\$app->action->{htm}{'$index'} = sub { $Utils::code_begin_param return join \"\", '", $eval, "'};\n\n\$app->action->{page}{'$index'} = ", Utils::Dump($page), ";\n\$app->action->{page}{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
 	
 	my $p = $path;
 	$p =~ s!\b$self->{dir}/!$self->{dir_c}/!;

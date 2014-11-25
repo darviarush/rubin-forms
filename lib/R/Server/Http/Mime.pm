@@ -1,4 +1,5 @@
 package R::Server::Http::Mime;
+# mime типы для файлов и писем
 
 sub new { return {
     "html" => "text/html",

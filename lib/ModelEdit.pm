@@ -1,5 +1,8 @@
 package ModelEdit;
 
+use strict;
+use warnings;
+
 sub new {
 	my ($cls, $app) = @_;
 	bless {app => $app}, $cls;
@@ -11,8 +14,10 @@ sub app { $_[0]->{app} }
 sub edit {
 	my ($self) = @_;
 
-	my $request = $self->{app}->request;
-	my $response = $self->{app}->response;
+	my $app = $self->{app};
+	my $request = $app->request;
+	my $response = $app->response;
+	my $ini = $app->ini;
 	
 	my $erase = $request->param("method") eq 'erase';
 	my $action = $request->param("action");
@@ -25,13 +30,14 @@ sub edit {
 		my ($arg, $key, $col) = @_;
 		my $val = $ini->{do}{$key}? join ",", sort { $a cmp $b } ($erase || !$col? (): $col), grep {$_ ne $col} (split /,\s*/, $ini->{do}{$key}): $col;
 		$ini->{do}{$key} = $val;
-		if($val ne "") { Utils::inject_ini($_[0], "", $key, $val) } else { main::msg "in $key delete"; Utils::delete_ini($_[0], "", $key); delete $ini->{do}{$key} }
+		if($val ne "") { Utils::inject_ini($_[0], "", $key, $val) } else { Utils::delete_ini($_[0], "", $key); delete $ini->{do}{$key} }
 	};
 	
 	if($action eq "selfcol") {
 		my $key = "$tab.selfcol";
 		if($perm ne "") {
-			$i = 0;
+			my $i = 0;
+			my $_info = $app->connect->info;
 			for my $col (split /,\s*/, $perm) {
 				if($i++ == 0 && $col !~ /\./) { $col = "$tab.$col"; }
 				return $response->error(406, "`$col` не разделён \".\"") unless $col =~ /\./;
@@ -39,33 +45,41 @@ sub edit {
 				return $response->error(406, "Нет столбца $col в базе") unless exists $_info->{$`}{$'};
 			}
 			$ini->{do}{$key} = $perm;
-			Utils::inject_ini($_[0], "", $key, $perm);
+			Utils::inject_ini($_[1], "", $key, $perm);
 		}
-		else { Utils::delete_ini($_[0], "", $key); delete $ini->{do}{$key} }
+		else { Utils::delete_ini($_[1], "", $key); delete $ini->{do}{$key} }
 	}
 	elsif($action eq "valid") {
 		my @roles = split /,\s*/, $perm;
 		$self->app->auth->get_validator($_, "$tab.$_", $col) for @roles; # тестируем, чтобы были такие валидаторы
-		$inject->($_[0], "$tab.$_", $col) for @roles;
-		$inject->($_[0], "$tab.$_") unless @roles;
+		$inject->($_[1], "$tab.$_", $col) for @roles;
+		$inject->($_[1], "$tab.$_") unless @roles;
 	}
 	elsif($action eq "tab_perm") {
-		$inject->($_[0], "$tab.$role", $perm);
+		$inject->($_[1], "$tab.$role", $perm);
 	}
 	elsif($action eq "perm") {
-		$inject->($_[0], "$tab.$role.$perm", $col);
+		$inject->($_[1], "$tab.$role.$perm", $col);
 	}
 	else {
 		die "Неизвестный action=$action";
 	}
 }
 
-# выбирает информацию из sql-файла
+# кеширует
+sub install_info {
+	my $self = shift;
+	return $self->{install_info} if exists $self->{install_info};
+	$self->{install_info} = $self->get_install_info(@_ or main::files("install.sql"));
+}
+
+# выбирает информацию из sql-файлов
 sub get_install_info {
+	my ($self, @file) = @_;
 	my ($order, $prev, $install, $tab, $col) = (1, "\@", {});
 	my $f;
 	
-	for my $file (@_) {
+	for my $file (@file) {
 		
 		open $f, $file or die $!;
 		
@@ -118,8 +132,9 @@ sub get_install_info {
 
 my %column_type = ("int(11)" => "int", "tinyint(4)" => "tinyint");
 
-sub sql_from_info {
-	my ($sql) = @_;
+#sub sql_from_info {
+sub alter_column {
+	my ($self, $sql) = @_;
 	($sql? (($column_type{$sql->{column_type}} || $sql->{column_type} || "").
 	($sql->{is_nullable} eq "YES" || $sql->{column_key} =~ /PRI/? "": " not null").
 	(defined($sql->{column_default})? " default $sql->{column_default}": "").

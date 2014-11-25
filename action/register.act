@@ -1,18 +1,16 @@
+# регистрация
 
-use Mailer;
-
-$email = $param->{email};
+$email = $request->param("email");
 if($email) {
-	$mailer = Mailer->new;
 
-	$user = replace("user", {email=>$email});
-	$user_id = $user->{id};
+	$user_id = $app->connect->replace("user", {email=>$email})->last_id;
 
 	$sess = Utils::unic_id(20);
-	erase("sess", {user_id=>$user_id, new_pass=>1});
-	add("sess", {id=>$sess, user_id=>$user_id, new_pass=>1});
+	$app->connect->erase("sess", {user_id=>$user_id, new_pass=>1});
+	$app->connect->add("sess", {id=>$sess, user_id=>$user_id, new_pass=>1});
 
-	$mailer->send_email("register", {To=>$email}, {id=>$sess});
+	# send_email
+	$app->mailer->send("register", {To=>$email}, {id=>$sess});
 
 	return { email => $email };
 }
@@ -20,10 +18,10 @@ if($email) {
 
 $id = $param->{id};
 if($id) {
-	$new_pass = query("sess", "new_pass", {id=>$id});
+	$new_pass = $app->connect->query("sess", "new_pass", {id=>$id});
 
 	if($new_pass) {
-		setcookie "sess", $id, undef, "/";
+		$response->cookie("sess", $id, path => "/");
 	}
 	return { new_pass => $new_pass };
 }

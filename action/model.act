@@ -1,12 +1,15 @@
 use ModelEdit;
 
+use strict;
+use warnings;
 
 # авторизируемся
-return $request->status(401) unless $ini->{site}{test};
+return $request->status(401) unless $app->ini->{site}{test};
 
+$edit = ModelEdit->new($app);
 
 if(exists $param->{area}) {
-	$install = get_install_info(main::files("install.sql"));
+	$install = $edit->install_info;
 	$install = $install->{$param->{tab}};
 	open $f, $install->{file} or die "Нет файла $install->{file}:$!";
 	@lines = <$f>;
@@ -18,9 +21,9 @@ if(exists $param->{area}) {
 if($param->{method}) {
 
 	if($param->{method} eq "+") {
-		$install = get_install_info(files("install.sql"));
+		$install = $edit->install_info;
 		$tab = $param->{tab};
-		return $install->{$tab}->{install} . $install->{$tab}->{after};
+		return $install->{$tab}{install} . $install->{$tab}{after};
 	}
 
 	Utils::replace("main_do.ini", \&model_edit);
@@ -29,9 +32,9 @@ if($param->{method}) {
 }
 
 $table_info = sub {
-	$install = get_install_info(files("install.sql"));
-	$_info = get_info();
-	$info = get_ini_info();
+	$install = $edit->install_info;
+	$_info = $self->{app}->connect->info;
+	$info = $self->{app}->auth;
 	$rules = $info->{rules};
 
 	%tab = Utils::set(keys(%$_info), keys(%$install), map { keys(%$_) } values %$info);
@@ -117,7 +120,7 @@ $table_info = sub {
 
 				package => $ins->{package} // "",
 				install => $ins->{install} // "",
-				sql => sql_from_info($sql),
+				sql => $edit->alter_column($sql),
 				valid => $info->{tab_valid}{$tab}{$col},
 				
 				order => $sql->{ordinal_position} || $ins->{order} || "",

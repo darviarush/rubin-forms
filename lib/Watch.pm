@@ -1,4 +1,4 @@
-
+# старый ватчер. Сейчас разбит на R::Watch и функции в разных классах
 
 use File::Find;
 use POSIX qw(strftime);

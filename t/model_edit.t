@@ -1,15 +1,13 @@
+# тестирует ModelEdit.pm
+
 use strict;
 use warnings;
 
-
-use Data::Dumper;
 use Test::More tests => 10;
 
 use Msg;
-use Auth;
-use Utils;
-use Action;
 use ModelEdit;
+our $app;
 
 my $ref = "
 project.self = add,edit,view
@@ -18,10 +16,10 @@ project.self.view = name, description
 project.ref = user_id
 ";
 
-our $ini;
+my $ini = $app->ini;
 $ini->{do} = Utils::parse_ini(undef, $ref);
 
-our $param = {
+$app->request->{param} = {
 	method => 'save',
 	action => 'perm',
 	tab => 'project',
@@ -30,13 +28,14 @@ our $param = {
 	perm => 'add'
 };
 
-model_edit($ref);
+my $model_edit = ModelEdit->new($app);
+$model_edit->edit($ref);
 
 like $ref, qr/project.self.add = name/;
 is $ini->{do}{"project.self.add"}, "name";
 
 
-$param = {
+$app->request->{param} = {
 	method => 'erase',
 	action => 'perm',
 	tab => 'project',
@@ -45,12 +44,12 @@ $param = {
 	perm => 'view'
 };
 
-model_edit($ref);
+$model_edit->edit($ref);
 
 like $ref, qr/project.self.view = description/;
 is $ini->{do}{"project.self.view"}, "description";
 
-$param = {
+$app->request->{param} = {
 	method => 'erase',
 	action => 'perm',
 	tab => 'project',
@@ -59,13 +58,13 @@ $param = {
 	perm => 'view'
 };
 
-model_edit($ref);
+$model_edit->edit($ref);
 
 unlike $ref, qr/project.self.view/;
 is $ini->{do}{"project.self.view"}, undef;
 
 
-$param = {
+$app->request->{param} = {
 	method => 'erase',
 	action => 'tab_perm',
 	tab => 'project',
@@ -74,12 +73,12 @@ $param = {
 	perm => 'view'
 };
 
-model_edit($ref);
+$model_edit->edit($ref);
 
 like $ref, qr/project.self = add,edit/;
 is $ini->{do}{"project.self"}, "add,edit";
 
-$param = {
+$app->request->{param} = {
 	method => 'save',
 	action => 'tab_perm',
 	tab => 'project',
@@ -88,7 +87,7 @@ $param = {
 	perm => 'rm'
 };
 
-model_edit($ref);
+$model_edit->edit($ref);
 
 like $ref, qr/project.self = add,edit,rm/;
 is $ini->{do}{"project.self"}, "add,edit,rm";

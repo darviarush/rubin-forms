@@ -11,9 +11,9 @@ sub unique { my %x; map { if(exists $x{$_}) { () } else { $x{$_} = 1; $_ } } @_ 
 # замыкание
 sub closure {
 	my $sub = pop;
-	my ($obj, @args) = @_;
+	my @args = @_;
 	sub {
-		$sub->($obj, @args, @_);
+		$sub->(@args, @_);
 	}
 }
 
@@ -659,6 +659,7 @@ my $code_begin_i = "sub { my (\$dataset, \$id1) = \@_; my \$i = 0; for my \$data
 my $code_end_i = "\$i++; } }\n";
 my $code_begin1_i = "sub { my (\$data, \$id) = \@_; \n";
 my $code_end1_i = "}\n";
+our $code_begin_param = "my (\$app, \$data, \$id) = \@_; my \$dbh=\$app->connect->{dbh}; my \$action=\$app->action; my \$_STASH = \$app->stash;";
 
 
 sub TemplateBare {
@@ -688,7 +689,7 @@ sub TemplateBare {
 	
 	my $get_id = sub { $open_id? ($form->{id}? "$form->{id}-$open_id": $open_id): /\bid=["']?([\w-]+)[^<]*\G/i && $1 };
 	
-	my $vario = sub { my ($type, $var, $const) = @_; defined($const)? $re_type->($const): defined($type)? ($var eq "_DATA"? "\$data": $var eq "_STASH"? "\\%_STASH": $var eq 'i'? "\$i": $var eq "i0"? "(\$i-1)": $var eq "id"? "\$id": "\$_STASH{'$var'}"): "\$data->{'$var'}" };
+	my $vario = sub { my ($type, $var, $const) = @_; defined($const)? $re_type->($const): defined($type)? ($var eq "user_id"? "\$app->session->user_id": $var eq "_DATA"? "\$data": $var eq "_STASH"? "\\%_STASH": $var eq 'i'? "\$i": $var eq "i0"? "(\$i-1)": $var eq "id"? "\$id": "\$_STASH{'$var'}"): "\$data->{'$var'}" };
 	my $helper = sub {
 		my ($type, $var, $const, $open_braket) = @_;
 		push @html, $vario->($type, $var, $const);
@@ -764,7 +765,7 @@ sub TemplateBare {
 					if($form->{load}) {
 						my $data = ($name? "\$data->{'$name'}": "\$_[0] = \$data");
 						my $where = exists $form->{where}? ", join '', $form->{where}": '';
-						$load = "$data = form_load(\$id.'-$name'$where) unless ref($data);";
+						$load = "$data = \$action->form_load(\$id.'-$name'$where) unless ref($data);";
 						push @code, ["load", $load . "\n"];
 						$load = "do { $load () }, ";
 					}
@@ -855,7 +856,7 @@ sub TemplateBare {
 			$T->{where} = "id=\$$var" if $var;
 			$T->{tab} = $model // $name;
 			$T->{where} = "$form->{tab}_id=\$$form->{name}_id" . (exists $T->{where}? " AND ($T->{where})": "") if $load == 2;
-			$T->{where} =~ s!['\\]!\\$&!g, $T->{where} =~ s!\$(%)?(\w+)!"', quote(" . $vario->($1, $2) . "), '"!ge, $T->{where} = "'$T->{where}'" if exists $T->{where};
+			$T->{where} =~ s!['\\]!\\$&!g, $T->{where} =~ s!\$(%)?(\w+)!"', \$dbh->quote(" . $vario->($1, $2) . "), '"!ge, $T->{where} = "'$T->{where}'" if exists $T->{where};
 			#$T->{where} =~ s!\$(%)?(\w+)!"'".$vario->($1, $2)."'"!ge if exists $T->{where};
 			
 			my $n = ($name? "-$name": "");
@@ -884,7 +885,7 @@ sub TemplateBare {
 		}
 		if($code eq "begin" and $code[$i+1]->[0] eq "end") { splice @code, $i, 2; goto CODE; }
 	}
-	$form->{code} = join "", $code_begin1_i, map({$_->[1]} @code), $code_end1_i;
+	$form->{code} = join "", "sub { $code_begin_param\n", map({$_->[1]} @code), "\n}\n";
 	
 	my $x = join "", @html;
 	#our $rem++;
@@ -893,7 +894,7 @@ sub TemplateBare {
 }
 
 sub TemplateStr {
-	join "", $code_begin1, TemplateBare, $code_end1;
+	join "", $code_begin1, TemplateBare(@_), $code_end1;
 }
 
 # возвращает функцию

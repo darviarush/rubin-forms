@@ -1,4 +1,5 @@
 package Cron;
+# запуск заданий по времени
 
 sub new {
 	my ($cls) = @_;

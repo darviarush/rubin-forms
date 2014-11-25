@@ -81,9 +81,9 @@ sub ritter {
 
 	$app->session->reset;
 	
-	my $act = $app->action;
-	my $_action = $act->{act};
-	my $_action_htm = $act->{htm};
+	my $action = $app->action;
+	my $_action = $action->{act};
+	my $_action_htm = $action->{htm};
 	my $_HEAD = $request->head;
 	
 	eval {
@@ -95,6 +95,7 @@ sub ritter {
 			
 			#$_user_id = $_COOKIE->{sess}? auth(): undef;
 			#%_STASH = (user_id => $_user_id);
+			$app->stash({});
 			
 			$self->submit($ajax eq "submit");
 			return $self->ajax_redirect if $response->{status} == 307;
@@ -156,6 +157,8 @@ $x
 			$conn->reconnect;
 		}
 	}
+	
+	$app->{stash} = {};
 	
 }
 
