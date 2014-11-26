@@ -1,13 +1,9 @@
 package R::App;
 # содержит различные объекты, необходимые для приложения
 
-use AnyEvent;
-
 sub new {
 	my ($cls) = @_;
-	my $app = bless {}, $cls;
-	$app->event(AnyEvent);
-	$app
+	bless {}, $cls;
 }
 
 

@@ -37,12 +37,60 @@ sub daemon {
 # расщепляем процесс 
 sub fork {
 	my ($self, $lord, $lords) = @_;
-	$self->{lord} = $lord;
+	$self->{lord} = $lord //= $self->{lord};
 	$lords //= $self->{app}->ini->{site}{lords};
 	for(my $i=0; $i<$lords; $i++) {
 		threads->create($lord) or die $!;
 	}
 	$! = undef;
+	$self
+}
+
+# завершает работу с процессами
+sub close {
+	my ($self) = @_;
+	for my $thr (threads->list) { $thr->detach; }
+	$self
+}
+
+# тестирует - можно ли перезагружать
+sub test {
+	my ($self, $test) = @_;
+	$test //= $0;
+	my $res = `perl -c $test`;
+	return $? == 0? undef: $res;
+}
+
+# перезагружает сервер
+sub reload {
+	my ($self) = @_;
+	#print STDERR `nginx -s reload`;
+	my $app = $self->{app};
+	
+	$app->process->close;
+	$app->server->close;
+	my $pid = CORE::fork;
+	die "Не могу создать процесс. $!" if $pid < 0;
+	exec $0, @ARGV if $pid;	# заменяем родительский процесс
+
+	sleep 3;
+	if(kill 0, getppid) {	# завершаемся если процесс за 3 секунды не упал
+		$app->hung->close;
+		open my $p, ">/dev/null" or die $!;
+		CORE::close $_ for 3..fileno $p; 
+		exit;
+	}
+	
+	# восстанавливаемся
+	$app->server->create;
+	$self->fork;
+	
+	# if(my $res = $self->test) {
+		# main::msg ":RED", $res, ":RESET";
+	# } else {
+		# $self->end_server;
+		# exec $0, @ARGV;
+	# }
 	$self
 }
 
@@ -79,46 +127,6 @@ sub loop {
 	}
 }
 
-# завершает работу с процессами
-sub close {
-	my ($self) = @_;
-	for my $thr (threads->list) { $thr->detach; }
-	$self
-}
-
-# тестирует - можно ли перезагружать
-sub test {
-	my ($self, $test) = @_;
-	$test //= $0;
-	my $res = `perl -c $test`;
-	return $? == 0? undef: $res;
-}
-
-# перезагружает сервер
-sub reload {
-	my ($self) = @_;
-	#print STDERR `nginx -s reload`;
-	$self->{app}->server->close;
-	my $pid = CORE::fork;
-	die "Не могу создать процесс. $!" if $pid < 0;
-	exec $0, @ARGV unless $pid;	# процесс
-
-	sleep 3;
-	if(kill 0, $pid) {	# завершаемся
-		$self->end_server;
-		exit;
-	} 
-	
-	waitpid $pid, WNOHANG;	# удаляем зомби
-	
-	# if(my $res = $self->test) {
-		# main::msg ":RED", $res, ":RESET";
-	# } else {
-		# $self->end_server;
-		# exec $0, @ARGV;
-	# }
-	$self
-}
 
 sub end_server {
 	my ($self, $end_server) = @_;

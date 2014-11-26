@@ -38,7 +38,7 @@ sub compile {
 	
 	unless($self->{dir}) {
 		$self->{dir} = 'action';
-		$self->{dir_c} = 'action_c';
+		$self->{dir_c} = 'watch/action_c';
 	}
 
 	my $watch = R::Watch->new;

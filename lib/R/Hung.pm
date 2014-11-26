@@ -4,7 +4,8 @@ package R::Hung;
 
 
 my %pid;
-END { kill KILL, keys %pid; #main::msg "END";
+sub close {
+	kill KILL, keys %pid;
 }
 
 sub DESTROY { my ($self) = @_; kill KILL, @{$self->{pid}}; delete $pid{$_} for @{$self->{pid}}; #main::msg "DESTROY", $self->{pid};
