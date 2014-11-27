@@ -4,6 +4,7 @@ package R::Server::Http;
 use base R::Server;
 
 use Socket;
+use Symbol;
 
 use R::Request; # из него получаем $R::Request::RE_LOCATION
 
@@ -17,12 +18,16 @@ sub new {
 # создаёт подключение
 sub create {
 	my ($self) = @_;
-	my ($_port, $sd) = $self->{app}->ini->{site}{port};
-	
+	my $_port = $self->{app}->ini->{site}{port};
+	my $sd = gensym;  
+	 
 	if($_port =~ /^\d+$/) {
 		socket $sd, AF_INET, SOCK_STREAM, getprotobyname("tcp") or die "socket: $!\n";
-		setsockopt $sd, SOL_SOCKET, SO_REUSEADDR, pack("l", 1) or die "setsockopt: $!\n"; # захватываем сокет, если он зан¤т другим процессом
-		bind $sd, sockaddr_in($_port, INADDR_ANY) or die "bind: $!\n";
+		setsockopt $sd, SOL_SOCKET, SO_REUSEADDR, pack("l", 1) or die "setsockopt reuseaddr: $!\n"; # захватываем сокет, если он занят другим процессом
+		#if(SO_REUSEPORT =~ /^\d+$/) {
+		#	setsockopt $sd, SOL_SOCKET, SO_REUSEPORT, pack("l", 1) or die "setsockopt reuseport: $!\n";
+		#}
+		bind $sd, sockaddr_in($_port, INADDR_ANY) or die "$$ bind: $!\n";
 		listen $sd, SOMAXCONN or die "listen: $!\n";
 	} else {
 		socket $sd, PF_UNIX, SOCK_STREAM, 0 or die "socket: $!\n";
@@ -30,7 +35,7 @@ sub create {
 		bind $sd, sockaddr_un($_port) or die "bind: $!\n";
 		listen $sd, SOMAXCONN  or die "listen: $!\n";
 	}
-	
+
 	$self->{sd} = $sd;
 	$self
 }
@@ -62,6 +67,8 @@ sub accept {
 	# vec($out, $sd, 1) = 1;
 	# vec($err, $sd, 1) = 1;
 	
+	#$app->event->io(cb => );
+	
 	my($ns, $keep_alive);
 	for(;;) {
 		
@@ -80,7 +87,7 @@ sub accept {
 			close $ns if $ns;
 			accept $ns, $self->{sd} or die "not ns: $!";
 			$self->{ns} = $ns;
-			next unless defined($HTTP = <$ns>);
+			last unless defined($HTTP = <$ns>);
 		}
 		
 		$self->stat_start() if $_test;
@@ -139,6 +146,7 @@ sub accept {
 		%$request = (app=>$app);
 		%$response = (app=>$app);
 		($k, $v) = ();
+		close $ns unless $keep_alive;
 	}
 }
 

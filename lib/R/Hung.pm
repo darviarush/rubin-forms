@@ -58,10 +58,11 @@ package R::Hung::Process;
 use IPC::Open3;
 use POSIX qw/strftime/;
 use Cwd qw/abs_path/;
+use Symbol;
 
 sub new {
 	my ($cls, $watch) = @_;
-	my ($in, $out) = ();
+	my ($in, $out) = (gensym, gensym);
 	my $pid = open3($in, $out, $out, $watch->{hang}) or die "Не запустился процесс `$watch->{hang}`. $!";
 	
 	#Utils::nonblock($in);

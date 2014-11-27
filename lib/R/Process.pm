@@ -1,7 +1,7 @@
 package R::Process;
 # работает с процессами и нитями
 
-use POSIX ":sys_wait_h";
+use POSIX qw/:sys_wait_h/;
 use threads ('yield',
 	'stack_size' => 64*4096,
 	'exit' => 'threads_only',
@@ -12,6 +12,7 @@ use threads::shared;
 
 sub new {
 	my ($cls, $app) = @_;
+	
 	bless {app=>$app, end_server=>sub {
 		my ($app) = @_;
 		$app->process->close;
@@ -37,19 +38,55 @@ sub daemon {
 # расщепляем процесс 
 sub fork {
 	my ($self, $lord, $lords) = @_;
-	$self->{lord} = $lord;
-	$lords //= $self->{app}->ini->{site}{lords};
+	my $ini = $self->{app}->ini;
+	$self->{lord} = $lord //= $self->{lord};
+	$lords //= $ini->{site}{lords};
 	for(my $i=0; $i<$lords; $i++) {
-		threads->create($lord) or die $!;
-	}
+		threads->create($lord, $self->{app}) or die $!;
+	} 
 	$! = undef;
 	$self
 }
 
+# завершает работу с процессами
+sub close {
+	my ($self) = @_;
+	for my $thr (threads->list) { $thr->detach; }
+	$self
+}
+
+# перезагружает сервер
+sub reload {
+	my ($self) = @_;
+	#print STDERR `nginx -s reload`;
+	
+	my $app = $self->{app};
+
+	@ARGV = "ini" if @ARGV==1;
+	push @ARGV, "restart=" . fileno($app->server->{sd}) if $ARGV[$#ARGV] !~ /^restart=\d+$/;
+	
+	my $pid = CORE::fork;
+	die "Не могу создать процесс. $!" if $pid < 0;
+	exec $0, @ARGV unless $pid;	# процесс
+	
+	sleep 3;
+	
+	my $is = waitpid $pid, WNOHANG;	# удаляем зомби
+	kill(9, $pid), waitpid $pid, 0 unless $is;	# потомок почему-то не завершился - удаляем
+	
+	# if(my $res = $self->test) {
+		# main::msg ":RED", $res, ":RESET";
+	# } else {
+		# $self->end_server;
+		# exec $0, @ARGV;
+	# }
+	$self
+} 
 
 # главный процесс - следит за остальными и выполняет действия по крону
 sub loop {
 	my ($self, $cron) = @_;
+	kill 9, getppid if $ini->{restart};	# завершаем родительский процесс, если это перезагрузка
 	$SIG{INT} = $SIG{TERM} = Utils::closure($self, sub { $_[0]->end_server; exit; });
 	for(;;) {
 		sleep 1;
@@ -79,46 +116,13 @@ sub loop {
 	}
 }
 
-# завершает работу с процессами
-sub close {
-	my ($self) = @_;
-	for my $thr (threads->list) { $thr->detach; }
-	$self
-}
-
 # тестирует - можно ли перезагружать
-sub test {
-	my ($self, $test) = @_;
-	$test //= $0;
-	my $res = `perl -c $test`;
-	return $? == 0? undef: $res;
-}
-
-# перезагружает сервер
-sub reload {
-	my ($self) = @_;
-	#print STDERR `nginx -s reload`;
-	$self->{app}->server->close;
-	my $pid = CORE::fork;
-	die "Не могу создать процесс. $!" if $pid < 0;
-	exec $0, @ARGV unless $pid;	# процесс
-
-	sleep 3;
-	if(kill 0, $pid) {	# завершаемся
-		$self->end_server;
-		exit;
-	} 
-	
-	waitpid $pid, WNOHANG;	# удаляем зомби
-	
-	# if(my $res = $self->test) {
-		# main::msg ":RED", $res, ":RESET";
-	# } else {
-		# $self->end_server;
-		# exec $0, @ARGV;
-	# }
-	$self
-}
+# sub test {
+	# my ($self, $test) = @_;
+	# $test //= $0;
+	# my $res = `perl -c $test`;
+	# return $? == 0? undef: $res;
+# }
 
 sub end_server {
 	my ($self, $end_server) = @_;

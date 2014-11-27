@@ -15,16 +15,15 @@ $SIG{USR1}->();
 
 # грузим экшены
 msg ":bold black", "load action...";
-$app->action->compile("action", "watch/action_c")->write("watch/action.pl");
+$app->action->compile->write("watch/action.pl") unless $app->ini->{restart};
 $app->stash({});
 require "watch/action.pl";
-
 
 # Открываем сокет
 # наш скрипт будет слушать порт $ini->{site}{port} (9000)
 # длина очереди соединений (backlog)- 5 штук
 $app->server;
-msg ":empty", "Слушаем ", ":green", $app->ini->{site}{port};
+msg ":empty", ":red", $$, ":reset", " Слушаем ", ":green", $app->ini->{site}{port};
 
 # демонизируемся
 $app->process->daemon if $app->ini->{site}{daemon};
