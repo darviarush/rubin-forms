@@ -7,6 +7,7 @@ use threads ('yield',
 	'exit' => 'threads_only',
 	'stringify');
 use threads::shared;
+#use forks;
 
 
 
@@ -24,7 +25,7 @@ sub new {
 # демонизирует
 sub daemon {
 	my ($self, $path) = @_;
-	$path //= dirname($0).'/rubin.log';
+	$path //= $_FRAMEWORK.'/watch/rubin.log';
 	open STDOUT, '>', $path or die "Не могу перенаправить STDOUT. $!";
 	open STDERR, '>>', $path or die "Не могу перенаправить STDERR. $!";
 	open STDIN, "<", "/dev/null" or die "Не могу перенаправить STDIN. $!";
@@ -38,11 +39,16 @@ sub daemon {
 # расщепляем процесс 
 sub fork {
 	my ($self, $lord, $lords) = @_;
+
 	my $ini = $self->{app}->ini;
 	$self->{lord} = $lord //= $self->{lord};
 	$lords //= $ini->{site}{lords};
+
 	for(my $i=0; $i<$lords; $i++) {
-		threads->create($lord, $self->{app}) or die $!;
+		threads->create(sub {
+			# $SIG{ALRM} = sub { main::msg ":red", "tid: ".threads->tid." exit"; threads->exit };
+			goto &$lord;
+		}, $self->{app}) or die $!; 
 	} 
 	$! = undef;
 	$self
@@ -51,42 +57,78 @@ sub fork {
 # завершает работу с процессами
 sub close {
 	my ($self) = @_;
-	for my $thr (threads->list) { $thr->detach; }
+	for my $thr (threads->list) { $thr->kill(SIGALRM)->join; }
 	$self
 }
+
+
+# перезагружает сервер
+# sub reload {
+	# my ($self) = @_;
+	## print STDERR `nginx -s reload`;
+	
+	# my $app = $self->{app};
+
+	# @ARGV = "ini" if @ARGV==1;
+	# push @ARGV, "restart=" . fileno($app->server->{sd}) if $ARGV[$#ARGV] !~ /^restart=\d+$/;
+	
+	# my $pid = CORE::fork;
+	# die "Не могу создать процесс. $!" if $pid < 0;
+	# exec $0, @ARGV unless $pid;	# процесс
+	
+	# sleep 3;
+	
+	# my $is = waitpid $pid, WNOHANG;	# удаляем зомби
+	# kill(9, $pid), waitpid $pid, 0 unless $is;	# потомок почему-то не завершился - удаляем
+	
+	# $self
+#}
+
+# тестирует - можно ли перезагружать
+# sub test {
+	# my ($self, $test) = @_;
+	# $test //= $0;
+	# my $res = `perl -c $test`;
+	# return $? == 0? undef: $res;
+# }
 
 # перезагружает сервер
 sub reload {
 	my ($self) = @_;
 	#print STDERR `nginx -s reload`;
-	
 	my $app = $self->{app};
-
+	
 	@ARGV = "ini" if @ARGV==1;
-	push @ARGV, "restart=" . fileno($app->server->{sd}) if $ARGV[$#ARGV] !~ /^restart=\d+$/;
+	push @ARGV, "restart=$$" if $ARGV[$#ARGV] !~ /^restart=1$/;
+	
+	$self->close;
+	$app->server->close;
 	
 	my $pid = CORE::fork;
 	die "Не могу создать процесс. $!" if $pid < 0;
-	exec $0, @ARGV unless $pid;	# процесс
+	exec $0, @ARGV unless $pid;	# дочерний процесс
 	
 	sleep 3;
 	
 	my $is = waitpid $pid, WNOHANG;	# удаляем зомби
-	kill(9, $pid), waitpid $pid, 0 unless $is;	# потомок почему-то не завершился - удаляем
+	if($is) {	# потомок не завершился - завершаюсь
+		main::msg "Потомок не завершился - завершаюсь";
+		$app->hung->close;
+		$app->connect->close; 
+		#open my $p, ">/dev/null" or die $!;
+		#CORE::close $_ for 3..fileno $p; 
+		exit;
+	}
 	
-	# if(my $res = $self->test) {
-		# main::msg ":RED", $res, ":RESET";
-	# } else {
-		# $self->end_server;
-		# exec $0, @ARGV;
-	# }
-	$self
-} 
+	# восстанавливаемся
+	main::msg ":bold black", "Потомок завершился - восстанавливаюсь";
+	$app->server->create;
+	$self->fork
+}
 
 # главный процесс - следит за остальными и выполняет действия по крону
 sub loop {
 	my ($self, $cron) = @_;
-	kill 9, getppid if $ini->{restart};	# завершаем родительский процесс, если это перезагрузка
 	$SIG{INT} = $SIG{TERM} = Utils::closure($self, sub { $_[0]->end_server; exit; });
 	for(;;) {
 		sleep 1;
@@ -116,13 +158,6 @@ sub loop {
 	}
 }
 
-# тестирует - можно ли перезагружать
-# sub test {
-	# my ($self, $test) = @_;
-	# $test //= $0;
-	# my $res = `perl -c $test`;
-	# return $? == 0? undef: $res;
-# }
 
 sub end_server {
 	my ($self, $end_server) = @_;
@@ -140,7 +175,7 @@ sub watch {
 	my $watch = $self->{app}->watch;
 	$watch->on(qr//, [ grep { defined $_ and !exists $watch->{file}{$_} and -e $_ } "qq", "main.ini", values %INC], sub {
 		my ($path, $app) = @_;
-		my $module = m!/.*\.(\w+)\.pl$!? ($1 eq "act"? "action": $1): "module";
+		my $module = $path =~ m!/.*\.(\w+)\.pl$!? ($1 eq "act"? "action": $1): "module";
 		main::msg ":empty", ":time", " - ", ":red", $module, ":reset", " $path";
 		$app->process->reload;
 	});

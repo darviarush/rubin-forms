@@ -6,7 +6,7 @@ use R::Watch;
 # конструктор
 sub new {
 	my($cls, $app) = @_;
-	bless {app => $app}, $cls;
+	bless {app => $app, dir => 'action', dir_c => 'watch/action_c'}, $cls;
 }
 
 # удаляет директорию co скомпиленными темплейтами
@@ -34,11 +34,6 @@ sub compile {
 	if(@_>1) {
 		$self->{dir} = $dir;
 		$self->{dir_c} = $dir_c;
-	}
-	
-	unless($self->{dir}) {
-		$self->{dir} = 'action';
-		$self->{dir_c} = 'action_c';
 	}
 
 	my $watch = R::Watch->new;

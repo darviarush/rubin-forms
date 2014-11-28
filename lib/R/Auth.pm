@@ -167,32 +167,40 @@ sub valid {
 	$self
 }
 
+# возвращает имена валидаторов для 
+sub valid_names {
+	my($self, $tab, $view) = @_;
+	my $valid = $self->{valid};
+	map { $valid->{$_} or () } $self->connect->FIELDS_NAMES($view);
+}
+
 # проверяет вложенную структуру
 sub check_role_view {
 	my ($self, $tab, $view, @args) = @_;
 	
 	my $tmp;
+	my $connect = $self->connect;
 	my @S = [@_];
 	
 	while(@S) {
 		($tmp, $tab, $view, @args) = @{pop @S};
-		my $param = { Utils::set($self->connect->FIELDS_NAMES($view)) };
+		my $param = { Utils::set($connect->FIELDS_NAMES($view)) };
 	
 		$self->check_role('view', $tab, $param);
 
 		for my $arg (@args) {
-			if(ref $arg eq "HASH") { 
-				$self->check_role('view', $tab, $arg);
-			}
-			elsif($arg->[0] =~ /^(?:LEFT|INNER)$/) {
+			if(ref $arg eq "ARRAY" and $arg->[0] =~ /^(?:LEFT|INNER)$/) {
 				push @S, $arg;
 			}
-			elsif($arg->[0] =~ /^(?:HAVING)$/) {
-				$self->check_role('view', $tab, $arg->[1]);
-			}
-			elsif($arg->[0] =~ /^(?:GROUP|ORDER|LIMIT)$/) {
-			}
-			else { die "Ошибка в параметре `$arg`" }
+			# elsif(ref $arg eq "HASH") { 
+				# $self->check_role('view', $tab, $arg);
+			# }
+			# elsif($arg->[0] =~ /^(?:HAVING)$/) {
+				# $self->check_role('view', $tab, $arg->[1]);
+			# }
+			# elsif($arg->[0] =~ /^(?:GROUP|ORDER|LIMIT)$/) {
+			# }
+			# else { die "Ошибка в параметре `$arg`" }
 		}
 	}
 
@@ -219,6 +227,28 @@ sub insert {
 	$self
 }
 
+
+sub form_load {
+	my ($self, $action, $where) = @_;
+	my $response;
+	my $form = $self->{app}->action->{forms}{$action};
+	my $tab = $form->{model} // $form->{name};
+	my $view = [keys $form->{fields}];
+	$self->check_role('view', $tab, $view);
+	my $valid = [$self->valid_names($tab, $view)];
+	if($form->{is_list}) {
+		$response = $self->query_all($tab, $view, $where);
+		if(@$valid) {
+			$_->{_valid} = $valid for @$response;
+		}
+	}
+	else {
+		$response = $self->query_ref($tab, $view, $where);
+		$response->{_valid} = $valid if @$valid;
+	}
+	
+	$response
+}
 
 
 1;
