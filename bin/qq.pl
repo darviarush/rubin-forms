@@ -1,5 +1,8 @@
 #> сервер - http, fcgi или psgi
 
+#use AnyEvent;
+#msg ":bold black", "using $AnyEvent::MODEL $AnyEvent::detect";
+
 
 # перечитывает main_do.ini по сигналу
 # считывает права на таблицы и их столбцы
@@ -19,7 +22,7 @@ $app->action->compile->write("watch/action.pl") unless $app->ini->{restart};
 $app->stash({});
 require "watch/action.pl";
 
-# Открываем сокет
+# Открываем сокет 
 # наш скрипт будет слушать порт $ini->{site}{port} (9000)
 # длина очереди соединений (backlog)- 5 штук
 $app->server;
@@ -52,5 +55,5 @@ sub lord {
 	$app->connect(undef) # чтобы не закрылась через dbh_connect
 	->connect;	# своё подключение к БД
 	$app->server	# инициализируемся в новом треде
-	->accept($app->ini->{site}{ext}? \&R::Server::tan: \&R::Server::ritter);
+	->loop($app->ini->{site}{ext}? \&R::Server::tan: \&R::Server::ritter);
 }

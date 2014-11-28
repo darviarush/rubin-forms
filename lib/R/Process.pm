@@ -2,6 +2,7 @@ package R::Process;
 # работает с процессами и нитями
 
 use POSIX qw/:sys_wait_h/;
+use AnyEvent;
 use threads ('yield',
 	'stack_size' => 64*4096,
 	'exit' => 'threads_only',
@@ -10,16 +11,10 @@ use threads::shared;
 #use forks;
 
 
-
 sub new {
 	my ($cls, $app) = @_;
 	
-	bless {app=>$app, end_server=>sub {
-		my ($app) = @_;
-		$app->process->close;
-		$app->server->close;
-		main::msg "server close";
-	}}, $cls;
+	bless {app=>$app}, $cls;
 }
 
 # демонизирует
@@ -46,8 +41,10 @@ sub fork {
 
 	for(my $i=0; $i<$lords; $i++) {
 		threads->create(sub {
-			# $SIG{ALRM} = sub { main::msg ":red", "tid: ".threads->tid." exit"; threads->exit };
-			goto &$lord;
+			local $SIG{KILL} = Utils::closure($self->{app}, sub { $_[0]->server->close });
+			my $w = AnyEvent->timer(after => 1, interval=>1, cb=>sub{});	# просто для того, чтобы срабатывал $SIG{'KILL'}
+			$lord->(@_);
+			undef $w;
 		}, $self->{app}) or die $!; 
 	} 
 	$! = undef;
@@ -57,10 +54,13 @@ sub fork {
 # завершает работу с процессами
 sub close {
 	my ($self) = @_;
-	for my $thr (threads->list) { $thr->kill(SIGALRM)->join; }
+	for my $thr (threads->list) { $thr->kill(KILL)->join; }
+	$self->{app}->server->close;
+	main::msg ":space", ":red", $$, ":cyan", "server close";
 	$self
 }
 
+sub end { $_[0]->close; exit } 
 
 # перезагружает сервер
 # sub reload {
@@ -99,7 +99,7 @@ sub reload {
 	my $app = $self->{app};
 	
 	@ARGV = "ini" if @ARGV==1;
-	push @ARGV, "restart=$$" if $ARGV[$#ARGV] !~ /^restart=1$/;
+	push @ARGV, "restart=1" if $ARGV[$#ARGV] eq "restart=1";
 	
 	$self->close;
 	$app->server->close;
@@ -129,7 +129,7 @@ sub reload {
 # главный процесс - следит за остальными и выполняет действия по крону
 sub loop {
 	my ($self, $cron) = @_;
-	$SIG{INT} = $SIG{TERM} = Utils::closure($self, sub { $_[0]->end_server; exit; });
+	$SIG{INT} = $SIG{TERM} = Utils::closure($self, \&R::Process::end);
 	for(;;) {
 		sleep 1;
 		# задачи по крону
@@ -156,17 +156,6 @@ sub loop {
 		};
 		main::msg(":red", "Лорд завершился с ошибкой: ".($@ || $!)), $@ = $! = undef if $@ || $!;
 	}
-}
-
-
-sub end_server {
-	my ($self, $end_server) = @_;
-	if(@_>1) {
-		$self->{end_server} = $end_server;
-	} else {
-		$self->{end_server}->($self->{app});
-	}
-	$self
 }
 
 # перезагружать сервер, если изменился какой-то из модулей проекта

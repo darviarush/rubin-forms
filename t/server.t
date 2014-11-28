@@ -10,7 +10,6 @@ use Test::More tests => 1;
 our $app;
 
 END {
-$app->server->close;
 $app->process->close;
 }
 
@@ -29,7 +28,7 @@ $app->ini({
 $app->process->fork(*lord);
 
 sub lord {
-	$app->server->accept(*ritter);
+	$app->server->loop(*ritter);
 }
 
 sub ritter {

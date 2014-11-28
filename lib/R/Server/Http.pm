@@ -5,6 +5,7 @@ use base R::Server;
 
 use Socket;
 use Symbol;
+use AnyEvent;
 
 use R::Request; # из него получаем $R::Request::RE_LOCATION
 
@@ -47,9 +48,34 @@ sub create {
 	# $self
 # }
 
-# бесконечный цикл ожидани¤ и выполнени¤ запросов
-sub accept {
+# бесконечный цикл ожидания и выполнения запросов
+sub loop {
 	my ($self, $ritter) = @_;
+	
+	$self->{ritter} = $ritter;
+	$self->{wait} = AnyEvent->condvar;
+	my $w = AnyEvent->io(fh=>$self->{sd}, poll=> 'r', cb=> Utils::closure($self, \&R::Server::Http::accept));
+	$self->{wait}->recv;
+	undef $w;
+}
+
+# пытается перехватить запрос
+sub accept {
+	my ($self) = @_;
+	
+	my $ns = gensym;
+	unless( accept $ns, $self->{sd} ) {
+		undef $ns;
+		die "not ns: $!" if $!;
+		return;
+	}
+	
+	$self->impulse($ns);
+}
+
+# обрабатывает одиночный запрос
+sub impulse {
+	my ($self, $ns) = @_;
 	
 	my $app = $self->{app};
 	my $request = $app->request;
@@ -57,100 +83,99 @@ sub accept {
 	my $http_status = $app->serverHttpStatus;
 	my $_test = $app->ini->{site}{test};
 	
-	#my $sel = IO::Socket->new($_socket);
-	#$sel->add();
+	my $keep_alive;
+				
+	my $HTTP = <$ns>;
+	return $self->close_ns($ns) unless defined $HTTP;
 	
-	# добавляем в векторы сокет
-	# my ($vec, $out, $err) = ("", "", "");
-	# my $sd = fileno($self->{sd});
-	# vec($vec, $sd, 1) = 1;
-	# vec($out, $sd, 1) = 1;
-	# vec($err, $sd, 1) = 1;
+	$self->stat_start if $_test;
 	
-	#$app->event->io(cb => );
-	
-	my($ns, $keep_alive);
-	for(;;) {
+	if(my @param = $HTTP =~ m!^(\w+) $R::Request::RE_LOCATION (HTTP\/\d\.\d)\r?$!o) {
 		
-		#my $nfound = select $vec, undef, undef, undef;
-		#msg CYAN."nfound ".RESET." soc=$self->{sd} vec=$vec ".RED.$nfound.RESET;
-		#$nfound = select undef, $out, undef, undef;
-		#if $nfound == $sd
-		#$nfound = select undef, undef, $err, undef;
-		#next unless defined $nfound;
+		# считываем заголовки
+		my ($head, $body);
+		/: (.*?)\r?$/ and $head->{$`} = $1 while defined($_ = <$ns>) and !/^\r?$/;
 		
-		#if $nfound == $sd;
-		
-		my ($HTTP, $ret) = ();
-		$HTTP = <$ns> if $keep_alive;
-		unless(defined $HTTP) {
-			close $ns if $ns;
-			accept $ns, $self->{sd} or die "not ns: $!";
-			$self->{ns} = $ns;
-			last unless defined($HTTP = <$ns>);
+		# считываем данные
+		if(my $CONTENT_LENGTH = $head->{"Content-Length"} and not exists $head->{'REQUEST_BODY_FILE'}) {
+			read $ns, $body, $CONTENT_LENGTH;
 		}
 		
-		$self->stat_start() if $_test;
-		
-		if(my @param = $HTTP =~ m!^(\w+) $R::Request::RE_LOCATION (HTTP\/\d\.\d)\r?$!o) {
-			
-			# считываем заголовки
-			my ($head, $body);
-			/: (.*?)\r?$/ and $head->{$`} = $1 while defined($_ = <$ns>) and !/^\r?$/;
-			
-			# считываем данные
-			if(my $CONTENT_LENGTH = $head->{"Content-Length"} and not exists $head->{'REQUEST_BODY_FILE'}) {
-				read $ns, $body, $CONTENT_LENGTH;
-			}
-			
-			$request->reset(@param, $head, $body);
-			$response->reset();
-			#main::msg ":cyan", $request;
-			$self->stat_begin() if $_test;
+		$request->reset(@param, $head, $body);
+		$response->reset();
 
-			# настраиваем сессионное подключение (несколько запросов на соединение, если клиент поддерживает)
-			$keep_alive = (lc $head->{Connection} eq 'keep-alive');
-			
-			$ritter->($self);
-		} else {
-			$response->error(400)
-			->type("text/plain")
-			->body("400 $http_status->{400}");
+		$self->stat_begin() if $_test;
+
+		# настраиваем сессионное подключение (несколько запросов на соединение, если клиент поддерживает)
+		$keep_alive = (lc $head->{Connection} eq 'keep-alive');
+		
+		$self->{ritter}->($app);
+	} else {
+		$response->error(400)
+		->type("text/plain")
+		->body("400 $http_status->{400}");
+	}
+	
+	my $status = $response->{status};
+	
+	my $RESPONSE = "HTTP/1.1 $status $http_status->{$status}\n";
+	my $body = $response->{body};
+	
+	unless(exists $response->{head}{"Content-Length"}) {
+		my $len = 0;
+		for my $text (@$body) {
+			$text = JSON::to_json($text) if ref $text;
+			$len += length $text;
 		}
-		
-		my $status = $response->{status};
-		
-		my $RESPONSE = "HTTP/1.1 $status $http_status->{$status}\n";
-		my $body = $response->{body};
-		
-		unless(exists $response->{head}{"Content-Length"}) {
-			my $len = 0;
-			for my $text (@$body) {
-				$text = JSON::to_json($text) if ref $text;
-				$len += length $text;
-			}
-			$response->{head}{"Content-Length"} = $len;
-		}
-		
-		$response->{head}{Connection} = "keep-alive" if $keep_alive;
-		
-		my ($k, $v);
-		my $out_head = $response->{head};
-		send $ns, $RESPONSE, 0;
-		send $ns, "$k: $v\n", 0 while ($k, $v) = each %$out_head;
-		send $ns, "\n", 0;
-		send $ns, $_, 0 for @$body;
-		
-		$self->stat_end($RESPONSE) if $_test;
-		
-		%$request = (app=>$app);
-		%$response = (app=>$app);
-		($k, $v) = ();
-		close $ns unless $keep_alive;
+		$response->{head}{"Content-Length"} = $len;
+	}
+	
+	$response->{head}{Connection} = "keep-alive" if $keep_alive;
+	
+	my ($k, $v);
+	my $out_head = $response->{head};
+	send $ns, $RESPONSE, 0;
+	send $ns, "$k: $v\n", 0 while ($k, $v) = each %$out_head;
+	send $ns, "\n", 0;
+	send $ns, $_, 0 for @$body;
+	
+	$self->stat_end($RESPONSE) if $_test;
+	
+	%$request = (app=>$app);
+	%$response = (app=>$app);
+	
+	if($keep_alive) {
+		$self->{impulse}{$ns} = [ $ns, AnyEvent->io(fh=>$ns, poll=> 'r', cb=> Utils::closure($self, $ns, \&R::Server::Http::impulse)) ] unless exists $self->{impulse}{$ns};
+	} else {
+		$self->close_ns($ns);
 	}
 }
 
+# закрывает сокет и все ns
+sub close {
+	my ($self) = @_ ;
+	while(my ($k, $v) = each %{$self->{impulse}}) {
+		my ($ns, $w) = @$v;
+		undef $w;
+		CORE::close $ns;
+		undef $ns;
+	}
+	delete $self->{impulse};
+	CORE::close $self->{sd} if $self->{sd};
+	undef $self->{sd};
+	$self->{wait}->send if $self->{wait};	# выходим из бесконечного цикла
+	#undef $self->{wait};
+	$self
+}
 
-sub close { my ($self) = @_; close $self->{ns} if $self->{ns}; close $self->{sd}; }
+# закрывает ns
+sub close_ns {
+	my ($self, $ns) = @_;
+	undef $self->{impulse}{$ns}[1];
+	delete $self->{impulse}{$ns};
+	CORE::close $ns;
+	undef $ns;
+	$self
+}
 
 1;

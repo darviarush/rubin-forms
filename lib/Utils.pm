@@ -364,6 +364,12 @@ sub cp {
 	Utils::write($to, Utils::read($from));
 }
 
+# переносит файл
+sub mv {
+	my ($from, $to) = @_;
+	Utils::cp($from, $to) unless rename $from, $to;
+}
+
 # stderr и stdout записывает так же и в файл
 sub tee {
 	my ($path, $nodel) = @_;
