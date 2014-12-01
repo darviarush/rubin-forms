@@ -2,7 +2,6 @@ package R::Process;
 # работает с процессами и нитями
 
 use POSIX qw/:sys_wait_h/;
-use AnyEvent;
 use threads ('yield',
 	'stack_size' => 64*4096,
 	'exit' => 'threads_only',
@@ -40,27 +39,35 @@ sub fork {
 	$lords //= $ini->{site}{lords};
 
 	for(my $i=0; $i<$lords; $i++) {
-		threads->create(sub {
-			local $SIG{KILL} = Utils::closure($self->{app}, sub { $_[0]->server->close });
-			my $w = AnyEvent->timer(after => 1, interval=>1, cb=>sub{});	# просто для того, чтобы срабатывал $SIG{'KILL'}
-			$lord->(@_);
-			undef $w;
-		}, $self->{app}) or die $!; 
-	} 
+		threads->create(\&R::Process::subprocess, $self->{app}) or die "not create subprocess `$i`. $!"; 
+	}
 	$! = undef;
 	$self
+}
+
+# в новом процессе
+sub subprocess {
+	my ($app) = @_;
+	require AnyEvent;
+	local $SIG{KILL} = Utils::closure($app, sub { $_[0]->{connect}->close if $_[0]->{connect}; $_[0]->server->close });
+	my $w;
+	my $w = AnyEvent->timer(after => 1, interval=>1, cb=>sub{});	# просто для того, чтобы срабатывал $SIG{'KILL'}
+	$app->{process}{lord}->(@_);
+	undef $w;
 }
 
 # завершает работу с процессами
 sub close {
 	my ($self) = @_;
 	for my $thr (threads->list) { $thr->kill(KILL)->join; }
-	$self->{app}->server->close;
+	my $app = $self->{app};
+	$app->{server}->close if $app->{server};
+	$app->{connect}->close if $app->{connect};
 	main::msg ":space", ":red", $$, ":cyan", "server close";
 	$self
 }
 
-sub end { $_[0]->close; exit } 
+sub end { $_[0]->close; exit }
 
 # перезагружает сервер
 # sub reload {

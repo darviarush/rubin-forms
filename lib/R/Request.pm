@@ -12,9 +12,10 @@ our $RE_LOCATION = qr!((/([^\s\?]*?)(?:(-?\d+)((?:_-?\d+)*)|(\.\w+))?)(?:\?(\S+)
 # устанавливает новые значения
 sub reset {
 	my ($self) = @_;
-	my ($ids);
-	($self, $self->{method}, $self->{url}, $self->{location}, $self->{action}, $self->{ids}{id}, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body}) = @_;
+	my ($ids, $id);
+	($self, $self->{method}, $self->{url}, $self->{location}, $self->{action}, $id, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body}) = @_;
 	
+	$self->{ids}{id} = $id if defined $id;
 	if(defined $ids and $ids ne "") {
 		my $i = 2;
 		$self->{ids}{"id" . ($i++)} = $_ for split /_/, substr $ids, 1;

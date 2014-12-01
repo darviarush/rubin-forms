@@ -439,10 +439,14 @@ sub post {
 	require LWP::UserAgent;
 	my ($url, $param, @headers) = @_;
 	my $ua = LWP::UserAgent->new;
-	$ua->timeout(10);
+	$ua->timeout(5);
+	if(ref $headers[0] and ${$headers[0]} eq "keepAlive") {
+		require LWP::ConnCache;
+		$ua->conn_cache(LWP::ConnCache->new);
+	}
 	my $response = $ua->post($url, @headers, Content => form_param($param));
 	die $response->status_line unless $response->is_success;
-	wantarray? ($response->content, $response): $response->content;
+	wantarray? ($ua, $response->content, $response): $response->content;
 }
 
 # превращает файл в массив

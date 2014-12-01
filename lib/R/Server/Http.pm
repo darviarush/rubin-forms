@@ -5,7 +5,6 @@ use base R::Server;
 
 use Socket;
 use Symbol;
-use AnyEvent;
 
 use R::Request; # из него получаем $R::Request::RE_LOCATION
 
@@ -21,7 +20,7 @@ sub create {
 	my ($self) = @_;
 	my $_port = $self->{app}->ini->{site}{port};
 	my $sd = gensym;  
-	 
+	
 	if($_port =~ /^\d+$/) {
 		socket $sd, AF_INET, SOCK_STREAM, getprotobyname("tcp") or die "socket: $!\n";
 		setsockopt $sd, SOL_SOCKET, SO_REUSEADDR, pack("l", 1) or die "setsockopt reuseaddr: $!\n"; # захватываем сокет, если он занят другим процессом
@@ -51,11 +50,12 @@ sub create {
 # бесконечный цикл ожидания и выполнения запросов
 sub loop {
 	my ($self, $ritter) = @_;
-	
+	require AnyEvent;
 	$self->{ritter} = $ritter;
 	$self->{wait} = AnyEvent->condvar;
 	my $w = AnyEvent->io(fh=>$self->{sd}, poll=> 'r', cb=> Utils::closure($self, \&R::Server::Http::accept));
 	$self->{wait}->recv;
+	main::msg "exit";
 	undef $w;
 }
 
@@ -75,7 +75,11 @@ sub accept {
 
 # обрабатывает одиночный запрос
 sub impulse {
+	local ($_);
 	my ($self, $ns) = @_;
+					
+	my $HTTP = <$ns>;
+	return $self->close_ns($ns) unless defined $HTTP;
 	
 	my $app = $self->{app};
 	my $request = $app->request;
@@ -84,9 +88,6 @@ sub impulse {
 	my $_test = $app->ini->{site}{test};
 	
 	my $keep_alive;
-				
-	my $HTTP = <$ns>;
-	return $self->close_ns($ns) unless defined $HTTP;
 	
 	$self->stat_start if $_test;
 	
@@ -107,7 +108,7 @@ sub impulse {
 		$self->stat_begin() if $_test;
 
 		# настраиваем сессионное подключение (несколько запросов на соединение, если клиент поддерживает)
-		$keep_alive = (lc $head->{Connection} eq 'keep-alive');
+		$keep_alive = ($head->{Connection} =~ /keep-alive/i);
 		
 		$self->{ritter}->($app);
 	} else {
@@ -138,13 +139,14 @@ sub impulse {
 	send $ns, "$k: $v\n", 0 while ($k, $v) = each %$out_head;
 	send $ns, "\n", 0;
 	send $ns, $_, 0 for @$body;
-	
+
 	$self->stat_end($RESPONSE) if $_test;
 	
 	%$request = (app=>$app);
 	%$response = (app=>$app);
-	
+
 	if($keep_alive) {
+		require AnyEvent;
 		$self->{impulse}{$ns} = [ $ns, AnyEvent->io(fh=>$ns, poll=> 'r', cb=> Utils::closure($self, $ns, \&R::Server::Http::impulse)) ] unless exists $self->{impulse}{$ns};
 	} else {
 		$self->close_ns($ns);
@@ -164,15 +166,16 @@ sub close {
 	CORE::close $self->{sd} if $self->{sd};
 	undef $self->{sd};
 	$self->{wait}->send if $self->{wait};	# выходим из бесконечного цикла
-	#undef $self->{wait};
 	$self
 }
 
 # закрывает ns
 sub close_ns {
 	my ($self, $ns) = @_;
-	undef $self->{impulse}{$ns}[1];
-	delete $self->{impulse}{$ns};
+	if($self->{impulse}{$ns}) {
+		undef $self->{impulse}{$ns}[1];
+		delete $self->{impulse}{$ns};
+	}
 	CORE::close $ns;
 	undef $ns;
 	$self
