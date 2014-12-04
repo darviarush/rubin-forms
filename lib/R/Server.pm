@@ -46,6 +46,7 @@ sub stat_end {
 	}
 }
 
+# выдаёт файл
 sub file {
 	my ($self) = @_;
 	my $app = $self->{app};
@@ -55,7 +56,7 @@ sub file {
 	eval {
 		my $root = abs_path(".");
 		if($root ne substr abs_path($request->html), 0, length $root) {
-			$response->error(403);
+			$response->error(403, "403 $http->{403}");
 		} else {
 			my $path = $request->html;
 			$response->type( $mime->{$ext} );
@@ -82,16 +83,19 @@ sub ritter {
 	$app->session->reset;
 	
 	my $action = $app->action;
-	my $_action = $action->{act};
+	my $_action_act = $action->{act};
 	my $_action_htm = $action->{htm};
 	my $_HEAD = $request->head;
+	my $_action = $request->{location};
 	
 	eval {
-		my $action = $_action{$_action};
-		my $action_htm = $_action_htm{$_action};
-		my $ajax = $_HEAD->{"Ajax"};
+		my $action = $_action_act->{$_action};
+		my $action_htm = $_action_htm->{$_action};
+		my $ajax = $_HEAD->{"Ajax"} // "";
 		
-		if(defined $action_htm and $ajax eq "reload") {
+		main::msg $action, $action_htm, $_action;
+		
+		if(defined $action_htm and $ajax eq "submit") {
 			
 			#$_user_id = $_COOKIE->{sess}? auth(): undef;
 			#%_STASH = (user_id => $_user_id);
@@ -101,38 +105,42 @@ sub ritter {
 			return $self->ajax_redirect if $response->{status} == 307;
 		}
 		elsif(defined $action_htm and $ajax eq "") {
+			$app->stash({});
+			
 			@ret = $action? $action->($app, $request, $response): $param;
-			if(!defined $response->{body}) {
-				@ret = $_action_htm{$_action}->($app, $ret[0], $_action);
+			if(!$action || $action && !defined $response->{body}) {
+				@ret = $_action_htm->{$_action}->($app, $ret[0], $_action);
 				for(; my $_layout = $_layout{$_action}; $_action = $_layout) {
-					my $arg = ($action = $_action{$_layout})? $action->($app, $request, $response): {};
-					@ret = $_action_htm{$_layout}->($app, $arg, $_layout, @ret);
+					my $arg = ($action = $_action_act->{$_layout})? $action->($app, $request, $response): {};
+					@ret = $_action_htm->{$_layout}->($app, $arg, $_layout, @ret);
 				}
 			}
 		} elsif(defined $action) {
 			@ret = $action->($app, $request, $response);
-		} elsif(exists $_info->{$action}) {
+		} elsif(exists $_info->{$_action}) {
 			@ret = $self->update;
 		} else {
-			$response->error(404);
+			@ret = $response->error(404);
 		}
-		$request->body( map { ref($_)? to_json($_): $_ } @ret );
+		
+		$response->body( @ret==1 && ref($ret[0])? to_json($ret[0]): @ret );
 	};
 
 	if(my $error = $@ || $!) {
 		my $is_io = $!;
 		$@ = $! = undef;
-		if(ref $error eq "Rubin::Raise") {
+		if(ref $error eq "R::Raise") {
 			$request->body($error);
 		} else {
-			if(ref $error eq "Rubin::Exception") { $request->{status} = $error->{error}; $error = join "", $error->{error}, " ", $error->{message}, "\n\n", $error->{trace} }
+			if(ref $error eq "R::Exception") { $request->{status} = $error->{error}; $error = join "", $error->{error}, " ", $error->{message}, "\n\n", $error->{trace} }
 			else { $_STATUS = 500; }
 			
 			$error = ($is_io? "io: ": "").$error;
 			
 			my $e = $error;
-			$e =~ s!\b((?:called )?at|line|thread)\b!CYAN.$1.RESET!ge;
-			main::msg ":empty", ":red", "action-error `$_action".($param->{id} // "")."`:", ":reset", " $e\n";
+			R::color_error("action-error $request->{url}", $error);
+			#$e =~ s!\b((?:called )?at|line|thread)\b!CYAN.$1.RESET!ge;
+			#main::msg ":empty", ":red", "action-error `$_action".($param->{id} // "")."`:", ":reset", " $e\n";
 			$error = $_test ? $error: "Внутренняя ошибка";
 			
 			if($_HEAD->{Accept} =~ /^text\/json\b/) {
@@ -158,7 +166,7 @@ $x
 		}
 	}
 	
-	$app->{stash} = {};
+	$app->{stash} = undef;
 	
 }
 

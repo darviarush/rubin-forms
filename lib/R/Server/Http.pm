@@ -24,9 +24,6 @@ sub create {
 	if($_port =~ /^\d+$/) {
 		socket $sd, AF_INET, SOCK_STREAM, getprotobyname("tcp") or die "socket: $!\n";
 		setsockopt $sd, SOL_SOCKET, SO_REUSEADDR, pack("l", 1) or die "setsockopt reuseaddr: $!\n"; # захватываем сокет, если он занят другим процессом
-		#if(SO_REUSEPORT =~ /^\d+$/) {
-		#	setsockopt $sd, SOL_SOCKET, SO_REUSEPORT, pack("l", 1) or die "setsockopt reuseport: $!\n";
-		#}
 		bind $sd, sockaddr_in($_port, INADDR_ANY) or die "$$ bind: $!\n";
 		listen $sd, SOMAXCONN or die "listen: $!\n";
 	} else {
@@ -51,11 +48,11 @@ sub create {
 sub loop {
 	my ($self, $ritter) = @_;
 	require AnyEvent;
-	$self->{ritter} = $ritter;
+	$self->{ritter} = $ritter // ($self->{app}->ini->{site}{ext}? $self->can("tan"): $self->can("ritter"));
 	$self->{wait} = AnyEvent->condvar;
-	my $w = AnyEvent->io(fh=>$self->{sd}, poll=> 'r', cb=> Utils::closure($self, \&R::Server::Http::accept));
+	my $w = AnyEvent->io(fh=>$self->{sd}, poll=> 'r', cb=> Utils::closure($self, $self->can("accept")));
 	$self->{wait}->recv;
-	main::msg "exit";
+	#main::msg ":space", ":magenta", $$, threads->tid, ":cyan", "exit";
 	undef $w;
 }
 
@@ -110,7 +107,7 @@ sub impulse {
 		# настраиваем сессионное подключение (несколько запросов на соединение, если клиент поддерживает)
 		$keep_alive = ($head->{Connection} =~ /keep-alive/i);
 		
-		$self->{ritter}->($app);
+		$self->{ritter}->($self);
 	} else {
 		$response->error(400)
 		->type("text/plain")
@@ -147,7 +144,7 @@ sub impulse {
 
 	if($keep_alive) {
 		require AnyEvent;
-		$self->{impulse}{$ns} = [ $ns, AnyEvent->io(fh=>$ns, poll=> 'r', cb=> Utils::closure($self, $ns, \&R::Server::Http::impulse)) ] unless exists $self->{impulse}{$ns};
+		$self->{impulse}{$ns} = [ $ns, AnyEvent->io(fh=>$ns, poll=> 'r', cb=> Utils::closure($self, $ns, $self->can("impulse")))] unless exists $self->{impulse}{$ns};
 	} else {
 		$self->close_ns($ns);
 	}

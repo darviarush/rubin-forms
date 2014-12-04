@@ -39,104 +39,101 @@ sub fork {
 	$lords //= $ini->{site}{lords};
 
 	for(my $i=0; $i<$lords; $i++) {
-		threads->create(\&R::Process::subprocess, $self->{app}) or die "not create subprocess `$i`. $!"; 
+		threads->create($lord, $self) or die "not create subprocess `$i`. $!"; 
 	}
 	$! = undef;
 	$self
 }
 
 # в новом процессе
-sub subprocess {
-	my ($app) = @_;
-	require AnyEvent;
-	local $SIG{KILL} = Utils::closure($app, sub { $_[0]->{connect}->close if $_[0]->{connect}; $_[0]->server->close });
-	my $w;
-	my $w = AnyEvent->timer(after => 1, interval=>1, cb=>sub{});	# просто для того, чтобы срабатывал $SIG{'KILL'}
-	$app->{process}{lord}->(@_);
-	undef $w;
-}
+# sub subprocess {
+	# my ($app) = @_;
+	# require AnyEvent;
+	# local $SIG{KILL} = Utils::closure($app, sub { $_[0]->{connect}->close if $_[0]->{connect}; $_[0]->server->close });
+	# my $w;
+	# $w = AnyEvent->timer(after => 1, interval=>1, cb=>sub{});	# просто для того, чтобы срабатывал $SIG{'KILL'}
+	# $app->{process}{lord}->(@_);
+	# undef $w;
+# }
 
 # завершает работу с процессами
 sub close {
 	my ($self) = @_;
-	for my $thr (threads->list) { $thr->kill(KILL)->join; }
+	for my $thr (threads->list) { $thr->detach; }
 	my $app = $self->{app};
 	$app->{server}->close if $app->{server};
 	$app->{connect}->close if $app->{connect};
-	main::msg ":space", ":red", $$, ":cyan", "server close";
+	#main::msg ":space", ":red", $$, ":cyan", "server close";
 	$self
 }
 
 sub end { $_[0]->close; exit }
 
-# перезагружает сервер
-# sub reload {
-	# my ($self) = @_;
-	## print STDERR `nginx -s reload`;
-	
-	# my $app = $self->{app};
-
-	# @ARGV = "ini" if @ARGV==1;
-	# push @ARGV, "restart=" . fileno($app->server->{sd}) if $ARGV[$#ARGV] !~ /^restart=\d+$/;
-	
-	# my $pid = CORE::fork;
-	# die "Не могу создать процесс. $!" if $pid < 0;
-	# exec $0, @ARGV unless $pid;	# процесс
-	
-	# sleep 3;
-	
-	# my $is = waitpid $pid, WNOHANG;	# удаляем зомби
-	# kill(9, $pid), waitpid $pid, 0 unless $is;	# потомок почему-то не завершился - удаляем
-	
-	# $self
-#}
-
-# тестирует - можно ли перезагружать
-# sub test {
-	# my ($self, $test) = @_;
-	# $test //= $0;
-	# my $res = `perl -c $test`;
-	# return $? == 0? undef: $res;
-# }
-
-# перезагружает сервер
-sub reload {
+# следит за изменением файлов и перезагружает сервер
+sub spy {
 	my ($self) = @_;
-	#print STDERR `nginx -s reload`;
-	my $app = $self->{app};
-	
-	@ARGV = "ini" if @ARGV==1;
-	push @ARGV, "restart=1" if $ARGV[$#ARGV] eq "restart=1";
-	
-	$self->close;
-	$app->server->close;
 	
 	my $pid = CORE::fork;
-	die "Не могу создать процесс. $!" if $pid < 0;
-	exec $0, @ARGV unless $pid;	# дочерний процесс
-	
-	sleep 3;
-	
-	my $is = waitpid $pid, WNOHANG;	# удаляем зомби
-	if($is) {	# потомок не завершился - завершаюсь
-		main::msg "Потомок не завершился - завершаюсь";
-		$app->hung->close;
-		$app->connect->close; 
-		#open my $p, ">/dev/null" or die $!;
-		#CORE::close $_ for 3..fileno $p; 
-		exit;
+	die "Ошибка создания сокета. $!" if $pid < 0;
+	if($pid) {
+		main::msg ":space", ":red", $$, ":reset", " spy start";
+		$self->save_pid($pid);
+		my $app = $self->{app};
+		$SIG{PIPE} = $SIG{INT} = $SIG{HUP} = sub {
+			kill -9, $self->{main_pid};
+			$app->{hung}->close if $app->{hung};
+			main::msg ":space", ":red", $$, ":reset", "spy exit";
+			exit;
+		};
+		
+		# перекомпиливать сторонние файлы проекта
+		$app->hung if $app->ini->{site}{hung};
+		# следить за изменениями
+		my $_watch = $app->ini->{site}{watch};
+		if($_watch) {
+			$app->action->watch;	# перекомпилировать экшены
+			$app->test->watch;		# запуск теста при изменении
+			$self->watch;			# перезагружать сервер, если изменился какой-то из модулей проекта
+		}
+		
+		for(;;) {
+			sleep 1;
+			$app->watch->run if $_watch;
+			$self->create("restart=1") if waitpid $self->{main_pid}, WNOHANG;
+		} 
 	}
+	$self
+}
+
+# создаёт главный процесс 
+sub create {
+	my ($self, @ini) = @_;
 	
-	# восстанавливаемся
-	main::msg ":bold black", "Потомок завершился - восстанавливаюсь";
-	$app->server->create;
-	$self->fork
+	my @av = @ARGV;
+	@av = "ini" if @av==1;	
+	push @av, @ini;
+	
+	my $pid = CORE::fork;
+	die "Ошибка создания процесса. $!" if $pid < 0;
+	
+	exec "perl", $0, @av unless $pid;
+	
+	$self->save_pid($pid);
+	
+	$self
+}
+
+# сохраняет pid
+sub save_pid {
+	my ($self, $pid) = @_;
+	$self->{main_pid} = $pid;
+	$self
 }
 
 # главный процесс - следит за остальными и выполняет действия по крону
 sub loop {
 	my ($self, $cron) = @_;
-	$SIG{INT} = $SIG{TERM} = Utils::closure($self, \&R::Process::end);
+	$SIG{INT} = $SIG{TERM} = Utils::closure($self, $self->can("end"));
 	for(;;) {
 		sleep 1;
 		# задачи по крону
@@ -151,14 +148,9 @@ sub loop {
 				my @return = $thr->join();
 				my $tid = $thr->tid();
 				my $error = $thr->error();
-				#if($tid == $cron) {
-				#	print RED."Завершился крон № $tid\n".RESET."$error";
-				#	$cron = threads->create(*cron::run)->tid();
-				#} else {
-					main::msg ":empty", ":red", "Завершился лорд № $tid", ":reset", ($error? "\nС ошибкой: $error": "").(@return? "\nВернул: ": "");
-					main::msg \@return if @return;
-					threads->create(*lord);
-				#}
+				main::msg ":empty", ":red", "Завершился лорд № $tid", ":reset", ($error? "\nС ошибкой: $error": "");
+				#(@return? "\nВернул: ": "")main::msg \@return if @return;
+				threads->create($self->{lord}, $self);
 			}
 		};
 		main::msg(":red", "Лорд завершился с ошибкой: ".($@ || $!)), $@ = $! = undef if $@ || $!;
@@ -169,11 +161,13 @@ sub loop {
 sub watch {
 	my ($self) = @_;
 	my $watch = $self->{app}->watch;
-	$watch->on(qr//, [ grep { defined $_ and !exists $watch->{file}{$_} and -e $_ } "qq", "main.ini", values %INC], sub {
+	my $dirs = [main::files("qq"), "main.ini", main::dirs("lib"), main::files("bin/qq.pl"), main::files("bin/ini.pl"), main::files($self->{app}->action->{dir_c})];
+	main::msg ;
+	$watch->on(qr//, $dirs, sub {
 		my ($path, $app) = @_;
 		my $module = $path =~ m!/.*\.(\w+)\.pl$!? ($1 eq "act"? "action": $1): "module";
 		main::msg ":empty", ":time", " - ", ":red", $module, ":reset", " $path";
-		$app->process->reload;
+		kill HUP, $app->process->{main_pid};
 	});
 	$self
 }

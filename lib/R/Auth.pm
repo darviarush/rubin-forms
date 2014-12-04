@@ -211,7 +211,7 @@ sub check_role_view {
 sub update { my($self, $tab, $set, $where)=@_; $self->valid(sub{ $self->{app}->connect->update($tab, $set, $where); }, 'edit', $tab, $set); $self }
 sub erase { my($self, $tab, $param)=@_; $self->check_role('rm', $tab, {}); $self->{app}->connect->erase($tab, $param); $self }
 sub add { my($self, $tab, $param)=@_; $self->valid(sub{ $self->{app}->connect->add($tab, $param) }, 'add', $tab, $param); $self }
-sub push { my($self, $tab, $param)=@_; $self->valid(sub { $self->{app}->connect->push($tab, $param) }, 'add', $tab, $param) }
+sub append { my($self, $tab, $param)=@_; $self->valid(sub { $self->{app}->connect->append($tab, $param) }, 'add', $tab, $param) }
 sub replace { my ($self, $tab, $param) = @_; $self->check_role($param->{id}? 'edit': 'add', $tab, $param); $self->{app}->connect->replace($tab, $param); $self }
 sub last_count { my($self)=@_; $self->{app}->connect->{last_count} }
 sub last_id { my($self)=@_; $self->{app}->connect->last_id }

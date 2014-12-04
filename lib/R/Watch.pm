@@ -59,6 +59,8 @@ sub scan {
 		}
 	}
 	
+	return $self unless -e $dir;
+	
 	my ($ext, $callback) = @$scan;
 	
 	find({
@@ -84,7 +86,8 @@ sub run {
 		main::msg('watch_dir', $dir), $self->erase($dir), $self->scan($dir) if $mtime < main::mtime($dir);
 	}
 	while(my($file, $mtime) = each %{$self->{watch}}) {
-		main::msg('watch_file', $file), $self->{watch}{$file} = main::mtime($file), $self->{file}{$file}->($file, $self->{app}) if $mtime < main::mtime($file);
+		#main::msg('watch_file', $file), 
+		$self->{watch}{$file} = main::mtime($file), $self->{file}{$file}->($file, $self->{app}) if $mtime < main::mtime($file);
 	}
 	$self
 }

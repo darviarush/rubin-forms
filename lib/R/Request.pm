@@ -5,7 +5,6 @@ use base R::Utils::Object;
 
 use IO::String;
 
-
 # для разбора url. Используется вместе с reset
 our $RE_LOCATION = qr!((/([^\s\?]*?)(?:(-?\d+)((?:_-?\d+)*)|(\.\w+))?)(?:\?(\S+))?)!;
 

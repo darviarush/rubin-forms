@@ -405,7 +405,7 @@ sub add {
 }
 
 # добавляет одну запись в таблицу и возвращает её id
-sub push {
+sub append {
 	my ($self, $tab, $param) = @_;
 	$self->add($tab, $param)->last_id;
 }

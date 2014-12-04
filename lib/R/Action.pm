@@ -96,7 +96,7 @@ sub compile_htm {
 	my $code = $page->{code};
 	delete $page->{code};
 	
-	$eval = join "", "\$app->action->{htm}{'$index'} = sub { $Utils::code_begin_param return join \"\", '", $eval, "'};\n\n\$app->action->{page}{'$index'} = ", Utils::Dump($page), ";\n\$app->action->{page}{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
+	$eval = join "", ($index eq "index"? "\$app->action->{htm}{'/'} = ": ()), "\$app->action->{htm}{'$index'} = sub { $Utils::code_begin_param return join \"\", '", $eval, "'};\n\n\$app->action->{page}{'$index'} = ", Utils::Dump($page), ";\n\$app->action->{page}{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
 	
 	my $p = $path;
 	$p =~ s!\b$self->{dir}/!$self->{dir_c}/!;
@@ -125,7 +125,7 @@ sub compile_action {
 	my @my = keys %my;
 	my @local = grep { exists $local{$_} } @my;
 	@my = grep { not exists $our{$_} and not exists $local{$_} } @my;
-	my $eval = join("", "our(", join(", ", @our), "); \$app->action->{act}{'$index'} = sub {" , (@local? ("local(", join(", ", @local), "); "): ()), (@my? ("my(", join(", ", @my), "); "): ()), "(\$app, \$request, \$response) = \@_; ", $action, "\n};\n\n1;");
+	my $eval = join("", "our(", join(", ", @our), "); ", ($index eq "index"? "\$app->action->{act}{'/'} = ": ()), "\$app->action->{act}{'$index'} = sub {" , (@local? ("local(", join(", ", @local), "); "): ()), (@my? ("my(", join(", ", @my), "); "): ()), "(\$app, \$request, \$response) = \@_; ", $action, "\n};\n\n1;");
 
 	my $p = $path;
 	$p =~ s!\b$self->{dir}/!$self->{dir_c}/!;
