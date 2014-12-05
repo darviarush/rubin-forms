@@ -19,15 +19,15 @@ sub user {
 sub user_id {
 	my ($self, $user_id) = @_;
 	$self->{user_id} = $user_id, return $self if @_>1;
-	return $self->{user_id} if $self->{user_id};
+	return $self->{user_id} if exists $self->{user_id};
 	my $app = $self->{app};
 	my $request = $app->request;
 	my $sess = $request->cookie("sess");
-	return unless $sess;
+	return 0 unless $sess;
 	my $conn = $app->connect;
-	my @res = $conn->query("sess", "user_id", $sess);
-	$conn->update("sess", {now=>$conn->now}, {id=>$sess}) if $self->{user_id} = $res[0];
-	return $fld? @res: $res[0];
+	my $id = $conn->query("sess", "user_id", $sess)+0;
+	$conn->update("sess", {now=>$conn->now}, {id=>$id}) if $self->{user_id} = $id;
+	return $id;
 }
 
 sub delete {

@@ -775,7 +775,7 @@ sub TemplateBare {
 					if($form->{load}) {
 						my $data = ($name? "\$data->{'$name'}": "\$_[0] = \$data");
 						my $where = exists $form->{where}? ", join '', $form->{where}": '';
-						$load = "$data = \$action->form_load(\$id.'-$name'$where) unless ref($data);";
+						$load = "$data = \$app->auth->form_load(\$id.'-$name'$where) unless ref($data);";
 						push @code, ["load", $load . "\n"];
 						$load = "do { $load () }, ";
 					}

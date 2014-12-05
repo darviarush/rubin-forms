@@ -2,6 +2,7 @@
 BEGIN {
 	#use Carp 'verbose';
 	use Term::ANSIColor qw//;
+	use Fcntl ':flock';
 	#$SIG{ __DIE__ } = \&Carp::confess;
 
 	sub R::color_error {
@@ -13,18 +14,26 @@ BEGIN {
 		#$e =~ s!\b(require|called at|at|line|thread)\b!Term::ANSIColor::colored($1, $color_words)!ge;
 		#print STDERR $e;
 		
-		my ($efile, $eline);
+		local ($_, $`, $', $1, $2);
+		my @trace;
+		
+		my $push = sub {
+			push @trace, "$_[0]:$_[1]: " . Term::ANSIColor::colored($_[3] // $action.": ", $color_error) . Term::ANSIColor::colored($_[2], $color_words) . "\n";
+		};
 		
 		if(ref $error) { $error = Utils::Dump($error); }
-		else { $error =~ s! at (\S+) line (\d+)(?:, <GEN\d+> line \d+)\.$!!; $efile = $1; $eline = $2; }
+		else { 
+			$error =~ s!^syntax error at (\S+) line (\d+), (near .*)\n!! and $push->($1, $2, $3, 'syntax error ');
+			$error =~ s! at (\S+) line (\d+)(?:, <GEN\d+> line \d+)?\.\s*$!! and $push->($1, $2, $error);
+		}
 		
 		for(my $i=1; my @param = caller($i); $i++) {
 			my ($package, $file, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = @param;
 			$subroutine =~ s!^main::(\w+)$!$1!;
-			push @trace, "$file:$line: $subroutine\n" if $subroutine !~ /^(?:__ANON__|\(eval\))$/;
+			$subroutine =~ s!(^|::)__ANON__$!$1~!;
+			push @trace, "$file:$line: $subroutine\n" if $subroutine ne "(eval)";
 		}
 		
-		print STDERR  "$efile:$eline: " . Term::ANSIColor::colored($action.": ", $color_error) . Term::ANSIColor::colored($error, $color_words);
 		print STDERR $_ for @trace;
 	}
 	

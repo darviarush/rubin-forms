@@ -1,15 +1,12 @@
 #> сервер - http, fcgi или psgi
 
-# демонизируемся
-$app->process->daemon if $app->ini->{site}{daemon};
+# грузим экшены
+msg(":bold black", "load action..."), $app->action->compile->write("watch/action.pl") unless $app->ini->{restart};
 
-# запускаем главный процесс, за которым будет следить и перезапускать этот
+# запускаем главный процесс, за которым будет следить и перезапускать этот. Там так же идёт демонизация
 $app->process->spy unless $app->ini->{restart};
 # тут уже порождённый процесс
 
-# грузим экшены
-msg(":bold black", "load action..."), $app->action->compile->write("watch/action.pl") unless $app->ini->{restart};
-$app->stash({});
 require "watch/action.pl";
 
 # перечитывает main_do.ini по сигналу

@@ -233,7 +233,7 @@ sub form_load {
 	my $response;
 	my $form = $self->{app}->action->{forms}{$action};
 	my $tab = $form->{model} // $form->{name};
-	my $view = [keys $form->{fields}];
+	my $view = [keys %{$form->{fields}}];
 	$self->check_role('view', $tab, $view);
 	my $valid = [$self->valid_names($tab, $view)];
 	if($form->{is_list}) {

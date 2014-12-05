@@ -42,6 +42,7 @@ sub compile {
 	$self
 }
 
+
 sub write {
 	my ($self, $file) = @_;
 	$self->{require} = $file // $self->{require};
@@ -125,7 +126,7 @@ sub compile_action {
 	my @my = keys %my;
 	my @local = grep { exists $local{$_} } @my;
 	@my = grep { not exists $our{$_} and not exists $local{$_} } @my;
-	my $eval = join("", "our(", join(", ", @our), "); ", ($index eq "index"? "\$app->action->{act}{'/'} = ": ()), "\$app->action->{act}{'$index'} = sub {" , (@local? ("local(", join(", ", @local), "); "): ()), (@my? ("my(", join(", ", @my), "); "): ()), "(\$app, \$request, \$response) = \@_; ", $action, "\n};\n\n1;");
+	my $eval = join("", (@our? ("our(", join(", ", @our), "); "): ""), ($index eq "index"? "\$app->action->{act}{'/'} = ": ()), "\$app->action->{act}{'$index'} = sub {" , (@local? ("local(", join(", ", @local), "); "): ()), (@my? ("my(", join(", ", @my), "); "): ()), "(\$app, \$request, \$response) = \@_; ", $action, "\n};\n\n1;");
 
 	my $p = $path;
 	$p =~ s!\b$self->{dir}/!$self->{dir_c}/!;

@@ -73,13 +73,17 @@ sub end { $_[0]->close; exit }
 sub spy {
 	my ($self) = @_;
 	
+	# демонизируемся
+	$self->daemon if $self->{app}->ini->{site}{daemon};
+	
 	my $pid = CORE::fork;
-	die "Ошибка создания сокета. $!" if $pid < 0;
+	die "Ошибка создания дочернего процесса. $!" if $pid < 0;
 	if($pid) {
-		main::msg ":space", ":red", $$, ":reset", " spy start";
-		$self->save_pid($pid);
+		main::msg ":space", ":red", $$, ":reset", "spy start", ":green", $pid;
+		$self->main_pid($pid);
 		my $app = $self->{app};
-		$SIG{PIPE} = $SIG{INT} = $SIG{HUP} = sub {
+		#$SIG{PIPE} = 
+		$SIG{INT} = $SIG{HUP} = sub {
 			kill -9, $self->{main_pid};
 			$app->{hung}->close if $app->{hung};
 			main::msg ":space", ":red", $$, ":reset", "spy exit";
@@ -100,7 +104,7 @@ sub spy {
 			sleep 1;
 			$app->watch->run if $_watch;
 			$self->create("restart=1") if waitpid $self->{main_pid}, WNOHANG;
-		} 
+		}
 	}
 	$self
 }
@@ -115,19 +119,21 @@ sub create {
 	
 	my $pid = CORE::fork;
 	die "Ошибка создания процесса. $!" if $pid < 0;
-	
 	exec "perl", $0, @av unless $pid;
 	
-	$self->save_pid($pid);
+	$self->main_pid($pid);
 	
 	$self
 }
 
 # сохраняет pid
-sub save_pid {
+sub main_pid {
 	my ($self, $pid) = @_;
-	$self->{main_pid} = $pid;
-	$self
+	if(@_==1) { $self->{main_pid} }
+	else {
+		$self->{main_pid} = $pid;
+		$self
+	}
 }
 
 # главный процесс - следит за остальными и выполняет действия по крону

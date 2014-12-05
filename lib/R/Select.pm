@@ -1,9 +1,12 @@
 ﻿package R::Select;
+# запускает функцию при изменении трубы или сокета
 
 use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK O_NDELAY);
 
+# конструктор
 sub new { my ($cls) = @_; bless { file => {}, rin => undef, win => undef, ein => undef, interval => undef }, $cls }
 
+# устанавливает обработчик на файл
 sub on {
 	my ($self, $file, $ioe, $callback) = @_;
 	my $fileno = ref $file? fileno($file): $file;
@@ -16,6 +19,7 @@ sub on {
 	$self
 }
 
+# отключает обработчики от файла
 sub off {
 	my ($self, $fileno) = @_;
 	$fileno = fileno $fileno if ref $fileno;
@@ -30,6 +34,7 @@ sub off {
 	$self
 }
 
+# устанавливает выбор
 sub select {
 	my ($self, $interval) = @_;
 	$self->{interval} = $interval if defined $interval;
@@ -37,6 +42,7 @@ sub select {
 	return ($rin, $win, $ein, $lefttime) if $nfound > 0;
 }
 
+# запускает выбор
 sub run {
 	my ($self, $interval) = @_;
 	my @vec = $self->select($interval);
@@ -44,6 +50,7 @@ sub run {
 	$self
 }
 
+# распознаёт файлы с изменениями
 sub exec {
 	my ($self, $rin, $win, $ein) =  @_;
 	while(my ($fileno, $val) = each %{$self->{file}}) {
@@ -53,6 +60,7 @@ sub exec {
 	}
 }
 
+# бесконечный цикл с обработкой
 sub loop {
 	my ($self, $timeout, $sub) = @_;
 	$sub = $timeout, $timeout = 1 if ref $timeout;
