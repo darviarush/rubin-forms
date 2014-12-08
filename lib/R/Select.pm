@@ -2,6 +2,7 @@
 # запускает функцию при изменении трубы или сокета
 
 use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK O_NDELAY);
+use Time::HiRes;
 
 # конструктор
 sub new { my ($cls) = @_; bless { file => {}, rin => undef, win => undef, ein => undef, interval => undef }, $cls }
@@ -38,8 +39,8 @@ sub off {
 sub select {
 	my ($self, $interval) = @_;
 	$self->{interval} = $interval if defined $interval;
-	my ($nfound, $lefttime) = select $rin=$self->{rin}, $win=$self->{win}, $ein=$self->{ein}, $self->{interval};
-	return ($rin, $win, $ein, $lefttime) if $nfound > 0;
+	my $nfound = select $rin=$self->{rin}, $win=$self->{win}, $ein=$self->{ein}, $self->{interval};
+	return ($rin, $win, $ein) if $nfound > 0;
 }
 
 # запускает выбор
@@ -54,9 +55,9 @@ sub run {
 sub exec {
 	my ($self, $rin, $win, $ein) =  @_;
 	while(my ($fileno, $val) = each %{$self->{file}}) {
-		$val->[0]($val->[1], 0) if defined $rin and vec($rin, $fileno, 1);
-		$val->[0]($val->[1], 1) if defined $win and vec($win, $fileno, 1);
-		$val->[0]($val->[1], 2) if defined $ein and vec($ein, $fileno, 1);
+		$val->[0]($self->{app}, $val->[1], 0) if defined $rin and vec($rin, $fileno, 1);
+		$val->[0]($self->{app}, $val->[1], 1) if defined $win and vec($win, $fileno, 1);
+		$val->[0]($self->{app}, $val->[1], 2) if defined $ein and vec($ein, $fileno, 1);
 	}
 }
 
@@ -66,15 +67,15 @@ sub loop {
 	$sub = $timeout, $timeout = 1 if ref $timeout;
 	my $rtime = $timeout;
 	for(;;) {
+		my $end = Time::HiRes::time + $rtime;
 		my @vec = $self->select($rtime);
-		if(@vec) {
-			$self->exec(@vec);
-			my $lefttime = $vec[3];
-			$rtime = $lefttime || $timeout;
-			next if $lefttime > 0.1;
+		$self->exec(@vec) if @vec;
+		$rtime = $end - Time::HiRes::time;
+		main::msg $rtime;
+		if($rtime <= 0) {
+			$sub->($self->{app});
+			$rtime = $timeout;
 		}
-		$sub->();
-		$rtime = $timeout;
 	}
 }
 

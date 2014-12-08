@@ -86,14 +86,12 @@ sub ritter {
 	my $_action_act = $action->{act};
 	my $_action_htm = $action->{htm};
 	my $_HEAD = $request->head;
-	my $_action = $request->{location};
+	my $_action = $request->{action};
 	
 	eval {
 		my $action = $_action_act->{$_action};
 		my $action_htm = $_action_htm->{$_action};
 		my $ajax = $_HEAD->{"Ajax"} // "";
-		
-		main::msg $action, $action_htm, $_action;
 		
 		if(defined $action_htm and $ajax eq "submit") {
 			
@@ -106,7 +104,6 @@ sub ritter {
 		}
 		elsif(defined $action_htm and $ajax eq "") {
 			$app->stash({});
-			
 			@ret = $action? $action->($app, $request, $response): $param;
 			if(!$action || $action && !defined $response->{body}) {
 				@ret = $_action_htm->{$_action}->($app, $ret[0], $_action);
@@ -123,46 +120,30 @@ sub ritter {
 			@ret = $response->error(404);
 		}
 		
-		$response->body( @ret==1 && ref($ret[0])? to_json($ret[0]): @ret );
+		
+		$response->body( @ret==1 && ref $ret[0]? JSON::to_json($ret[0]): @ret );
 	};
 
 	if(my $error = $@ || $!) {
 		my $is_io = $!;
 		$@ = $! = undef;
-		if(ref $error eq "R::Raise") {
-			$request->body($error);
+		
+		if(ref $error eq "R::Response::Raise") {
+			$response->body($error);
 		} else {
-			if(ref $error eq "R::Exception") { $request->{status} = $error->{error}; $error = join "", $error->{error}, " ", $error->{message}, "\n\n", $error->{trace} }
-			else { $_STATUS = 500; }
+
+			$error = ref $error eq "R::Raise::Trace"? $error: $app->raise->set($error);
+			$error = $app->ini->{site}{test} ? $error: "Внутренняя ошибка";
 			
-			$error = ($is_io? "io: ": "").$error;
-			
-			my $e = $error;
-			R::color_error("action-error $request->{url}", $error);
-			#$e =~ s!\b((?:called )?at|line|thread)\b!CYAN.$1.RESET!ge;
-			#main::msg ":empty", ":red", "action-error `$_action".($param->{id} // "")."`:", ":reset", " $e\n";
-			$error = $_test ? $error: "Внутренняя ошибка";
-			
+			$response->status(500);
 			if($_HEAD->{Accept} =~ /^text\/json\b/) {
 				$response->type("text/plain");
-				@ret = to_json({error=> $error});
+				$response->body({error=> $error});
 			} else {
 				$response->type("text/html");
-				my ($i, $x) = 0;
-				$error =~ s!\b((?:called )?at|line|thread)\b!<font color=LightSlateGray>$1</font>!g;
-				$error =~ s/^(.*)/$x = $1; ""/e;
-				$error =~ s!\n(\s*)!"</div>\n<div class='".($i++ % 2 == 0? 'e-odd': 'e-even')."'>"!ge;
-				$error =~ s!^</div>\n!!;
-				$error =~ s!<div class='[^']+'>$!!;
-				@ret = ("<style><!--
-.e-even {background: lavender}
-.e-odd {background: AliceBlue}
-.e-even, .e-odd { padding: 4pt 4pt 4pt 20pt }
---></style>
-$x
-", $error);
+				$response->body($error->html);
 			}
-			$conn->reconnect;
+			$app->connect->reconnect;
 		}
 	}
 	

@@ -100,16 +100,15 @@ sub impulse {
 		}
 		
 		$request->reset(@param, $head, $body);
-		$response->reset();
+		$response->reset;
 
-		$self->stat_begin() if $_test;
+		$self->stat_begin if $_test;
 
 		# настраиваем сессионное подключение (несколько запросов на соединение, если клиент поддерживает)
 		$keep_alive = ($head->{Connection} =~ /keep-alive/i);
-		
 		$self->{ritter}->($self);
 	} else {
-		$response->error(400)
+		$response->status(400)
 		->type("text/plain")
 		->body("400 $http_status->{400}");
 	}
@@ -122,7 +121,7 @@ sub impulse {
 	unless(exists $response->{head}{"Content-Length"}) {
 		my $len = 0;
 		for my $text (@$body) {
-			$text = JSON::to_json($text) if ref $text;
+			$text = "$text" if ref $text;
 			$len += length $text;
 		}
 		$response->{head}{"Content-Length"} = $len;

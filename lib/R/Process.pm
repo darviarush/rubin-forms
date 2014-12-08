@@ -146,7 +146,7 @@ sub loop {
 		eval {
 			$cron->($self->{app});
 		};
-		main::msg(":red", "Сбойнула задача крона: ".($@ || $!)), $@ = $! = undef if $@ || $!;
+		main::msg(":red", "Сбойнула задача крона:\n$@$!"), $@ = $! = undef if $@ || $!;
 		
 		eval {
 			my @joinable = threads->list(threads::joinable);
@@ -154,12 +154,12 @@ sub loop {
 				my @return = $thr->join();
 				my $tid = $thr->tid();
 				my $error = $thr->error();
-				main::msg ":empty", ":red", "Завершился лорд № $tid", ":reset", ($error? "\nС ошибкой: $error": "");
+				main::msg ":empty", ":red", "Завершился лорд № $tid", ":reset", ($error? "\nС ошибкой:\n$error": "");
 				#(@return? "\nВернул: ": "")main::msg \@return if @return;
 				threads->create($self->{lord}, $self);
 			}
 		};
-		main::msg(":red", "Лорд завершился с ошибкой: ".($@ || $!)), $@ = $! = undef if $@ || $!;
+		main::msg(":red", "Лорд завершился с ошибкой:\n$@$!"), $@ = $! = undef if $@ || $!;
 	}
 }
 
@@ -168,7 +168,6 @@ sub watch {
 	my ($self) = @_;
 	my $watch = $self->{app}->watch;
 	my $dirs = [main::files("qq"), "main.ini", main::dirs("lib"), main::files("bin/qq.pl"), main::files("bin/ini.pl"), main::files($self->{app}->action->{dir_c})];
-	main::msg ;
 	$watch->on(qr//, $dirs, sub {
 		my ($path, $app) = @_;
 		my $module = $path =~ m!/.*\.(\w+)\.pl$!? ($1 eq "act"? "action": $1): "module";

@@ -97,7 +97,7 @@ sub compile_htm {
 	my $code = $page->{code};
 	delete $page->{code};
 	
-	$eval = join "", ($index eq "index"? "\$app->action->{htm}{'/'} = ": ()), "\$app->action->{htm}{'$index'} = sub { $Utils::code_begin_param return join \"\", '", $eval, "'};\n\n\$app->action->{page}{'$index'} = ", Utils::Dump($page), ";\n\$app->action->{page}{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
+	$eval = join "", "\$app->action->{htm}{'$index'} = sub { $Utils::code_begin_param return join \"\", '", $eval, "'};\n\n\$app->action->{page}{'$index'} = ", Utils::Dump($page), ";\n\$app->action->{page}{'$index'}{code} = ", $code, ";\n", @write, "\n\n1;";
 	
 	my $p = $path;
 	$p =~ s!\b$self->{dir}/!$self->{dir_c}/!;
@@ -115,18 +115,19 @@ sub compile_action {
 	my $index = $1;
 
 	my $action = Utils::read($path);
-	my @our = qw/%ENV @INC %INC @ISA/;
+	my @our = qw//;
 	my %our = Utils::set(@our);
-	my %local = Utils::set(qw/@_ $_ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9 $a $b/);
+	my %local = Utils::set(qw/$_ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9 $a $b/);
 	my %my = Utils::set(qw/$app $request $response/);
+	my %no = Utils::set(qw/@_ %ENV @INC %INC @ISA/);
 	while($action =~ /\$(\w+)(::\w+)*\s*(\{|\[)|([\%\$\@]\w+)(::\w+)*/g) {
 		next if $2 // $5;$my{$4} = 1 if $4;
 		$my{($3 eq "{"? "%": "@").$1} = 1 if $1;
 	}
 	my @my = keys %my;
 	my @local = grep { exists $local{$_} } @my;
-	@my = grep { not exists $our{$_} and not exists $local{$_} } @my;
-	my $eval = join("", (@our? ("our(", join(", ", @our), "); "): ""), ($index eq "index"? "\$app->action->{act}{'/'} = ": ()), "\$app->action->{act}{'$index'} = sub {" , (@local? ("local(", join(", ", @local), "); "): ()), (@my? ("my(", join(", ", @my), "); "): ()), "(\$app, \$request, \$response) = \@_; ", $action, "\n};\n\n1;");
+	@my = grep { not exists $our{$_} and not exists $local{$_} and not exists $no{$_} } @my;
+	my $eval = join("", (@our? ("our(", join(", ", @our), "); "): ""), "\$app->action->{act}{'$index'} = sub {" , (@local? ("local(", join(", ", @local), "); "): ()), (@my? ("my(", join(", ", @my), "); "): ()), "(\$app, \$request, \$response) = \@_; ", $action, "\n};\n\n1;");
 
 	my $p = $path;
 	$p =~ s!\b$self->{dir}/!$self->{dir_c}/!;

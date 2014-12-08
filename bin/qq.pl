@@ -31,7 +31,9 @@ $app->process->fork(*lord);
 
 
 # бесконечный цикл с cron
+require POSIX;
 $app->process->loop(sub {	# будет вызываться раз в секунду
+	$app->process->close, exit unless kill 0, POSIX::getppid();
 	$app->session->delete if time % 3600 == 0;	# раз в час
 });
 

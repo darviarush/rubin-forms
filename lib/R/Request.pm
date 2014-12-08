@@ -14,6 +14,8 @@ sub reset {
 	my ($ids, $id);
 	($self, $self->{method}, $self->{url}, $self->{location}, $self->{action}, $id, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body}) = @_;
 	
+	$self->{action} = 'index' if $self->{action} eq "";
+	
 	$self->{ids}{id} = $id if defined $id;
 	if(defined $ids and $ids ne "") {
 		my $i = 2;

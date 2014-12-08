@@ -69,8 +69,9 @@ sub error {
 	my($self, $status, $error) = @_;
 	$self->{status} = $status;
 	$self->type('text/plain');
-	$self->body($error // "$status " . $self->{app}->serverHttpStatus->{$status});
-	$self
+	my $msg = $error // "$status " . $self->{app}->serverHttpStatus->{$status};
+	$self->body($msg);
+	$msg
 }
 
 sub body { 

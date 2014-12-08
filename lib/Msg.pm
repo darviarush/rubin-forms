@@ -5,64 +5,43 @@ BEGIN {
 	use Fcntl ':flock';
 	#$SIG{ __DIE__ } = \&Carp::confess;
 
-	sub R::color_error {
-		my ($action, $error, $color_error, $color_words) = @_;
-		$color_error //= 'red';
-		$color_words //= 'cyan';
-		#my $e = Carp::longmess(Term::ANSIColor::colored($error, $color_error));
-		##$e =~ s!^ at .*$!!m;
-		#$e =~ s!\b(require|called at|at|line|thread)\b!Term::ANSIColor::colored($1, $color_words)!ge;
-		#print STDERR $e;
-		
-		local ($_, $`, $', $1, $2);
-		my @trace;
-		
-		my $push = sub {
-			push @trace, "$_[0]:$_[1]: " . Term::ANSIColor::colored($_[3] // $action.": ", $color_error) . Term::ANSIColor::colored($_[2], $color_words) . "\n";
-		};
-		
-		if(ref $error) { $error = Utils::Dump($error); }
-		else { 
-			$error =~ s!^syntax error at (\S+) line (\d+), (near .*)\n!! and $push->($1, $2, $3, 'syntax error ');
-			$error =~ s! at (\S+) line (\d+)(?:, <GEN\d+> line \d+)?\.\s*$!! and $push->($1, $2, $error);
-		}
-		
-		for(my $i=1; my @param = caller($i); $i++) {
-			my ($package, $file, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = @param;
-			$subroutine =~ s!^main::(\w+)$!$1!;
-			$subroutine =~ s!(^|::)__ANON__$!$1~!;
-			push @trace, "$file:$line: $subroutine\n" if $subroutine ne "(eval)";
-		}
-		
-		print STDERR $_ for @trace;
-	}
-	
-	$SIG{ __DIE__ } = sub { die @_ if $^S; R::color_error("error", $_[0]); exit };
-	$SIG{ __WARN__ } = sub { R::color_error("warning", $_[0], 'yellow', 'green') };
-	
 	use Cwd;
 	use File::Basename qw/dirname/;
-	chdir dirname($0);
+	#chdir dirname($0);
 	
 	our $_FRAMEWORK;
 	
-	my $root = "."; #getcwd();
+	my $root = ".";
 	#chdir $root;
 	my @frame = split /\//, __FILE__;
 	my $frame = join("/", @frame[0..@frame-3]) || ".";
 	if($frame ne $root) { $_FRAMEWORK = $frame; unshift @INC, "$root/lib"; }
+	
 }
 our $_FRAMEWORK;
 
+use R::Raise;
 use R::App;
 our $app = R::App->new;
+
+$SIG{ __DIE__ } = sub {
+	my ($msg) = @_;
+	eval {
+		$msg = $app->raise->trace($msg) if ref $msg ne 'R::Raise::Trace';
+	};
+	die $msg if $^S;
+	print STDERR $msg;
+	exit
+};
+$SIG{ __WARN__ } = sub { print STDERR $app->raise->set($_[0])->color("warning", 'yellow', 'green') };
+
 
 use Utils;
 use POSIX qw//;
 use Term::ANSIColor qw//;
 
 my $_LOG = 1;
-my $_COLOR = $ENV{TERM} eq "cygwin";
+my $_COLOR = not $ENV{TERM} eq "dumb";
 
 sub msg (@) {
 	if($_LOG == 1) {
