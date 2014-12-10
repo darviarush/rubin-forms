@@ -404,6 +404,8 @@ sub block {
 	}
 }
 
+####################################### Операции с url ##########################################
+
 # эскейпит для url
 sub uri_escape {
 	my ($v, $re) = @_;
@@ -414,6 +416,7 @@ sub uri_escape {
 	$v
 }
 
+# разэскейпливает url
 sub uri_unescape {
 	my ($v) = @_;
 	local ($`, $', $1, $2);
@@ -524,7 +527,18 @@ sub decamelcase {
 	$s
 }
 
-# создаёт путь
+# изменяет путь cygwin на виндовый
+sub winpath {
+	require Cwd;
+	local ($`, $');
+	my $file = Cwd::abs_path($_[0]);
+	$file =~ s!^/cygdrive/(\w)!$1:!;
+	$file =~ s!^/(usr/)?!c:/cygwin/!;
+	$file =~ s!/!\\!g;
+	$file
+}
+
+# создаёт каталоги в пути
 sub mkpath { local ($_, $`, $'); $_ = $_[0]; mkdir $` while /\//g; $! = undef; }
 
 # возвращает путь к каталогу картинки без /image/. Параметр - id
@@ -659,7 +673,7 @@ sub parse_frames {
 	map { /=/; $` => $' } split /,/, $param;
 }
 
-# темплейт, аналогичный из js-библиотеки CTemplate::compile. Возвращает текст функции
+# темплейт, аналогичный из js-библиотеки CTemplate::compile. Возвращает текст функции без обёртки в sub{}
 my $code_begin = 'sub {	my ($dataset, $id1) = @_; my ($i, @res) = 0; for my $data (@$dataset) { my $id = "$id1-".($data->{id} // $i); push @res, \'';
 my $code_end = '\';	$i++; }	return join "", @res; }';
 my $code_begin1 = 'sub { my ($data, $id) = @_; return join "", \'';
@@ -669,7 +683,7 @@ my $code_begin_i = "sub { my (\$dataset, \$id1) = \@_; my \$i = 0; for my \$data
 my $code_end_i = "\$i++; } }\n";
 my $code_begin1_i = "sub { my (\$data, \$id) = \@_; \n";
 my $code_end1_i = "}\n";
-our $code_begin_param = "my (\$app, \$data, \$id) = \@_; my \$dbh=\$app->connect->{dbh}; my \$action=\$app->action; my \$_STASH = \$app->stash;";
+our $code_begin_param = "my (\$app, \$data, \$id, \$LAYOUT) = \@_; my \$_STASH = \$app->{stash};";
 
 
 sub TemplateBare {
@@ -794,7 +808,7 @@ sub TemplateBare {
 		$NO && m!\G</$TAG\s*>!? do { $TAG = $open_id = $open_tag = $NO = undef; $& }:
 		$open_tag && m!\G\$-(\w+)?!? do { $open_id = $1; "', \$id, '".(defined($1)? "-$1": "") }:
 		m!\G\$@([/\w]+)!? do { my $n = $1; my $id = $get_id->(); "', include_action(\$data->{'$id'}, \"\$id-$id\", '$n'), '" }:
-		m!\G\$&!? do { $page->{layout_id} = $get_id->(); "', \@_[2..\$#_], '" }:
+		m!\G\$&!? do { $page->{layout_id} = $get_id->(); "', \@\$LAYOUT, '" }:
 		m!\G\{%\s*(\w+)\s*=%\}!? do { "', do { \$_STASH{'$1'} = join '', ('" }:
 		m!\G\{%\s*end\s*%\}!? do { "'); () }, '" }:
 		m!\G\{%\s*if\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do {
@@ -903,6 +917,7 @@ sub TemplateBare {
 	$x
 }
 
+# добавляет обёртку в sub{}
 sub TemplateStr {
 	join "", $code_begin1, TemplateBare(@_), $code_end1;
 }

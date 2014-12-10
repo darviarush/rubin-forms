@@ -131,8 +131,10 @@ sub impulse {
 	
 	my ($k, $v);
 	my $out_head = $response->{head};
+	my $cookie = $response->{cookie};
 	send $ns, $RESPONSE, 0;
 	send $ns, "$k: $v\n", 0 while ($k, $v) = each %$out_head;
+	send $ns, "Set-Cookie: $_\n", 0 for @$cookie;
 	send $ns, "\n", 0;
 	send $ns, $_, 0 for @$body;
 

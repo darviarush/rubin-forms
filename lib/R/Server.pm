@@ -4,6 +4,8 @@ package R::Server;
 
 use base R::Utils::Main;
 
+use R::Request;
+
 use Time::HiRes qw//;
 use POSIX qw//;
 
@@ -83,15 +85,16 @@ sub ritter {
 	$app->session->reset;
 	
 	my $action = $app->action;
-	my $_action_act = $action->{act};
+	#my $_action_act = $action->{act};
 	my $_action_htm = $action->{htm};
 	my $_HEAD = $request->head;
 	my $_action = $request->{action};
 	
 	eval {
-		my $action = $_action_act->{$_action};
+		#my $action = $_action_act->{$_action};
 		my $action_htm = $_action_htm->{$_action};
 		my $ajax = $_HEAD->{"Ajax"} // "";
+		my @ret;
 		
 		if(defined $action_htm and $ajax eq "submit") {
 			
@@ -104,14 +107,7 @@ sub ritter {
 		}
 		elsif(defined $action_htm and $ajax eq "") {
 			$app->stash({});
-			@ret = $action? $action->($app, $request, $response): $param;
-			if(!$action || $action && !defined $response->{body}) {
-				@ret = $_action_htm->{$_action}->($app, $ret[0], $_action);
-				for(; my $_layout = $_layout{$_action}; $_action = $_layout) {
-					my $arg = ($action = $_action_act->{$_layout})? $action->($app, $request, $response): {};
-					@ret = $_action_htm->{$_layout}->($app, $arg, $_layout, @ret);
-				}
-			}
+			@ret = $self->wrap;
 		} elsif(defined $action) {
 			@ret = $action->($app, $request, $response);
 		} elsif(exists $_info->{$_action}) {
@@ -149,6 +145,118 @@ sub ritter {
 	
 	$app->{stash} = undef;
 	
+}
+
+
+# ajax-редирект
+sub ajax_redirect {
+	my ($self) = @_;
+	my $app = $self->{app};
+	my $request = $app->request;
+	my $response = $app->response;
+	
+	$request->reset( $response->{head}{"Location"} =~ $R::Request::RE_LOCATION );
+	
+	my $cookie = $response->{cookie};
+	$response->reset->{cookie} = $cookie;
+	
+	$self->{ritter}->();
+}
+
+# выполняет и оборачивает в лайоуты экшн
+sub wrap {
+	my ($self, $ajax) = @_;
+	my $app = $self->{app};
+	my $request = $app->request;
+	my $response = $app->response;
+	my $act = $request->{action};
+	my $action = $app->action;
+	my $_action_act = $action->{act};
+	my $_action_htm = $ajax? $action->{ajax_htm}: $action->{htm};
+	my $action_act = $_action_act->{$act};
+
+	my @ret = $action_act? $action_act->($app, $request, $response): $request->param;
+	if(!$action_act || $action_act && !defined $response->{body}) {
+		@ret = $_action_htm->{$act}->($app, $ret[0], $act);
+		for my $layout ($response->layout) {
+			$action_act = $_action_act->{$layout};
+			my $arg = $action_act? $action_act->($app, $request, $response): (ref $ret[0]? $ret[0]: {});
+			@ret = $_action_htm->{$layout}->($app, $arg, $layout, \@ret);
+		}
+		
+		# for(; my $_layout = $_layout{$_action}; $_action = $_layout) {
+			# my $arg = ($action = $_action_act->{$_layout})? $action->($app, $request, $response): {};
+			# @ret = $_action_htm->{$_layout}->($app, $arg, $_layout, @ret);
+		# }
+	}
+	@ret
+}
+
+
+# фреймы - механизм лайоутов и таргетов форм
+sub submit {
+	my ($self) = @_;
+	my $app = $self->{app};
+	my $request = $app->{request};
+	my $response = $app->{response};
+	
+	my $result = {};
+	my ($id, $url, $act);
+	
+	$act = $request->{action};
+	
+	$self->type("text/json");
+	
+	my $add_res = sub {
+
+		die "Нет экшена `$act`" if not exists $main::_action{$act} and not $main::_action_htm{$act};
+		
+		my $data = exists $main::_action{$act}? $main::_action{$act}->(): $::param;
+		$main::_pages{$act}{code}->($data, $act) if exists $main::_pages{$act}{code};
+		
+		$result->{$act} = {
+			act => $act,
+			($id ? (id => $id): ()),
+			#(exists $main::_forms{$act} && exists $main::_info->{$act}? (data => action_view($main::_action, $main::param)): ()),
+			(defined($data)? (data => $data): ()),
+			(exists $main::_pages{$act}{template}? (template => $main::_pages{$act}{template}): ()),
+			(exists $main::_pages{$act}{layout_id}? (layout_id => $main::_pages{$act}{layout_id}): ()),
+			(exists $main::_layout{$act}? (layout => $main::_layout{$act}): ())
+		};
+	};
+
+	if($_[0]) {
+		$add_res->();
+		return $result->{$act};
+	}
+	
+	unless($::param->{_noact_}) {
+		#$act = 'index' if $act eq "/";
+		my $layout_id = $::param->{_layout_id_};
+		my $layout = [];
+		for(; $act; $act = $main::_layout{$act}) {
+			last if defined($layout_id) and $main::_pages{$act}{layout_id} eq $layout_id;
+			$add_res->();
+			unshift @$layout, $act;
+		}
+		$result->{"\@layout"} = $layout;
+		if(defined $layout_id and exists $main::_layout{$act}) {
+			$result->{$act=$main::_layout{$act}} = { act => $act, layout_id => $result->{$act}{layout_id} };
+			unshift @$layout, $act;
+		}
+	}
+
+	my $frames = Utils::param($::param->{_frames_}, qr/,/);
+
+	while(($id, $url) = each %$frames) {
+		if($url =~ /\?/) { ($act, $::param) = ($`, Utils::param($')) } else { $act = $url; $::param = {} }
+		$add_res->();
+	}
+
+	$result->{'@stash'} = \%::_STASH;
+	$result->{'@url'} = $::_URL;
+
+	return $result;
 }
 
 

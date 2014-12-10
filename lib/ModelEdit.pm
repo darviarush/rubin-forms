@@ -142,4 +142,117 @@ sub alter_column {
 	($sql->{extra} ne ""? " $sql->{extra}": "")): "")
 }
 
+
+sub table_info {
+	my ($edit) = @_;
+	my $install = $edit->install_info;
+	my $_info = $edit->{app}->connect->info;
+	my $info = $edit->{app}->auth;
+	my $rules = $info->{rules};
+
+	my %tab = Utils::set(keys(%$_info), keys(%$install), map { keys(%$_) } values %$info);
+
+	# tab_selfcol 
+	# tab_validator 
+	# tab_update
+	# tab_error 
+	# tab_valid 
+	# rules 
+	# tab_rules
+
+	my @table;
+	
+	for my $tab (keys %tab) {
+
+		my $perm = $info->{tab_rules}{$tab};
+		my $noauth = $perm->{noauth};
+		my $user = $perm->{user};
+		my $self = $perm->{self};
+		
+		my $i = 0;
+		my @selfcol = map { $i++ == 0 && $_->[0] eq $tab? $_->[1]: $_->[0].".".$_->[1] } @{$info->{tab_selfcol}{$tab}};
+		
+		push @table, my $table = {
+			name => $tab,
+			
+			selfcol => join(", ", @selfcol),
+			
+			noauth_add => $noauth->{add},
+			noauth_view => $noauth->{view},
+			noauth_rm => $noauth->{rm},
+			noauth_edit => $noauth->{edit},
+			
+			user_add => $user->{add},
+			user_view => $user->{view},
+			user_rm => $user->{rm},
+			user_edit => $user->{edit},
+			
+			self_add => $self->{add},
+			self_view => $self->{view},
+			self_rm => $self->{rm},
+			self_edit => $self->{edit},
+			
+			is_sql => exists($_info->{$tab}),
+			is_install => exists($install->{$tab}),
+			
+			package => $install->{$tab}{package},
+			
+			order => $install->{$tab}{order} // 100000
+		};
+		
+		my %col = Utils::set(keys(%{$_info->{$tab}}), keys(%{$rules->{$tab}}), keys(%{$info->{tab_valid}{$tab}}), keys(%{$install->{$tab}{cols}}) );
+		
+		my $columns = $table->{col} = [];
+		
+		for my $col (keys %col) {
+		
+			my $sql = $_info->{$tab}{$col};
+			my $ins = $install->{$tab}{cols}{$col};
+			
+			my $perm = $info->{rules}{$tab}{$col};
+			my $noauth = $perm->{noauth};
+			my $user = $perm->{user};
+			my $self = $perm->{self};
+		
+			push @$columns, {
+			
+				name => $col,
+				
+				noauth_add => $noauth->{add},
+				noauth_view => $noauth->{view},
+				noauth_rm => $noauth->{rm},
+				noauth_edit => $noauth->{edit},
+				
+				user_add => $user->{add},
+				user_view => $user->{view},
+				user_rm => $user->{rm},
+				user_edit => $user->{edit},
+				
+				self_add => $self->{add},
+				self_view => $self->{view},
+				self_rm => $self->{rm},
+				self_edit => $self->{edit},
+
+				is_sql => !!$sql,
+				is_install => !!$ins,
+
+				package => $ins->{package} // "",
+				install => $ins->{install} // "",
+				sql => $edit->alter_column($sql),
+				valid => $info->{tab_valid}{$tab}{$col},
+				
+				order => $sql->{ordinal_position} || $ins->{order} || "",
+			};
+		}
+		#main::msg @{$table->{col}};
+		
+		#main::msg(@$col);
+		$table->{col} = [ sort({ $a->{order} <=> $b->{order} } @$columns) ];
+		#msg $table->{col};
+	}
+
+	[sort {  $a->{order} <=> $b->{order} } @table];
+}
+
+
 1;

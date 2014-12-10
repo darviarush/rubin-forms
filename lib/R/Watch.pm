@@ -95,12 +95,13 @@ sub run {
 # вызывает срабатывание всех слушатилей на файлах, соответвующих маске или, если файл не указан - то на всех
 sub fire {
 	my($self, $path) = @_;
+	my $app = $self->{app};
 	if(!defined $path) {
-		while(my($file, $cb) = each %{$self->{file}}) { $cb->($file); }
+		while(my($file, $cb) = each %{$self->{file}}) { $cb->($file, $app); }
 	}
-	elsif(!ref($path) and exists $self->{watch}{$path}) { $self->{file}{$path}->($path) }
+	elsif(!ref($path) and exists $self->{watch}{$path}) { $self->{file}{$path}->($path, $app) }
 	else {
-		while(my($file, $cb) = each %{$self->{file}}) { $cb->($file) if $file =~ $path; }
+		while(my($file, $cb) = each %{$self->{file}}) { $cb->($file, $app) if $file =~ $path; }
 	}
 	$self
 }

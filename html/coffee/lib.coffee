@@ -571,7 +571,7 @@ CInit =
 		if param.pack
 			for i in CInit.pack = param.pack.split(",") then CInit.require i
 			delete param.pack
-		for i of param then throw CRoot.raise "Нет параметра #{i} для инициализации библиотеки"
+		for i of param then throw CRoot.raise "Нет параметра #{i} в инициализаторе библиотеки"
 		undefined
 
 
@@ -1134,7 +1134,11 @@ CEffect =
 
 
 CRoot = null
-unless window.$ then $ = (e) -> (if typeof e == 'function' then CRoot._init_functions.push e else CRoot.wrap e)
+unless window.$ then $ = (e) ->
+	if typeof e == 'function' then CRoot._init_functions.push e
+	else if e == 'string' then CRoot.find e
+	else if !e? then new CWidgets
+	else CRoot.wrap e
 
 	
 class CWidget
@@ -2146,7 +2150,7 @@ class CWidget
 	fly: (flag) ->
 		if flag then from = @new("div").css width: 'auto', height: 'auto', margin: 0, padding: 0
 		@on 'scroll', if flag == 1 then do(from)->->
-			if 
+			#if 
 	
 	toggle$ = (args, s) -> args[if (i=args.indexOf s) != -1 then (i+1) % args.length else 0]
 	

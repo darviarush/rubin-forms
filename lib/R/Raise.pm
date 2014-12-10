@@ -92,10 +92,7 @@ sub color {
 sub asString {
 	my ($self, $action) = @_;
 	join "", map {
-		my $file = Cwd::abs_path($_->{file});
-		$file =~ s!^/cygdrive/(\w)!$1:!;
-		$file =~ s!^/(usr/)?!c:/cygwin/!;
-		$file =~ s!/!\\!g;
+		my $file = Utils::winpath($self->{file});
 		if($_->{sub}) { "$file:$_->{line}:1: $_->{sub}\n" }
 		else { "$file:$_->{line}:1: " . ($_->{action} // $action) .": " . $_->{msg} . "\n" }
 	} @{$self->{trace}};

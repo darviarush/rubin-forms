@@ -33,11 +33,11 @@ sub new {
 		
 		Utils::write("watch/watch.$ext", "");
 		
-		my $process = R::Hung::Process->new($watch);
+		my $process = R::Hung::Process->new($watch, $app);
 		push @{$self->{pid}}, $process->{pid};
 		$pid{$process->{pid}} = 1;
 
-		$watching->on(qr/\.(?:$watch->{ext})$/, [main::files(@in)], (sub { my ($p) = @_; sub { $p->inset(@_) }})->($process));
+		$watching->on(qr/\.(?:$watch->{ext})$/, [main::files(@in)], Utils::closure($process, $process->can("inset")));
 		
 	}
 
@@ -62,16 +62,17 @@ use Cwd qw/abs_path/;
 use Symbol;
 
 sub new {
-	my ($cls, $watch) = @_;
+	my ($cls, $watch, $app) = @_;
 	my ($in, $out) = (gensym, gensym);
 	my $pid = open3($in, $out, $out, $watch->{hang}) or die "Не запустился процесс `$watch->{hang}`. $!";
 	
-	#Utils::nonblock($in);
-	#Utils::nonblock($out);
-	#my $old = select $out; $| = 1; select $old;
+	main::msg "Запустился процесс $pid=$watch->{hang}";
+	
 	my ($ext) = split /\|/, $watch->{ext};
 	
-	my $self = bless {watch => $watch, ext => $ext, in => $in, out => $out, pid => $pid}, $cls;
+	my $self = bless {app=>$app, watch => $watch, ext => $ext, in => $in, out => $out, pid => $pid}, $cls;
+	
+	#$app->select->on($out, 're', Utils::closure($self, $self->can("")));
 	
 	if($watch->{start}) {
 		#out(scalar <$out>);
@@ -88,7 +89,8 @@ sub out {
 }
 
 sub inset {
-	my ($self, $path) = @_;
+	my ($self, $path, $app) = @_;
+	#main::msg $self, $path, !!$app;
 	my $watch = $self->{watch};
 	my $ext = $self->{ext};
 	my $out = $self->{out};
@@ -96,10 +98,12 @@ sub inset {
 	unlink $map;
 	#main::msg 'cp', $path, "watch/watch.$ext";
 	Utils::cp($path, "watch/watch.$ext");
-	my $p = abs_path($path);
-	$p =~ s!/cygdrive/(\w)/!$1:/!, $p =~ s!/!\\!g if $watch->{win};
+	my $p = $path;
+	$p =~ Utils::winpath($p) if $watch->{win};
 	unless($_ = join "", $self->read_bk) {
+		main::msg 'kill $self->{pid}';
 		kill KILL, $self->{pid};
+		#$watch->{start} = 0;
 		%$self = %{R::Hung::Process->new($watch)};
 		$_ = join "", $self->read_bk;
 	}
@@ -122,12 +126,11 @@ sub inset {
 
 sub read_bk {
 	my ($self) = @_;
-	my @out;
-	#main::msg ":green", "read_bk";
-	my $i = 0;
-	while(not @out = $self->read_nonblock(0.25) and $i++ > 10) {}
-	#main::msg ":red", "read_bk out", \@out;
-	@out
+	my $out = $self->{out};
+	main::msg "line";
+	my $line = <$out>;
+	main::msg "line end";
+	return ($line, $self->read_nonblock(0.25));
 }
 
 use Time::HiRes qw//;
@@ -142,11 +145,8 @@ sub read_nonblock {
 	vec($vec, $f, 1) = 1;
 	for(;;) {
 		my $time = Time::HiRes::time();
-		my ($nfound, $rtime) = select $rin=$vec, $win=$vec, $ein=$vec, $sleep;
-		my $o = <$out>;
-		#main::msg kill(0, $self->{pid}), vec($vec, $f, 1), vec($rin, $f, 1), vec($win, $f, 1), vec($ein, $f, 1), $nfound, $rtime, Time::HiRes::time() - $time;
-		last unless defined $o;
-		push @out, $o;
+		my $nfound = select $rin=$vec, $win=$vec, $ein=$vec, $sleep;
+		if($nfound) { push @out, <$out> } else { last; }
 	}
 	Utils::block($out);
 	return @out;

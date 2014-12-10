@@ -9,7 +9,7 @@ use JSON qw//;
 sub reset {
 	my ($self) = @_;
 	my $app = $self->{app};
-	%$self = (app => $app, status => 200, head=>{'Content-Type' => 'text/html; charset=utf-8'}, body=>[] );
+	%$self = (app => $app, status => 200, head=>{'Content-Type' => 'text/html; charset=utf-8'}, body=>undef );
 	$self
 }
 
@@ -21,7 +21,7 @@ sub head {
 		if($k =~ /^Content-Type$/i) { $self->type($v) }
 		else {
 			$self->{head}{$k} = $v = Utils::uri_escape($v, qr/[^ -\xFF]/);
-			#push @::_HEAD, $k.": ".$v;
+			#push @{$self->{HEAD}}, [$k, $v];
 		}
 		$self
 	}
@@ -46,8 +46,8 @@ sub cookie {
 		(exists $param->{domain}? "; Domain=$param->{domain}": ()),
 		(exists $param->{secure}? "; Secure": ()),
 		(exists $param->{httponly}? "; HttpOnly": ());
-	$self->head("Set-Cookie", $val);
-	#push @::_COOKIE, $val;
+	#$self->head("Set-Cookie", $val);
+	push @{$self->{cookie}}, $val;
 	$self
 }
 
@@ -74,6 +74,7 @@ sub error {
 	$msg
 }
 
+# устанавливает/возвращает body
 sub body { 
 	my $self = shift;
 	if(@_ > 0) {
@@ -83,16 +84,28 @@ sub body {
 	else { $self->{body} }
 }
 
+# добавл€ет к body массив спереди
 sub prepend {
 	my $self = shift;
 	unshift @{$self->{body}}, @_;
 	$self
 }
 
+# добавл€ет к body массив позади
 sub append {
 	my $self = shift;
 	push @{$self->{body}}, @_;
 	$self
+}
+
+# устанавливает/возвращает лайоуты дл€ текущей акции
+sub layout {
+	my $self = shift;
+	if(@_ > 0) {
+		$self->{layout} = [@_];
+		$self
+	}
+	else { @{$self->{layout}} or @{$self->{app}{action}->layout($self->{app}{request}{action})} }
 }
 
 1;
