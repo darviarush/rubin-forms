@@ -2,7 +2,6 @@ package R::Hung;
 # управляет "висящими заданиями" прописанными в main.ini вроде coffee -w
 
 
-
 my %pid;
 sub close {
 	kill KILL, keys %pid;
@@ -42,7 +41,7 @@ sub new {
 	}
 
 	main::msg(":BOLD BLACK", "\ncompiling...");
-	$watching->fire();
+	$watching->fire;
 	main::msg(":BOLD BLACK", "\nwatching...");
 	$self;
 }
@@ -58,7 +57,7 @@ package R::Hung::Process;
 
 use IPC::Open3;
 use POSIX qw/strftime/;
-use Cwd qw/abs_path/;
+use Time::HiRes qw//;
 use Symbol;
 
 sub new {
@@ -66,7 +65,9 @@ sub new {
 	my ($in, $out) = (gensym, gensym);
 	my $pid = open3($in, $out, $out, $watch->{hang}) or die "Не запустился процесс `$watch->{hang}`. $!";
 	
-	main::msg "Запустился процесс $pid=$watch->{hang}";
+	my $old = select $out; $|=1; select $old;
+	
+	main::msg "Запустился процесс $$ $pid $watch->{hang}";
 	
 	my ($ext) = split /\|/, $watch->{ext};
 	
@@ -82,6 +83,7 @@ sub new {
 }
 
 sub out {
+	
 	for(@_) {
 		chomp $_;
 		main::msg ":empty", map { /^(compiled|watching|generated|at)$/? (":bold black", $_, ":reset"): /error/? (':red', $_, ':reset'): $_ } split /(compiled|watching|generated|\bat\b)/;
@@ -91,26 +93,29 @@ sub out {
 sub inset {
 	my ($self, $path, $app) = @_;
 	#main::msg $self, $path, !!$app;
+	my $time = Time::HiRes::time;
 	my $watch = $self->{watch};
 	my $ext = $self->{ext};
 	my $out = $self->{out};
 	my $map = "watch/watch.".($watch->{map} || "map");
 	unlink $map;
-	#main::msg 'cp', $path, "watch/watch.$ext";
+	#main::msg ":green", "cp $path";
 	Utils::cp($path, "watch/watch.$ext");
 	my $p = $path;
-	$p =~ Utils::winpath($p) if $watch->{win};
-	unless($_ = join "", $self->read_bk) {
-		main::msg 'kill $self->{pid}';
-		kill KILL, $self->{pid};
+	$p = Utils::winpath($p) if $watch->{win};
+	until($_ = join "", $self->read_bk) {
+		main::msg ":red", "cp -x $path watch/watch.$ext";
+		Utils::cp($path, "watch/watch.$ext");
+		#main::msg 'kill $self->{pid}';
+		#kill KILL, $self->{pid};
 		#$watch->{start} = 0;
-		%$self = %{R::Hung::Process->new($watch)};
-		$_ = join "", $self->read_bk;
+		#%$self = %{R::Hung::Process->new($watch)};
+		#$_ = join "", $self->read_bk;
 	}
 	
 	s!$watch->{reg_compile}!($+{time} // strftime("%T", localtime))." - compiled $p"!ge;
 	s!$watch->{reg_error}!"$p:$+{line}:".($+{char} || 1).": error: ".($+{msg2}? "$+{msg2}: ": "")."$+{msg}"!ge;
-	out(split /\n/, $_);
+	my @out = split /\n/, $_;
 	
 	my $to = $watch->{out};
 	for my $from (split /\s*,\s*/, $watch->{in}) {
@@ -122,31 +127,28 @@ sub inset {
 	#main::msg 'cp', "watch/watch.$new_ext", $path;
 	Utils::cp("watch/watch.$new_ext", $path);
 	$path =~ s!\.$new_ext!.map!, Utils::cp($map, $path) if -e $map;
+	
+	$out[0] = sprintf "%.4f %s", Time::HiRes::time - $time, $out[0];
+	out(@out);
+	#main::msg sprintf "%.4f - %s", Time::HiRes::time - $time, $path;
 }
 
 sub read_bk {
 	my ($self) = @_;
-	my $out = $self->{out};
-	main::msg "line";
-	my $line = <$out>;
-	main::msg "line end";
-	return ($line, $self->read_nonblock(0.25));
+	$self->read_nonblock(3);
 }
 
-use Time::HiRes qw//;
 sub read_nonblock {
 	my ($self, $sleep) = @_;
 	my $out = $self->{out};
 	my @out;
 	Utils::nonblock($out);
-	my $f = fileno($out);
 	my $vec = '';
-	my ($rin, $ein);
-	vec($vec, $f, 1) = 1;
-	for(;;) {
-		my $time = Time::HiRes::time();
-		my $nfound = select $rin=$vec, $win=$vec, $ein=$vec, $sleep;
-		if($nfound) { push @out, <$out> } else { last; }
+	my ($rin, $win, $ein);
+	vec($vec, fileno($out), 1) = 1;
+	my $nfound = select $rin=$vec, $win=$vec, $ein=$vec, $sleep;
+	if($nfound) {
+		push @out, <$out>;
 	}
 	Utils::block($out);
 	return @out;

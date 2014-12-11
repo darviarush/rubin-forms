@@ -96,6 +96,7 @@ sub run {
 sub fire {
 	my($self, $path) = @_;
 	my $app = $self->{app};
+	
 	if(!defined $path) {
 		while(my($file, $cb) = each %{$self->{file}}) { $cb->($file, $app); }
 	}
@@ -107,6 +108,6 @@ sub fire {
 }
 
 # цикл слежения
-sub loop { my ($self, $sub) = @_; for(;;) { $sub->() if $sub; $self->run; sleep 1; } }
+sub loop { my ($self, $sub) = @_; for(;;) { $sub->($self->{app}) if $sub; $self->run; sleep 1; } }
 
 1;
