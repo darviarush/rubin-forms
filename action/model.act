@@ -7,6 +7,7 @@ use warnings;
 return $response->error(401) unless $app->ini->{site}{test};
 
 $edit = ModelEdit->new($app);
+$param = $request->param;
 
 if(exists $param->{area}) {
 	$install = $edit->install_info;
