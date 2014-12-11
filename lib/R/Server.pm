@@ -108,8 +108,8 @@ sub ritter {
 		elsif(defined $action_htm and $ajax eq "") {
 			$app->stash({});
 			@ret = $self->wrap;
-		} elsif(defined $action) {
-			@ret = $action->($app, $request, $response);
+		} elsif(defined(my $act = $action->{act}{$_action})) {
+			@ret = $act->($app, $request, $response);
 		} elsif(exists $_info->{$_action}) {
 			@ret = $self->update;
 		} else {

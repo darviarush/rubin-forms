@@ -67,7 +67,7 @@ sub new {
 	
 	my $old = select $out; $|=1; select $old;
 	
-	main::msg "Запустился процесс $$ $pid $watch->{hang}";
+	main::msg ":space", "Запустился процесс", ":red", $pid, ":bold black", $watch->{hang};
 	
 	my ($ext) = split /\|/, $watch->{ext};
 	
@@ -86,13 +86,12 @@ sub out {
 	
 	for(@_) {
 		chomp $_;
-		main::msg ":empty", map { /^(compiled|watching|generated|at)$/? (":bold black", $_, ":reset"): /error/? (':red', $_, ':reset'): $_ } split /(compiled|watching|generated|\bat\b)/;
+		main::msg ":empty", map { /^(compiled|watching|generated|at)$/? (":bold black", $_, ":reset"): /^error/? (':red', $_, ':reset'): $_ } split /(\b(?:compiled|watching|generated|at|error)\b:?)/;
 	}
 }
 
 sub inset {
 	my ($self, $path, $app) = @_;
-	#main::msg $self, $path, !!$app;
 	my $time = Time::HiRes::time;
 	my $watch = $self->{watch};
 	my $ext = $self->{ext};
@@ -124,13 +123,21 @@ sub inset {
 	
 	my $new_ext = $watch->{outext};
 	$path =~ s!\.\w+$!.$new_ext!;
-	#main::msg 'cp', "watch/watch.$new_ext", $path;
-	Utils::cp("watch/watch.$new_ext", $path);
-	$path =~ s!\.$new_ext!.map!, Utils::cp($map, $path) if -e $map;
+	if(-e $map) {
+		$p = $path;
+		$p =~ s!\.$new_ext$!.map!;
+		Utils::mv($map, $p);
+		$p =~ m!([^/]+)$! and $p = $1;
+		$_ = Utils::read("watch/watch.$new_ext");
+		s!(^|\n)//[#@] sourceMappingURL=watch\..*\s*$!//# sourceMappingURL=$p\n!;
+		Utils::write($path, $_);
+	}
+	else {
+		Utils::mv("watch/watch.$new_ext", $path);
+	}
 	
-	$out[0] = sprintf "%.4f %s", Time::HiRes::time - $time, $out[0];
+	#$out[0] = sprintf "%.4f %s", Time::HiRes::time - $time, $out[0];
 	out(@out);
-	#main::msg sprintf "%.4f - %s", Time::HiRes::time - $time, $path;
 }
 
 sub read_bk {

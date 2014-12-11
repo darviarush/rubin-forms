@@ -12,7 +12,7 @@ sub AUTOLOAD {
 	my $prop = $1;
 	
 	eval "sub $AUTOLOAD { my (\$self, \$val) = \@_; if(\@_ == 1) { \$self->{'$prop'} } else { \$self->{'$prop'} = \$val; \$self }}";
-	die $@ // $! if $@ // $!;
+	die "$AUTOLOAD: ".($@ // $!) if $@ // $!;
 	my $sub = *{$AUTOLOAD}{CODE};
 	
 	if(@_ == 1) {

@@ -16,25 +16,26 @@ BEGIN {
 	my @frame = split /\//, __FILE__;
 	my $frame = join("/", @frame[0..@frame-3]) || ".";
 	if($frame ne $root) { $_FRAMEWORK = $frame; unshift @INC, "$root/lib"; }
+
+	use R::Raise;
+	my $raise = R::Raise->new;
 	
+	$SIG{ __DIE__ } = sub {
+		my ($msg) = @_;
+		eval {
+			$msg = $raise->trace($msg) if ref $msg ne 'R::Raise::Trace';
+		};
+		die $msg if $^S;
+		print STDERR $msg;
+		exit
+	};
+	$SIG{ __WARN__ } = sub { print STDERR $raise->set($_[0])->color("warning", 'yellow', 'green') };
+
 }
 our $_FRAMEWORK;
 
-use R::Raise;
 use R::App;
 our $app = R::App->new;
-
-$SIG{ __DIE__ } = sub {
-	my ($msg) = @_;
-	eval {
-		$msg = $app->raise->trace($msg) if ref $msg ne 'R::Raise::Trace';
-	};
-	die $msg if $^S;
-	print STDERR $msg;
-	exit
-};
-$SIG{ __WARN__ } = sub { print STDERR $app->raise->set($_[0])->color("warning", 'yellow', 'green') };
-
 
 use Utils;
 use POSIX qw//;
