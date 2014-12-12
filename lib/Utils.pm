@@ -683,7 +683,10 @@ my $code_begin_i = "sub { my (\$dataset, \$id1) = \@_; my \$i = 0; for my \$data
 my $code_end_i = "\$i++; } }\n";
 my $code_begin1_i = "sub { my (\$data, \$id) = \@_; \n";
 my $code_end1_i = "}\n";
-our $code_begin_param = "my (\$app, \$data, \$id, \$LAYOUT) = \@_; my \$_STASH = \$app->{stash};";
+our $code_begin_param = "my (\$app, \$data, \$id, \$LAYOUT) = \@_; ";
+#my $code_quote = "my \$dbh = \$app->connect->{dbh}; ";
+my $code_stash = "my \$_STASH = \$app->{stash}; ";
+#my $code_user_id = "my \$user_id = \$app->session->user_id; ";
 
 
 sub TemplateBare {
@@ -713,7 +716,18 @@ sub TemplateBare {
 	
 	my $get_id = sub { $open_id? ($form->{id}? "$form->{id}-$open_id": $open_id): /\bid=["']?([\w-]+)[^<]*\G/i && $1 };
 	
-	my $vario = sub { my ($type, $var, $const) = @_; defined($const)? $re_type->($const): defined($type)? ($var eq "user_id"? "\$app->session->user_id": $var eq "_DATA"? "\$data": $var eq "_STASH"? "\\%_STASH": $var eq 'i'? "\$i": $var eq "i0"? "(\$i-1)": $var eq "id"? "\$id": "\$_STASH{'$var'}"): "\$data->{'$var'}" };
+	my $vario = sub {
+		my ($type, $var, $const) = @_;
+		defined($const)? $re_type->($const): defined($type)? (
+			$var eq "user_id"? "\$app->session->user_id":
+			$var eq "_DATA"? "\$data":
+			$var eq "_STASH"? do { $page->{is_stash} = 1; "\\%_STASH"}:
+			$var eq 'i'? "\$i":
+			$var eq "i0"? "(\$i-1)":
+			$var eq "id"? "\$id":
+			do { $page->{is_stash} = 1; "\$_STASH{'$var'}" }
+		): "\$data->{'$var'}"
+	};
 	my $helper = sub {
 		my ($type, $var, $const, $open_braket) = @_;
 		push @html, $vario->($type, $var, $const);
@@ -809,7 +823,7 @@ sub TemplateBare {
 		$open_tag && m!\G\$-(\w+)?!? do { $open_id = $1; "', \$id, '".(defined($1)? "-$1": "") }:
 		m!\G\$@([/\w]+)!? do { my $n = $1; my $id = $get_id->(); "', include_action(\$data->{'$id'}, \"\$id-$id\", '$n'), '" }:
 		m!\G\$&!? do { $page->{layout_id} = $get_id->(); "', \@\$LAYOUT, '" }:
-		m!\G\{%\s*(\w+)\s*=%\}!? do { "', do { \$_STASH{'$1'} = join '', ('" }:
+		m!\G\{%\s*(\w+)\s*=%\}!? do { $page->{is_stash} = 1; "', do { \$_STASH{'$1'} = join '', ('" }:
 		m!\G\{%\s*end\s*%\}!? do { "'); () }, '" }:
 		m!\G\{%\s*if\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do {
 			$pos += length $&;
@@ -880,7 +894,11 @@ sub TemplateBare {
 			$T->{where} = "id=\$$var" if $var;
 			$T->{tab} = $model // $name;
 			$T->{where} = "$form->{tab}_id=\$$form->{name}_id" . (exists $T->{where}? " AND ($T->{where})": "") if $load == 2;
-			$T->{where} =~ s!['\\]!\\$&!g, $T->{where} =~ s!\$(%)?(\w+)!"', \$dbh->quote(" . $vario->($1, $2) . "), '"!ge, $T->{where} = "'$T->{where}'" if exists $T->{where};
+			if(exists $T->{where}) {
+				$T->{where} =~ s!['\\]!\\$&!g;
+				$T->{where} =~ s!\$(%)?(\w+)!"', \$app->connect->{dbh}->quote(" . $vario->($1, $2) . "), '"!ge;
+				$T->{where} = "'$T->{where}'";
+			}
 			#$T->{where} =~ s!\$(%)?(\w+)!"'".$vario->($1, $2)."'"!ge if exists $T->{where};
 			
 			my $n = ($name? "-$name": "");
@@ -909,9 +927,15 @@ sub TemplateBare {
 		}
 		if($code eq "begin" and $code[$i+1]->[0] eq "end") { splice @code, $i, 2; goto CODE; }
 	}
-	$form->{code} = join "", "sub { $code_begin_param\n", map({$_->[1]} @code), "\n}\n";
 	
-	my $x = join "", @html;
+	my @begin;
+	#push @begin, $code_quote if $form->{is_quote};
+	push @begin, $code_stash if $form->{is_stash};
+	#push @begin, $code_user_id if $form->{is_user_id};
+	
+	$form->{code} = join "", "sub { $code_begin_param", @begin, "\n", map({$_->[1]} @code), "\n}\n";
+	
+	my $x = join "", "sub { $code_begin_param", @begin, " return join \"\", '", @html, "'};";
 	#our $rem++;
 	#Utils::write("$rem.pl", $x);
 	$x

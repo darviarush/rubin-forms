@@ -50,7 +50,7 @@ sub new {
 	my ($cls, $error) = @_;
 	local ($_, $`, $', $1, $2);
 	my $trace = [];
-	
+
 	if(ref $error) { $error = Utils::Dump($error); }
 	else {
 		for my $e (split /\n/, $error) {
@@ -60,6 +60,9 @@ sub new {
 		}
 		
 	}
+	
+	push(@$trace, { file=>"?", line=>"?", msg => $R::Connect::CURR_SQL }), $R::Connect::CURR_SQL = undef if $R::Connect::CURR_SQL;
+	
 	bless { orig => $error, trace => $trace }, $cls;
 }
 

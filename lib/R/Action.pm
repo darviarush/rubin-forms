@@ -97,7 +97,7 @@ sub compile_htm {
 	my $code = $page->{code};
 	delete $page->{code};
 	
-	$eval = join "", "\$app->action->{htm}{'$index'} = sub { $Utils::code_begin_param return join \"\", '", $eval, "'};\n\n\$app->action->{page}{'$index'} = ", Utils::Dump($page), ";\n\$app->action->{page}{'$index'}{code} = \$app->action->{ajax_htm} = ", $code, ";\n", @write, "\n\n1;";
+	$eval = join "", "\$app->action->{htm}{'$index'} = ", $eval, "\n\n\$app->action->{page}{'$index'} = ", Utils::Dump($page), ";\n\$app->action->{page}{'$index'}{code} = \$app->action->{ajax_htm} = ", $code, ";\n", @write, "\n\n1;";
 	
 	my $p = $path;
 	$p =~ s!\b$self->{dir}/!$self->{dir_c}/!;

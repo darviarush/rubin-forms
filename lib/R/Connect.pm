@@ -5,6 +5,8 @@ use DBI;
 use POSIX qw/strftime/;
 
 
+our $CURR_SQL;
+
 # зарезервированные слова sql
 our %SQL_WORD = (
 mysql => Utils::set(qw/ACCESSIBLE ADD ALL ALTER ANALYZE AND AS ASC ASENSITIVE BEFORE BETWEEN BIGINT BINARY BLOB BOTH BY CALL CASCADE CASE CHANGE CHAR CHARACTER CHECK COLLATE COLUMN CONDITION CONSTRAINT CONTINUE CONVERT CREATE CROSS CURRENT_DATE CURRENT_TIME CURRENT_TIMESTAMP CURRENT_USER CURSOR DATABASE DATABASES DAY_HOUR DAY_MICROSECOND DAY_MINUTE DAY_SECOND DEC DECIMAL DECLARE DEFAULT DELAYED DELETE DESC DESCRIBE DETERMINISTIC DISTINCT DISTINCTROW DIV DOUBLE DROP DUAL EACH ELSE ELSEIF ENCLOSED ESCAPED EXISTS EXIT EXPLAIN FALSE FETCH FLOAT FLOAT4 FLOAT8 FOR FORCE FOREIGN FROM FULLTEXT GET GRANT GROUP HAVING HIGH_PRIORITY HOUR_MICROSECOND HOUR_MINUTE HOUR_SECOND IF IGNORE IN INDEX INFILE INNER INOUT INSENSITIVE INSERT INT INT1 INT2 INT3 INT4 INT8 INTEGER INTERVAL INTO IO_AFTER_GTIDS IO_BEFORE_GTIDS IS ITERATE JOIN KEY KEYS KILL LEADING LEAVE LEFT LIKE LIMIT LINEAR LINES LOAD LOCALTIME LOCALTIMESTAMP LOCK LONG LONGBLOB LONGTEXT LOOP LOW_PRIORITY MASTER_BIND MASTER_SSL_VERIFY_SERVER_CERT MATCH MAXVALUE MEDIUMBLOB MEDIUMINT MEDIUMTEXT MIDDLEINT MINUTE_MICROSECOND MINUTE_SECOND MOD MODIFIES NATURAL NONBLOCKING NOT NO_WRITE_TO_BINLOG NULL NUMERIC ON OPTIMIZE OPTION OPTIONALLY OR ORDER OUT OUTER OUTFILE PARTITION PRECISION PRIMARY PROCEDURE PURGE RANGE READ READS READ_WRITE REAL REFERENCES REGEXP RELEASE RENAME REPEAT REPLACE REQUIRE RESIGNAL RESTRICT RETURN REVOKE RIGHT RLIKE SCHEMA SCHEMAS SECOND_MICROSECOND SELECT SENSITIVE SEPARATOR SET SHOW SIGNAL SMALLINT SPATIAL SPECIFIC SQL SQLEXCEPTION SQLSTATE SQLWARNING SQL_BIG_RESULT SQL_CALC_FOUND_ROWS SQL_SMALL_RESULT SSL STARTING STRAIGHT_JOIN TABLE TERMINATED THEN TINYBLOB TINYINT TINYTEXT TO TRAILING TRIGGER TRUE UNDO UNION UNIQUE UNLOCK UNSIGNED UPDATE USAGE USE USING UTC_DATE UTC_TIME UTC_TIMESTAMP VALUES VARBINARY VARCHAR VARCHARACTER VARYING WHEN WHERE WHILE WITH WRITE XOR YEAR_MONTH ZEROFILL/)
@@ -354,15 +356,19 @@ sub quick_rows {
 # запрашивает строку
 sub query {
 	my ($self) = @_;
-	my $sql = sel(@_);
-	$self->{dbh}->selectrow_array($sql);
+	$CURR_SQL = sel(@_);
+	my @row = $self->{dbh}->selectrow_array($CURR_SQL);
+	$CURR_SQL = undef;
+	return wantarray? @row: $row[0];
 }
 
 # запрашивает строки
 sub query_all {
 	my ($self) = @_;
-	my $sql = sel @_;
-	$self->{dbh}->selectall_arrayref($sql, {Slice=>{}});
+	$CURR_SQL = sel @_;
+	my $row = $self->{dbh}->selectall_arrayref($CURR_SQL, {Slice=>{}});
+	$CURR_SQL = undef;
+	$row
 }
 
 # строка в виде хеша
@@ -384,23 +390,23 @@ sub last_count { $_[0]->{last_count} }
 sub erase {
 	my ($self, $tab, $where) = @_;
 	my $cond = $self->DO_WHERE($where);
-	my $sql = join "", "DELETE FROM ", $self->SQL_WORD($tab), " WHERE ", $cond;
-	$self->{last_count} = $dbh->do($sql) + 0;
+	$CURR_SQL = join "", "DELETE FROM ", $self->SQL_WORD($tab), " WHERE ", $cond;
+	$self->{last_count} = $dbh->do($CURR_SQL) + 0;
+	$CURR_SQL = undef;
 	$self
 }
 
 # добавляет одну запись в таблицу
 sub add {
 	my ($self, $tab, $param) = @_;
-	my $sql;
 	if(%$param) {	
 		my $SET = $self->DO_SET($param);
-		$sql = join "", "INSERT INTO ", $self->SQL_WORD($tab), " SET ", $SET;
+		$CURR_SQL = join "", "INSERT INTO ", $self->SQL_WORD($tab), " SET ", $SET;
 	} else {
-		$sql = join "", "INSERT INTO ", $self->SQL_WORD($tab), " () VALUES ()";
+		$CURR_SQL = join "", "INSERT INTO ", $self->SQL_WORD($tab), " () VALUES ()";
 	}
-	$self->{last_count} = $dbh->do($sql) + 0;
-	$self->{last_id} = undef;
+	$self->{last_count} = $dbh->do($CURR_SQL) + 0;
+	$self->{last_id} = $CURR_SQL = undef;
 	$self
 }
 
@@ -415,8 +421,9 @@ sub append {
 sub insert {
 	my ($self, $tab, $fields, $matrix) = @_;
 	my $SET = $self->INS_SET($matrix);
-	my $sql = join "", "INSERT INTO ", $self->SQL_WORD($tab), " (", $self->FIELDS($fields), ") VALUES ", $SET;
-	$self->{last_count} = $self->{dbh}->do($sql)+0;
+	$CURR_SQL = join "", "INSERT INTO ", $self->SQL_WORD($tab), " (", $self->FIELDS($fields), ") VALUES ", $SET;
+	$self->{last_count} = $self->{dbh}->do($CURR_SQL)+0;
+	$CURR_SQL = undef;
 	$self
 }
 
@@ -425,8 +432,9 @@ sub update {
 	my ($self, $tab, $param, $where) = @_;
 	my $SET = $self->DO_SET($param);
 	my $COND = $self->DO_WHERE($where);
-	my $sql = join "", "UPDATE ", $self->SQL_WORD($tab), " SET ", $SET, " WHERE ", $COND;
+	$CURR_SQL = join "", "UPDATE ", $self->SQL_WORD($tab), " SET ", $SET, " WHERE ", $COND;
 	$self->{last_count} = $dbh->do($sql)+0;
+	$CURR_SQL = undef;
 	$self
 }
 

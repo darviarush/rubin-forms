@@ -1,4 +1,7 @@
-﻿package R::Auth;
+﻿use strict;
+use warnings;
+
+package R::Auth;
 # авторизация запросов
 
 
@@ -171,7 +174,7 @@ sub valid {
 sub valid_names {
 	my($self, $tab, $view) = @_;
 	my $valid = $self->{valid};
-	map { $valid->{$_} or () } $self->connect->FIELDS_NAMES($view);
+	map { $valid->{$_} or () } $self->{app}->connect->FIELDS_NAMES($view);
 }
 
 # проверяет вложенную структуру
@@ -179,7 +182,7 @@ sub check_role_view {
 	my ($self, $tab, $view, @args) = @_;
 	
 	my $tmp;
-	my $connect = $self->connect;
+	my $connect = $self->{app}->connect;
 	my @S = [@_];
 	
 	while(@S) {
@@ -215,9 +218,9 @@ sub append { my($self, $tab, $param)=@_; $self->valid(sub { $self->{app}->connec
 sub replace { my ($self, $tab, $param) = @_; $self->check_role($param->{id}? 'edit': 'add', $tab, $param); $self->{app}->connect->replace($tab, $param); $self }
 sub last_count { my($self)=@_; $self->{app}->connect->{last_count} }
 sub last_id { my($self)=@_; $self->{app}->connect->last_id }
-sub query { my($self, $fields, @any)=@_; $self->check_role_view($tab, $fields); $self->{app}->connect->query($fields, @any) }
-sub query_ref { my($self, $fields, @any)=@_; $self->check_role_view($tab, $fields); $self->{app}->connect->query_ref($fields, @any) }
-sub query_all { my($self, $fields, @any)=@_; $self->check_role_view($tab, $fields); $self->{app}->connect->query_all($fields, @any) }
+sub query { my($self, $tab, $fields, @any)=@_; $self->check_role_view($tab, $fields); $self->{app}->connect->query($tab, $fields, @any) }
+sub query_ref { my($self, $tab, $fields, @any)=@_; $self->check_role_view($tab, $fields); $self->{app}->connect->query_ref($tab, $fields, @any) }
+sub query_all { my($self, $tab, $fields, @any)=@_; $self->check_role_view($tab, $fields); $self->{app}->connect->query_all($tab, $fields, @any) }
 sub insert {
 	my($self, $tab, $fields, $matrix)=@_;
 	$self->check_role('add', $tab, $fields);
@@ -231,10 +234,10 @@ sub insert {
 sub form_load {
 	my ($self, $action, $where) = @_;
 	my $response;
-	my $form = $self->{app}->action->{forms}{$action};
-	my $tab = $form->{model} // $form->{name};
+	my $form = $self->{app}->action->{form}{$action};
+	my $tab = $form->{tab} // $form->{name};
 	my $view = [keys %{$form->{fields}}];
-	$self->check_role('view', $tab, $view);
+	#$self->check_role('view', $tab, $view);
 	my $valid = [$self->valid_names($tab, $view)];
 	if($form->{is_list}) {
 		$response = $self->query_all($tab, $view, $where);
