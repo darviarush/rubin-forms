@@ -54,7 +54,7 @@ sub cookie {
 sub redirect {
 	my ($self, $url, $text) = @_;
 	$self->{status} = 307;
-	$self->header("Location" => $url);
+	$self->head("Location" => $url);
 	$self->body("Redirect to <a href='$url'>".Utils::escapeHTML($text // $url)."</a>");
 }
 

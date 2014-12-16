@@ -63,6 +63,11 @@ sub close {
 	my $app = $self->{app};
 	$app->{server}->close if $app->{server};
 	$app->{connect}->close if $app->{connect};
+	
+	#my @pids = map { my @x = split /\s*/, $_; POSIX::getppid() == $x[]? $x[1]: () } split /\n/, `ps -W`;
+	require POSIX;
+	kill -9, POSIX::getppid();	# убиваем группу парента
+	
 	#main::msg ":space", ":red", $$, ":cyan", "server close";
 	$self
 }
@@ -74,7 +79,8 @@ sub spy {
 	my ($self) = @_;
 	
 	# демонизируемся
-	$self->daemon if $self->{app}->ini->{site}{daemon};
+	my $_daemon = $self->{app}->ini->{site}{daemon};
+	$self->daemon if $_daemon;
 	
 	my $pid = CORE::fork;
 	die "Ошибка создания дочернего процесса. $!" if $pid < 0;
@@ -82,8 +88,9 @@ sub spy {
 		main::msg ":space", ":red", $$, ":reset", "spy start", ":green", $pid;
 		$self->main_pid($pid);
 		my $app = $self->{app};
-		#$SIG{PIPE} = 
-		$SIG{INT} = $SIG{HUP} = sub {
+		
+		#$SIG{PIPE} =
+		$SIG{INT} = $SIG{HUP} = my $exit = sub {
 			kill -9, $self->{main_pid};
 			$app->{hung}->close if $app->{hung};
 			main::msg ":space", ":red", $$, ":reset", "spy exit";
@@ -92,6 +99,7 @@ sub spy {
 		
 		# перекомпиливать сторонние файлы проекта
 		$app->hung if $app->ini->{site}{hung};
+		
 		# следить за изменениями
 		my $_watch = $app->ini->{site}{watch};
 		if($_watch) {
@@ -100,8 +108,11 @@ sub spy {
 			$self->watch;			# перезагружать сервер, если изменился какой-то из модулей проекта
 		}
 		
+		#my $test = "";
+		#vec($test, fileno(STDIN), 1) = 1;
 		for(;;) {
 			sleep 1;
+			#$exit->() if !$_daemon and select undef, $test, $test, 0;
 			$app->watch->run if $_watch;
 			$self->create("restart=1") if waitpid $self->{main_pid}, WNOHANG;
 		}

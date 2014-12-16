@@ -391,7 +391,7 @@ sub erase {
 	my ($self, $tab, $where) = @_;
 	my $cond = $self->DO_WHERE($where);
 	$CURR_SQL = join "", "DELETE FROM ", $self->SQL_WORD($tab), " WHERE ", $cond;
-	$self->{last_count} = $dbh->do($CURR_SQL) + 0;
+	$self->{last_count} = $self->{dbh}->do($CURR_SQL) + 0;
 	$CURR_SQL = undef;
 	$self
 }
@@ -405,7 +405,7 @@ sub add {
 	} else {
 		$CURR_SQL = join "", "INSERT INTO ", $self->SQL_WORD($tab), " () VALUES ()";
 	}
-	$self->{last_count} = $dbh->do($CURR_SQL) + 0;
+	$self->{last_count} = $self->{dbh}->do($CURR_SQL) + 0;
 	$self->{last_id} = $CURR_SQL = undef;
 	$self
 }
@@ -433,7 +433,7 @@ sub update {
 	my $SET = $self->DO_SET($param);
 	my $COND = $self->DO_WHERE($where);
 	$CURR_SQL = join "", "UPDATE ", $self->SQL_WORD($tab), " SET ", $SET, " WHERE ", $COND;
-	$self->{last_count} = $dbh->do($sql)+0;
+	$self->{last_count} = $self->{dbh}->do($sql)+0;
 	$CURR_SQL = undef;
 	$self
 }

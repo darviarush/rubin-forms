@@ -527,8 +527,37 @@ sub decamelcase {
 	$s
 }
 
+# создаёт для процесса два двунаправленного вывода
+sub pipe {
+	my ($reader, $ch_writer, $ch_reader, $writer);
+	
+	pipe $ch_reader, $writer or die "not create pipe. $!";
+	pipe $reader, $ch_writer or die "not create pipe. $!";;
+	
+	binmode $reader; binmode $writer; binmode $ch_reader; binmode $ch_writer;
+
+	my $stdout = select $in; $| = 1;
+	select $writer; $| = 1;
+	select $ch_writer; $| = 1;
+	select $stdout;
+	return {
+		rd=>$reader, crd=>$ch_writer, cwr=>$ch_reader, wr=>$writer
+	};
+}
+
+# дублирует в указанные пайпы stdin и stdout
+sub std2pipe {
+	require POSIX;
+	my ($in, $out, $err) = @_;
+	POSIX::dup2(0, $in) if $in;
+	POSIX::dup2(1, $out) if $out;
+	POSIX::dup2(2, $err) if $err;
+}
+
+
 # изменяет путь cygwin на виндовый
 sub winpath {
+	return "--undef path in winpath--" if !defined $_[0];
 	require Cwd;
 	local ($`, $');
 	my $file = Cwd::abs_path($_[0]);

@@ -16,7 +16,7 @@ BEGIN {
 	my @frame = split /\//, __FILE__;
 	my $frame = join("/", @frame[0..@frame-3]) || ".";
 	if($frame ne $root) { $_FRAMEWORK = $frame; unshift @INC, "$root/lib"; }
-
+	
 	use R::Raise;
 	my $raise = R::Raise->new;
 	

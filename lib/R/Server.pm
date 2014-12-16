@@ -115,8 +115,7 @@ sub ritter {
 		} else {
 			@ret = $response->error(404);
 		}
-		
-		
+
 		$response->body( @ret==1 && ref $ret[0]? JSON::to_json($ret[0]): @ret );
 	};
 
@@ -128,9 +127,10 @@ sub ritter {
 			$response->body($error);
 		} else {
 
-			$error = ref $error eq "R::Raise::Trace"? $error: $app->raise->set($error);
-			$error = $app->ini->{site}{test} ? $error: "Внутренняя ошибка";
-			
+			$error = ref $error eq "R::Raise::Trace" ? $error: $app->raise->set($error);
+			main::msg "$error";
+			$error = $app->ini->{site}{test} ? $error: $app->raise->set("Внутренняя ошибка");
+
 			$response->status(500);
 			if($_HEAD->{Accept} =~ /^text\/json\b/) {
 				$response->type("text/plain");

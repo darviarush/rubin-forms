@@ -1,21 +1,20 @@
 package R::Hung;
 # управляет "висящими заданиями" прописанными в main.ini вроде coffee -w
+use POSIX;
 
-
-my %pid;
 sub close {
-	kill KILL, keys %pid;
+	my ($self) = @_;
+	kill HUP, @{$self->{pid}};
 }
 
-sub DESTROY { my ($self) = @_; kill KILL, @{$self->{pid}}; delete $pid{$_} for @{$self->{pid}}; #main::msg "DESTROY", $self->{pid};
-}
+sub DESTROY { $_[0]->close }
 
 sub new {
 	my ($cls, $app) = @_;
 	
 	my $self = bless {app => $app}, $cls;
 	
-	mkdir "watch";
+	#mkdir "watch";
 	
 	die "Нет конфигурации watch в ini-файле. Смотрите пример в main.sample.ini" unless exists $app->ini->{watch};
 
@@ -34,7 +33,6 @@ sub new {
 		
 		my $process = R::Hung::Process->new($watch, $app);
 		push @{$self->{pid}}, $process->{pid};
-		$pid{$process->{pid}} = 1;
 
 		$watching->on(qr/\.(?:$watch->{ext})$/, [main::files(@in)], Utils::closure($process, $process->can("inset")));
 		
