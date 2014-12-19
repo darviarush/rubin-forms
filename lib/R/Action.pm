@@ -146,7 +146,9 @@ sub layout {
 	return $lay if defined $lay;
 	my $layout = $self->{layout};
 	my $layouts = [];
-	push @$layouts, $action while $action=$layout->{$action};
+	my $act = $action;
+	do { push @$layouts, $act } while $act=$layout->{$act};
+	main::msg $layouts;
 	$self->{layout_cache}{$action} = $layouts;
 }
 

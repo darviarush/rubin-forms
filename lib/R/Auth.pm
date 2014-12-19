@@ -1,7 +1,4 @@
-﻿use strict;
-use warnings;
-
-package R::Auth;
+﻿package R::Auth;
 # авторизация запросов
 
 

@@ -96,27 +96,28 @@ sub ritter {
 		my $ajax = $_HEAD->{"Ajax"} // "";
 		my @ret;
 		
-		if(defined $action_htm and $ajax eq "submit") {
+		if(defined $action_htm and $ajax eq "reload") {
 			
 			#$_user_id = $_COOKIE->{sess}? auth(): undef;
 			#%_STASH = (user_id => $_user_id);
-			$app->stash({});
-			
-			$self->submit($ajax eq "submit");
+			main::msg "submit";
+			$self->submit($ajax eq "reload");
 			return $self->ajax_redirect if $response->{status} == 307;
 		}
 		elsif(defined $action_htm and $ajax eq "") {
-			$app->stash({});
+			main::msg "wrap";
 			@ret = $self->wrap;
 		} elsif(defined(my $act = $action->{act}{$_action})) {
+			main::msg "act", $ajax;
 			@ret = $act->($app, $request, $response);
 		} elsif(exists $_info->{$_action}) {
+			main::msg "update";
 			@ret = $self->update;
 		} else {
-			@ret = $response->error(404);
+			$response->error(404);
 		}
-
-		$response->body( @ret==1 && ref $ret[0]? JSON::to_json($ret[0]): @ret );
+	
+		$response->body( @ret==1 && ref $ret[0]? JSON::to_json($ret[0]): @ret ) unless @{$response->{body}};
 	};
 
 	if(my $error = $@ || $!) {
@@ -143,7 +144,7 @@ sub ritter {
 		}
 	}
 	
-	$app->{stash} = undef;
+	$app->{stash} = {};
 	
 }
 
@@ -195,66 +196,66 @@ sub wrap {
 
 # фреймы - механизм лайоутов и таргетов форм
 sub submit {
-	my ($self) = @_;
+	my ($self, $ajax) = @_;
 	my $app = $self->{app};
 	my $request = $app->{request};
 	my $response = $app->{response};
+	my $action = $app->{action};
+	my $actions = $action->{act};
+	my $templates = $action->{htm};
+	my $pages = $action->{page};
+	my $param = $request->param;
 	
 	my $result = {};
 	my ($id, $url, $act);
 	
 	$act = $request->{action};
 	
-	$self->type("text/json");
+	$response->type("text/json");
 	
 	my $add_res = sub {
 
-		die "Нет экшена `$act`" if not exists $main::_action{$act} and not $main::_action_htm{$act};
+		die "Нет экшена `$act`" if not exists $actions->{$act} and not exists $templates->{$act};
 		
-		my $data = exists $main::_action{$act}? $main::_action{$act}->(): $::param;
-		$main::_pages{$act}{code}->($data, $act) if exists $main::_pages{$act}{code};
+		my $data = exists $actions->{$act}? $actions->{$act}->($app, $request, $response): $param;
+		$pages->{$act}{code}->($data, $act) if exists $pages->{$act}{code};
 		
 		$result->{$act} = {
 			act => $act,
 			($id ? (id => $id): ()),
 			#(exists $main::_forms{$act} && exists $main::_info->{$act}? (data => action_view($main::_action, $main::param)): ()),
 			(defined($data)? (data => $data): ()),
-			(exists $main::_pages{$act}{template}? (template => $main::_pages{$act}{template}): ()),
-			(exists $main::_pages{$act}{layout_id}? (layout_id => $main::_pages{$act}{layout_id}): ()),
-			(exists $main::_layout{$act}? (layout => $main::_layout{$act}): ())
+			(exists $pages->{$act}{template}? (template => $pages->{$act}{template}): ()),
+			(exists $pages->{$act}{layout_id}? (layout_id => $pages->{$act}{layout_id}): ()),
+			#(exists $layout->{$act}? (layout => $layout{$act}): ())
 		};
 	};
 
-	if($_[0]) {
+	if($ajax) {
 		$add_res->();
 		return $result->{$act};
 	}
 	
-	unless($::param->{_noact_}) {
-		#$act = 'index' if $act eq "/";
-		my $layout_id = $::param->{_layout_id_};
-		my $layout = [];
-		for(; $act; $act = $main::_layout{$act}) {
-			last if defined($layout_id) and $main::_pages{$act}{layout_id} eq $layout_id;
-			$add_res->();
-			unshift @$layout, $act;
-		}
-		$result->{"\@layout"} = $layout;
-		if(defined $layout_id and exists $main::_layout{$act}) {
+	unless($param->{_noact_}) {
+		my $layout_id = $param->{_layout_id_};
+		
+		my $layout = $response->layout;
+		if(defined $layout_id) {
 			$result->{$act=$main::_layout{$act}} = { act => $act, layout_id => $result->{$act}{layout_id} };
 			unshift @$layout, $act;
 		}
+		$result->{"\@layout"} = $layout;
 	}
 
 	my $frames = Utils::param($::param->{_frames_}, qr/,/);
 
 	while(($id, $url) = each %$frames) {
-		if($url =~ /\?/) { ($act, $::param) = ($`, Utils::param($')) } else { $act = $url; $::param = {} }
+		if($url =~ /\?/) { $act = $`; $request->{param} = Utils::param($'); } else { $act = $url; $request->{param} = {} }
 		$add_res->();
 	}
 
-	$result->{'@stash'} = \%::_STASH;
-	$result->{'@url'} = $::_URL;
+	$result->{'@stash'} = $app->{stash};
+	$result->{'@url'} = $request->{url};
 
 	return $result;
 }

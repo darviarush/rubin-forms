@@ -34,10 +34,12 @@ sub daemon {
 sub fork {
 	my ($self, $lord, $lords) = @_;
 
+	#POSIX::setpgid($$); # устанавливаем свою группу процессов
+	
 	my $ini = $self->{app}->ini;
 	$self->{lord} = $lord //= $self->{lord};
 	$lords //= $ini->{site}{lords};
-
+	
 	for(my $i=0; $i<$lords; $i++) {
 		threads->create($lord, $self) or die "not create subprocess `$i`. $!"; 
 	}
@@ -65,8 +67,8 @@ sub close {
 	$app->{connect}->close if $app->{connect};
 	
 	#my @pids = map { my @x = split /\s*/, $_; POSIX::getppid() == $x[]? $x[1]: () } split /\n/, `ps -W`;
-	require POSIX;
 	kill -9, POSIX::getppid();	# убиваем группу парента
+	#kill -9, $$;	# убиваем свою группу
 	
 	#main::msg ":space", ":red", $$, ":cyan", "server close";
 	$self
@@ -81,6 +83,9 @@ sub spy {
 	# демонизируемся
 	my $_daemon = $self->{app}->ini->{site}{daemon};
 	$self->daemon if $_daemon;
+	
+	# pipe my $rd, my $wr;
+	# my $old=select $rd; $|=1; select $wr; $|=1; select $old;
 	
 	my $pid = CORE::fork;
 	die "Ошибка создания дочернего процесса. $!" if $pid < 0;
@@ -108,15 +113,24 @@ sub spy {
 			$self->watch;			# перезагружать сервер, если изменился какой-то из модулей проекта
 		}
 		
-		#my $test = "";
-		#vec($test, fileno(STDIN), 1) = 1;
+		# my $test = "";
+		# my ($rdr, $wdr, $edr);
+		# vec($test, fileno($rd), 1) = 1;
+		# Utils::nonblock($rd);
 		for(;;) {
 			sleep 1;
-			#$exit->() if !$_daemon and select undef, $test, $test, 0;
+			# if(select $rdr=$test, $wdr=$test, $edr=$test, 0) {
+				# main::msg "any:", <$rd>;
+			# }
 			$app->watch->run if $_watch;
 			$self->create("restart=1") if waitpid $self->{main_pid}, WNOHANG;
 		}
 	}
+	
+	# require POSIX;
+	# POSIX::dup2($wr, fileno STDOUT);
+	# POSIX::dup2($wr, fileno STDERR);
+	
 	$self
 }
 

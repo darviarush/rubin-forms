@@ -560,7 +560,8 @@ sub winpath {
 	return "--undef path in winpath--" if !defined $_[0];
 	require Cwd;
 	local ($`, $');
-	my $file = Cwd::abs_path($_[0]);
+	my $file = eval { Cwd::abs_path($_[0]) };
+	$file //= $_[0];
 	$file =~ s!^/cygdrive/(\w)!$1:!;
 	$file =~ s!^/(usr/)?!c:/cygwin/!;
 	$file =~ s!/!\\!g;

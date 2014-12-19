@@ -9,7 +9,7 @@ use JSON qw//;
 sub reset {
 	my ($self) = @_;
 	my $app = $self->{app};
-	%$self = (app => $app, status => 200, head=>{'Content-Type' => 'text/html; charset=utf-8'}, body=>undef );
+	%$self = (app => $app, status => 200, head=>{'Content-Type' => 'text/html; charset=utf-8'}, body=>undef, layout => [] );
 	$self
 }
 
@@ -71,7 +71,6 @@ sub error {
 	$self->type('text/plain');
 	my $msg = $error // "$status " . $self->{app}->serverHttpStatus->{$status};
 	$self->body($msg);
-	$msg
 }
 
 # устанавливает/возвращает body

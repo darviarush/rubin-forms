@@ -16,10 +16,11 @@ sub reset {
 	
 	$self->{action} = 'index' if $self->{action} eq "";
 	
-	$self->{ids}{id} = $id if defined $id;
+	$self->{ids} = my $IDS = {};
+	$IDS->{id} = $id if defined $id;
 	if(defined $ids and $ids ne "") {
 		my $i = 2;
-		$self->{ids}{"id" . ($i++)} = $_ for split /_/, substr $ids, 1;
+		$IDS->{"id" . ($i++)} = $_ for split /_/, substr $ids, 1;
 	}
 	$self
 }
@@ -64,7 +65,7 @@ sub post {
 				$self->{post} = $post = Utils::param_from_post(IO::String->new($self->{body}), $type, $len);
 			}
 		} else {
-			$self->{post} = {};
+			$self->{post} = $post = {};
 		}
 	}
 	defined($name)? $post->{$name}: $post;

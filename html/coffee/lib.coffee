@@ -2063,7 +2063,10 @@ class CWidget
 		style = (@_pseudoElement || @element).style
 		if important then style.setProperty key.lc(), val, "!important" else style[key] = val
 		this
-	getCssStyle: (key, pseudoClass) -> if p=@_pseudoElement then p.style else if @document().contains this then getComputedStyle @element, pseudoClass else @element.style
+	getCssStyle: (key, pseudoClass) ->
+		if @_pseudoElement then @_pseudoElement.style
+		else if @document().contains @element then getComputedStyle @element, pseudoClass
+		else @element.style
 	getCssValue: (key, pseudoClass) -> @getCssStyle(key, pseudoClass).getPropertyCSSValue toCssCase key
 	getCss: (key, pseudoClass) ->
 		if (fn=css_get_fn[key]) and off != ret=fn.call this, key, pseudoClass then return ret
@@ -2601,9 +2604,9 @@ class CWidget
 		arrow
 	
 	arrow: (pos = 'right', scale = 0.5, height = 10, width = 20, scale_corner = 0.5) ->
-		
 		borderWidth = @px 'border-'+pos+'-width'
 		backgroundColor = @rgba 'background-color'
+		
 		height += borderWidth
 		
 		[w, h] = @position.wh pos, width, height
@@ -3185,7 +3188,7 @@ class CTooltipWidget extends CWidget
 					#say right, bottom, vw, vh, pos, scale, scalex, scaley, height
 					if left >= 0 and top >= 0 and right <= vw and bottom <= vh then break
 			@hidden()
-				
+		
 		@arrow @position.invert[pos], corner, height, width
 		do @display if display
 		do @open if open

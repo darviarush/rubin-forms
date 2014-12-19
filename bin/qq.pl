@@ -30,13 +30,13 @@ $app->server;
 msg ":empty", ":red", $$, ":reset", " Слушаем ", ":green", $app->ini->{site}{port};
 
 # порождаем потоки
-$app->process->fork(*lord); 
-
+$app->process->fork(*lord);
 
 # бесконечный цикл с cron
 require POSIX;
+my $ppid = POSIX::getppid();
 $app->process->loop(sub {	# будет вызываться раз в секунду
-	$app->process->close, exit unless kill 0, POSIX::getppid();
+	$app->process->close, exit unless kill 0, $ppid;
 	$app->session->delete if time % 3600 == 0;	# раз в час
 });
 

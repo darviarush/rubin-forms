@@ -2,12 +2,8 @@
 BEGIN {
 	#use Carp 'verbose';
 	use Term::ANSIColor qw//;
-	use Fcntl ':flock';
+	#use Fcntl ':flock';
 	#$SIG{ __DIE__ } = \&Carp::confess;
-
-	use Cwd;
-	use File::Basename qw/dirname/;
-	#chdir dirname($0);
 	
 	our $_FRAMEWORK;
 	
@@ -40,6 +36,12 @@ our $app = R::App->new;
 use Utils;
 use POSIX qw//;
 use Term::ANSIColor qw//;
+
+my $old = select STDOUT;
+$| = 1;
+select STDERR;
+$| = 1;
+select $old;
 
 my $_LOG = 1;
 my $_COLOR = not $ENV{TERM} eq "dumb";

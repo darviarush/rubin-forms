@@ -59,7 +59,6 @@ sub loop {
 # пытается перехватить запрос
 sub accept {
 	my ($self) = @_;
-	
 	my $ns = gensym;
 	unless( accept $ns, $self->{sd} ) {
 		undef $ns;

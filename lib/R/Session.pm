@@ -18,14 +18,14 @@ sub user {
 # возвращает id пользователя, если он залогинен
 sub user_id {
 	my ($self, $user_id) = @_;
-	$self->{user_id} = $user_id, return $self if @_>1;
-	return $self->{user_id} if exists $self->{user_id};
+	$self->{user_id} = $user_id // 0, return $self if @_>1;
+	return $self->{user_id} if defined $self->{user_id};
 	my $app = $self->{app};
 	my $request = $app->request;
 	my $sess = $request->cookie("sess");
 	return 0 unless $sess;
 	my $conn = $app->connect;
-	my $id = $conn->query("sess", "user_id", $sess)+0;
+	my $id = $conn->query("sess", "user_id", {id=>$sess}) // 0;
 	$conn->update("sess", {now=>$conn->now}, {id=>$id}) if $self->{user_id} = $id;
 	return $id;
 }

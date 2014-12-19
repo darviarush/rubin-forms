@@ -98,6 +98,7 @@ sub trace {
 
 sub file {
 	my ($file) = @_;
+	return "?" unless defined $file;
 	$file =~ s!/watch/action_c/(.*)\.(\w+)\.pl$!/action/$1.$2!;
 	$file
 }
@@ -152,8 +153,8 @@ sub html {
 ",
 	map {
 		"<div class='".($i++ % 2 == 0? 'e-odd': 'e-even')."'>".
-		"<font color=LightSlateGray>".Utils::escapeHTML($_->{file}).":$_->{line}</font> ".
-		Utils::escapeHTML($_->{sub} || $_->{msg}).
+		"<font color=LightSlateGray>".Utils::escapeHTML(file($_->{file})).":".($_->{line} // "?")."</font> ".
+		Utils::escapeHTML($_->{sub} // $_->{msg} // "?").
 		"</div>"
 	} $self->trace);
 }
