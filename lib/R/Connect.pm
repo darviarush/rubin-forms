@@ -85,7 +85,7 @@ sub get_info {
 }
 
 # возвращает текущее время в формате базы
-sub now { main::msg @_[1..$#_]; strftime("%F %T", localtime @_[1..$#_]) }
+sub now { main::msg 'nnn?', @_[1..$#_]; strftime("%F %T", @_>1? localtime @_[1..$#_]: localtime) }
 
 
 # оборачивает в `` если нужно

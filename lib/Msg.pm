@@ -25,7 +25,7 @@ BEGIN {
 		print STDERR $msg;
 		exit
 	};
-	$SIG{ __WARN__ } = sub { print STDERR $raise->set($_[0])->color("warning", 'yellow', 'green') };
+	$SIG{ __WARN__ } = sub { print STDERR $raise->trace($_[0])->color("warning", 'yellow', 'green') };
 
 }
 our $_FRAMEWORK;

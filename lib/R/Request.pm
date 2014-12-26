@@ -13,8 +13,8 @@ sub reset {
 	my ($self) = @_;
 	my ($ids, $id);
 	($self, $self->{method}, $self->{url}, $self->{location}, $self->{action}, $id, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body}) = @_;
-	
-	$self->{action} = 'index' if $self->{action} eq "";
+
+	$self->{action} = 'index' unless $self->{action};
 	
 	$self->{ids} = my $IDS = {};
 	$IDS->{id} = $id if defined $id;

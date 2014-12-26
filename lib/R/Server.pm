@@ -93,31 +93,29 @@ sub ritter {
 	eval {
 		#my $action = $_action_act->{$_action};
 		my $action_htm = $_action_htm->{$_action};
-		my $ajax = $_HEAD->{"Ajax"} // "";
+		my $ajax = $_HEAD->{"Ajax"};
 		my @ret;
 		
-		if(defined $action_htm and $ajax eq "reload") {
-			
-			#$_user_id = $_COOKIE->{sess}? auth(): undef;
-			#%_STASH = (user_id => $_user_id);
-			main::msg "submit";
-			$self->submit($ajax eq "reload");
-			return $self->ajax_redirect if $response->{status} == 307;
+		if(defined $action_htm and defined $ajax and $ajax eq "reload") {
+			$self->submit;
 		}
-		elsif(defined $action_htm and $ajax eq "") {
-			main::msg "wrap";
+		elsif(defined $action_htm and !$ajax) {
+			#main::msg "wrap";
 			@ret = $self->wrap;
 		} elsif(defined(my $act = $action->{act}{$_action})) {
-			main::msg "act", $ajax;
+			#main::msg "act", $ajax;
 			@ret = $act->($app, $request, $response);
 		} elsif(exists $_info->{$_action}) {
-			main::msg "update";
+			#main::msg "update";
 			@ret = $self->update;
 		} else {
 			$response->error(404);
+			goto NEXT;
 		}
 	
-		$response->body( @ret==1 && ref $ret[0]? JSON::to_json($ret[0]): @ret ) unless @{$response->{body}};
+		$response->{body} = \@ret unless defined $response->{body};
+		
+		return $self->ajax_redirect if $response->{status} == 307;
 	};
 
 	if(my $error = $@ || $!) {
@@ -144,6 +142,7 @@ sub ritter {
 		}
 	}
 	
+	NEXT:
 	$app->{stash} = {};
 	
 }
@@ -156,12 +155,15 @@ sub ajax_redirect {
 	my $request = $app->request;
 	my $response = $app->response;
 	
-	$request->reset( $response->{head}{"Location"} =~ $R::Request::RE_LOCATION );
+	my @location;
+	return unless @location = $response->{head}{"Location"} =~ $R::Request::RE_LOCATION;
+	
+	$request->reset( @location );
 	
 	my $cookie = $response->{cookie};
 	$response->reset->{cookie} = $cookie;
 	
-	$self->{ritter}->();
+	$self->{ritter}->($self);
 }
 
 # выполняет и оборачивает в лайоуты экшн
@@ -184,18 +186,28 @@ sub wrap {
 			my $arg = $action_act? $action_act->($app, $request, $response): (ref $ret[0]? $ret[0]: {});
 			@ret = $_action_htm->{$layout}->($app, $arg, $layout, \@ret);
 		}
-		
-		# for(; my $_layout = $_layout{$_action}; $_action = $_layout) {
-			# my $arg = ($action = $_action_act->{$_layout})? $action->($app, $request, $response): {};
-			# @ret = $_action_htm->{$_layout}->($app, $arg, $_layout, @ret);
-		# }
+
 	}
 	@ret
 }
 
-
 # фреймы - механизм лайоутов и таргетов форм
 sub submit {
+	my ($self) = @_;
+	my $app = $self->{app};
+	my ($ret) = $self->wrap(1);
+	$app->response->type("text/plain");
+	return {
+		head => {
+			stash => $app,
+			url => $app->{request}{url},
+		},
+		body => $ret
+	}
+}
+
+# фреймы - механизм лайоутов и таргетов форм
+sub _submit {
 	my ($self, $ajax) = @_;
 	my $app = $self->{app};
 	my $request = $app->{request};

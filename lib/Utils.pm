@@ -963,7 +963,13 @@ sub TemplateBare {
 	push @begin, $code_stash if $form->{is_stash};
 	#push @begin, $code_user_id if $form->{is_user_id};
 	
-	$form->{code} = join "", "sub { $code_begin_param", @begin, "\n", map({$_->[1]} @code), "\n}\n";
+	$form->{code} = join "", "sub { $code_begin_param", @begin, "\n", map({$_->[1]} @code), "
+	my \$template = \$app->{action}{page}{\$id}{template};
+	return [\@\$LAYOUT, {
+		act=>\$id,
+		template=>\$template,
+		data=>\$data
+	}]\n}\n";
 	
 	my $x = join "", "sub { $code_begin_param", @begin, " return join \"\", '", @html, "'};";
 	#our $rem++;
