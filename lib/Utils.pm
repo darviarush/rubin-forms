@@ -1,5 +1,10 @@
 package Utils;
 
+use strict;
+use warnings;
+
+
+
 use Data::Dumper;
 
 # создаёт множество
@@ -16,6 +21,15 @@ sub closure {
 		$sub->(@args, @_);
 	}
 }
+
+# создаёт функции-свойства в указанном классе
+sub has {
+	my $cls = shift;
+	for my $name (@_) {
+		eval "sub ${cls}::$name { if(\@_>1) { \$_[0]->{'$name'} = \$_[1]; \$_[0] } else { \$_[0]->{'$name'} } }"
+	}
+}
+
 
 # сортирует по свойству
 sub order_by {
@@ -199,6 +213,11 @@ sub unic_id {
 
 	return $unic_id;
 }
+
+# sub unic_id {
+	# my $size = shift || 16;
+	# to_radix(int(rand 2**32), 62);
+# }
 
 
 # создаёт соль заданной длины
@@ -536,8 +555,7 @@ sub pipe {
 	
 	binmode $reader; binmode $writer; binmode $ch_reader; binmode $ch_writer;
 
-	my $stdout = select $in; $| = 1;
-	select $writer; $| = 1;
+	my $stdout = select $writer; $| = 1;
 	select $ch_writer; $| = 1;
 	select $stdout;
 	return {
@@ -714,9 +732,6 @@ my $code_end_i = "\$i++; } }\n";
 my $code_begin1_i = "sub { my (\$data, \$id) = \@_; \n";
 my $code_end1_i = "}\n";
 our $code_begin_param = "my (\$app, \$data, \$id, \$LAYOUT) = \@_; ";
-#my $code_quote = "my \$dbh = \$app->connect->{dbh}; ";
-my $code_stash = "my \$_STASH = \$app->{stash}; ";
-#my $code_user_id = "my \$user_id = \$app->session->user_id; ";
 
 
 sub TemplateBare {
@@ -741,7 +756,7 @@ sub TemplateBare {
 	local ($_, $&, $`, $', $1, $2, $3, $4, $5);
 	($_) = @_;
 	
-	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id, @ifST, @code) = ($_, 0);
+	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id, @ifST, @code, $use_user_id) = ($_, 0);
 	my $page = my $form = {};
 	
 	my $get_id = sub { $open_id? ($form->{id}? "$form->{id}-$open_id": $open_id): /\bid=["']?([\w-]+)[^<]*\G/i && $1 };
@@ -749,13 +764,13 @@ sub TemplateBare {
 	my $vario = sub {
 		my ($type, $var, $const) = @_;
 		defined($const)? $re_type->($const): defined($type)? (
-			$var eq "user_id"? "\$app->session->user_id":
+			$var eq "user_id"? do { $page->{is_user_id} = 1; $page->{is_stash} = 1; "\$_STASH->{'user_id'}" }:
 			$var eq "_DATA"? "\$data":
-			$var eq "_STASH"? do { $page->{is_stash} = 1; "\\%_STASH"}:
+			$var eq "_STASH"? do { $page->{is_stash} = 1; "\$_STASH"}:
 			$var eq 'i'? "\$i":
 			$var eq "i0"? "(\$i-1)":
 			$var eq "id"? "\$id":
-			do { $page->{is_stash} = 1; "\$_STASH{'$var'}" }
+			do { $page->{is_stash} = 1; "\$_STASH->{'$var'}" }
 		): "\$data->{'$var'}"
 	};
 	my $helper = sub {
@@ -853,7 +868,7 @@ sub TemplateBare {
 		$open_tag && m!\G\$-(\w+)?!? do { $open_id = $1; "', \$id, '".(defined($1)? "-$1": "") }:
 		m!\G\$@([/\w]+)!? do { my $n = $1; my $id = $get_id->(); "', include_action(\$data->{'$id'}, \"\$id-$id\", '$n'), '" }:
 		m!\G\$&!? do { $page->{layout_id} = $get_id->(); "', \@\$LAYOUT, '" }:
-		m!\G\{%\s*(\w+)\s*=%\}!? do { $page->{is_stash} = 1; "', do { \$_STASH{'$1'} = join '', ('" }:
+		m!\G\{%\s*(\w+)\s*=%\}!? do { $page->{is_stash} = 1; "', do { \$_STASH->{'$1'} = join '', ('" }:
 		m!\G\{%\s*end\s*%\}!? do { "'); () }, '" }:
 		m!\G\{%\s*if\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do {
 			$pos += length $&;
@@ -959,17 +974,18 @@ sub TemplateBare {
 	}
 	
 	my @begin;
+	
+	#my $code_quote = "my \$dbh = \$app->connect->{dbh}; ";
+	my $code_stash = "my \$_STASH = \$app->{stash}; ";
+	my $code_user_id = "\$app->session->user_id; ";
+	
 	#push @begin, $code_quote if $form->{is_quote};
 	push @begin, $code_stash if $form->{is_stash};
-	#push @begin, $code_user_id if $form->{is_user_id};
+	push @begin, $code_user_id if $form->{is_user_id};
 	
-	$form->{code} = join "", "sub { $code_begin_param", @begin, "\n", map({$_->[1]} @code), "
-	my \$template = \$app->{action}{page}{\$id}{template};
-	return [\@\$LAYOUT, {
-		act=>\$id,
-		template=>\$template,
-		data=>\$data
-	}]\n}\n";
+	
+	my @use_user_id = ($use_user_id? "\$app->{stash}{'user_id'} = \$app->session->user_id;": ());
+	$form->{code} = join "", "sub { $code_begin_param", @begin, "\n", map({$_->[1]} @code), "\n}";
 	
 	my $x = join "", "sub { $code_begin_param", @begin, " return join \"\", '", @html, "'};";
 	#our $rem++;

@@ -130,7 +130,7 @@
 #	3. onModel<Имя>: - вызывается при изменении свойства модели
 #	4. onRepo<Имя репозит.><Имя переменной> - переменная добавляется в репозиторий
 # 97. preloader на animation
-# 98. 
+# 98. удалять из body[act].data неиспользуемые в темплейтах param и stash. Для этого модифицировать param
 
 
 # Ссылки:
@@ -1304,7 +1304,8 @@ class CWidget
 			doc = @document()
 			for x in @_init_widgets
 				cls = x[0].getName()
-				for id in x[1] when e = doc.getElementById id then e.setAttribute 'ctype', cls; @createWidget e
+				for id in x[1] when (e = doc.getElementById id) and not e.widget then e.setAttribute 'ctype', cls; @createWidget e
+			this
 	
 	CRoot = new CRoot$ document.documentElement || document.firstChild
 	
@@ -1333,7 +1334,7 @@ class CWidget
 		replaceState$ = pushState$
 		gotoState$ = (w, n) -> w.location.hash = "#"+w.history$[w.history_pos$+=n][0]
 		
-	init_his$ = (w) -> w.history$ = [[w.location.href, w.document.title, null]]; w.history_pos$ = 0 ; w.history_before$ = w.history.length
+	init_his$ = (w) -> w.history$ = [[w.location.href, w.document.title, null]]; w.history_pos$ = 0 ; w.history_before$ = w.history.length - 1
 	
 	navigate: (args...) ->
 		init_his$ w unless (w=@window()).history$
@@ -1350,6 +1351,9 @@ class CWidget
 			else if n == 0 then replaceState$ w, null, title, url; args[0] = w.location.href; w.history$[w.history_pos$] = args
 			else if (t=w.history$[w.history_pos$+=n])? then w.document.title = t[1]; gotoState$ w, n
 			else throw @raise "Переход по истории на несуществующий элемент"
+			
+			if w.history_before$ + w.history$.length > w.history.length then w.history_before$ = w.history.length - w.history$.length
+			
 			this
 		else w.history$[w.history_pos$]
 	
@@ -1370,13 +1374,17 @@ class CWidget
 	
 	history_change: (data) ->
 		init_his$ w unless (w=@window()).history$
-		#say 'begin', w.history$.length, w.history_before$, w.history.length, w.history.length + 1 == w.history$.length + w.history_before$ 
-		if w.history.length + 1 == w.history$.length + w.history_before$ then w.history$.push [w.location.href, w.document.title, data]
-		else if w.history.length == w.history$.length + w.history_before$
-			if null == n = @history w.location.href then throw @raise "Невозможно определить позицию в истории - нет текущего url `#{w.location.href}`"
+		
+		real = w.history.length
+		len = w.history$.length + w.history_before$
+		
+		if len == real - 1 then w.history$.push [w.location.href, w.document.title, data]
+		else if len == real
+			if null == n = @history w.location.href then w.history$.unshift [w.location.href, w.document.title, data]
 			w.history_pos$ = n
 		else
-			w.history_pos$ = w.history$.length + w.history_before$ - w.history.length
+			w.history_pos$ = len - real
+			
 		#say 'end', w.history$.length
 		this
 
@@ -1738,8 +1746,11 @@ class CWidget
 			if arguments.length then @element.textContent = val; this else @element.textContent
 	html: (val) -> if arguments.length then @element.innerHTML = val; this else @element.innerHTML
 	htmlscript: (val) ->
-		win = @window()
 		@element.innerHTML = val
+		@runscript()
+		this
+	runscript: ->
+		win = @window()
 		for script in @find("script").all() then win.eval script.innerHTML
 		this
 	val: @::text
@@ -1751,11 +1762,74 @@ class CWidget
 	normalize: -> @element.normalize(); this
 	update: (val, request) ->
 		if off != @send 'onBeforeUpdate', val
-			if /^\{/.test val then val = toJSON val; @htmlscript CTemplate.compile(val.template)(val.data, @id())
-			else if request?.request and ///^text/html\b///i.test request.request.getResponseHeader "Content-Type" then @htmlscript val
+			if /^\{/.test val
+				val = fromJSON val
+				CTemplate._STASH = val.stash || {}
+				if layouts = val.layout
+					in_layout = val.layout_id
+					for layout in layouts
+						page = val.body[layout]
+						@byId(in_layout).html CTemplate.compile(page.template)(page.data || {}, layout)
+						in_layout = page.layout_id
+					@byId(val.layout_id).runscript()
+				else
+					@htmlscript CTemplate.compile(val.template)(val.data, @id())
+				
+				$(w = @window()).clean()
+				$(w.document).clean()
+				do CRoot.initWidgets
+				
+				if url=val.url
+					title = CTemplate._STASH.title
+					
+					url = CUrl.from url
+					old = CUrl.from w.location.href
+					extend frames = {}, CParam.from(old.param._f, /,/), CParam.from url.param._f, /,/
+					url.param._f = frames if frames = CParam.to frames, ","
+					
+					args = [CUrl.to(url), title || @document().title]
+					if request.history then args.unshift 0
+					@navigate args...
+					say 'reload_manipulate', args..., w.history$, w.history_pos$
+				this
+				
+			else if request?.request and ///^text/html\b///i.test request.request.getResponseHeader "Content-Type"
+				@htmlscript val.replace ///[\s\S]*?<body[^<>]*>([\s\S]*?)</body\s*>[\s\S]*///i, "$1"
 			else @val val
 			@send 'onUpdate', val
 		this
+		
+	# reload_manipulate: (data) ->		
+		# data = fromJSON data if typeof data == 'string'
+		# if stash = data['@stash'] then CTemplate._STASH = stash
+		# if layout = data['@layout']
+			# for i in [1...layout.length]
+				# layout_id = data[layout[i-1]].layout_id
+				# page = data[act = layout[i]]
+				# @byId(layout_id).html CTemplate.compile(page.template)(page.data || {}, act)
+			# title = CTemplate._STASH.title
+			
+		# if frames = data["@frames"]
+			# for act, id of frames
+				# page = data[act]
+				# @byId(page.id).html CTemplate.compile(page.template)(page.data || {}, act)
+
+		# CTemplate._STASH = {}		
+				
+		# $(window).clean()
+		# $(document).clean()
+		# do CRoot.initWidgets
+		
+		# url = CUrl.from data['@url']
+		# old = CUrl.from @window().location.href
+		# extend frames = {}, CParam.from(old.param._f, /,/), CParam.from url.param._f, /,/
+		# url.param._f = frames if frames = CParam.to frames, ","
+		
+		# args = [CUrl.to(url), title || @document().title]
+		# if @request.history then args.unshift 0
+		# @navigate args...
+		# say 'reload_manipulate', args..., window.history$, window.history_pos$
+		# this
 	
 	outer: (val) ->
 		if arguments.length
@@ -2668,7 +2742,6 @@ class CWidget
 	#buildQuery: -> [(p=@parent())._tab || p.name(), @name(), p.data?.id || p.$id?.val()]
 	load: (param, args...) -> @loader()._load 'load', param || {}, this, args
 	submit: (param, args...) -> if @valid() then @loader()._load 'submit', extend(@param(), param || {}), this, args else this
-	reload: (param, args...) -> if @valid() then @loader()._load 'reload', extend(@param(), param || {}), this, args else this
 	save: (param, args...) -> if @valid() then @loader()._load 'save', extend(@param(), param || {}), this, args else this
 	ping: (param, args...) -> @loader()._load 'ping', param, this, args
 	erase: (param, args...) -> @loader()._load 'erase', extend(@param(), param || {}), this, args
@@ -2755,8 +2828,6 @@ class CSubmitWidget extends CButtonWidget
 	onclick: (e) -> @parent().submit(); e.stop(); off
 class CLoadWidget extends CButtonWidget
 	onclick: (e) -> @parent().load(); e.stop(); off
-class CReloadWidget extends CButtonWidget
-	onclick: (e) -> @parent().reload(); e.stop(); off
 class CUploadWidget extends CButtonWidget
 	onclick: (e) -> @parent().upload(); e.stop(); off
 class CSaveWidget extends CButtonWidget
@@ -2900,6 +2971,8 @@ class CFormWidget extends CWidget
 			id = @id()
 			for name, v of valid then @["$"+name].setValid v
 		this
+		
+	onkeyup: (e) -> if e.code() == 13 then e.stop(); @submit()
 
 
 class CTemplateWidget extends CFormWidget
@@ -3273,7 +3346,7 @@ class CLoaderWidget extends CWidget
 		
 		for key of param when key[0] == '$' then headers[key.slice(1).upFirst()] = param[key]; delete param[key]
 			
-		extend @request, timer: timer, request: request, headers: headers, history: param._history, url: url, customer: (if t = customer.attr 'target' then @byId t else if type=='submit' then @byId 'main' else customer)
+		extend @request, timer: timer, request: request, headers: headers, history: param._history, url: url, sender: customer, customer: (if t = customer.attr 'target' then @byId t else if type=='submit' then @byId 'main' else customer)
 		delete param._history
 		
 		params = if method != "POST" then (if params then url = CUrl.from url; extend url.param, param; url = CUrl.to url); null
@@ -3297,8 +3370,6 @@ class CLoaderWidget extends CWidget
 		args = @request.args
 		customer.send "onComplete", data, @request, args...
 		switch @request.type
-			when "reload"
-				@reload_manipulate data
 			when "upload"
 				customer.add data
 			when "submit", "load"
@@ -3334,42 +3405,10 @@ class CLoaderWidget extends CWidget
 
 	ohSubmit: -> @vid()
 	ohComplete: -> @novid()
-	ohLoad: -> @request.customer.tooltip null
+	ohLoad: -> @request.sender.tooltip null
 	ohError: ->
 		error = if @request.request.status == 500 then @request.request.responseText else escapeHTML @request.error
-		@request.customer.tooltip ctype: 'tooltip', close: 1, html: "<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка</h3>"+error, open: 1, timeout: 5000, class: 'c-error'
-	
-	reload_manipulate: (data) ->		
-		data = fromJSON data if typeof data == 'string'
-		if stash = data['@stash'] then CTemplate._STASH = stash
-		if layout = data['@layout']
-			for i in [1...layout.length]
-				layout_id = data[layout[i-1]].layout_id
-				page = data[act = layout[i]]
-				@byId(layout_id).html CTemplate.compile(page.template)(page.data || {}, act)
-			title = CTemplate._STASH.title
-			
-		if frames = data["@frames"]
-			for act, id of frames
-				page = data[act]
-				@byId(page.id).html CTemplate.compile(page.template)(page.data || {}, act)
-
-		CTemplate._STASH = {}		
-				
-		$(window).clean()
-		$(document).clean()
-		do CRoot.initWidgets
-		
-		url = CUrl.from data['@url']
-		old = CUrl.from @window().location.href
-		extend frames = {}, CParam.from(old.param._frames_, /,/), CParam.from url.param._frames_, /,/
-		url.param._frames_ = frames if frames = CParam.to frames, ","
-		
-		args = [CUrl.to(url), title || @document().title]
-		if @request.history then args.unshift 0
-		@navigate args...
-		say 'reload_manipulate', args..., window.history$, window.history_pos$
-		this
+		@request.sender.tooltip ctype: 'tooltip', close: 1, html: "<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка</h3>"+error, open: 1, timeout: 5000, class: 'c-error'
 
 
 class CStatusWidget extends CLoaderWidget
@@ -3406,13 +3445,11 @@ class CRouterWidget extends CWidget
 				#if url.hash then a.attr "target", url.hash; url.hash = ""
 				param = {}
 				param._noact_ = noact if url.pathname == @document().location.pathname
-				if url.hash then param._layout_id_ = url.hash; url.hash = ""
+				if url.hash then param._a = url.hash; url.hash = ""
 				param._act = CUrl.to url
 				#if not a._loader and not a.attr 'cloader' then a.loader this
-				a.reload param
+				a.load param
 		this
-	
-	val: -> undefined
 	
 	prev_url$ = null
 	
@@ -3421,8 +3458,8 @@ class CRouterWidget extends CWidget
 		@history_change()
 		href = @window().location.href
 		href = href.replace ///\#.*$///, ''
-		# # say 'popstate', href, old, pos, e
-		if prev_url$ != href then @reload _act: href, _history: 1
+		say 'popstate', href, e
+		if prev_url$ != href then @load _act: href, _history: 1
 		prev_url$ = href
 		
 	onhashchange_window: pop$

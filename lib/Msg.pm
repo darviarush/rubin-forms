@@ -1,5 +1,7 @@
 # создаёт $app, добавляет пути, обрабатывает ошибки (в лог, цвет)
+
 BEGIN {
+	#use open qw/:utf8 :std/;
 	#use Carp 'verbose';
 	use Term::ANSIColor qw//;
 	#use Fcntl ':flock';

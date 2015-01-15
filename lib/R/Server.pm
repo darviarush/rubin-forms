@@ -2,13 +2,16 @@ package R::Server;
 # базовый класс для серверов
 # распечатывают статистику. Используются в драйверах
 
-use base R::Utils::Main;
+use strict;
+use warnings;
+
 
 use R::Request;
 
 use Time::HiRes qw//;
 use POSIX qw//;
 
+Utils::has("R::Server", "app");
 
 sub new {
 	my ($cls, $app) = @_;
@@ -54,14 +57,13 @@ sub file {
 	my $app = $self->{app};
 	my $request = $app->request;
 	my $response = $app->response;
-	my $mime = $app->serverHttpMime;
 	eval {
 		my $root = abs_path(".");
 		if($root ne substr abs_path($request->html), 0, length $root) {
-			$response->error(403, "403 $http->{403}");
+			$response->error(403, "403 ".$app->serverHttpStatus->{403});
 		} else {
 			my $path = $request->html;
-			$response->type( $mime->{$ext} );
+			$response->type( $app->serverHttpMime->{$request->ext} );
 			$response->head( "Content-Length" => -s $path );
 			$response->body( Utils::file2array($path, $app->ini->{site}{buf_size} // 1024*1024) );
 		}
@@ -84,10 +86,11 @@ sub ritter {
 
 	$app->session->reset;
 	
+	my $_info = $app->{connect}{info};
 	my $action = $app->action;
 	#my $_action_act = $action->{act};
 	my $_action_htm = $action->{htm};
-	my $_HEAD = $request->head;
+	my $_HEAD = $request->{head};
 	my $_action = $request->{action};
 	
 	eval {
@@ -96,21 +99,20 @@ sub ritter {
 		my $ajax = $_HEAD->{"Ajax"};
 		my @ret;
 		
-		if(defined $action_htm and defined $ajax and $ajax eq "reload") {
-			$self->submit;
+		main::msg $_action, $action->{act}{$_action}, $action_htm, $ajax;
+		
+		if(defined $action_htm and defined $ajax and $ajax =~ /^(submit|load)$/) {
+			@ret = $self->submit;
 		}
 		elsif(defined $action_htm and !$ajax) {
-			#main::msg "wrap";
 			@ret = $self->wrap;
 		} elsif(defined(my $act = $action->{act}{$_action})) {
-			#main::msg "act", $ajax;
 			@ret = $act->($app, $request, $response);
 		} elsif(exists $_info->{$_action}) {
 			#main::msg "update";
 			@ret = $self->update;
 		} else {
-			$response->error(404);
-			goto NEXT;
+			return $response->error(404);
 		}
 	
 		$response->{body} = \@ret unless defined $response->{body};
@@ -141,8 +143,7 @@ sub ritter {
 			$app->connect->reconnect;
 		}
 	}
-	
-	NEXT:
+
 	$app->{stash} = {};
 	
 }
@@ -155,10 +156,11 @@ sub ajax_redirect {
 	my $request = $app->request;
 	my $response = $app->response;
 	
-	my @location;
-	return unless @location = $response->{head}{"Location"} =~ $R::Request::RE_LOCATION;
+	my @location = $response->{head}{"Location"} =~ m!^$R::Request::RE_LOCATION$!o;
+	main::msg $response->{head}{"Location"}, $R::Request::RE_LOCATION, \@location;
+	return unless @location;
 	
-	$request->reset( @location );
+	$request->reset( 'GET', @location, 'HTTP/1.1', $request->{head} );
 	
 	my $cookie = $response->{cookie};
 	$response->reset->{cookie} = $cookie;
@@ -191,23 +193,9 @@ sub wrap {
 	@ret
 }
 
-# фреймы - механизм лайоутов и таргетов форм
-sub submit {
-	my ($self) = @_;
-	my $app = $self->{app};
-	my ($ret) = $self->wrap(1);
-	$app->response->type("text/plain");
-	return {
-		head => {
-			stash => $app,
-			url => $app->{request}{url},
-		},
-		body => $ret
-	}
-}
 
 # фреймы - механизм лайоутов и таргетов форм
-sub _submit {
+sub submit {
 	my ($self, $ajax) = @_;
 	my $app = $self->{app};
 	my $request = $app->{request};
@@ -217,60 +205,85 @@ sub _submit {
 	my $templates = $action->{htm};
 	my $pages = $action->{page};
 	my $param = $request->param;
+	my $layout = $app->action->{layout};
 	
 	my $result = {};
-	my ($id, $url, $act);
-	
-	$act = $request->{action};
+	my $act;
+	my ($id, $url);
 	
 	$response->type("text/json");
 	
 	my $add_res = sub {
-
+		
 		die "Нет экшена `$act`" if not exists $actions->{$act} and not exists $templates->{$act};
 		
+		my $page = $pages->{$act};
+		
 		my $data = exists $actions->{$act}? $actions->{$act}->($app, $request, $response): $param;
-		$pages->{$act}{code}->($data, $act) if exists $pages->{$act}{code};
+		$page->{code}->($app, $data, $act) if exists $page->{code};
 		
 		$result->{$act} = {
-			act => $act,
+			#act => $act,
 			($id ? (id => $id): ()),
 			#(exists $main::_forms{$act} && exists $main::_info->{$act}? (data => action_view($main::_action, $main::param)): ()),
 			(defined($data)? (data => $data): ()),
-			(exists $pages->{$act}{template}? (template => $pages->{$act}{template}): ()),
-			(exists $pages->{$act}{layout_id}? (layout_id => $pages->{$act}{layout_id}): ()),
-			#(exists $layout->{$act}? (layout => $layout{$act}): ())
+			(exists $page->{template}? (template => $page->{template}): ()),
+			(exists $page->{layout_id}? (layout_id => $page->{layout_id}): ()),
+			#(exists $layout->{$act}? (layout => $layout->{$act}): ())
 		};
+		
 	};
 
 	if($ajax) {
+		$act = $request->{action};
 		$add_res->();
 		return $result->{$act};
 	}
 	
-	unless($param->{_noact_}) {
-		my $layout_id = $param->{_layout_id_};
-		
-		my $layout = $response->layout;
-		if(defined $layout_id) {
-			$result->{$act=$main::_layout{$act}} = { act => $act, layout_id => $result->{$act}{layout_id} };
-			unshift @$layout, $act;
+	my $layout_id = $param->{_a} // "main";
+	my @layout = $response->layout;
+	my $layouts = [];
+	for (@layout) {
+		$act = $_;
+		if($layout_id eq ($pages->{$act}{layout_id} // "")) { last; } else { $add_res->($act); }
+		unshift @$layouts, $act;
+	}
+
+	my $frames = $param->{_f};
+	if($frames) {
+		$frames = Utils::param($frames, qr/,/);
+
+		while(($id, $url) = each %$frames) {
+			if($url =~ /\?/) { $act = $`; $request->{param} = Utils::param($'); } else { $act = $url; $request->{param} = {} }
+			$add_res->($act);
 		}
-		$result->{"\@layout"} = $layout;
 	}
-
-	my $frames = Utils::param($::param->{_frames_}, qr/,/);
-
-	while(($id, $url) = each %$frames) {
-		if($url =~ /\?/) { $act = $`; $request->{param} = Utils::param($'); } else { $act = $url; $request->{param} = {} }
-		$add_res->();
-	}
-
-	$result->{'@stash'} = $app->{stash};
-	$result->{'@url'} = $request->{url};
-
-	return $result;
+	
+	#$result->{$layouts->[0]}{layout_id} = $layout_id if @$layouts;
+	
+	return {
+		stash => $app->{stash},
+		url => $request->{url},
+		(@$layouts? (layout => $layouts): ()),
+		($layout_id? (layout_id => $layout_id): ()),
+		body => $result,
+	};
 }
+
+# фреймы - механизм лайоутов и таргетов форм
+# sub submit {
+	# my ($self) = @_;
+	# my $app = $self->{app};
+	# my ($ret) = $self->wrap(1);
+	# $app->response->type("text/plain");
+	# return {
+		# head => {
+			# stash => $app,
+			# url => $app->{request}{url},
+		# },
+		# body => $ret
+	# }
+# }
 
 
 1;

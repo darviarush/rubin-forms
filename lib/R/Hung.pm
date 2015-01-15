@@ -57,6 +57,7 @@ use IPC::Open3;
 use POSIX qw/strftime/;
 use Time::HiRes qw//;
 use Symbol;
+use JSON;
 
 sub new {
 	my ($cls, $watch, $app) = @_;
@@ -114,24 +115,29 @@ sub inset {
 	s!$watch->{reg_error}!"$p:$+{line}:".($+{char} || 1).": error: ".($+{msg2}? "$+{msg2}: ": "")."$+{msg}"!ge;
 	my @out = split /\n/, $_;
 	
+	my $js_path = $path;
 	my $to = $watch->{out};
 	for my $from (split /\s*,\s*/, $watch->{in}) {
-		last if $path =~ s!(^|/)$from!$1$to!;
+		last if $js_path =~ s!(^|/)$from!$1$to!;
 	}
 	
+	
 	my $new_ext = $watch->{outext};
-	$path =~ s!\.\w+$!.$new_ext!;
+	$js_path =~ s!\.\w+$!.$new_ext!;
 	if(-e $map) {
-		$p = $path;
+		$p = $js_path;
 		$p =~ s!\.$new_ext$!.map!;
-		Utils::mv($map, $p);
+		my $json = JSON::from_json(Utils::read($map));
+		($json->{file}) = $js_path =~ m!(?:^|/)html/(.*)!;
+		($json->{sources}->[0]) = $path =~ m!(?:^|/)html/(.*)!;
+		Utils::write($p, JSON::to_json($json));
 		$p =~ m!([^/]+)$! and $p = $1;
 		$_ = Utils::read("watch/watch.$new_ext");
 		s!(^|\n)//[#@] sourceMappingURL=watch\..*\s*$!//# sourceMappingURL=$p\n!;
-		Utils::write($path, $_);
+		Utils::write($js_path, $_);
 	}
 	else {
-		Utils::mv("watch/watch.$new_ext", $path);
+		Utils::mv("watch/watch.$new_ext", $js_path);
 	}
 	
 	#$out[0] = sprintf "%.4f %s", Time::HiRes::time - $time, $out[0];

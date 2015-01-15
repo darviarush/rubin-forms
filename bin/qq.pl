@@ -1,5 +1,9 @@
 #> сервер - http, fcgi или psgi
 
+use strict;
+use warnings;
+our $app;
+
 # грузим экшены
 msg(":bold black", "load action..."), $app->action->compile->write("watch/action.pl") unless $app->ini->{restart};
 

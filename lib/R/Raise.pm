@@ -1,6 +1,10 @@
 package R::Raise;
 # реализует исключение
 
+use strict;
+use warnings;
+
+
 # конструктор
 sub new {
 	my ($cls, $app) = @_;
@@ -37,6 +41,7 @@ package R::Raise::Trace;
 
 use Term::ANSIColor qw//;
 use Cwd qw//;
+use Data::Dumper;
 use overload
 	'""' => \&stringify,
 	'.' => \&concat,
@@ -56,7 +61,7 @@ sub new {
 	
 	my ($file, $line);
 	
-	if(ref $error) { $error = Utils::Dump($error); }
+	if(ref $error) { $error = $Utils::{Dump}{CODE}? $Utils::{Dump}{CODE}->($error): Dumper($error); }
 	else {
 		for my $e (split /\n/, $error) {
 			$e =~ s!^syntax error at (\S+) line (\d+), (.*)$!! and push @$trace, { file=>$file=$1, line=>$line=$2, msg=>$3, action=>'syntax error'} or
@@ -131,11 +136,24 @@ sub color {
 	} $self->trace;
 }
 
+# изменяет путь cygwin на виндовый
+sub _winpath {
+	return "--undef path in winpath--" if !defined $_[0];
+	local ($`, $');
+	my $file = eval { Cwd::abs_path($_[0]) };
+	$file //= $_[0];
+	$file =~ s!^/cygdrive/(\w)!$1:!;
+	$file =~ s!^/(usr/)?!c:/cygwin/!;
+	$file =~ s!/!\\!g;
+	$file
+}
+
+
 # строка
 sub asString {
 	my ($self, $action) = @_;
 	join "", map {
-		my $file = Utils::winpath($_->{file});
+		my $file = _winpath($_->{file});
 		if($_->{sub}) { "$file:$_->{line}:1: $_->{sub}\n" }
 		else { "$file:$_->{line}:1: " . ($_->{action} // $action) .": " . $_->{msg} . "\n" }
 	} $self->trace;
@@ -150,13 +168,14 @@ sub html {
 .e-odd {background: AliceBlue}
 .e-even, .e-odd { padding: 4pt 4pt 4pt 20pt }
 --></style>
+<div style='overflow: auto; width: 100%; height: 153px'>
 ",
-	map {
+	map({
 		"<div class='".($i++ % 2 == 0? 'e-odd': 'e-even')."'>".
 		"<font color=LightSlateGray>".Utils::escapeHTML(file($_->{file})).":".($_->{line} // "?")."</font> ".
 		Utils::escapeHTML($_->{sub} // $_->{msg} // "?").
 		"</div>"
-	} $self->trace);
+	} $self->trace), "</div>");
 }
 
 1;

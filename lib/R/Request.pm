@@ -1,9 +1,19 @@
 # объект содержит запрос
 package R::Request;
 
-use base R::Utils::Object;
+use strict;
+use warnings;
 
 use IO::String;
+
+# назначаем свойства
+Utils::has("R::Request", "app", "method", "url", "location", "action", "ext", "search", "version");
+
+
+sub new {
+	my ($cls, $app) = @_;
+	bless {app => $app}, $cls;
+}
 
 # для разбора url. Используется вместе с reset
 our $RE_LOCATION = qr!((/([^\s\?]*?)(?:(-?\d+)((?:_-?\d+)*)|(\.\w+))?)(?:\?(\S+))?)!;
@@ -90,8 +100,8 @@ sub html {
 	"html" . $self->{location};
 }
 
-sub action {
-	$_action = 'index' if $_action eq "";
-}
+#sub action {
+	#$_action = 'index' if $_action eq "";
+#}
 
 1;

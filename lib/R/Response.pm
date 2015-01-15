@@ -1,10 +1,18 @@
 package R::Response;
 # содержит параметры, необходимые для ответа
 
-use base R::Utils::Object;
+use strict;
+use warnings;
 
 use HTTP::Date qw//;
 use JSON qw//;
+
+Utils::has("R::Response", "app");
+
+sub new {
+	my ($cls, $app) = @_;
+	bless {app=>$app}, $cls;
+}
 
 sub reset {
 	my ($self) = @_;
@@ -41,11 +49,11 @@ sub type {
 sub cookie {
 	my ($self, $name, $value, %param) = @_;
 	my $val = join "", $name, "=", $value,
-		(exists $param->{expire}? ("; Expires=" , HTTP::Date::time2str($param->{expire})): ()),
-		(exists $param->{path}? "; Path=$param->{path}": ()),
-		(exists $param->{domain}? "; Domain=$param->{domain}": ()),
-		(exists $param->{secure}? "; Secure": ()),
-		(exists $param->{httponly}? "; HttpOnly": ());
+		(exists $param{expire}? ("; Expires=" , HTTP::Date::time2str($param{expire})): ()),
+		(exists $param{path}? "; Path=$param{path}": ()),
+		(exists $param{domain}? "; Domain=$param{domain}": ()),
+		(exists $param{secure}? "; Secure": ()),
+		(exists $param{httponly}? "; HttpOnly": ());
 	#$self->head("Set-Cookie", $val);
 	push @{$self->{cookie}}, $val;
 	$self

@@ -1,6 +1,9 @@
 package R::Connect;
 # подключение к базе и простенькие функции для запросов
 
+use strict;
+use warnings;
+
 use DBI;
 use POSIX qw/strftime/;
 
@@ -490,6 +493,10 @@ sub build_words {
 
 # добавляет слова в таблицу words, если их там нет и возвращает их идентификаторы
 sub set_words {
+	my $self = shift;
+	my $dbh = $self->{dbh};
+	
+	
 	my @words = build_words(@_);
 
 	my %word_id;
@@ -503,7 +510,9 @@ sub set_words {
 
 # возвращает word_id для тех слов в фразе, которые есть в words
 sub get_words {
-	my ($phrase) = @_;
+	my ($self, $phrase) = @_;
+	my $dbh = $self->{dbh};
+	
 	my @words = build_words($phrase);
 	my @word_id;
 	for my $word (@words) {
