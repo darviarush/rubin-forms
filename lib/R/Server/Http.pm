@@ -5,9 +5,7 @@ use base R::Server;
 
 use Socket;
 use Symbol;
-use JSON;
 
-my $JSON = JSON->new;
 
 use R::Request; # из него получаем $R::Request::RE_LOCATION
 
@@ -122,6 +120,11 @@ sub impulse {
 	
 	unless(exists $response->{head}{"Content-Length"}) {
 		my $len = 0;
+		my $JSON = $app->{json};
+		
+		
+		main::msg($app->json->encode([ 'http', $body->[0]{stash}{user_id} ]));
+		
 		for my $text (@$body) {
 			$text = $JSON->encode($text) if ref $text;
 			$len += length $text;

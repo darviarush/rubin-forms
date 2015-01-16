@@ -166,10 +166,10 @@ sub html {
 	("<style><!--
 .e-even {background: lavender}
 .e-odd {background: AliceBlue}
-.e-even, .e-odd { padding: 4pt 4pt 4pt 20pt }
+.e-even, .e-odd { padding: 4pt 4pt 4pt 20pt; overflow: visible; color: black }
 --></style>
-<div style='overflow: auto; width: 100%; height: 153px'>
-",
+<div class=e-container>
+", # style='overflow: auto; width: 100%; height: 153px'
 	map({
 		"<div class='".($i++ % 2 == 0? 'e-odd': 'e-even')."'>".
 		"<font color=LightSlateGray>".Utils::escapeHTML(file($_->{file})).":".($_->{line} // "?")."</font> ".

@@ -299,8 +299,8 @@ sub param_from_post {
 		$param;
 	} elsif($type =~ m!\bapplication/json\b!i) {
 		read $stdin, $_, $len;
-		require JSON;
-		JSON::from_json($_);
+		require JSON::XS;
+		JSON::XS->new->decode($_);
 	} else {
 		read $stdin, $_, $len;
 		param($_);
@@ -756,7 +756,7 @@ sub TemplateBare {
 	local ($_, $&, $`, $', $1, $2, $3, $4, $5);
 	($_) = @_;
 	
-	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id, @ifST, @code, $use_user_id) = ($_, 0);
+	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id, @ifST, @code) = ($_, 0);
 	my $page = my $form = {};
 	
 	my $get_id = sub { $open_id? ($form->{id}? "$form->{id}-$open_id": $open_id): /\bid=["']?([\w-]+)[^<]*\G/i && $1 };
@@ -935,13 +935,14 @@ sub TemplateBare {
 			$T->{noload} = 1 if $noload;
 			$load = $noload? 0: defined($load) && $load eq "load"? 1: $form->{load}? 2: 0;
 			$T->{load}  = $load if $load;
-			$T->{where} = $re_type->($where) if $where;
+			$T->{where} = unstring($where) if $where;
 			$T->{where} = "id=\$$var" if $var;
+			
 			$T->{tab} = $model // $name;
 			$T->{where} = "$form->{tab}_id=\$$form->{name}_id" . (exists $T->{where}? " AND ($T->{where})": "") if $load == 2;
 			if(exists $T->{where}) {
 				$T->{where} =~ s!['\\]!\\$&!g;
-				$T->{where} =~ s!\$(%)?(\w+)!"', \$app->connect->{dbh}->quote(" . $vario->($1, $2) . "), '"!ge;
+				$T->{where} =~ s!\$(%)?(\w+)!"', \$app->connect->quote(" . $vario->($1, $2) . "), '"!ge;
 				$T->{where} = "'$T->{where}'";
 			}
 			#$T->{where} =~ s!\$(%)?(\w+)!"'".$vario->($1, $2)."'"!ge if exists $T->{where};
@@ -983,8 +984,6 @@ sub TemplateBare {
 	push @begin, $code_stash if $form->{is_stash};
 	push @begin, $code_user_id if $form->{is_user_id};
 	
-	
-	my @use_user_id = ($use_user_id? "\$app->{stash}{'user_id'} = \$app->session->user_id;": ());
 	$form->{code} = join "", "sub { $code_begin_param", @begin, "\n", map({$_->[1]} @code), "\n}";
 	
 	my $x = join "", "sub { $code_begin_param", @begin, " return join \"\", '", @html, "'};";
@@ -994,13 +993,13 @@ sub TemplateBare {
 }
 
 # добавляет обёртку в sub{}
-sub TemplateStr {
-	join "", $code_begin1, TemplateBare(@_), $code_end1;
-}
+#sub TemplateStr {
+#	join "", $code_begin1, TemplateBare(@_), $code_end1;
+#}
 
 # возвращает функцию
 sub Template {
-	my $fn = eval TemplateStr(@_);
+	my $fn = eval TemplateBare(@_);
 	die $@ if $@;
 	$fn;
 }

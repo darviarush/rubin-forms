@@ -230,12 +230,23 @@ sub insert {
 
 sub form_load {
 	my ($self, $action, $where) = @_;
+	
+	$action =~ s!-\d+(-|$)!-$1!g;
+	
 	my $response;
-	my $form = $self->{app}->action->{form}{$action};
+	my $forms = $self->{app}->action->{form};
+	my $form = $forms->{$action};
 	my $tab = $form->{tab} // $form->{name};
-	my $view = [keys %{$form->{fields}}];
+	my %fields = (%{$form->{fields}}, (exists $forms->{"$action-"} && exists $forms->{"$action-"}{fields}? %{$forms->{"$action-"}->{fields}}: ()));
+	my $view = [keys %fields];
 	#$self->check_role('view', $tab, $view);
+	
+	main::msg '----------------------------', $action, $form unless $tab;
+	
 	my $valid = [$self->valid_names($tab, $view)];
+	
+	
+	
 	if($form->{is_list}) {
 		$response = $self->query_all($tab, $view, $where);
 		if(@$valid) {

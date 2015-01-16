@@ -57,7 +57,6 @@ use IPC::Open3;
 use POSIX qw/strftime/;
 use Time::HiRes qw//;
 use Symbol;
-use JSON;
 
 sub new {
 	my ($cls, $watch, $app) = @_;
@@ -127,10 +126,10 @@ sub inset {
 	if(-e $map) {
 		$p = $js_path;
 		$p =~ s!\.$new_ext$!.map!;
-		my $json = JSON::from_json(Utils::read($map));
+		my $json = $app->json->decode(Utils::read($map));
 		($json->{file}) = $js_path =~ m!(?:^|/)html/(.*)!;
 		($json->{sources}->[0]) = $path =~ m!(?:^|/)html/(.*)!;
-		Utils::write($p, JSON::to_json($json));
+		Utils::write($p, $app->json->encode($json));
 		$p =~ m!([^/]+)$! and $p = $1;
 		$_ = Utils::read("watch/watch.$new_ext");
 		s!(^|\n)//[#@] sourceMappingURL=watch\..*\s*$!//# sourceMappingURL=$p\n!;

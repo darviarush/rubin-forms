@@ -1081,7 +1081,7 @@ CTemplate =
 
 
 CHelper =
-	_NO_ESCAPE_HTML: raw: 1, json: 1, dump: 1, style: 1
+	_NO_ESCAPE_HTML: raw: 1, html: 1, json: 1, dump: 1, style: 1
 	json: toJSON
 	raw: (x) -> x
 	html: escapeHTML

@@ -41,7 +41,7 @@ eval { $app->auth->valid_param("", "view", 'main', {'v1'=>12, 'v2'=>'xxx'}) };
 ok $@;
 
 
-Utils::Template('
+my $t = '
 <div id=$+>
 	<div id=$*names>
 		#v1 $v2
@@ -51,7 +51,9 @@ Utils::Template('
 <div id=$*logo>
 #name
 </div>
-', my $forms, my $formlist);
+';
+
+Utils::Template($t, my $forms, my $formlist);
 
 #warn Dumper($form);
 #$query = form_query($formlist->[0]);

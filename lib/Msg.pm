@@ -33,7 +33,10 @@ BEGIN {
 our $_FRAMEWORK;
 
 use R::App;
-our $app = R::App->new;
+our $app = R::App->new("R");
+
+use JSON::XS;
+$app->json(JSON::XS->new->allow_nonref);
 
 use Utils;
 use POSIX qw//;

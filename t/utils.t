@@ -11,6 +11,7 @@ use Action;
 require_ok 'Utils';
 require_ok 'Helper';
 
+our $app;
 
 my $ret = Utils::path({ s => [ { a => [ { x => 10 }, { x => 5 } ], b => 12 }, { a => [ { x => 20 } ], b => 13 } ] }, "s.a.x");
 is_deeply $ret, [10, 5, 20];
@@ -153,7 +154,7 @@ my $fn = Utils::Template("
 		#val2
 	</div>
 ");
-my $html = $fn->({val1=> 'val-1', val2=> 'val-2'}, 'id-test');
+my $html = $fn->($app, {val1=> 'val-1', val2=> 'val-2'}, 'id-test');
 
 like $html, qr/val-1/;
 like $html, qr/val-2/;
@@ -173,7 +174,7 @@ $fn = Utils::Template(<<'END', my $forms, my $form);
 	#val2
 </div>
 END
-$html = $fn->({"val1"=> 'val-1', "val2"=> 'val-2', "ls"=> [{"val1"=> 'val-1-0', "val2"=> 'val-2-0', "ls"=> []}, {"val1"=> 'val-1-1', "val2"=> 'val-2-1', "ls"=> [{"val1"=> 'val-1-ls-<0>'}]}]}, 'id-test');
+$html = $fn->($app, {"val1"=> 'val-1', "val2"=> 'val-2', "ls"=> [{"val1"=> 'val-1-0', "val2"=> 'val-2-0', "ls"=> []}, {"val1"=> 'val-1-1', "val2"=> 'val-2-1', "ls"=> [{"val1"=> 'val-1-ls-<0>'}]}]}, 'id-test');
 
 
 like $html, qr/val-1/;
@@ -197,7 +198,7 @@ $fn = Utils::Template('
 			$x
 	</table>
 ');
-$html = $fn->([{tr=> [{f=>'f1', x=>'x1'}, {f=>'f2', x=>'x2'}]}, {tr=> [{f=>'f3', x=>'x3'}, {f=>'f4', x=>'x4'}]}], 'id_test');
+$html = $fn->($app, [{tr=> [{f=>'f1', x=>'x1'}, {f=>'f2', x=>'x2'}]}, {tr=> [{f=>'f3', x=>'x3'}, {f=>'f4', x=>'x4'}]}], 'id_test');
 
 like $html, qr/f1/;
 like $html, qr/f2/;
@@ -218,7 +219,7 @@ $fn = Utils::Template('
 			$x
 	</table>
 ');
-$html = $fn->([{tr=> [{f=>'f1', x=>'x1'}, {f=>'f2', x=>'x2'}]}, {tr=> [{f=>'f3', x=>'x3'}, {f=>'f4', x=>'x4'}]}], 'id_test');
+$html = $fn->($app, [{tr=> [{f=>'f1', x=>'x1'}, {f=>'f2', x=>'x2'}]}, {tr=> [{f=>'f3', x=>'x3'}, {f=>'f4', x=>'x4'}]}], 'id_test');
 
 like $html, qr/f1/;
 like $html, qr/f2/;
@@ -234,10 +235,10 @@ like $html, qr/<!--/;
 like $html, qr/<!!-- who\? --!>/;
 
 $fn = Utils::Template('- \$x:bool($y:bool("*", \'Да\n\'), "Нет"):raw(1) -');
-$html = $fn->({x => 1}, "");
+$html = $fn->($app, {x => 1}, "");
 is $html, "- \\Да\n -";
 
-$html = $fn->({x => 0}, "");
+$html = $fn->($app, {x => 0}, "");
 is $html, "- \\Нет -";
 
 my $r = <<'END';
@@ -245,14 +246,14 @@ ${x:bool($y:bool('\''), 10):raw}
 END
 
 $fn = Utils::Template($r);
-$html = $fn->({x=>1, y=>1});
+$html = $fn->($app, {x=>1, y=>1});
 is $html, "'\n";
 
-$html = $fn->({x=>0, y=>1});
+$html = $fn->($app, {x=>0, y=>1});
 is $html, "10\n";
 
 $fn = Utils::Template('$xyz:raw:raw ');
-$html = $fn->({xyz=>"<>"});
+$html = $fn->($app, {xyz=>"<>"});
 is $html, "<> ";
 
 $r = <<'END';
@@ -266,32 +267,32 @@ $r = <<'END';
 END
 
 $fn = Utils::Template($r);
-$html = $fn->({x=>1, y=>1});
+$html = $fn->($app, {x=>1, y=>1});
 is $html, "\n\t1\n\n";
-$html = $fn->({x=>10, y=>13, z=>13});
+$html = $fn->($app, {x=>10, y=>13, z=>13});
 is $html, "\n2\n\n";
-$html = $fn->({x=>10, y=>1, z=>2});
+$html = $fn->($app, {x=>10, y=>1, z=>2});
 is $html, "\n3\n\n";
 
 
-my $code = Utils::TemplateStr('<div id=$-frame>$@list/index</div>');
+my $code = Utils::TemplateBare('<div id=$-frame>$@list/index</div>');
 like $code, qr!, include_action\(\$data->{'frame'}, "\$id-frame", 'list/index'\),!;
 
-$code = Utils::TemplateStr('<div id=$-layout>$&</div>', $forms, my $page);
+$code = Utils::TemplateBare('<div id=$-layout>$&</div>', $forms, my $page);
 like $code, qr/\@/;
 is $page->{layout_id}, "layout";
 
-%Utils::_STASH = (stash => '"');
+$app->{stash}{stash} = '"';
 $fn = Utils::Template('{% a =%}$%stash:raw{% end %} - $%a $"2":raw(2:raw) $\'2\'');
-$html = $fn->();
+$html = $fn->($app, {});
 is $html, " - &quot; 2 2";
 
 $fn = Utils::Template('<tr tab="$abc"><div id="x1">');
-$html = $fn->({abc=>1});
+$html = $fn->($app, {abc=>1});
 is $html, '<tr tab="1"><div id="x1">';
 
 
-$code = Utils::TemplateStr('
+$code = Utils::TemplateBare('
 {% if 1 %}
 	{%if 2 %}
 		1
@@ -317,20 +318,20 @@ unlike $page->{code}, qr/if\(\s*2\s*\)/;
 
 
 
-# $code = Utils::TemplateStr('<div id=$+user:load(%user_id)>$s</div>', $forms, $page);
+# $code = Utils::TemplateBare('<div id=$+user:load(%user_id)>$s</div>', $forms, $page);
 # $form = $page->{code}[0];
 # is $form->{id}, "user";
 # is $form->{where}, 'id=$%user_id';
 # is $form->{load}, 1;
 
-# $code = Utils::TemplateStr('{% if $%user_id %}<div id=$*aim:load("user_id=$%user_id")>$s</div>{% fi %}', $forms, $page);
+# $code = Utils::TemplateBare('{% if $%user_id %}<div id=$*aim:load("user_id=$%user_id")>$s</div>{% fi %}', $forms, $page);
 # $form = $page->{code}[1];
 # is $form->{id}, "aim";
 # is $form->{where}, '"user_id=$%user_id"';
 # is $form->{load}, 1;
 
 
-# $code = Utils::TemplateStr('<div id=$+user:model(var)>$s</div> <div id=$+aim:load(aim1, var)>$s</div> <div id=$+a:noload>$s</div>', $forms, $page);
+# $code = Utils::TemplateBare('<div id=$+user:model(var)>$s</div> <div id=$+aim:load(aim1, var)>$s</div> <div id=$+a:noload>$s</div>', $forms, $page);
 # $form = $page->{code}[0];
 # is $form->{id}, "user";
 # is $form->{where}, 'id=$var';

@@ -3,6 +3,7 @@
 $response->cookie("sess", "", expires => 150723948, path => "/");
 $app->connect->erase("sess", {id => $sess}) if defined($sess = $request->cookie("sess"));
 $app->session->user_id(undef);
+main::msg($app->json->encode([ 'logout', $app->{stash} ]));
 delete $request->{cookie}{sess};
 
 return $response->redirect("/");

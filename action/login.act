@@ -16,7 +16,7 @@ if($user_id) {
 		$conn->add("sess", {id=>$sess, user_id=>$user_id});
 	}
 
-	$app->session->user_id($app->stash->{user_id} = $user_id);
+	$app->session->user_id($user_id);
 	$response->cookie(sess => $sess);
 	
 	$head = $request->head;

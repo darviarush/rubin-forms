@@ -5,7 +5,6 @@ use strict;
 use warnings;
 
 use HTTP::Date qw//;
-use JSON qw//;
 
 Utils::has("R::Response", "app");
 

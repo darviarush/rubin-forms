@@ -1,9 +1,14 @@
 package R::App;
 # содержит различные объекты, необходимые для приложения
 
+use strict;
+use warnings;
+use vars '$AUTOLOAD';
+
 sub new {
-	my ($cls) = @_;
-	bless {}, $cls;
+	my ($cls, $base) = @_;
+	$base //= "R";
+	bless {base => $base}, $cls;
 }
 
 
@@ -13,12 +18,15 @@ sub AUTOLOAD {
 	
 	eval "sub $AUTOLOAD { my (\$self, \$val) = \@_; if(\@_ == 1) { \$self->{'$prop'} } else { \$self->{'$prop'} = \$val; \$self }}";
 	die "$AUTOLOAD: ".($@ // $!) if $@ // $!;
+	no strict "refs";
 	my $sub = *{$AUTOLOAD}{CODE};
 	
 	if(@_ == 1) {
-		my $new = $prop; $new =~ s![A-Z]!::$&!g; $new = "R::".ucfirst $new;
+		my ($self) = @_;
+		my $base = $self->{base};
+		my $new = $prop; $new =~ s![A-Z]!::$&!g; $new = $base."::".ucfirst $new;
 		my $load = $prop; $load =~ s![A-Z]!/$&!g;
-		$load = "R/".ucfirst($load).".pm";
+		$load = $base."/".ucfirst($load).".pm";
 		require $load;
 		$_[0]->{$prop} = $new->new($_[0]);
 	}

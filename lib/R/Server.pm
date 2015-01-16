@@ -84,7 +84,7 @@ sub ritter {
 	my $request = $app->request;
 	my $response = $app->response;
 
-	$app->session->reset;
+	#$app->session->reset;
 	
 	my $_info = $app->{connect}{info};
 	my $action = $app->action;
@@ -99,7 +99,7 @@ sub ritter {
 		my $ajax = $_HEAD->{"Ajax"};
 		my @ret;
 		
-		main::msg $_action, $action->{act}{$_action}, $action_htm, $ajax;
+		#main::msg $_action, $action->{act}{$_action}, $action_htm, $ajax;
 		
 		if(defined $action_htm and defined $ajax and $ajax =~ /^(submit|load)$/) {
 			@ret = $self->submit;
@@ -112,7 +112,8 @@ sub ritter {
 			#main::msg "update";
 			@ret = $self->update;
 		} else {
-			return $response->error(404);
+			$response->error(404);
+			goto THEEND;
 		}
 	
 		$response->{body} = \@ret unless defined $response->{body};
@@ -144,6 +145,7 @@ sub ritter {
 		}
 	}
 
+	THEEND:
 	$app->{stash} = {};
 	
 }
@@ -155,9 +157,8 @@ sub ajax_redirect {
 	my $app = $self->{app};
 	my $request = $app->request;
 	my $response = $app->response;
-	
+
 	my @location = $response->{head}{"Location"} =~ m!^$R::Request::RE_LOCATION$!o;
-	main::msg $response->{head}{"Location"}, $R::Request::RE_LOCATION, \@location;
 	return unless @location;
 	
 	$request->reset( 'GET', @location, 'HTTP/1.1', $request->{head} );
@@ -180,16 +181,19 @@ sub wrap {
 	my $_action_htm = $ajax? $action->{ajax_htm}: $action->{htm};
 	my $action_act = $_action_act->{$act};
 
-	my @ret = $action_act? $action_act->($app, $request, $response): $request->param;
-	if(!$action_act || $action_act && !defined $response->{body}) {
-		@ret = $_action_htm->{$act}->($app, $ret[0], $act);
+	my @ret;
+	#my @ret = $action_act? $action_act->($app, $request, $response): $request->param;
+	#if(!$action_act || $action_act && !defined $response->{body}) {
+	#	main::msg 'act', $act, $app->json->encode($app->stash);
+	#	@ret = $_action_htm->{$act}->($app, $ret[0], $act);
+	#	main::msg 'act=', $act, $app->json->encode($app->stash);
 		for my $layout ($response->layout) {
 			$action_act = $_action_act->{$layout};
 			my $arg = $action_act? $action_act->($app, $request, $response): (ref $ret[0]? $ret[0]: {});
 			@ret = $_action_htm->{$layout}->($app, $arg, $layout, \@ret);
 		}
 
-	}
+	#}
 	@ret
 }
 
@@ -260,7 +264,6 @@ sub submit {
 	}
 	
 	#$result->{$layouts->[0]}{layout_id} = $layout_id if @$layouts;
-	
 	return {
 		stash => $app->{stash},
 		url => $request->{url},

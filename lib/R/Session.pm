@@ -27,7 +27,7 @@ sub user_id {
 	my $app = $self->{app};
 	my $request = $app->request;
 	my $sess = $request->cookie("sess");
-	return 0 unless $sess;
+	return $self->{app}{stash}{user_id} = 0 unless $sess;
 	my $conn = $app->connect;
 	$id = $conn->query("sess", "user_id", {id=>$sess}) // 0;
 	$conn->update("sess", {now=>$conn->now}, {id=>$id}) if $self->{app}{stash}{user_id} = $id;

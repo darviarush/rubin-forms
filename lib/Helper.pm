@@ -1,12 +1,12 @@
 package Helper;
 
-use JSON;
+use JSON::XS;
 use Data::Dumper;
 use Utils;
 
-our %_NO_ESCAPE_HTML = Utils::set(qw(raw json dump style));
+our %_NO_ESCAPE_HTML = Utils::set(qw(raw html json dump style));
 
-sub json { JSON::to_json($_[0]) }
+sub json { JSON::XS->new->encode($_[0]) }
 
 sub raw { $_[0] }
 
@@ -48,5 +48,8 @@ sub ne { if($_[0]=~$_FLOAT and $_[1]=~$_FLOAT) { $_[0] != $_[1] } else { $_[0] n
 sub visible { $_[0]? "": "display: none" }
 sub style { $_[0]? "style=\"$_[0]\"": "" }
 sub img { "/images/" . Utils::img_path($_[0]) }
+
+# запуск функции
+sub run { my $f = shift; $f->(@_) }
 
 1;

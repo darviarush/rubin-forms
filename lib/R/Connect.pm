@@ -77,7 +77,7 @@ sub get_info {
 	my $dbh = $self->{dbh};
 	my $sql = "select table_name, column_name, data_type, column_type, column_default, is_nullable, character_maximum_length, extra, column_key, ordinal_position
 		from information_schema.columns
-		where table_schema=".$dbh->quote($self->basename);
+		where table_schema=".$self->quote($self->basename);
 	my $rows = $dbh->selectall_arrayref($sql, {Slice=>{}});
 	my $info = {};
 	
@@ -122,7 +122,7 @@ sub DO_SET {
 			$self->SQL_COL($a, $as), "=", (
 				ref $b eq 'HASH'? scalar($self->replace($self->TAB_ref($a), $b)):
 				ref $b eq "SCALAR"? (ref $$b eq "SCALAR"? $$$b: $self->SQL_COL($$b, $as)):
-				$self->{dbh}->quote($b)
+				$self->quote($b)
 			)
 		);
 	}
@@ -132,36 +132,33 @@ sub DO_SET {
 # формирует where
 sub DO_WHERE {
 	my ($self, $where, $as) = @_;
-
-	my $dbh = $self->{dbh};
 	
 	if(ref $where) {
 		my @SET;
 		$where = [%$where] if ref $where eq "HASH";
 		for(my $i = 0; $i<@$where; $i+=2) {
 			my($a, $b) = ($where->[$i], $where->[$i+1]);
-			my $op = $a=~s/__ne$//? "<>": $a=~s/__lt$//? "<": $a=~s/__gt$//? ">": $a=~s/__le$//? "<=": $a=~s/__ge$//? ">=": $a=~s/__like$//? " like ": s/__unlike$//? " not like ": s/__isnt$//? " is not ": $a=~s/__between//? " BETWEEN ": !defined($b)? " is ": "=";
+			my $op = $a=~s/__ne$//? "<>": $a=~s/__lt$//? "<": $a=~s/__gt$//? ">": $a=~s/__le$//? "<=": $a=~s/__ge$//? ">=": $a=~s/__like$//? " like ": $a=~s/__unlike$//? " not like ": $a=~s/__isnt$//? " is not ": $a=~s/__between//? " BETWEEN ": !defined($b)? " is ": "=";
 			push @SET, join("", 
 				$self->SQL_COL($a, $as), $op, (
 					!defined($b)? "null":
-					ref $b eq "ARRAY"? ($op eq " BETWEEN "? $dbh->quote($b->[0])." AND ".$dbh->quote($b->[1]): do { $op = " IN " if $op eq '='; join "", "(", join(", ", map { $dbh->quote($_) } @$b), ")" } ):
+					ref $b eq "ARRAY"? ($op eq " BETWEEN "? $self->quote($b->[0])." AND ".$self->quote($b->[1]): do { $op = " IN " if $op eq '='; join "", "(", join(", ", map { $self->quote($_) } @$b), ")" } ):
 					ref $b eq 'HASH'? scalar($self->replace($self->TAB_ref($a), $b)):
 					ref $b eq "SCALAR"? (ref $$b eq "SCALAR"? $$$b: $self->SQL_COL($$b, $as)):
-					$dbh->quote($b)
+					$self->quote($b)
 				)
 			);
 		}
 		return join(" AND ", @SET)." AND ".$where->[$#$where] if @$where % 2;
 		return join(" AND ", @SET);
 	}
-
-	return $where =~ /^\d+$/? join("", $self->SQL_COL('id', $as), '=', $dbh->quote($where)): $where;
+	return $where =~ /^\d+$/? join("", $self->SQL_COL('id', $as), '=', $where): $where;
 }
 
 # формирует матрицу значений для INSERT
 sub INS_SET {
 	my ($self, $m) = @_;
-	my $set = join ",", map {join "", "(", join(",", map {$self->{dbh}->quote($_)} @$_), ")"} @$m;
+	my $set = join ",", map {join "", "(", join(",", map {$self->quote($_)} @$_), ")"} @$m;
 	return $set;
 }
 
@@ -199,7 +196,11 @@ sub TAB {
 # выборки
 sub sel {
 	my ($self, $tab, $view, @args) = @_;
-	join "", "SELECT ", $self->FIELDS($view), " FROM ", $self->SQL_WORD($tab), $self->query_add(" ", \@args);
+	my @view = $self->FIELDS($view);
+	die "not fields in sql query for `$tab`" unless @view;
+	my $sql = join "", "SELECT ", join(", ", @view), " FROM ", $self->SQL_WORD($tab), $self->query_add(" ", \@args);
+	main::msg $sql if $self->{app}->ini->{site}{'log-level'} >= 1;
+	$sql
 }
 
 # добавляет в push arg
