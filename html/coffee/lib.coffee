@@ -1106,6 +1106,7 @@ CHelper =
 	# атрибуты, классы, стили
 	visible: (a) -> if a then "" else 'display:none'
 	style: (a) -> if a then "style=\"#{a}\"" else ''
+	img: (a) -> "/images/#{CRadix.to(a, 62, '/')}"
 	
 	
 CValid =

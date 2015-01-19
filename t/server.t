@@ -33,7 +33,7 @@ sub ritter {
 }
 
 my $text = Utils::post("http://localhost:8999/id10_12?x=1", { y=>2 });
-
+#msg $text, $app->json->decode($text); 
 is_deeply $app->json->decode($text), { id=>10, id2=>12, x=>1, y=>2 };
 
 $text = Utils::post("http://localhost:8999/id10_12?x=5", { y=>2 });

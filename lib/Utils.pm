@@ -727,7 +727,7 @@ my $code_end = '\';	$i++; }	return join "", @res; }';
 my $code_begin1 = 'sub { my ($data, $id) = @_; return join "", \'';
 my $code_end1 = '\' }';
 
-my $code_begin_i = "sub { my (\$dataset, \$id1) = \@_; my \$i = 0; for my \$data (\@\$dataset) { my \$id = '\$id1-'.(\$data->{id} // \$i);\n";
+my $code_begin_i = 'sub { my ($dataset, $id1) = @_; my $i = 0; for my $data (@$dataset) { my $id = "$id1-".($data->{id} // $i);'."\n";
 my $code_end_i = "\$i++; } }\n";
 my $code_begin1_i = "sub { my (\$data, \$id) = \@_; \n";
 my $code_end1_i = "}\n";
@@ -925,30 +925,31 @@ sub TemplateBare {
 		# load присваивает данным, но только если там их нет
 		$open_tag && m!\G\$([+*])(\w+)?(?::(?:(noload)|(load|model)\((?:(\w+),\s*)?(?:(%?\w+)|($RE_TYPE))\)))?!? do {
 			my ($type, $name, $noload, $load, $model, $var, $where) = ($1, $2, $3, $4, $5, $6, $7);
-			$name //= "";
-			$T = {
-				name => $name, 
-				is_list => $type eq "*",
-			};
+			if(defined $name) {
+				$T = {
+					name => $name, 
+					is_list => $type eq "*",
+				};
 
-			$T->{model} = $model if $model;
-			$T->{noload} = 1 if $noload;
-			$load = $noload? 0: defined($load) && $load eq "load"? 1: $form->{load}? 2: 0;
-			$T->{load}  = $load if $load;
-			$T->{where} = unstring($where) if $where;
-			$T->{where} = "id=\$$var" if $var;
-			
-			$T->{tab} = $model // $name;
-			$T->{where} = "$form->{tab}_id=\$$form->{name}_id" . (exists $T->{where}? " AND ($T->{where})": "") if $load == 2;
-			if(exists $T->{where}) {
-				$T->{where} =~ s!['\\]!\\$&!g;
-				$T->{where} =~ s!\$(%)?(\w+)!"', \$app->connect->quote(" . $vario->($1, $2) . "), '"!ge;
-				$T->{where} = "'$T->{where}'";
+				$T->{model} = $model if $model;
+				$T->{noload} = 1 if $noload;
+				$load = $noload? 0: defined($load) && $load eq "load"? 1: $form->{load}? 2: 0;
+				$T->{load}  = $load if $load;
+				$T->{where} = unstring($where) if $where;
+				$T->{where} = "id=\$$var" if $var;
+				
+				$T->{tab} = $model // $name;
+				$T->{where} = "id=\$$form->{name}_id" . (exists $T->{where}? " AND ($T->{where})": "") if $load == 2;
+				if(exists $T->{where}) {
+					$T->{where} =~ s!['\\]!\\$&!g;
+					$T->{where} =~ s!\$(%)?(\w+)!"', \$app->connect->quote(" . $vario->($1, $2) . "), '"!ge;
+					$T->{where} = "'$T->{where}'";
+				}
+				#$T->{where} =~ s!\$(%)?(\w+)!"'".$vario->($1, $2)."'"!ge if exists $T->{where};
+				"', \$id, '-$name";
+			} else {
+				"', \$id, '";
 			}
-			#$T->{where} =~ s!\$(%)?(\w+)!"'".$vario->($1, $2)."'"!ge if exists $T->{where};
-			
-			my $n = ($name? "-$name": "");
-			"', \$id, '$n";
 		}:
 		m!\G[\\']!? "\\$&":
 		m!\G.!s? $&:

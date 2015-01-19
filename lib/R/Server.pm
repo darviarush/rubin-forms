@@ -189,7 +189,7 @@ sub wrap {
 	#	main::msg 'act=', $act, $app->json->encode($app->stash);
 		for my $layout ($response->layout) {
 			$action_act = $_action_act->{$layout};
-			my $arg = $action_act? $action_act->($app, $request, $response): (ref $ret[0]? $ret[0]: {});
+			my $arg = $action_act? $action_act->($app, $request, $response): (ref $ret[0]? $ret[0]: $request->param);
 			@ret = $_action_htm->{$layout}->($app, $arg, $layout, \@ret);
 		}
 

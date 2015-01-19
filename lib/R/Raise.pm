@@ -132,7 +132,11 @@ sub color {
 	
 	join "", map {
 		if($_->{sub}) { my $sub = $_->{sub}; $sub =~ s!::([^:]+)$!$col$1!; "$_->{file}:$_->{line}: $sub\n" }
-		else { "$_->{file}:$_->{line}: " . Term::ANSIColor::colored(($_->{action} // $action).": ", $color_error) . Term::ANSIColor::colored($_->{msg}, $color_words) . "\n" }
+		else {
+			$_->{file} //= "??";
+			$_->{line} //= "??";
+			"$_->{file}:$_->{line}: " . Term::ANSIColor::colored(($_->{action} // $action).": ", $color_error) . Term::ANSIColor::colored($_->{msg}, $color_words) . "\n"
+		}
 	} $self->trace;
 }
 

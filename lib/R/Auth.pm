@@ -231,17 +231,16 @@ sub insert {
 sub form_load {
 	my ($self, $action, $where) = @_;
 	
-	$action =~ s!-\d+(-|$)!-$1!g;
+	$action =~ s!-\d+!!g;
 	
 	my $response;
 	my $forms = $self->{app}->action->{form};
 	my $form = $forms->{$action};
 	my $tab = $form->{tab} // $form->{name};
-	my %fields = (%{$form->{fields}}, (exists $forms->{"$action-"} && exists $forms->{"$action-"}{fields}? %{$forms->{"$action-"}->{fields}}: ()));
-	my $view = [keys %fields];
+	my $view = [keys %{$form->{fields}}];
 	#$self->check_role('view', $tab, $view);
 	
-	main::msg '----------------------------', $action, $form unless $tab;
+	main::msg '----------------------------', $action, $where;
 	
 	my $valid = [$self->valid_names($tab, $view)];
 	

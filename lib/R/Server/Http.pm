@@ -122,9 +122,6 @@ sub impulse {
 		my $len = 0;
 		my $JSON = $app->{json};
 		
-		
-		main::msg($app->json->encode([ 'http', $body->[0]{stash}{user_id} ]));
-		
 		for my $text (@$body) {
 			$text = $JSON->encode($text) if ref $text;
 			$len += length $text;

@@ -3428,8 +3428,8 @@ new CTest 'cls-CListWidget', """
 
 См. #CTemplateWidget, #CFormWidget
 """, ->
-	@is (w=$("<lo id=e ctype=list class=c-template><li id=$+ ctype=form>$val1</li></lo>")).val([{val1: 1}, {val1: 2}]).html().replace(///['"]///g, ''), '<li id=e-0 ctype=form>1</li><li id=e-1 ctype=form>2</li>'
-	@is w.val([{val1: 1, id: 5}]).html().replace(///['"]///g, ''), '<li id=e-5 ctype=form>1</li>'
+	@is (w=$("<lo id=e ctype=list class=c-template><li id=$+ ctype=form>$val1</li></lo>")).val([{val1: 1}, {val1: 2}]).html().replace(///['"]///g, ''), '<li id=e-0 ctype=form onkeyup=return CSend(this, event)>1</li><li id=e-1 ctype=form>2</li>'
+	@is w.val([{val1: 1, id: 5}]).html().replace(///['"]///g, ''), '<li id=e-5 ctype=form onkeyup=return CSend(this, event)>1</li>'
 	
 	w = $("<lo id=e ctype=list class=c-template><li>t: <div id=$* ctype=list>#val1</div> ;</lo>").val [[val1: 6]]
 	@is w.html().replace(///['"]///g, ''), '<li>t: <div id=e-0 ctype=list><span id=e-0-0-val1>6</span></div> ;</li>'

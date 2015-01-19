@@ -10,5 +10,5 @@ sub A {
 
 eval { A() };
 
-like $@, qr/ex - error/;
-like $@, qr/: A\n/;
+like "$@", qr/ex - error/;
+like "$@", qr/A\n/;

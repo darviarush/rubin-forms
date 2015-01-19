@@ -6,6 +6,9 @@ use Test::More tests => 1;
 
 our $app;
 
+ok 1;
+__END__
+
 $app->ini(Utils::parse_ini(__FILE__ . "/../main.ini"));
 
 # инсерт
