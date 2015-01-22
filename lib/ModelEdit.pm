@@ -86,7 +86,7 @@ sub get_install_info {
 		my $package = undef;
 		
 		while(<$f>) {
-			if(/create\s+table\s+(?:`([^`]*)`|(\w+))/i) {
+			if(/^\s*create\s+table\s+(?:`([^`]*)`|(\w+))/i) {
 				$install->{$tab = $1 // $2} = {
 					name => $tab,
 					package => $package,
@@ -98,10 +98,12 @@ sub get_install_info {
 			} elsif(!$tab) {
 				$install->{$prev}{"after"} .= $_;
 				$install->{$prev}{"end"} .= $.;
+				main::msg $prev, $.;
 			} elsif(/^\s*(?:`([^`]*)`|(\w+))\s+(\w+)/) {
 				my $ins = $3.$';
 				$col = $1 // $2;
 				$ins =~ s/,?\s*$//;
+				$ins =~ s/("(\\"|.)*"|'(\\'|.)*'|`(\\`|.)*`|.)/lcfirst $1/ge;
 				$install->{$tab}{cols}{$col} = {name => $col, package => $package, install => $ins, order => $order++};
 				$install->{$tab}{install} .= $_;
 			} elsif(/^\s*(INDEX|UNIQUE)/i) {
@@ -147,8 +149,10 @@ sub table_info {
 	my ($edit) = @_;
 	my $install = $edit->install_info;
 	my $_info = $edit->{app}->connect->info;
-	my $info = $edit->{app}->auth;
+	my $info = {%{$edit->{app}->auth}};
 	my $rules = $info->{rules};
+	
+	delete $info->{app};
 
 	my %tab = Utils::set(keys(%$_info), keys(%$install), map { keys(%$_) } values %$info);
 

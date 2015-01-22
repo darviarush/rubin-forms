@@ -12,12 +12,18 @@ $param = $request->param;
 
 if(exists $param->{area}) {
 	$install = $edit->install_info;
+	msg 'i', $param->{tab};
 	$install = $install->{$param->{tab}};
+	
 	open $f, $install->{file} or die "Нет файла $install->{file}:$!";
 	@lines = <$f>;
 	close $f;
-	splice @lines, $install->{line}, $install->{line} - $install->{end}, $param->{area};
-	Utils::write($install->{file}, join "", @lines);
+	
+	main::msg 'line=', $install->{line}, 'size:',$install->{'end'}, map {"$_=".$edit->install_info->{$_}{'end'}} keys %{$edit->install_info};
+	
+	splice @lines, $install->{line}, $install->{end} - $install->{line}, $param->{area};
+	#Utils::write($install->{file}, join "", @lines);
+	return;
 }
 
 if($param->{method}) {

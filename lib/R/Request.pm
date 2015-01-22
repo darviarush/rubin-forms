@@ -16,7 +16,7 @@ sub new {
 }
 
 # для разбора url. Используется вместе с reset
-our $RE_LOCATION = qr!((/([^\s\?]*?)(?:(-?\d+)((?:_-?\d+)*)|(\.\w+))?)(?:\?(\S+))?)!;
+our $RE_LOCATION = qr!((/([^\s\?]*?(?:/\d+)?)_?(?:(-?\d+)((?:_-?\d+)*)|(\.\w+))?)(?:\?(\S+))?)!;
 
 # устанавливает новые значения
 sub reset {
@@ -24,6 +24,8 @@ sub reset {
 	my ($ids, $id);
 	($self, $self->{method}, $self->{url}, $self->{location}, $self->{action}, $id, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body}) = @_;
 
+	main::msg $self->{method}, $self->{url}, $self->{location}, $self->{action}, $id, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body};
+	
 	$self->{action} = 'index' unless $self->{action};
 	
 	$self->{ids} = my $IDS = {};
@@ -35,12 +37,14 @@ sub reset {
 	$self
 }
 
+# заголовки
 sub head {
 	my ($self, $name) = @_;
 	my $head = $self->{head};
 	defined($name)? $head->{$name}: $head;
 }
 
+# возвращает куки
 sub cookie {
 	my ($self, $name) = @_;
 	my $cookie = $self->{cookie};
@@ -50,6 +54,13 @@ sub cookie {
 	defined($name)? $cookie->{$name}: $cookie;
 }
 
+# возвращает параметры URL: /path5_6_-7, тогда ids = { id: 5, id2: 6, id3: -7 }
+sub ids {
+	my ($self, $name) = @_;
+	@_>1? $self->{ids}{$name}: $self->{ids}
+}
+
+# параметры после ?
 sub get {
 	my ($self, $name) = @_;
 	my $get = $self->{get};
@@ -59,6 +70,7 @@ sub get {
 	defined($name)? $get->{$name}: $get;
 }
 
+# POST-параметры
 sub post {
 	my ($self, $name) = @_;
 	my $post = $self->{post};
@@ -81,6 +93,7 @@ sub post {
 	defined($name)? $post->{$name}: $post;
 }
 
+# параметры POST, GET и из URL
 sub param {
 	my ($self, $name) = @_;
 	my $param = $self->{param};

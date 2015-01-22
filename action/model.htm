@@ -32,8 +32,9 @@ $(document).on("click", function(e) {
 			td.onLoad = function(data) {
 				this.byId('modal-fg-area').val(data)
 				this.byId('modal').open()
-				this.byId('modal-fg').line.val( td.attr("line") )
-				this.byId('modal-fg').end.val( td.attr("end") )
+				this.byId('modal-fg-tab').val( td.up().up().attr("tab") )
+				this.byId('modal-fg-line').val( td.attr("line") )
+				this.byId('modal-fg-end').val( td.attr("end") )
 				this.byId('modal-fg').onLoad = function() {
 					this.byId('modal').close()
 				}
@@ -97,6 +98,7 @@ table {border-collapse: collapse; }
 		<div style="float:right"><a id=modal-fg-save ctype="save" href="#">Сохранить</a></div>
 		<input type="hidden" id=modal-fg-line>
 		<input type="hidden" id=modal-fg-end>
+		<input type="hidden" id=modal-fg-tab>
 		<textarea id=modal-fg-area style='width:700px; height:400px'></textarea>
 	</div>
 </div>
@@ -127,7 +129,7 @@ table {border-collapse: collapse; }
 		<td role="self" class="click $self_edit:bool('is', 'no')">edit
 		<td role="self" class="click $self_rm:bool('is', 'no')">rm
 		
-		<td class="click $package:bool('is', 'no')">$package
+		<td class="$package:bool('is', 'no')">$package
 </tbody>
 
 <tbody id=$*col tab="$name">
@@ -146,14 +148,14 @@ table {border-collapse: collapse; }
 		<td class="click $self_edit:bool('is', 'no')" role="self">edit
 		<td class="grey">rm
 		<td class="click is" role="valid">$valid:join(", ")
-		<td class="click oh $sql:eq($install):bool('is', 'no')">{% if $sql:ne($install) %}$"<!--":raw
+		<td class="oh $sql:eq($install):bool('is', 'no')">{% if $sql:ne($install) %}$"<!--":raw
 			<table>
 			<tr><th>в файле<td>$install
 			<tr><th>в базе<td>$sql:bool("", "нет")$sql
 			</table>
 		$"-->":raw{% fi %}
 		$sql
-		<td class="click $package:bool('is', 'no')">$package
+		<td class="$package:bool('is', 'no')">$package
 </tbody>
 </table>
 

@@ -56,7 +56,7 @@ sub reconnect {
 # возвращает имя базы данных
 sub basename {
 	my ($self) = @_;
-	$self->{basename} //= $self->{app}->ini->{mysql}{DNS} =~ /database=(\w+)/ and $1
+	$self->{basename} //= $self->{app}->ini->{connect}{DNS} =~ /database=(\w+)/ and $1
 }
 
 # возвращает dbh

@@ -2942,7 +2942,7 @@ class CFormWidget extends CWidget
 		else data
 	param: ->
 		param = {}
-		for name in @_elements when not (x=this[name]).attr 'nodata' then param[name] = x.val()
+		for name in @_elements when not (x=@byName(name)).attr 'nodata' then param[name] = x.val()
 		param
 		
 	# buildQuery: ->

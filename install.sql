@@ -18,6 +18,7 @@ pass varchar(100) not null,
 is_admin tinyint not null default 0,
 name varchar(255) not null,
 ava int not null,
+description mediumtext not null,
 INDEX(email, pass)
 ) ENGINE=INNODB;
 

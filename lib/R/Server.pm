@@ -113,7 +113,6 @@ sub ritter {
 			@ret = $self->update;
 		} else {
 			$response->error(404);
-			goto THEEND;
 		}
 	
 		$response->{body} = \@ret unless defined $response->{body};
@@ -145,7 +144,6 @@ sub ritter {
 		}
 	}
 
-	THEEND:
 	$app->{stash} = {};
 	
 }

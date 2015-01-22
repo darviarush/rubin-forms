@@ -48,8 +48,10 @@ select STDERR;
 $| = 1;
 select $old;
 
+
 my $_LOG = 1;
-my $_COLOR = not $ENV{TERM} eq "dumb";
+my $_COLOR = !!$ENV{SHLVL}; #not $ENV{TERM} eq "dumb";
+
 
 sub msg (@) {
 	if($_LOG == 1) {

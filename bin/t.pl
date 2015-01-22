@@ -20,7 +20,7 @@ our \$app;
 }
 
 $verbosity = 1;
-$verbosity = shift @ARGS if $ARGS[0] =~ /^-?\d+$/;
+$verbosity = shift @ARGS if @ARGS and $ARGS[0] =~ /^-?\d+$/;
 
 @tests = files(@ARGS? map({ "t/$_.t" } @ARGS): "t/*.t");
 

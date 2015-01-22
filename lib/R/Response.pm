@@ -8,6 +8,7 @@ use HTTP::Date qw//;
 
 Utils::has("R::Response", "app");
 
+# кончструктор
 sub new {
 	my ($cls, $app) = @_;
 	bless {app=>$app}, $cls;
@@ -20,6 +21,8 @@ sub reset {
 	$self
 }
 
+
+# устанавливает и возвращает заголовки
 sub head {
 	my ($self, $k, $v) = @_;
 	if(@_ == 1) { $self->{head} }
@@ -34,6 +37,8 @@ sub head {
 	}
 }
 
+
+# устанавливает и возвращает content-type
 sub type {
 	my ($self, $v) = @_;
 	if(@_>1) {
@@ -45,6 +50,7 @@ sub type {
 	}
 }
 
+# устанавливает куки
 sub cookie {
 	my ($self, $name, $value, %param) = @_;
 	my $val = join "", $name, "=", $value,
@@ -58,6 +64,7 @@ sub cookie {
 	$self
 }
 
+# перенаправление на другой url. В ajax перенаправление происходит на сервере, а иначе - на клиенте
 sub redirect {
 	my ($self, $url, $text) = @_;
 	$self->{status} = 307;
@@ -74,7 +81,11 @@ sub status {
 # устанавливает ошибку - меняет body
 sub error {
 	my($self, $status, $error) = @_;
+	
+	return $self->redirect("/error/$status") if $self->{app}->action->{htm}{"error/$status"};
+	
 	$self->{status} = $status;
+	
 	$self->type('text/plain');
 	my $msg = $error // "$status " . $self->{app}->serverHttpStatus->{$status};
 	$self->body($msg);

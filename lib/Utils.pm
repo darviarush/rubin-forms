@@ -923,34 +923,32 @@ sub TemplateBare {
 		# :load([tab|model,] "where"|id|%id|5)
 		# шаблон для ajax - добавляет данные в load учитывая циклы и ифы
 		# load присваивает данным, но только если там их нет
-		$open_tag && m!\G\$([+*])(\w+)?(?::(?:(noload)|(load|model)\((?:(\w+),\s*)?(?:(%?\w+)|($RE_TYPE))\)))?!? do {
+		$open_tag && m!\G\$([+*])(\w+)(?::(?:(noload)|(load|model)\((?:(\w+),\s*)?(?:(%?\w+)|($RE_TYPE))\)))?!? do {
 			my ($type, $name, $noload, $load, $model, $var, $where) = ($1, $2, $3, $4, $5, $6, $7);
-			if(defined $name) {
-				$T = {
-					name => $name, 
-					is_list => $type eq "*",
-				};
+			$T = {
+				name => $name, 
+				is_list => $type eq "*",
+			};
 
-				$T->{model} = $model if $model;
-				$T->{noload} = 1 if $noload;
-				$load = $noload? 0: defined($load) && $load eq "load"? 1: $form->{load}? 2: 0;
-				$T->{load}  = $load if $load;
-				$T->{where} = unstring($where) if $where;
-				$T->{where} = "id=\$$var" if $var;
-				
-				$T->{tab} = $model // $name;
-				$T->{where} = "id=\$$form->{name}_id" . (exists $T->{where}? " AND ($T->{where})": "") if $load == 2;
-				if(exists $T->{where}) {
-					$T->{where} =~ s!['\\]!\\$&!g;
-					$T->{where} =~ s!\$(%)?(\w+)!"', \$app->connect->quote(" . $vario->($1, $2) . "), '"!ge;
-					$T->{where} = "'$T->{where}'";
-				}
-				#$T->{where} =~ s!\$(%)?(\w+)!"'".$vario->($1, $2)."'"!ge if exists $T->{where};
-				"', \$id, '-$name";
-			} else {
-				"', \$id, '";
+			$T->{model} = $model if $model;
+			$T->{noload} = 1 if $noload;
+			$load = $noload? 0: defined($load) && $load eq "load"? 1: $form->{load}? 2: 0;
+			$model = $var, $var = undef if $load == 2 and not defined $model;
+			$T->{load}  = $load if $load;
+			$T->{where} = unstring($where) if $where;
+			$T->{where} = "id=\$$var" if $var;
+			
+			$T->{tab} = $model // $name;
+			$T->{where} = ($type eq "*"? "$form->{name}_id=\$id": "id=\$$T->{tab}_id") . (exists $T->{where}? " AND ($T->{where})": "") if $load == 2;
+			if(exists $T->{where}) {
+				$T->{where} =~ s!['\\]!\\$&!g;
+				$T->{where} =~ s/\$(%)?(\w+)/ $form->{fields}{$2}=1 unless $1; "', \$app->connect->quote(" . $vario->($1, $2) . "), '"/ge;
+				$T->{where} = "'$T->{where}'";
 			}
+			#$T->{where} =~ s!\$(%)?(\w+)!"'".$vario->($1, $2)."'"!ge if exists $T->{where};
+			"', \$id, '-$name";
 		}:
+		$open_tag && m!\G\$([+*])!? "', \$id, '":
 		m!\G[\\']!? "\\$&":
 		m!\G.!s? $&:
 		last;

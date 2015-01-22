@@ -240,7 +240,7 @@ sub form_load {
 	my $view = [keys %{$form->{fields}}];
 	#$self->check_role('view', $tab, $view);
 	
-	main::msg '----------------------------', $action, $where;
+	main::msg '----------------------------', $action, $view, $where;
 	
 	my $valid = [$self->valid_names($tab, $view)];
 	
