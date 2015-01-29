@@ -1,0 +1,126 @@
+@import "blueprint/plugins/buttons/screen.css";
+
+/* 
+	Генератор кнопок: http://css3gen.com/
+	Генератор градиентов: http://www.colorzilla.com/gradient-editor/
+	Генератор тени: http://css3gen.com/box-shadow/
+	Генератор скруглённых углов и тени: http://cssround.com/
+	Генератор трансформации: http://demos.aimweb.name/css-transform-generator/
+	Генератор сносок: http://cssarrowplease.com/, http://apps.eky.hk/css-triangle-generator/
+	Виды стрелок: http://nicolasgallagher.com/pure-css-speech-bubbles/demo/, http://habrahabr.ru/post/161041/, http://habrahabr.ru/post/136175/, http://habrahabr.ru/post/107259/, http://css.yoksel.ru/css-figury/, http://css.yoksel.ru/flexbox/,
+	http://www.lullabot.com/blog/articles/announcing-beautytips-jquery-tooltip-plugin - канва
+	http://www.red-team-design.com/how-to-create-triangle-shapes и демо http://www.red-team-design.com/wp-content/uploads/2012/09/create-triangle-shapes-demo.html - разные способы
+	http://mrcoles.com/blog/callout-box-css-border-triangles-cross-browser/ - границами
+	CSS-хаки: http://habrahabr.ru/post/125396/
+	css-Эффекты: http://www.paulund.co.uk/creating-different-css3-box-shadows-effects
+	эффект стопки фоток: http://designshack.net/articles/css/use-pseudo-elements-to-create-an-image-stack-illusion/
+	
+	генератор шрифтов: http://fontello.com/
+	красивые кнопки со шрифтом webfont: http://vladmaxi.net/web-developer/css/krasivye-knopki-css-3d-3-stilya-i-6-cvetov.html
+	css3: http://css3please.com/
+	
+	библиотека анимаций: https://daneden.me/animate/ - на css3, http://h5bp.github.io/Effeckt.css/dist/ - на js
+	эмулятор css3: http://www.useragentman.com/blog/csssandpaper-a-css3-javascript-library/
+	
+	Эмулятор андроид: http://www.genymotion.com/
+	Favicon: http://olegorestov.ru/html5/favicon/
+	html5 - фичи: http://htmlbook.ru/html5, http://habrahabr.ru/post/173195/, http://habrahabr.ru/post/153613/
+	
+	vml: http://www.w3.org/TR/1998/NOTE-VML-19980513, http://msdn.microsoft.com/en-us/library/bb250524(VS.85).aspx
+	Тестировщик ie5.5+: http://www.my-debugbar.com/wiki/IETester/HomePage
+	Прозрачность png в ie: http://kizu.ru/lib/ie/
+
+	Примеры дизайна: http://ksenwork.ru/files/ksenwork.pdf, https://freelance.ru/users/ksenya_ka/
+*/
+
+.lineBlock {
+   border: 0; margin: 0.3em 0.15em; padding: 0;
+   display: -moz-inline-stack;
+   display: inline-block;
+   vertical-align: top;
+}
+
+.text { padding: 8px; text-align: justify; }
+.novid {display: none}
+
+.gradient-1 {
+background: -webkit-gradient(linear, 0 0, 0 bottom, from(#EEFF99), to(#66EE33));
+background: -webkit-linear-gradient(#EEFF99, #66EE33);
+background: -moz-linear-gradient(#EEFF99, #66EE33);
+background: -ms-linear-gradient(#EEFF99, #66EE33);
+background: -o-linear-gradient(#EEFF99, #66EE33);
+background: linear-gradient(#EEFF99, #66EE33);
+}
+
+.input, .button, .c-tip, .shadow {
+-webkit-box-shadow: #666 0px 2px 3px;
+-moz-box-shadow: #666 0px 2px 3px;
+-o-box-shadow: #666 0px 2px 3px;
+box-shadow: #666 0px 2px 3px;
+}
+
+.input, .radius-8 {
+-o-border-radius: 8px;
+-webkit-border-radius: 8px;
+-moz-border-radius: 8px;
+border-radius: 8px;
+}
+
+.radius-6 {
+-o-border-radius: 6px;
+-webkit-border-radius: 6px;
+-moz-border-radius: 6px;
+border-radius: 6px;
+}
+
+.button, .radius-4, .c-tip {
+-o-border-radius: 4px;
+-webkit-border-radius: 4px;
+-moz-border-radius: 4px;
+border-radius: 4px;
+}
+
+.input { padding: 3px; }
+
+.c-checkbox {
+	
+}
+
+.c-text { color: Grey !important; font-style: italic }
+
+.c-tip { background-color: #2a2a2a; color: LightSkyBlue; font-weight: 900; border: solid 1px gray; padding: 4px; }
+
+.c-error { background-color: #ffaaaa; }
+
+.header {padding: 10px 0px 10px 0px}
+
+/*
+http://css3pie.com/pie/PIE.htc
+http://www.twinhelix.com/css/iepngfix/
+http://www.dillerdesign.com/experiment/DD_belatedPNG/
+*/
+
+
+/*
+.speech:before {
+	content: ' ';
+	position: absolute;
+	width: 0;
+	height: 0;
+	left: 30px;
+	top: 100px;
+	border: 25px solid;
+	border-color: #666 transparent transparent #666;
+}
+
+.speech:after {
+	content: ' ';
+	position: absolute;
+	width: 0;
+	height: 0;
+	left: 38px;
+	top: 100px;
+	border: 15px solid;
+	border-color: #fff transparent transparent #fff;
+}
+*/

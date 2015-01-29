@@ -104,7 +104,7 @@
 # 75. списки для модели (?)
 #* 76. Избавиться от методов onKey на модели
 # 77. :load("where $user_id order by 1 limit 10") - limit, если не указан - 10. count - если есть - доп. запрос. Так же - уникальное id для кеша (можно взять формы)
-# 78. Перейти на http://learnboost.github.io/stylus/. В main.ini создать секцию watch с описанием таких штук
+#* 78. Перейти на http://learnboost.github.io/stylus/. В main.ini создать секцию watch с описанием таких штук
 #	Добавить команду qq compile - которая будет перекомпиливать всё - stylus, coffeescript, шаблоны и спрайты: qq css + qq sprite + qq coffee + qq action
 #	qq watch - висит и перекомпиливает. qq с test в ini - добавляет qq watch
 # 79. встроенный crontab - R::Cron->new->on(1, sub {}); и для сигналов: 
@@ -131,6 +131,7 @@
 #	4. onRepo<Имя репозит.><Имя переменной> - переменная добавляется в репозиторий
 # 97. preloader на animation
 # 98. удалять из body[act].data неиспользуемые в темплейтах param и stash. Для этого модифицировать param
+# 99. i18n - @html и @text переводят автоматически. Секции для переводов по тегу clang
 
 
 # Ссылки:
@@ -199,10 +200,41 @@ toJSON = if window.JSON then JSON.stringify else (s) ->
 		when isNaN s then "null"
 		else s
 
+$isNode = (x) ->
+	if typeof x.nodeType == 'number'
+		n = x.nodeType
+		try
+			x.nodeType = ''
+			if x.nodeType != '' then return true
+			x.nodeType = n
+		catch e
+			return true
+	false
+		
 extend = (obj, args...) -> (for arg in args then for k, v of arg then (if v? then obj[k]=v else delete obj[k])); obj
 extend_uniq = (obj, args...) -> (for arg in args then for k, v of arg then (if v? then (if not(k of obj) then obj[k]=v) else delete obj[k])); obj
-extend_deep = (obj, args...) -> (for arg in args then for k,v of arg then (if v? then (if v instanceof Object and (o=obj[k]) instanceof Object then extend_deep o, v else obj[k]=v) else delete obj[k])); obj
-extend_deep_uniq = (obj, args...) -> (for arg in args then for k,v of arg then (if v? then (if v instanceof Object and (o=obj[k]) instanceof Object then extend_deep o, v else (if not(k of obj) then obj[k]=v)) else delete obj[k])); obj
+extend_deep = (obj, args...) ->
+	for arg in args
+		for k,v of arg
+			if v == o=obj[k] then
+			else if v instanceof Object and o instanceof Object 
+				if v instanceof Array and o instanceof Array then obj[k]=v
+				else if $isNode(v) and not $isNode(o) then extend_deep o, v
+				else obj[k]=v
+			else obj[k]=v
+	obj
+extend_deep_uniq = (obj, args...) ->
+	for arg in args
+		for k,v of arg
+			if k of obj then
+			else if v == o=obj[k] then
+			else if v instanceof Object and o instanceof Object 
+				if v instanceof Array and o instanceof Array then obj[k]=v
+				else if $isNode(v) and not $isNode(o) then extend_deep o, v
+				else obj[k]=v
+			else obj[k]=v
+	obj
+
 
 
 extend_uniq String.prototype, CString =
@@ -514,25 +546,34 @@ CMath =
 	
 CCssF =
 	w: (root, rem = 12) ->
-		sel_w = []; r = ["<style>"]; x1 = []; x2 = []; x3 = []	
+		#sel_w = [];
+		r = ["<style>"]; x1 = []; x2 = []; x3 = []	
 		for j in [1..rem]
-			sel_w.push w = ".w#{j}", push = ".push#{j}", pull = ".pull#{j}", offset = ".offset#{j}"
-			r.push "#{w} { width: " + (100 / j) + "% }"
-			x1.push "#{push} {left: #{k}%}"
-			x2.push "#{pull} {right: #{k}%}"
-			x3.push "#{offset} {margin-left: #{k}%}"
+			#sel_w.push w = ".w#{j}", push = ".push#{j}", pull = ".pull#{j}", offset = ".offset#{j}"
+			w = ".w#{j}"
+			push = ".push#{j}"
+			pull = ".pull#{j}"
+			offset = ".offset#{j}"
+			r.push "#{w} {width: " + (k = 100 / j) + "%;float:left}"
+			x1.push "#{push} {left: #{k}%;float:left}"
+			x2.push "#{pull} {right: #{k}%;float:left}"
+			x3.push "#{offset} {margin-left: #{k}%;float:left}"
 			for i in [1..j]
 				k = 100 * i / j
 				t = "#{i}_#{j}"
-				sel_w.push w = ".w#{t}", push = ".push#{t}", pull = ".pull#{t}", offset = ".offset#{t}"
-				r.push "#{w} {width: #{k}%}"
-				x1.push "#{push} {left: #{k}%}"
-				x2.push "#{pull} {right: #{k}%}"
-				x3.push "#{offset} {margin-left: #{k}%}"
+				#sel_w.push w = ".w#{t}", push = ".push#{t}", pull = ".pull#{t}", offset = ".offset#{t}"
+				w = ".w#{t}"
+				push = ".push#{t}"
+				pull = ".pull#{t}"
+				offset = ".offset#{t}"
+				r.push "#{w} {width: #{k}%;float:left}"
+				x1.push "#{push} {left: #{k}%;float:left}"
+				x2.push "#{pull} {right: #{k}%;float:left}"
+				x3.push "#{offset} {margin-left: #{k}%;float:left}"
 		r.push.apply r, x1
 		r.push.apply r, x2
 		r.push.apply r, x3
-		r.push sel_w.join(",") + "{float:left}"
+		#r.push sel_w.join(",") + "{float:left}"
 		r.push "</style>"
 		root.head().append r.join "\n"
 	resize: (root) ->
@@ -564,7 +605,7 @@ CInit =
 		if param.name then window.name = param.name; delete param.name
 		if param.post then CInit.post = param.post; delete param.post
 		if param.url then CInit.url = param.url; delete param.url
-		if 'cssf' of param then CCssF.w CRoot; delete param.cssf
+		if 'cssf' of param then CCssF.w CRoot, param.cssf || 12; delete param.cssf
 		if param.css
 			for i in param.css.split(",") then CInit.link i
 			delete param.css
@@ -3311,7 +3352,7 @@ class CLoaderWidget extends CWidget
 		request = @request.request
 		if request.readyState == 4 # @html q.statusText # показать статус (Not Found, ОК..)
 			if request.status == 200 or request.statusText=='' then @loaded() # q.statusText=='' - для протоколов file или ftp
-			else @loaded_error "Ошибка Ajax: "+request.statusText
+			else @loaded_error "Ошибка Ajax: "+request.status+" "+request.statusText
 		undefined
 
 	_onTimer: =>
@@ -3408,8 +3449,10 @@ class CLoaderWidget extends CWidget
 	ohComplete: -> @novid()
 	ohLoad: -> @request.sender.tooltip null
 	ohError: ->
-		error = if @request.request.status == 500 then @request.request.responseText else escapeHTML @request.error
-		@request.sender.tooltip ctype: 'tooltip', close: 1, html: "<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка</h3>"+error, open: 1, timeout: 5000, class: 'c-error'
+		content = @wrap "<div cview=ajax_error></div>"
+		#if @request then content.first(".c-tip-content").update @request.request.responseText, @request
+		if @request.error then content.first(".c-tip-content").text @request.error
+		@request.sender.tooltip ctype: 'tooltip', close: 1, open: 1, html: content, timeout: 5000, class: 'c-error'
 
 
 class CStatusWidget extends CLoaderWidget
@@ -3445,7 +3488,7 @@ class CRouterWidget extends CWidget
 				if loader = @config.loader then a._loader = loader
 				#if url.hash then a.attr "target", url.hash; url.hash = ""
 				param = {}
-				param._noact_ = noact if url.pathname == @document().location.pathname
+				#param._noact_ = noact if url.pathname == @document().location.pathname
 				if url.hash then param._a = url.hash; url.hash = ""
 				param._act = CUrl.to url
 				#if not a._loader and not a.attr 'cloader' then a.loader this
@@ -3480,7 +3523,10 @@ CView =
 <div id=$-error style="display:none; background-color:MistyRose">
 <img src="img/loader_error.gif"> #error_msg
 </div>
-''']
+'''],
+	ajax_error: [CWidget, '''
+<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка</h3><div class=c-tip-content></div>
+	''']
 	
 	
 CRoot.initialize()

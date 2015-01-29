@@ -1,126 +1,165 @@
-@import "blueprint/plugins/buttons/screen.css";
+/* инициалтзация */
+
+html {margin:0;padding:0;border:0}
+body, div, span, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre, a, abbr, acronym, address, code, del, dfn, em, img, q, dl, dt, dd, ol, ul, li, fieldset, form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td, article, aside, dialog, figure, footer, header, hgroup, nav, section {margin:0;padding:0;border:0;vertical-align:baseline;}
+article, aside, details, figcaption, figure, dialog, footer, header, hgroup, menu, nav, section {display:block;}
+table {border-collapse:separate;border-spacing:0;}
+caption, th, td {text-align:left;font-weight:normal;float:none !important;}
+table, th, td {vertical-align:middle;}
+blockquote:before, blockquote:after, q:before, q:after {content:'';}
+blockquote, q {quotes:"" "";}
+img {border:none;}
+:focus {outline:0;}
+
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.42857143;
+  color: #333;
+  background-color: #fff;
+  overflow: auto;
+}
+
+input, button, select, textarea { font-family: inherit; font-size: inherit; line-height: inherit; }
+input:hover, button:hover, select:hover, textarea:hover { border-color: orange }
+a { color: #428bca; text-decoration: none; }
+a:hover, a:focus { color: #2a6496; text-decoration: underline; }
+a:focus { outline: thin dotted; outline: 5px auto -webkit-focus-ring-color; outline-offset: -2px; }
+
+/* главные */
+
+@media (min-width: 568px) {
+	.in1 {width: 550px;}
+	.in2 {width: 500px;}
+	.in3 {width: 450px;}
+
+	.h1 {height: 100px}
+}
+
+@media (min-width: 768px) {
+	.in1 {width: 750px;}
+	.in2 {width: 650px;}
+	.in3 {width: 550px;}
+
+	.h1 {height: 100px}
+}
+@media (min-width: 992px) {
+	.in1 { width: 970px; }
+	.in2 { width: 770px; }
+	.in3 { width: 570px; }
+	
+	.h1 {height: 70px}
+}
+@media (min-width: 1200px) {
+	.in1 { width: 1170px; }
+	.in2 { width: 970px; }
+	.in3 { width: 770px; }
+	
+	.h1 {height: 50px}
+}
+
+body * { overflow: hidden; padding: 0; margin: 0; -webkit-box-sizing: border-box; -moz-box-sizing: border-box; box-sizing: border-box; }
+
+/* 100% */
+
+html, body, .all { width: 100%; height: 100% }
+.all-h { height: 100% }
+.all-v { width: 100% }
+
+/* inline-block */
+.ib { display: -moz-inline-stack; display: inline-block; zoom: 1; *display: inline; }
+
+/* сброс */
+.w0 {width: auto}
+.push0 { left: auto }
+.pull0 { right: auto }
+.offset0 { margin-left: auto }
+.top0 { margin-top: auto }
+
+/* бокс */
+.box { padding: 4pt; margin: 4pt; background: PapayaWhip; border-radius: 5pt; }
+
+/* padding-и и маргины */
+.p { padding: 4pt }
+.pa4 {padding: 4pt}
+.m { margin: 4pt }
+.m-lt { margin: 4pt 0pt 0pt 4pt }
+.m-rb { margin: 0pt 4pt 4pt 0pt }
+.ico {margin: 4pt}
+.mr {margin-right: 4pt}
+.ml {margin-left: 4pt}
+.mt {margin-top: 4pt}
+.mb {margin-bottom: 4pt}
+
+/* линии на границе */
+.hr { border: solid 1px #E7E7E7 }
+.hr-h { border-left: solid 1px #E7E7E7; border-right: solid 1px #E7E7E7 }
+.hr-v { border-top: solid 1px #E7E7E7; border-bottom: solid 1px #E7E7E7 }
+.hr-l { border-left: solid 1px #E7E7E7 }
+.hr-r { border-right: solid 1px #E7E7E7 }
+.hr-b { border-bottom: solid 1px #E7E7E7 }
+.hr-t { border-top: solid 1px #E7E7E7 }
+
+
+/* центрирование */
+.l { text-align: left }
+.r { text-align: right }
+.j { text-align: justify }
+.c { text-align: center; *zoom: 1; text-align: -o-center; text-align: -moz-center; text-align: -webkit-center; text-align: -khtml-center }
+
+.mid { margin: 0 auto; display: block; vertical-align: middle; }
+
+/* разное */
+.fl {float:left}
+.fr {float:right}
+.cp {cursor: pointer}
+
+/* округление наполовину */
+.rnd { border-radius: 1em; padding: 0 1em 0 1em }
+
+/* округление */
+.round { -moz-border-radius: 1em; -webkit-border-radius: 1em; border-radius: 1em; }
+.round4 { -moz-border-radius: 4pt; -webkit-border-radius: 4pt; border-radius: 4pt; }
+.round5 { -moz-border-radius: 5pt; -webkit-border-radius: 5pt; border-radius: 5pt; }
+
+/* цвета */
+
+/* тултип */
+.c-tip { background-color: #2a2a2a; background-color: rgba(0, 0, 0, 0.7); color: WhiteSmoke; /*border: solid 1px gray;*/ padding: 5px; border-radius: 3px; font-size: 12px; width: 200px; max-height: 200px; }
+.c-tip h1, .c-tip h2, .c-tip h3, .c-tip h4 { color: LightSkyBlue; }
+
 
 /* 
-	Генератор кнопок: http://css3gen.com/
-	Генератор градиентов: http://www.colorzilla.com/gradient-editor/
-	Генератор тени: http://css3gen.com/box-shadow/
-	Генератор скруглённых углов и тени: http://cssround.com/
-	Генератор трансформации: http://demos.aimweb.name/css-transform-generator/
-	Генератор сносок: http://cssarrowplease.com/, http://apps.eky.hk/css-triangle-generator/
-	Виды стрелок: http://nicolasgallagher.com/pure-css-speech-bubbles/demo/, http://habrahabr.ru/post/161041/, http://habrahabr.ru/post/136175/, http://habrahabr.ru/post/107259/, http://css.yoksel.ru/css-figury/, http://css.yoksel.ru/flexbox/,
-	http://www.lullabot.com/blog/articles/announcing-beautytips-jquery-tooltip-plugin - канва
-	http://www.red-team-design.com/how-to-create-triangle-shapes и демо http://www.red-team-design.com/wp-content/uploads/2012/09/create-triangle-shapes-demo.html - разные способы
-	http://mrcoles.com/blog/callout-box-css-border-triangles-cross-browser/ - границами
-	CSS-хаки: http://habrahabr.ru/post/125396/
-	css-Эффекты: http://www.paulund.co.uk/creating-different-css3-box-shadows-effects
-	эффект стопки фоток: http://designshack.net/articles/css/use-pseudo-elements-to-create-an-image-stack-illusion/
-	
-	генератор шрифтов: http://fontello.com/
-	красивые кнопки со шрифтом webfont: http://vladmaxi.net/web-developer/css/krasivye-knopki-css-3d-3-stilya-i-6-cvetov.html
-	css3: http://css3please.com/
-	
-	библиотека анимаций: https://daneden.me/animate/ - на css3, http://h5bp.github.io/Effeckt.css/dist/ - на js
-	эмулятор css3: http://www.useragentman.com/blog/csssandpaper-a-css3-javascript-library/
-	
-	Эмулятор андроид: http://www.genymotion.com/
-	Favicon: http://olegorestov.ru/html5/favicon/
-	html5 - фичи: http://htmlbook.ru/html5, http://habrahabr.ru/post/173195/, http://habrahabr.ru/post/153613/
-	
-	vml: http://www.w3.org/TR/1998/NOTE-VML-19980513, http://msdn.microsoft.com/en-us/library/bb250524(VS.85).aspx
-	Тестировщик ie5.5+: http://www.my-debugbar.com/wiki/IETester/HomePage
-	Прозрачность png в ie: http://kizu.ru/lib/ie/
-
-	Примеры дизайна: http://ksenwork.ru/files/ksenwork.pdf, https://freelance.ru/users/ksenya_ka/
-*/
-
-.lineBlock {
-   border: 0; margin: 0.3em 0.15em; padding: 0;
-   display: -moz-inline-stack;
-   display: inline-block;
-   vertical-align: top;
-}
-
-.text { padding: 8px; text-align: justify; }
-.novid {display: none}
-
-.gradient-1 {
-background: -webkit-gradient(linear, 0 0, 0 bottom, from(#EEFF99), to(#66EE33));
-background: -webkit-linear-gradient(#EEFF99, #66EE33);
-background: -moz-linear-gradient(#EEFF99, #66EE33);
-background: -ms-linear-gradient(#EEFF99, #66EE33);
-background: -o-linear-gradient(#EEFF99, #66EE33);
-background: linear-gradient(#EEFF99, #66EE33);
-}
-
-.input, .button, .c-tip, .shadow {
--webkit-box-shadow: #666 0px 2px 3px;
--moz-box-shadow: #666 0px 2px 3px;
--o-box-shadow: #666 0px 2px 3px;
-box-shadow: #666 0px 2px 3px;
-}
-
-.input, .radius-8 {
--o-border-radius: 8px;
--webkit-border-radius: 8px;
--moz-border-radius: 8px;
-border-radius: 8px;
-}
-
-.radius-6 {
--o-border-radius: 6px;
--webkit-border-radius: 6px;
--moz-border-radius: 6px;
-border-radius: 6px;
-}
-
-.button, .radius-4, .c-tip {
--o-border-radius: 4px;
--webkit-border-radius: 4px;
--moz-border-radius: 4px;
-border-radius: 4px;
-}
-
-.input { padding: 3px; }
-
-.c-checkbox {
-	
-}
-
-.c-text { color: Grey !important; font-style: italic }
-
-.c-tip { background-color: #2a2a2a; color: LightSkyBlue; font-weight: 900; border: solid 1px gray; padding: 4px; }
-
-.c-error { background-color: #ffaaaa; }
-
-.header {padding: 10px 0px 10px 0px}
-
-/*
-http://css3pie.com/pie/PIE.htc
-http://www.twinhelix.com/css/iepngfix/
-http://www.dillerdesign.com/experiment/DD_belatedPNG/
+	иконки: http://www.aha-soft.com/free-icons/index.htm
+	http://habrahabr.ru/post/136622/
+	http://habrahabr.ru/post/136588/
+	http://toster.ru/q/123153 - что должен знать js-программист в 2014 году
+	http://purecss.io/ и http://jeet.gs/ - фреймворки css
 */
 
 
-/*
-.speech:before {
-	content: ' ';
-	position: absolute;
-	width: 0;
-	height: 0;
-	left: 30px;
-	top: 100px;
-	border: 25px solid;
-	border-color: #666 transparent transparent #666;
+/* футер */
+.orange_gradient {
+color: Ivory;
+font-weight: 900;
+
+background: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiA/Pgo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgdmlld0JveD0iMCAwIDEgMSIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+CiAgPGxpbmVhckdyYWRpZW50IGlkPSJncmFkLXVjZ2ctZ2VuZXJhdGVkIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeDE9IjAlIiB5MT0iMCUiIHgyPSIwJSIgeTI9IjEwMCUiPgogICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZlYmYwMSIgc3RvcC1vcGFjaXR5PSIxIi8+CiAgICA8c3RvcCBvZmZzZXQ9IjQ2JSIgc3RvcC1jb2xvcj0iI2ZlYmYwMSIgc3RvcC1vcGFjaXR5PSIwLjYiLz4KICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2ZlYmYwMSIgc3RvcC1vcGFjaXR5PSIxIi8+CiAgPC9saW5lYXJHcmFkaWVudD4KICA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSJ1cmwoI2dyYWQtdWNnZy1nZW5lcmF0ZWQpIiAvPgo8L3N2Zz4=);
+background: -moz-linear-gradient(top,  rgba(254,191,1,1) 0%, rgba(254,191,1,0.6) 46%, rgba(254,191,1,1) 100%); /* FF3.6+ */
+background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgba(254,191,1,1)), color-stop(46%,rgba(254,191,1,0.6)), color-stop(100%,rgba(254,191,1,1))); /* Chrome,Safari4+ */
+background: -webkit-linear-gradient(top,  rgba(254,191,1,1) 0%,rgba(254,191,1,0.6) 46%,rgba(254,191,1,1) 100%); /* Chrome10+,Safari5.1+ */
+background: -o-linear-gradient(top,  rgba(254,191,1,1) 0%,rgba(254,191,1,0.6) 46%,rgba(254,191,1,1) 100%); /* Opera 11.10+ */
+background: -ms-linear-gradient(top,  rgba(254,191,1,1) 0%,rgba(254,191,1,0.6) 46%,rgba(254,191,1,1) 100%); /* IE10+ */
+background: linear-gradient(to bottom,  rgba(254,191,1,1) 0%,rgba(254,191,1,0.6) 46%,rgba(254,191,1,1) 100%); /* W3C */
+filter: none;
+*filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#febf01', endColorstr='#febf01',GradientType=0 ); /* IE6-8 */
 }
 
-.speech:after {
-	content: ' ';
-	position: absolute;
-	width: 0;
-	height: 0;
-	left: 38px;
-	top: 100px;
-	border: 15px solid;
-	border-color: #fff transparent transparent #fff;
+.orange_gradient a {
+font-weight: normal;
 }
-*/
+
+.round_bottom {
+-moz-border-radius: 0 0 1em 1em;
+-webkit-border-radius: 0 0 1em 1em;
+border-radius: 0 0 1em 1em;
+}

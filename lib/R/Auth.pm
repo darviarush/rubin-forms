@@ -212,7 +212,8 @@ sub update { my($self, $tab, $set, $where)=@_; $self->valid(sub{ $self->{app}->c
 sub erase { my($self, $tab, $param)=@_; $self->check_role('rm', $tab, {}); $self->{app}->connect->erase($tab, $param); $self }
 sub add { my($self, $tab, $param)=@_; $self->valid(sub{ $self->{app}->connect->add($tab, $param) }, 'add', $tab, $param); $self }
 sub append { my($self, $tab, $param)=@_; $self->valid(sub { $self->{app}->connect->append($tab, $param) }, 'add', $tab, $param) }
-sub replace { my ($self, $tab, $param) = @_; $self->check_role($param->{id}? 'edit': 'add', $tab, $param); $self->{app}->connect->replace($tab, $param); $self }
+sub save { my ($self, $tab, $param) = @_; $self->check_role($param->{id}? 'edit': 'add', $tab, $param); $self->{app}->connect->save($tab, $param); $self }
+sub replace { my ($self, $tab, $param) = @_; my $id = $self->query($tab, "id", $param, "LIMIT 1"); if($id) { $self->update($tab, $param) } else { $self->add($tab, $param) } $self }
 sub last_count { my($self)=@_; $self->{app}->connect->{last_count} }
 sub last_id { my($self)=@_; $self->{app}->connect->last_id }
 sub query { my($self, $tab, $fields, @any)=@_; $self->check_role_view($tab, $fields); $self->{app}->connect->query($tab, $fields, @any) }
@@ -260,6 +261,29 @@ sub form_load {
 	$response
 }
 
+
+# выбирает какая акция нужна. Параметров не использует
+sub action_main {
+	my ($self) = @_;
+	my $app = $self->{app};
+	my $request = $app->request;
+	my $_action = $request->{action};
+	my $method = $request->{head}{'Ajax'};
+	
+	my $_info = $app->connect->info;
+	my $p = {};
+	my $tab = $_info->{$_action};
+	my $param = $request->param;
+	while(my($key, $val) = each %$param) {
+		$p->{$key} = $val if exists $tab->{$key};
+	}
+	
+	!$method || $method eq 'load'? $app->action->{form}{$_action}->($app, $_action, $p):
+	$method eq 'save'? { count => $self->save($_action, $p)->last_count }:
+	$method eq 'erase'? { count => $self->erase($_action, $p)->last_count }:
+	$method eq 'submit'? do { $self->save($_action, $p); $app->action->{form}{$_action}->($app, $_action, $p) }:
+	1;
+}
 
 1;
 
