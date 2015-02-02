@@ -135,6 +135,7 @@
 
 
 # Ссылки:
+# https://sites.google.com/site/moispargalkicss/home/spisok-standartnyh-media-queries - стандартные медиа-запросы css
 # http://habrahabr.ru/post/237671/ - слепой набор
 # https://developer.mozilla.org/ru/docs/Web/JavaScript/Reference/Global_Objects/Array/indexOf - справочник мозилла на русском
 # http://docs.ractivejs.org/latest/observers - фреймворк с моделью данных и темплейтами
@@ -2675,7 +2676,27 @@ class CWidget
 		anim
 
 	
-	type$.all 'timeout interval clear animate morph'
+	analog_anim$ =
+		ease: 'animation-timing-function'
+		timeout: 'animation-duration'
+		count: 'animation-iteration-count'
+		wait: 'animation-delay'
+		play: 'animation-direction'
+		mode: 'animation-fill-mode'
+		state: 'animation-play-state'
+	
+	anim: (a) ->
+		if typeof a == "string" then a = CEffect[a]
+		if 'effect' of a then extend_deep_uniq a, CEffect[a.effect]
+		
+		for k of analog_anim$
+			if k of a then @css analog_anim$[k], a[k]; delete a[k]
+		
+		this
+			
+		
+	
+	type$.all 'timeout interval clear animate morph anim'
 
 	
 	# методы шейпов
@@ -3450,8 +3471,8 @@ class CLoaderWidget extends CWidget
 	ohLoad: -> @request.sender.tooltip null
 	ohError: ->
 		content = @wrap "<div cview=ajax_error></div>"
-		#if @request then content.first(".c-tip-content").update @request.request.responseText, @request
-		if @request.error then content.first(".c-tip-content").text @request.error
+		if text = @request?.request.responseText then content.first(".c-tip-content").update text, @request
+		if @request.error then content.first("h3").text @request.error
 		@request.sender.tooltip ctype: 'tooltip', close: 1, open: 1, html: content, timeout: 5000, class: 'c-error'
 
 
