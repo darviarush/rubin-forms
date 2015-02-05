@@ -548,17 +548,18 @@ CMath =
 CCssF =
 	w: (root, rem = 12) ->
 		#sel_w = [];
-		r = ["<style>"]; x1 = []; x2 = []; x3 = []	
+		r = ["<style>"]; x1 = []; x2 = []; x3 = []
+		float = "float:left"
 		for j in [1..rem]
 			#sel_w.push w = ".w#{j}", push = ".push#{j}", pull = ".pull#{j}", offset = ".offset#{j}"
 			w = ".w#{j}"
 			push = ".push#{j}"
 			pull = ".pull#{j}"
 			offset = ".offset#{j}"
-			r.push "#{w} {width: " + (k = 100 / j) + "%;float:left}"
-			x1.push "#{push} {left: #{k}%;float:left}"
-			x2.push "#{pull} {right: #{k}%;float:left}"
-			x3.push "#{offset} {margin-left: #{k}%;float:left}"
+			r.push "#{w} {width: " + (k = 100 / j) + "%;#{float}}"
+			x1.push "#{push} {left: #{k}%;#{float}}"
+			x2.push "#{pull} {right: #{k}%;#{float}}"
+			x3.push "#{offset} {margin-left: #{k}%;#{float}}"
 			for i in [1..j]
 				k = 100 * i / j
 				t = "#{i}_#{j}"
@@ -567,10 +568,10 @@ CCssF =
 				push = ".push#{t}"
 				pull = ".pull#{t}"
 				offset = ".offset#{t}"
-				r.push "#{w} {width: #{k}%;float:left}"
-				x1.push "#{push} {left: #{k}%;float:left}"
-				x2.push "#{pull} {right: #{k}%;float:left}"
-				x3.push "#{offset} {margin-left: #{k}%;float:left}"
+				r.push "#{w} {width: #{k}%;#{float}}"
+				x1.push "#{push} {left: #{k}%;#{float}}"
+				x2.push "#{pull} {right: #{k}%;#{float}}"
+				x3.push "#{offset} {margin-left: #{k}%;#{float}}"
 		r.push.apply r, x1
 		r.push.apply r, x2
 		r.push.apply r, x3
@@ -2687,10 +2688,12 @@ class CWidget
 	
 	anim: (a) ->
 		if typeof a == "string" then a = CEffect[a]
-		if 'effect' of a then extend_deep_uniq a, CEffect[a.effect]
+		if 'name' of a then extend_deep_uniq a, CEffect[a.name]
 		
 		for k of analog_anim$
 			if k of a then @css analog_anim$[k], a[k]; delete a[k]
+		
+		
 		
 		this
 			

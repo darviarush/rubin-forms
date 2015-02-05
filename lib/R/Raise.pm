@@ -168,9 +168,9 @@ sub html {
 	my ($self) = @_;
 	my $i = 0;
 	("<style><!--
-.e-even {background: lavender}
-.e-odd {background: AliceBlue}
-.e-even, .e-odd { padding: 4pt 4pt 4pt 20pt; overflow: visible; color: black }
+.e-container .e-even {background: lavender}
+.e-container .e-odd {background: AliceBlue}
+.e-container .e-even, e-container .e-odd { padding: 4pt 4pt 4pt 20pt; overflow: visible; color: black }
 --></style>
 <div class=e-container>
 ", # style='overflow: auto; width: 100%; height: 153px'

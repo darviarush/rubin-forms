@@ -8,12 +8,13 @@ use HTTP::Date qw//;
 
 Utils::has("R::Response", "app");
 
-# кончструктор
+# конструктор
 sub new {
 	my ($cls, $app) = @_;
 	bless {app=>$app}, $cls;
 }
 
+# сбрасывает объект в начальное состояние
 sub reset {
 	my ($self) = @_;
 	my $app = $self->{app};
@@ -144,7 +145,10 @@ sub render {
 		$_action = $request->{action};
 	}
 	
-	$request->{ids} = {%{$request->{ids}}, %$data} if defined $data;
+	if(defined $data) {
+		$request->{ids} = {%{$request->{ids}}, %$data};
+		$request->{param} = {%{$request->{param}}, %$data} if defined $request->{param};
+	}
 	
 	my $action_htm = $_action_htm->{$_action};
 	my $ajax = $_HEAD->{"Ajax"};

@@ -1,10 +1,13 @@
 package R::Hung;
 # управляет "висящими заданиями" прописанными в main.ini вроде coffee -w
-use POSIX;
+#use POSIX qw/:HUP/;
+
+use strict;
+use warnings;
 
 sub close {
 	my ($self) = @_;
-	kill HUP, @{$self->{pid}};
+	kill 'HUP', @{$self->{pid}};
 }
 
 sub DESTROY { $_[0]->close }
@@ -38,8 +41,10 @@ sub new {
 		
 	}
 
-	main::msg(":BOLD BLACK", "\ncompiling...");
-	$watching->fire;
+	if($app->ini->{hung}{compiling} =~ /^yes$/i) {
+		main::msg(":BOLD BLACK", "\ncompiling...");
+		$watching->fire;
+	}
 	main::msg(":BOLD BLACK", "\nwatching...");
 	$self;
 }
@@ -80,11 +85,18 @@ sub new {
 	$self
 }
 
+my $_COLOR = !!$ENV{SHLVL};
+
 sub out {
 	
 	for(@_) {
 		chomp $_;
-		main::msg ":empty", map { /^(compiled|watching|generated|at)$/? (":bold black", $_, ":reset"): /^error/? (':red', $_, ':reset'): $_ } split /(\b(?:compiled|watching|generated|at|error)\b:?)/;
+		if($_COLOR) {
+			main::msg ":empty", map { /^(compiled|watching|generated|at)$/? (":bold black", $_, ":reset"): /^error/? (':red', $_, ':reset'): $_ } split /(\b(?:compiled|watching|generated|at|error)\b:?)/;
+		} else {
+			s!\e\[\d+m!!g;
+			main::msg $_;
+		}
 	}
 }
 
@@ -93,52 +105,71 @@ sub inset {
 	my $time = Time::HiRes::time;
 	my $watch = $self->{watch};
 	my $ext = $self->{ext};
-	my $out = $self->{out};
+	my $watch_path = "watch/watch.$ext";
+	my $new_ext = $watch->{outext};
+	my $watch_out_path = "watch/watch.$new_ext";
 	my $map = "watch/watch.".($watch->{map} || "map");
-	unlink $map;
-	#main::msg ":green", "cp $path";
-	Utils::cp($path, "watch/watch.$ext");
-	my $p = $path;
-	$p = Utils::winpath($p) if $watch->{win};
-	until($_ = join "", $self->read_bk) {
-		main::msg ":red", "cp -x $path watch/watch.$ext";
-		Utils::cp($path, "watch/watch.$ext");
-		#main::msg 'kill $self->{pid}';
-		#kill KILL, $self->{pid};
-		#$watch->{start} = 0;
-		#%$self = %{R::Hung::Process->new($watch)};
-		#$_ = join "", $self->read_bk;
-	}
-	
-	s!$watch->{reg_compile}!($+{time} // strftime("%T", localtime))." - compiled $p"!ge;
-	s!$watch->{reg_error}!"$p:$+{line}:".($+{char} || 1).": error: ".($+{msg2}? "$+{msg2}: ": "")."$+{msg}"!ge;
-	my @out = split /\n/, $_;
-	
+
 	my $js_path = $path;
 	my $to = $watch->{out};
 	for my $from (split /\s*,\s*/, $watch->{in}) {
 		last if $js_path =~ s!(^|/)$from!$1$to!;
 	}
-	
-	
-	my $new_ext = $watch->{outext};
 	$js_path =~ s!\.\w+$!.$new_ext!;
-	if(-e $map) {
-		$p = $js_path;
-		$p =~ s!\.$new_ext$!.map!;
-		my $json = $app->json->decode(Utils::read($map));
-		($json->{file}) = $js_path =~ m!(?:^|/)html/(.*)!;
-		($json->{sources}->[0]) = $path =~ m!(?:^|/)html/(.*)!;
-		Utils::write($p, $app->json->encode($json));
-		$p =~ m!([^/]+)$! and $p = $1;
-		$_ = Utils::read("watch/watch.$new_ext");
-		s!(^|\n)//[#@] sourceMappingURL=watch\..*\s*$!//# sourceMappingURL=$p\n!;
-		Utils::write($js_path, $_);
-	}
-	else {
-		Utils::mv("watch/watch.$new_ext", $js_path);
+	
+	unlink $map;
+	#main::msg ":green", "cp $path";
+
+	Utils::cp($path, $watch_path);
+	my $p = $path;
+	$p = Utils::winpath($p) if $watch->{win};
+	until($_ = join "", $self->read_bk) {
+		main::msg ":red", "cp -x $path watch/watch.$ext";
+		Utils::cp($path, "watch/watch.$ext");
 	}
 	
+	Time::HiRes::usleep($self->{watch}{usleep} * 1000) if $self->{watch}{usleep};
+	
+	s!\e\[\d+m!!g unless $_COLOR;
+	
+	s!$watch->{reg_compile}!($+{time} // strftime("%T", localtime))." ".(-s $watch_path)." - compiled $p"!ge;
+	s!$watch->{reg_error}!"$p:$+{line}:".($+{char} || 1).": error: ".($+{msg2}? "$+{msg2}: ": "")."$+{msg}"!ge;
+	my @out = split /\n/, $_;
+	
+	unless(-s $watch_out_path) {
+		Time::HiRes::usleep(100*1000);
+	}
+	
+	unless(-s $watch_out_path) {
+		main::msg ":red", "Файл `$watch_out_path` -> `$js_path` имеет нулевой размер";
+	} else {
+	
+		if(-e $map) {
+			$p = $js_path;
+			$p =~ s!\.$new_ext$!.map!;
+
+			my $json;
+			eval {
+				$json = $app->json->decode(main::msg($map, Utils::read($map)));
+			};
+			
+			if($@ // $!) {
+				main::msg ":red", ":space", "Файл `$map` не был сформирован:\n", "$@$!";
+			} else {
+				($json->{file}) = $js_path =~ m!(?:^|/)html/(.*)!;
+				($json->{sources}->[0]) = $path =~ m!(?:^|/)html/(.*)!;
+				Utils::write($p, $app->json->encode($json));
+			}
+			
+			$p =~ m!([^/]+)$! and $p = $1;
+			$_ = Utils::read($watch_out_path);
+			s!(^|\n)/([/\*])[#@] sourceMappingURL=watch\..*\s*$!"/$1# sourceMappingURL=$p".($1 eq "*"? " */": "")."\n"!e;
+			Utils::write($js_path, $_);
+		}
+		else {
+			Utils::mv($watch_out_path, $js_path);
+		}
+	}
 	#$out[0] = sprintf "%.4f %s", Time::HiRes::time - $time, $out[0];
 	out(@out);
 }

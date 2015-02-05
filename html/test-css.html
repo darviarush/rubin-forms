@@ -3,12 +3,101 @@
 <head>
 	<meta charset="UTF-8">
 	<title>Rubin Css Framework</title>
-	<script id=_app_ src="/js/lib.js?cssf=12&css=style&post=json" type="text/javascript"></script>
+	<script id=_app_ src="/js/lib.js?cssf=24&css=rubin&post=json" type="text/javascript"></script>
+	<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
 </head>
 <body>
-	
-	<div class="in1">
-		div.
+
+	<div class="in1 hr-h">
+		<h1>Rubin-css</h1>
+		
+		<h2>Контейнеры: .in1 .in2 .in3</h2>
+		<p>.in1, .in2 и .in3 позволяют выбрать отступы от края страницы. Причём ширина контейнера будет одинакова независимо от ширины страницы.</p>
+		
+		<h2>Сетка</h2>
+		<p>Сетка создаётся параметром cssf: <i class="text-blue">&lt;script id=_app_ src="/js/lib.js?cssf=12&css=rubin&post=json" type="text/javascript"&gt;&lt;/script&gt;</i>. По умолчанию она - 12. Можно делать любой: cssf=16. Но при увеличении сетки увеличивается и время на её генерацию, а значит - время загрузки страницы</p>
+		<p>Её классы: w1 - 100%, w2 - 50%, w3 - треть, w4 - 25%, w1_2 - 50%, w2_3 - две вторых ширины блока</p>
+		
+		<p>
+			<div class="w1">w1</div>
+			<div class="w4">w4</div><div class="w3">w3</div>
+		<p>
+		
+		
+		<h2>Поля</h2>
+		
+		<h2>Отступы</h2>
+		
+		<h2>Кнопки</h2>
+		
+		
+		<h2>Контролы</h2>
+		
+		<h3>Табы</h3>
+		<p>
+			div.nav a*3
+		
+			<div class="nav">
+				<a href="#" onclick="return false">таб1</a>
+				<a href="#" onclick="return false">таб2</a>
+				<a href="#" onclick="return false">таб3</a>
+			</div>
+		</p>
+		
+		<h3>Панели</h3>
+		<p>
+			<div class="w3 m dim-line">
+				<div class="dim">.dim</div>
+				<div class="dim-light">.dim-light</div>
+				<p>.dim-line</p>
+			</div>
+			
+			<div class="w3 m green-line">
+				<div class="green">.green</div>
+				<div class="green-light">.green-light</div>
+				<p>.green-line</p>
+			</div>
+			
+			<div class="w3 m orange-line">
+				<div class="orange">.orange</div>
+				<div class="orange-light">.orange-light</div>
+				<p>.orange-line</p>
+			</div>
+			
+			<div class="w3 m purple-line">
+				<div class="purple">.purple</div>
+				<div class="purple-light">.purple-light</div>
+				<p>.purple-line</p>
+			</div>
+			
+			<div class="w3 m blue-line">
+				<div class="blue">.blue</div>
+				<div class="blue-light">.blue-light</div>
+				<p>.blue-line</p>
+			</div>
+			
+			<div class="w3 m red-line">
+				<div class="red">.red</div>
+				<div class="red-light">.red-light</div>
+				<p>.red-line</p>
+			</div>
+		</p>
+		
+		<h3>Кнопки</h3>
+		<p>
+			<a class=btn href="#" onclick="return false">.btn</a>
+			<a class="btn dim" href="#" onclick="return false">.btn.dim</a>
+			<a class="btn green" href="#" onclick="return false">.btn.green</a>
+			<a class="btn orange" href="#" onclick="return false">.btn.orange</a>
+			<a class="btn purple" href="#" onclick="return false">.btn.purple</a>
+			<a class="btn blue" href="#" onclick="return false">.btn.blue</a>
+			<a class="btn red" href="#" onclick="return false">.btn.red</a>
+		</p>
+
+		<h3>Метки</h3>
+		
+		<p>Пример метки: <span class="badge">10</span></p>
+		
 	</div>
 	
 </body>
