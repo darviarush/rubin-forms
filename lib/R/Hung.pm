@@ -65,12 +65,15 @@ use Symbol;
 
 sub new {
 	my ($cls, $watch, $app) = @_;
-	my ($in, $out) = (gensym, gensym);
-	my $pid = open3($in, $out, $out, $watch->{hang}) or die "Не запустился процесс `$watch->{hang}`. $!";
-	
-	my $old = select $out; $|=1; select $old;
-	
-	main::msg ":space", "Запустился процесс", ":red", $pid, ":bold black", $watch->{hang};
+	my ($in, $out, $pid, $old);
+	if($watch->{hang}) {
+		($in, $out) = (gensym, gensym);
+		$pid = open3($in, $out, $out, $watch->{hang}) or die "Не запустился процесс `$watch->{hang}`. $!";
+		$old = select $out; $|=1; select $old;
+		main::msg ":space", "Запустился процесс", ":red", $pid, ":bold black", $watch->{hang};
+	} elsif(!$watch->{run}) {
+		die "Нет ни main.ini:watch:hung, ни main.ini:watch:run";
+	}
 	
 	my ($ext) = split /\|/, $watch->{ext};
 	
@@ -122,10 +125,11 @@ sub inset {
 
 	Utils::cp($path, $watch_path);
 	my $p = $path;
-	$p = Utils::winpath($p) if $app->ini->{hung}{winpath};
+	my $winpath = $app->ini->{hung}{winpath};
+	$p = Utils::winpath($p) if defined $winpath and $winpath =~ /^yes$/i;
 	until($_ = join "", $self->read_bk) {
-		main::msg ":red", "cp -x $path watch/watch.$ext";
-		Utils::cp($path, "watch/watch.$ext");
+		main::msg ":red", "Нет ответа компиллятора `$watch->{hung}` на cp $path $watch_path";
+		#Utils::cp($path, $watch_path);
 	}
 	
 	s!\e\[\d+m!!g unless $_COLOR;
@@ -163,6 +167,8 @@ sub inset {
 			
 			$p =~ m!([^/]+)$! and $p = $1;
 			$_ = Utils::read($watch_out_path);
+			main::msg ":red", "Файл тождественен предыдущему!" if defined $self->{prev} and $self->{prev} eq $_;
+			$self->{prev} = $_;
 			s!(?:^|\n)/([/\*])[#@] sourceMappingURL=.*\s*$!"/$1# sourceMappingURL=$p".($1 eq "*"? " */": "")."\n"!e;
 			Utils::write($js_path, $_);
 		}
