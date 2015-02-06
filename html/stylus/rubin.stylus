@@ -1,3 +1,19 @@
+/* константы */
+$dim = #778899
+$ldim = #E7E7E7
+$green = #3CB371
+$lgreen = #F0FFF0
+$orange = #FFA500
+$lorange = #FFF8DC
+$violet = #9370DB
+$lviolet = #D8BFD8
+$blue = #4169E1
+$lblue = #F0FFFF
+$red = #CD5C5C
+$lred = #FFE4E1
+
+$defbackground = #fff
+
 /* функции */
 
 wrap(a, b)
@@ -71,7 +87,7 @@ border-radius()
 	wrapsmall border-radius arguments
 	
 box-sizing()
-	wrapsmall box-sizing arguments
+	wrap box-sizing arguments
 	
 opacity(a)
 	wrapsmall opacity arguments
@@ -79,7 +95,53 @@ opacity(a)
 
 user-select()
 	wrapms user-select arguments
+	
+box-shadow()
+	wrap box-shadow arguments
+	
+/* http://www.broken-links.com/tests/gradients/ */
+linearGradient()
+	background-color: #3BA4C7; 
+	background-image: -moz-linear-gradient(arguments);
+	background-image: -webkit-linear-gradient(arguments);
+	background-image: -khtml-linear-gradient(arguments);
+	background-image: -o-linear-gradient(arguments);
+	background-image: -ms-linear-gradient(arguments);
+	
+	/*pos = top bottom left right
+	args = arguments
+	if args[0] in pos
+		if args[0] == left
+			pos1 = left center
+			pos2 = right center
 
+	
+	background-image: -khtml-gradient(linear, top, #3BA4C7 0% ,#1982A5 100%);
+	background-image: -webkit-gradient(top, #3BA4C7 0% ,#1982A5 100%);
+	
+	background-image: -webkit-linear-gradient(top, #3BA4C7 0%, #1982A5 100%); 
+	background-image: -o-linear-gradient(top, #3BA4C7 0%, #1982A5 100%); 
+	background-image: -ms-linear-gradient(top, #3BA4C7 0% ,#1982A5 100%);
+	background-image: -khtml-gradient(top, #3BA4C7 0% ,#1982A5 100%);
+	
+	filter: unquote("progid:DXImageTransform.Microsoft.gradient( startColorstr='#1982A5', endColorstr='#1982A5',GradientType=0 )");
+	-ms-filter: unquote("progid:DXImageTransform.Microsoft.gradient( startColorstr='#1982A5', endColorstr='#1982A5',GradientType=0 )");
+	*/
+	background-image: linear-gradient(arguments);
+	
+top-gradient(c1, c2)
+	background-color: c1; 
+	background-image: -moz-linear-gradient(top, c1 0%, c2 100%); 
+	background-image: -webkit-linear-gradient(top, c1 0%, c2 100%); 
+	background-image: -o-linear-gradient(top, c1 0%, c2 100%); 
+	background-image: -ms-linear-gradient(top, c1 0% ,c2 100%);
+	background-image: -khtml-gradient(linear, left top, left bottom, color-stop(0%, c1) , color-stop(100%, c2));
+	background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, c1) , color-stop(100%, c2));
+	-ms-filter: unquote("progid:DXImageTransform.Microsoft.gradient( startColorstr='" + c1 + "', endColorstr='" + c2 + "',GradientType=0 )");
+	filter: unquote("progid:DXImageTransform.Microsoft.gradient( startColorstr='" + c1 + "', endColorstr='" + c2 + "',GradientType=0 )");
+	background-image: linear-gradient(top, c1 0% ,c2 100%);   
+	
+	
 /* инициализация */
 
 html {margin:0;padding:0;border:0}
@@ -108,9 +170,9 @@ a { color: #428bca; text-decoration: none; }
 a:hover, a:focus { color: #2a6496; text-decoration: underline; }
 a:focus { outline: thin dotted; outline: 5px auto -webkit-focus-ring-color; outline-offset: -2px; }
 
-h1, h2, h3, h4, h5, h6 { margin: 10pt 0 5pt 0; clear: both }
-p {clear: both}
+h1, h2, h3, h4, h5, h6 { border-width: 10pt 0 5pt 0; border-color: transparent; border-style: solid; }
 
+* { padding: 0; margin: 0; box-sizing: border-box; overflow: auto; clear: both } 
 
 
 /* экран */
@@ -147,7 +209,6 @@ p {clear: both}
 	.h1 {height: 50px}
 }
 
-* { padding: 0; margin: 0; box-sizing: border-box; overflow: auto; } 
 
 /* 100% */
 html, body, .all { width: 100%; height: 100% }
@@ -165,10 +226,10 @@ html, body, .all { width: 100%; height: 100% }
 .top0 { margin-top: auto }
 
 /* бокс */
-.box { padding: 4pt; margin: 4pt; background: PapayaWhip; border-radius: 5pt; }
+/*.box { padding: 4pt; margin: 4pt; background: PapayaWhip; border-radius: 5pt; }*/
 
 
-mix(cls, prop, args...)
+mixer(cls, prop, args...)
 	.{cls}
 		{prop}: args
 	.{cls}-h
@@ -184,17 +245,12 @@ mix(cls, prop, args...)
 	.{cls}-b
 		{prop}-bottom: args
 	.{cls}-t
-		{prop}-top: args
+		{prop}-top: args 
 
 /* padding-и и маргины (p и m) */
-mix(p, padding, 4pt)
-mix(m, border, solid 4pt transparent)
-mix(m, outline-offset, -4pt)
+mixer(p, padding, 4pt)
 
 .ico {margin: 4pt}
-
-/* линии на границе (hr) */
-mix(hr, border, solid 1px #E7E7E7)
 
 /* округление (rn) */
 radiusmix(prop, r...)
@@ -210,7 +266,7 @@ radiusmix(prop, r...)
 		border-radius 0 r r 0
 		
 
-radiusmix(rm, 4pt)
+radiusmix(rs, 4pt)
 /* полностью круглый */
 radiusmix(ra, 1em)
 
@@ -232,6 +288,9 @@ radiusmix(ra, 1em)
 .fr {float:right}
 .cp {cursor: pointer}
 
+/* летающая панелька */
+.fly {position: fixed}
+
 
 /* контролы */
 
@@ -245,40 +304,68 @@ line-height: 1;
 color: #fff;
 }
 
-/* панели и ярлыки */
+/* панели, заголовки и цвета */
 colormix(prop, c1, c2)
-	.{prop}
+	.{prop}, .{prop}:hover
 		background-color c1
-		color c2
-		font-weight 700
+		color white
 	.{prop}-light
 		background-color c2
-	.{prop}-line
-		outline solid 1px c1
+		color black
+	.{prop}-box
+		outline-style solid 
+		outline-width 1px
+		outline-offset -4pt
+		border solid 4pt transparent
+		outline-color c1
+	.{prop}-text
+		color c1
+		font-weight 700
+	.{prop}-header
+		color c1
+		font-weight 700
+		background-color c2
 		
-colormix("dim", LightSlateGray, LightGray)
-colormix("green", MediumSeaGreen, Honeydew)
-colormix("orange", orange, Cornsilk)
-colormix("purple", MediumPurple, Thistle)
-colormix("blue", RoyalBlue, Azure)
-colormix("red", IndianRed, MistyRose)
+.box { border: solid 4pt transparent }
+
+colormix("dim", $dim, $ldim)
+colormix("green", $green, $lgreen)
+colormix("orange", $orange, $lorange)
+colormix("violet", $violet, $lviolet)
+colormix("blue", $blue, $lblue)
+colormix("red", $red, $lred)
+
+/* линии на границе (hr) */
+mixer(hr, border, solid 1px #E7E7E7)
+mixer(blue-hr, border, solid 1px #E7E7E7)
+
 
 
 /* кнопки */
 .btn, .btn:link, .btn:visited, .btn:focus {
 text-decoration: none;
+text-align:center;
 padding: 1em;
 border-radius: 4px;
 user-select: none;
-transition: 0.2s;
-box-shadow: 1px 1px 2px rgba(0,0,0,0.4) inset;
+box-shadow: 0px 0px 2px #bababa, inset 0px 0px 1px #ffffff;
 }
-.btn:hover { cursor: pointer;  box-shadow: none;}
+.btn:hover { cursor: pointer; }
 .btn:active { position:relative; top: 1px; left: 1px; }
 
-/* табы */
+colorias  = (dim $dim) (green $green) (orange $orange) (violet $violet) (blue $blue) (red $red)
+keysi = keys(colorias)
+valsi = values(colorias)
 
-/* цвета */
+for n, i in keysi
+	c1 = valsi[i]
+	c2 = darken(c1, 30%)
+	.btn.{n}
+		top-gradient c1 c2
+
+/* выбор */
+
+/* табы */
 
 /* тултип */
 .c-tip { background-color: #2a2a2a; background-color: rgba(0, 0, 0, 0.7); color: WhiteSmoke; /*border: solid 1px gray;*/ padding: 5px; border-radius: 3px; font-size: 12px; width: 200px; max-height: 200px; }
@@ -299,15 +386,16 @@ box-shadow: 1px 1px 2px rgba(0,0,0,0.4) inset;
 color: Ivory;
 font-weight: 900;
 
-background: unquote('url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiA/Pgo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgdmlld0JveD0iMCAwIDEgMSIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+CiAgPGxpbmVhckdyYWRpZW50IGlkPSJncmFkLXVjZ2ctZ2VuZXJhdGVkIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeDE9IjAlIiB5MT0iMCUiIHgyPSIwJSIgeTI9IjEwMCUiPgogICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZlYmYwMSIgc3RvcC1vcGFjaXR5PSIxIi8+CiAgICA8c3RvcCBvZmZzZXQ9IjQ2JSIgc3RvcC1jb2xvcj0iI2ZlYmYwMSIgc3RvcC1vcGFjaXR5PSIwLjYiLz4KICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2ZlYmYwMSIgc3RvcC1vcGFjaXR5PSIxIi8+CiAgPC9saW5lYXJHcmFkaWVudD4KICA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSJ1cmwoI2dyYWQtdWNnZy1nZW5lcmF0ZWQpIiAvPgo8L3N2Zz4=)');
+//background: unquote('url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiA/Pgo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgdmlld0JveD0iMCAwIDEgMSIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+CiAgPGxpbmVhckdyYWRpZW50IGlkPSJncmFkLXVjZ2ctZ2VuZXJhdGVkIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeDE9IjAlIiB5MT0iMCUiIHgyPSIwJSIgeTI9IjEwMCUiPgogICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZlYmYwMSIgc3RvcC1vcGFjaXR5PSIxIi8+CiAgICA8c3RvcCBvZmZzZXQ9IjQ2JSIgc3RvcC1jb2xvcj0iI2ZlYmYwMSIgc3RvcC1vcGFjaXR5PSIwLjYiLz4KICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2ZlYmYwMSIgc3RvcC1vcGFjaXR5PSIxIi8+CiAgPC9saW5lYXJHcmFkaWVudD4KICA8cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSJ1cmwoI2dyYWQtdWNnZy1nZW5lcmF0ZWQpIiAvPgo8L3N2Zz4=)');
 background: -moz-linear-gradient(top,  rgba(254,191,1,1) 0%, rgba(254,191,1,0.6) 46%, rgba(254,191,1,1) 100%); /* FF3.6+ */
 background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgba(254,191,1,1)), color-stop(46%,rgba(254,191,1,0.6)), color-stop(100%,rgba(254,191,1,1))); /* Chrome,Safari4+ */
 background: -webkit-linear-gradient(top,  rgba(254,191,1,1) 0%,rgba(254,191,1,0.6) 46%,rgba(254,191,1,1) 100%); /* Chrome10+,Safari5.1+ */
 background: -o-linear-gradient(top,  rgba(254,191,1,1) 0%,rgba(254,191,1,0.6) 46%,rgba(254,191,1,1) 100%); /* Opera 11.10+ */
 background: -ms-linear-gradient(top,  rgba(254,191,1,1) 0%,rgba(254,191,1,0.6) 46%,rgba(254,191,1,1) 100%); /* IE10+ */
+
+-ms-filter: unquote("progid:DXImageTransform.Microsoft.gradient( startColorstr='#febf01', endColorstr='#febf01',GradientType=0 )"); /* IE8-9 */
+filter: unquote("progid:DXImageTransform.Microsoft.gradient( startColorstr='#febf01', endColorstr='#febf01',GradientType=0 )"); /* IE6-7 */
 background: linear-gradient(to bottom,  rgba(254,191,1,1) 0%,rgba(254,191,1,0.6) 46%,rgba(254,191,1,1) 100%); /* W3C */
-filter: none;
-*filter: unquote("progid:DXImageTransform.Microsoft.gradient( startColorstr='#febf01', endColorstr='#febf01',GradientType=0 )"); /* IE6-8 */
 }
 
 .orange_gradient a {

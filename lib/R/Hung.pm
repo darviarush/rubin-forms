@@ -122,22 +122,22 @@ sub inset {
 
 	Utils::cp($path, $watch_path);
 	my $p = $path;
-	$p = Utils::winpath($p) if $watch->{win};
+	$p = Utils::winpath($p) if $app->ini->{hung}{winpath};
 	until($_ = join "", $self->read_bk) {
 		main::msg ":red", "cp -x $path watch/watch.$ext";
 		Utils::cp($path, "watch/watch.$ext");
 	}
 	
-	Time::HiRes::usleep($self->{watch}{usleep} * 1000) if $self->{watch}{usleep};
-	
 	s!\e\[\d+m!!g unless $_COLOR;
 	
 	s!$watch->{reg_compile}!($+{time} // strftime("%T", localtime))." ".(-s $watch_path)." - compiled $p"!ge;
-	s!$watch->{reg_error}!"$p:$+{line}:".($+{char} || 1).": error: ".($+{msg2}? "$+{msg2}: ": "")."$+{msg}"!ge;
+	s!$watch->{reg_error}!"$p:$+{line}:".($+{char} || 1).": error: ".($+{msg2}? "$+{msg2}: ": "").($+{msg}? $+{msg}:"")!ge;
 	my @out = split /\n/, $_;
 	
+	Time::HiRes::usleep($self->{watch}{sleep} * 1000) if exists $self->{watch}{sleep};
+	
 	unless(-s $watch_out_path) {
-		Time::HiRes::usleep(100*1000);
+		Time::HiRes::usleep(($self->{watch}{wait} // 100) * 1000);
 	}
 	
 	unless(-s $watch_out_path) {
@@ -150,7 +150,7 @@ sub inset {
 
 			my $json;
 			eval {
-				$json = $app->json->decode(main::msg($map, Utils::read($map)));
+				$json = $app->json->decode(Utils::read($map));
 			};
 			
 			if($@ // $!) {
@@ -163,7 +163,7 @@ sub inset {
 			
 			$p =~ m!([^/]+)$! and $p = $1;
 			$_ = Utils::read($watch_out_path);
-			s!(^|\n)/([/\*])[#@] sourceMappingURL=watch\..*\s*$!"/$1# sourceMappingURL=$p".($1 eq "*"? " */": "")."\n"!e;
+			s!(?:^|\n)/([/\*])[#@] sourceMappingURL=.*\s*$!"/$1# sourceMappingURL=$p".($1 eq "*"? " */": "")."\n"!e;
 			Utils::write($js_path, $_);
 		}
 		else {

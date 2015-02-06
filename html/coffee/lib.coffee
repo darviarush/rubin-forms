@@ -122,7 +122,7 @@
 # 91. widget.type - createWidget должен короткие имена классов собирать в ассоциативный массив (?). C*Widget и html-xs = HtmlXs
 # 92. fly - делает виджет плавающим в окне. @fly top|bottom, [без_ограничений]
 # 93. переделать CTemplate.compile
-# 94. CBox
+# 94. CBox в stream
 # 95. Растягивающиеся тултипы и окошки через таскание мышкой границы
 # 96. Подумать над архитектурой фреймворка. В частности:
 #	1. обработка событий на document. Когда человек тыкает где-то ещё, вне элемента, то последнему элементу приходит завершающее событие
@@ -132,6 +132,8 @@
 # 97. preloader на animation
 # 98. удалять из body[act].data неиспользуемые в темплейтах param и stash. Для этого модифицировать param
 # 99. i18n - @html и @text переводят автоматически. Секции для переводов по тегу clang
+# 100. main.ini:watch:run - запускает процесс и main.ini:watch:cascad - каскадирует с другим watch
+# 101. подумать над названиями фреймворков: ka - жизненная сила, ba - чувства (эмоции), ax (ah) - дух, su (shu) - тень (тёмная сторона)
 
 
 # Ссылки:
@@ -549,29 +551,33 @@ CCssF =
 	w: (root, rem = 12) ->
 		#sel_w = [];
 		r = ["<style>"]; x1 = []; x2 = []; x3 = []
-		float = "float:left"
+		float = "float:left; clear:none !important"
+		padding = "padding: 4pt"
 		for j in [1..rem]
 			#sel_w.push w = ".w#{j}", push = ".push#{j}", pull = ".pull#{j}", offset = ".offset#{j}"
 			w = ".w#{j}"
+			v = ".v#{j}"
 			push = ".push#{j}"
 			pull = ".pull#{j}"
 			offset = ".offset#{j}"
-			r.push "#{w} {width: " + (k = 100 / j) + "%;#{float}}"
-			x1.push "#{push} {left: #{k}%;#{float}}"
-			x2.push "#{pull} {right: #{k}%;#{float}}"
-			x3.push "#{offset} {margin-left: #{k}%;#{float}}"
+			k = 100 / j
+			r.push "#{w}{width:#{k}%;#{float}}", "#{v}{width:#{k}%;#{float};#{padding}}"
+			x1.push "#{push}{left:#{k}%;#{float}}"
+			x2.push "#{pull}{right:#{k}%;#{float}}"
+			x3.push "#{offset}{margin-left:#{k}%;#{float}}"
 			for i in [1..j]
 				k = 100 * i / j
 				t = "#{i}_#{j}"
 				#sel_w.push w = ".w#{t}", push = ".push#{t}", pull = ".pull#{t}", offset = ".offset#{t}"
 				w = ".w#{t}"
+				v = ".v#{t}"
 				push = ".push#{t}"
 				pull = ".pull#{t}"
 				offset = ".offset#{t}"
-				r.push "#{w} {width: #{k}%;#{float}}"
-				x1.push "#{push} {left: #{k}%;#{float}}"
-				x2.push "#{pull} {right: #{k}%;#{float}}"
-				x3.push "#{offset} {margin-left: #{k}%;#{float}}"
+				r.push "#{w}{width:#{k}%;#{float}}", "#{v}{width:#{k}%;#{float};#{padding}}"
+				x1.push "#{push}{left:#{k}%;#{float}}"
+				x2.push "#{pull}{right:#{k}%;#{float}}"
+				x3.push "#{offset}{margin-left:#{k}%;#{float}}"
 		r.push.apply r, x1
 		r.push.apply r, x2
 		r.push.apply r, x3
