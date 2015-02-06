@@ -41,7 +41,7 @@ require POSIX;
 my $ppid = POSIX::getppid();
 $app->process->loop(sub {	# будет вызываться раз в секунду
 	$app->process->close, exit unless kill 0, $ppid;
-	$app->session->delete if time % 3600 == 0;	# раз в час
+	#$app->session->delete if time % 3600 == 0;	# раз в час - не доделано
 });
 
 # Обработчик запросов

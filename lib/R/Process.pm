@@ -80,6 +80,8 @@ sub end { $_[0]->close; exit }
 sub spy {
 	my ($self) = @_;
 	
+	setpgrp 0, $$;
+	
 	# демонизируемся
 	my $_daemon = $self->{app}->ini->{site}{daemon};
 	$self->daemon if $_daemon;
@@ -117,14 +119,19 @@ sub spy {
 		# my ($rdr, $wdr, $edr);
 		# vec($test, fileno($rd), 1) = 1;
 		# Utils::nonblock($rd);
+		
 		for(;;) {
-			sleep 1;
-			# if(select $rdr=$test, $wdr=$test, $edr=$test, 0) {
-				# main::msg "any:", <$rd>;
-			# }
-			$app->watch->run if $_watch;
-			$self->create("restart=1") if waitpid $self->{main_pid}, WNOHANG;
+			eval {
+				sleep 1;
+				# if(select $rdr=$test, $wdr=$test, $edr=$test, 0) {
+					# main::msg "any:", <$rd>;
+				# }
+				$app->watch->run if $_watch;
+				$self->create("restart=1") if waitpid $self->{main_pid}, WNOHANG;
+			};
+			main::msg ":red", "Сбой в цикле spy:\n$@" if $@;
 		}
+		
 	}
 	
 	# require POSIX;

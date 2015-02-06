@@ -174,7 +174,8 @@ sub table_info {
 		my $self = $perm->{self};
 		
 		my $i = 0;
-		my @selfcol = map { $i++ == 0 && $_->[0] eq $tab? $_->[1]: $_->[0].".".$_->[1] } @{$info->{tab_selfcol}{$tab}};
+
+		my @selfcol = map { $i++ == 0 && $_->[0] eq $tab? $_->[1]: $_->[0].".".$_->[1] } @{$info->{selfcol}{$tab}};
 		
 		push @table, my $table = {
 			name => $tab,
@@ -204,7 +205,7 @@ sub table_info {
 			order => $install->{$tab}{order} // 100000
 		};
 		
-		my %col = Utils::set(keys(%{$_info->{$tab}}), keys(%{$rules->{$tab}}), keys(%{$info->{tab_valid}{$tab}}), keys(%{$install->{$tab}{cols}}) );
+		my %col = Utils::set(keys(%{$_info->{$tab}}), keys(%{$rules->{$tab}}), keys(%{$info->{valid}{$tab}}), keys(%{$install->{$tab}{cols}}) );
 		
 		my $columns = $table->{col} = [];
 		
@@ -243,7 +244,7 @@ sub table_info {
 				package => $ins->{package} // "",
 				install => $ins->{install} // "",
 				sql => $edit->alter_column($sql),
-				valid => $info->{tab_valid}{$tab}{$col},
+				valid => $info->{valid}{$tab}{$col},
 				
 				order => $sql->{ordinal_position} || $ins->{order} || "",
 			};

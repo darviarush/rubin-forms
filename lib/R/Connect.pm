@@ -448,6 +448,7 @@ sub save {
 	if(my $id = $param->{id}) {
 		delete $param->{id};
 		$self->update($tab, $param, $id);
+		$self->{last_id} = $id;
 	} else {
 		$self->add($tab, $param);
 	}

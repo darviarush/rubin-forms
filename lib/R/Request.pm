@@ -1,4 +1,4 @@
-# îáúåêò ñîäåðæèò çàïðîñ
+ï»¿# Ð¾Ð±ÑŠÐµÐºÑ‚ ÑÐ¾Ð´ÐµÑ€Ð¶Ð¸Ñ‚ Ð·Ð°Ð¿Ñ€Ð¾Ñ
 package R::Request;
 
 use strict;
@@ -6,7 +6,7 @@ use warnings;
 
 use IO::String;
 
-# íàçíà÷àåì ñâîéñòâà
+# Ð½Ð°Ð·Ð½Ð°Ñ‡Ð°ÐµÐ¼ ÑÐ²Ð¾Ð¹ÑÑ‚Ð²Ð°
 Utils::has("R::Request", "app", "method", "url", "location", "action", "ext", "search", "version");
 
 
@@ -15,16 +15,16 @@ sub new {
 	bless {app => $app}, $cls;
 }
 
-# äëÿ ðàçáîðà url. Èñïîëüçóåòñÿ âìåñòå ñ reset
+# Ð´Ð»Ñ Ñ€Ð°Ð·Ð±Ð¾Ñ€Ð° url. Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ÑÑ Ð²Ð¼ÐµÑÑ‚Ðµ Ñ reset
 our $RE_LOCATION = qr!((/([^\s\?]*?(?:/\d+)?)_?(?:(-?\d+)((?:_-?\d+)*)|(\.\w+))?)(?:\?(\S+))?)!;
 
-# óñòàíàâëèâàåò íîâûå çíà÷åíèÿ
+# ÑƒÑÑ‚Ð°Ð½Ð°Ð²Ð»Ð¸Ð²Ð°ÐµÑ‚ Ð½Ð¾Ð²Ñ‹Ðµ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ñ
 sub reset {
 	my ($self) = @_;
 	my ($ids, $id);
 	($self, $self->{method}, $self->{url}, $self->{location}, $self->{action}, $id, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body}) = @_;
 
-	main::msg $self->{method}, $self->{url}, $self->{location}, $self->{action}, $id, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body};
+	main::msg 'req->reset', $self->{method}, $self->{url}, $self->{location}, $self->{action}, $id, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body};
 	
 	$self->{action} = 'index' unless $self->{action};
 	
@@ -37,14 +37,14 @@ sub reset {
 	$self
 }
 
-# çàãîëîâêè
+# Ð·Ð°Ð³Ð¾Ð»Ð¾Ð²ÐºÐ¸
 sub head {
 	my ($self, $name) = @_;
 	my $head = $self->{head};
 	defined($name)? $head->{$name}: $head;
 }
 
-# âîçâðàùàåò êóêè
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ ÐºÑƒÐºÐ¸
 sub cookie {
 	my ($self, $name) = @_;
 	my $cookie = $self->{cookie};
@@ -54,13 +54,13 @@ sub cookie {
 	defined($name)? $cookie->{$name}: $cookie;
 }
 
-# âîçâðàùàåò ïàðàìåòðû URL: /path5_6_-7, òîãäà ids = { id: 5, id2: 6, id3: -7 }
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ Ð¿Ð°Ñ€Ð°Ð¼ÐµÑ‚Ñ€Ñ‹ URL: /path5_6_-7, Ñ‚Ð¾Ð³Ð´Ð° ids = { id: 5, id2: 6, id3: -7 }
 sub ids {
 	my ($self, $name) = @_;
 	@_>1? $self->{ids}{$name}: $self->{ids}
 }
 
-# ïàðàìåòðû ïîñëå ?
+# Ð¿Ð°Ñ€Ð°Ð¼ÐµÑ‚Ñ€Ñ‹ Ð¿Ð¾ÑÐ»Ðµ ?
 sub get {
 	my ($self, $name) = @_;
 	my $get = $self->{get};
@@ -70,7 +70,7 @@ sub get {
 	defined($name)? $get->{$name}: $get;
 }
 
-# POST-ïàðàìåòðû
+# POST-Ð¿Ð°Ñ€Ð°Ð¼ÐµÑ‚Ñ€Ñ‹
 sub post {
 	my ($self, $name) = @_;
 	my $post = $self->{post};
@@ -93,7 +93,7 @@ sub post {
 	defined($name)? $post->{$name}: $post;
 }
 
-# ïàðàìåòðû POST, GET è èç URL
+# Ð¿Ð°Ñ€Ð°Ð¼ÐµÑ‚Ñ€Ñ‹ POST, GET Ð¸ Ð¸Ð· URL
 sub param {
 	my ($self, $name) = @_;
 	my $param = $self->{param};
@@ -102,12 +102,13 @@ sub param {
 			my $val = $self->{ids}{$name} // $self->{get}{$name} // $self->get($name);
 			return $val if defined $val;
 		}
+		main::msg "xtx", $self->{ids};
 		$self->{param} = $param = {%{$self->post}, %{$self->get}, %{$self->{ids}}};
 	}
 	defined($name)? $param->{$name}: $param;
 }
 
-# ïóòü ê html-ôàéëàì
+# Ð¿ÑƒÑ‚ÑŒ Ðº html-Ñ„Ð°Ð¹Ð»Ð°Ð¼
 sub html {
 	my ($self) = @_;
 	"html" . $self->{location};
