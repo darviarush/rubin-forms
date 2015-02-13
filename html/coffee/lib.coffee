@@ -548,41 +548,57 @@ CMath =
 
 	
 CCssF =
-	w: (root, rem = 12) ->
-		#sel_w = [];
-		r = ["<style>"]; x1 = []; x2 = []; x3 = []
-		float = "float:left; clear:none !important"
-		padding = "padding: 4pt"
-		for j in [1..rem]
-			#sel_w.push w = ".w#{j}", push = ".push#{j}", pull = ".pull#{j}", offset = ".offset#{j}"
-			w = ".w#{j}"
-			v = ".v#{j}"
-			push = ".push#{j}"
-			pull = ".pull#{j}"
-			offset = ".offset#{j}"
-			k = 100 / j
-			r.push "#{w}{width:#{k}%;#{float}}", "#{v}{width:#{k}%;#{float};#{padding}}"
-			x1.push "#{push}{left:#{k}%;#{float}}"
-			x2.push "#{pull}{right:#{k}%;#{float}}"
-			x3.push "#{offset}{margin-left:#{k}%;#{float}}"
-			for i in [1..j]
-				k = 100 * i / j
-				t = "#{i}_#{j}"
-				#sel_w.push w = ".w#{t}", push = ".push#{t}", pull = ".pull#{t}", offset = ".offset#{t}"
-				w = ".w#{t}"
-				v = ".v#{t}"
-				push = ".push#{t}"
-				pull = ".pull#{t}"
-				offset = ".offset#{t}"
-				r.push "#{w}{width:#{k}%;#{float}}", "#{v}{width:#{k}%;#{float};#{padding}}"
-				x1.push "#{push}{left:#{k}%;#{float}}"
-				x2.push "#{pull}{right:#{k}%;#{float}}"
-				x3.push "#{offset}{margin-left:#{k}%;#{float}}"
-		r.push.apply r, x1
-		r.push.apply r, x2
-		r.push.apply r, x3
-		#r.push sel_w.join(",") + "{float:left}"
+	w: (root, param = 'w12') ->
+		
+		exists = (v) -> if r=param.match new RegExp("(?:^|\\d)"+v+"(\\d+)") then parseInt r[1]
+		get = (v, def) -> if (r=exists v)? then r else def
+		
+		pa = get "p", 20
+		
+		padding = "#{pa}px"
+		margin = "0 #{pa*2}px 0 -#{pa}px"
+		r = ["<style>", "*{clear:both;margin:0;padding:0;overflow:auto;box-sizing:border-box}", "html,body{width:100%;height:100%}", ".in1,.in2,.in3{ margin:0 auto 0 auto;min-height:100%; padding: 0 #{pa}px 0 #{pa}px}"]
+		float = "float:left;clear:none;padding:#{pa}px;margin:#{margin};"
+		#float = "display:inline-block;text-align:justify;padding:#{padding};margin:#{margin}"
+		#after = ":after{display:inline; float:right; margin-left:#{ma}px;content:'.'}"
+		
+		add = (t)->
+			#if i==1 then say "width=", width, "w(#{j})=", (width - (j-1)*ma) / j, "k(#{i})=",
+			k = i * (width - (j-1)*pa) / j + (i-1)*pa
+			#k = width * i / j
+			r.push ".w#{t}{width:#{k}px;#{float}}" #, ".offset#{t}{margin-left:#{k}px;float:left;clear:none}"
+		
+		inx = get 'in', 1
+		# width, inX
+		widths = [[550, 500, 450], [750, 650, 550], [970, 770, 570], [1170, 970, 770]]
+		display = [568, 768, 992, 1200]
+		#for u, n in display
+			#width = widths[n][inx-1]
+			#width -= pa*2
+			#max_width = (if n<display.length-1 then "and(max-width:#{display[n+1]-1}px)" else "")
+			#r.push "@media(min-width:#{u}px)#{max_width}{", ".in#{inx}{width:#{width}px}", ".in#{inx}:before{content:'.';display:block;width:#{width+ma*8}px}"
+		if 1
+			width = 500
+			r.push ".in#{inx}{width:#{width}px}", ".in#{inx}:before{content:'.';display:block;width:#{width+pa*8}px}"
+			if rem = exists 'w'			
+				for j in [1..rem]
+					i = 1
+					add j
+					for i in [1..j]
+						add "#{i}_#{j}"
+			r.push "}"
+		
+		if rem = exists 'x'
+			
+			for j in [1..rem]
+				k = 100 / j
+				r.push ".x#{j}{width:#{k}%;#{float}}", "#.offset#{j}{margin-left:#{k}%;#{float}}"
+				for i in [1..j]
+					k = 100 * i / j; t = "#{i}_#{j}"
+					r.push ".x#{t}{width:#{k}%;#{float}}", ".x-offset#{t}{margin-left:#{k}%;#{float}}"
+		
 		r.push "</style>"
+		say r
 		root.head().append r.join "\n"
 	resize: (root) ->
 		root.window()
@@ -610,25 +626,25 @@ CInit =
 		CInit.init param
 		
 	init: (param) ->
-		if param.name then window.name = param.name; delete param.name
-		if param.post then CInit.post = param.post; delete param.post
-		if param.url then CInit.url = param.url; delete param.url
-		if 'cssf' of param then CCssF.w CRoot, param.cssf || 12; delete param.cssf
-		if param.css
-			for i in param.css.split(",") then CInit.link i
-			delete param.css
-		if param.theme == "blueprint"
-			CInit.link "screen", "screen, projection"
-			CInit.link "print", "print"
-			if IE < 8 then CInit.link "ie", "screen, projection"
-			delete param.theme
-		if param.theme == "app"
-			CInit.link "style", "screen, projection"
-			delete param.theme
-		if param.pack
-			for i in CInit.pack = param.pack.split(",") then CInit.require i
-			delete param.pack
-		for i of param then throw CRoot.raise "Нет параметра #{i} в инициализаторе библиотеки"
+		for key of param
+			switch key
+				when 'name' then window.name = param.name
+				when 'post' then CInit.post = param.post
+				when 'url' then CInit.url = param.url
+				when 'css' then CCssF.w CRoot, param.css
+				when 'style'
+					for i in param.style.split(",") then CInit.link i
+				when 'theme' 
+					if param.theme == "blueprint"
+						CInit.link "screen", "screen, projection"
+						CInit.link "print", "print"
+						if IE < 8 then CInit.link "ie", "screen, projection"
+					else if param.theme == "app"
+						CInit.link "style", "screen, projection"
+					else throw CRoot.raise "Нет темы #{param.theme}"
+				when 'pack'
+					for i in CInit.pack = param.pack.split(",") then CInit.require i
+				else throw CRoot.raise "Нет параметра #{key} в инициализаторе библиотеки"
 		undefined
 
 

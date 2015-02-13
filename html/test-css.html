@@ -3,34 +3,130 @@
 <head>
 	<meta charset="UTF-8">
 	<title>Rubin Css Framework</title>
-	<script id=_app_ src="/js/lib.js?cssf=24&css=rubin&post=json" type="text/javascript"></script>
+	<script id=_app_ src="/js/lib.js?css=in1w12x12" type="text/javascript"></script>
 	<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
 </head>
 <body>
 
-	<div class="fly w12 offset10_12 orange-box">
-		<p class="orange">.fly</p>
-		Плавающая панелька
-	</div>
+	<!--div class="w12" style="position: fixed; float:right">
+		<p class="orange"></p>
+		<a href="">Модульная сетка</a>
+		
+	</div-->
+	<div style="position:fixed;width:0;height:100%;border-left:dotted 1px #ccc;left:50%;margin-left:10px">&nbsp;</div>
+	<div style="position:fixed;width:0;height:100%;border-left:dotted 1px #ccc;left:50%;margin-left:1px">&nbsp;</div>
+	<div style="position:fixed;width:0;height:100%;border-left:dotted 1px #ccc;left:50%;margin-left:-9px">&nbsp;</div>
 	
-	<div class="in1 hr-h">
+	
+	<div class="in1 hr-h v">
 	
 		<h1>Rubin-css</h1>
+		
+		<h2>Настройка css-фреймворка</h2>
+		<p>css-фреймворк встроен в javascript-фреймворк Рубин.</p>
+		<p>Это означает, что он генерируется файлом lib.js с параметром <b>css</b>.</p>
+		<p>Просто подключите lib.js к html-странице:</p>
+		<code lang=html>
+			&lt;script id=_app_ type="html/javascript" src="js/lib.js?css"&gt;&lt;/script&gt;
+		</code>
+		
+		<h3>Список параметров</h3>
+		<p>Параметр - буква с цифрой или без. Параметры указываются так:</p>
+		<code lang=html>
+			&lt;script id=_app_ type="html/javascript" src="js/lib.js?css=n1w12x24"&gt;&lt;/script&gt;
+		</code>
+		
+		<p>nX - указывает для какой ширины, указываемой классом .inX генерировать сетку классов .w. Если не указан - генерирует для всех</p>
+		
+		<h3>Добавление файлов </h3>
 		
 		<h2>Контейнеры: .in1 .in2 .in3</h2>
 		<p>.in1, .in2 и .in3 позволяют выбрать отступы от края страницы. Причём ширина контейнера будет одинакова независимо от ширины страницы.</p>
 		
 		<h2>Сетка</h2>
-		<p>Сетка создаётся параметром cssf: <i class="text-blue">&lt;script id=_app_ src="/js/lib.js?cssf=12&css=rubin&post=json" type="text/javascript"&gt;&lt;/script&gt;</i>. По умолчанию она - 12. Можно делать любой: cssf=16. Но при увеличении сетки увеличивается и время на её генерацию, а значит - время загрузки страницы</p>
-		<p>Её классы: w1 - 100%, w2 - 50%, w3 - треть, w4 - 25%, w1_2 - 50%, w2_3 - две вторых ширины блока</p>
+		<p>Сетка создаётся параметром css: <code><xmp>&lt;script id=_app_ src="/js/lib.js?css=in1w12&amp;post=json" type="text/javascript"&gt;&lt;/script&gt;</xmp></code>. По умолчанию она - 12. Можно делать любой: cssf=16. Но при увеличении сетки увеличивается и время на её генерацию, а значит - время загрузки страницы.</p>
+		<p>Её классы: w1 - 100%, w2 - 50%, w3 - треть, w4 - 25%, w1_2 - 50%, w2_3 - две трети.</p>
 		
-		<p class="">
-			<div class="w1">w1</div>
-			<div class="w4">w4</div><div class="w3">w3</div>
-		<p>
 		
+		<style>
+			.in1 {
+				outline: solid 1px SlateGrey;
+			}
+			.in1 div {
+				background: lavender;
+				color: SlateGrey;
+				outline: solid 1px SlateGrey;
+			}
+			.in1 div div {
+				background: #D6D6FA;
+			}
+		</style>
+		
+		<div class="w1">.w1</div>
+		
+		<div class="w2">.w2</div>
+		<div class="w2">.w2</div>
+		
+		<div class="w3">.w3</div>
+		<div class="w3">.w3</div>
+		<div class="w3">.w3</div>
+		
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		
+		<div class="w4_9">.w4_9</div> <div class="w2_9">.w2_9</div> <div class="w3">.w3_9</div>
+		<div class="w4">.w4</div> <div class="w5_12">.w5_12</div> <div class="w3">.w3</div>
+		
+		
+		
+		
+		
+		<!--h3>Вложенные блоки</h3>
+		
+		<div class="w2">.w2<br>
+			<div class="w4">.w4</div>
+			<div class="w4">.w4</div>
+			<br>
+			текст
+		</div>
+		<div class="w2">.w2<br>
+			<div class="w6">.w6</div>
+			<div class="w6">.w6</div>
+			<div class="w6">.w6</div>
+			<br>
+			текст
+		</div>
+		
+		
+		<p>.offsetx - смещают на заданное количество блоков</p>
+		
+		<div class="v4">.v4</div><div class="v5_12 offset3">.offset3.v5_12</div>
 		
 		<h2>Поля</h2>
+		<p>.v - просто добавляет поля. .w - убирает поля</p>
+		
+		<div class="v4">.v4</div><div class="v3">.v3</div>
+		
 		
 		<h2>Отступы</h2>
 		
@@ -149,7 +245,7 @@
 
 		<h3>Метки</h3>
 		
-		<p>Пример метки: <span class="badge">10</span></p>
+		<p>Пример метки: <span class="badge">10</span></p-->
 		
 	</div>
 	

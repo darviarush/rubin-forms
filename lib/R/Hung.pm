@@ -88,19 +88,33 @@ sub new {
 	$self
 }
 
-my $_COLOR = !!$ENV{SHLVL};
-
 sub out {
 	
 	for(@_) {
 		chomp $_;
-		if($_COLOR) {
+		if($main::_UNIX) {
 			main::msg ":empty", map { /^(compiled|watching|generated|at)$/? (":bold black", $_, ":reset"): /^error/? (':red', $_, ':reset'): $_ } split /(\b(?:compiled|watching|generated|at|error)\b:?)/;
 		} else {
 			s!\e\[\d+m!!g;
 			main::msg $_;
 		}
 	}
+}
+
+# ожидает изменения файла
+sub wait {
+	my ($self, $file) = @_;
+	
+	my $prev_size = $self->{'prev_size' . $file};
+	my $wait = ($self->{watch}{wait} // 100) * 1000;
+	
+	Time::HiRes::usleep($wait) unless -s $file;
+	Time::HiRes::usleep($wait) if !-e $file or defined $prev_size and $prev_size == -s $file;
+	
+	main::msg ":red", "Файл `$file` имеет нулевой размер" unless -s $file;
+	main::msg ":red", "Размер файла `$file` равен предыдущему размеру" if !-e $file or defined $prev_size and $prev_size == -s $file;
+	
+	$self->{'prev_size' . $file} = -s $file;
 }
 
 sub inset {
@@ -123,7 +137,10 @@ sub inset {
 	unlink $map;
 	#main::msg ":green", "cp $path";
 
+	$self->wait($path);
+	
 	Utils::cp($path, $watch_path);
+	
 	my $p = $path;
 	my $winpath = $app->ini->{hung}{winpath};
 	$p = Utils::winpath($p) if defined $winpath and $winpath =~ /^yes$/i;
@@ -132,22 +149,19 @@ sub inset {
 		#Utils::cp($path, $watch_path);
 	}
 	
-	s!\e\[\d+m!!g unless $_COLOR;
+	s!\e\[\d+m!!g unless $main::_UNIX;
 	
 	s!$watch->{reg_compile}!($+{time} // strftime("%T", localtime))." ".(-s $watch_path)." - compiled $p"!ge;
-	s!$watch->{reg_error}!"$p:$+{line}:".($+{char} || 1).": error: ".($+{msg2}? "$+{msg2}: ": "").($+{msg}? $+{msg}:"")!ge;
+	my $is_err = s!$watch->{reg_error}!"$p:$+{line}:".($+{char} || 1).": error: ".($+{msg2}? "$+{msg2}: ": "").($+{msg}? $+{msg}:"")!ge;
+	
 	my @out = split /\n/, $_;
 	
-	Time::HiRes::usleep($self->{watch}{sleep} * 1000) if exists $self->{watch}{sleep};
+	unless($is_err) {
 	
-	unless(-s $watch_out_path) {
-		Time::HiRes::usleep(($self->{watch}{wait} // 100) * 1000);
-	}
-	
-	unless(-s $watch_out_path) {
-		main::msg ":red", "Файл `$watch_out_path` -> `$js_path` имеет нулевой размер";
-	} else {
-	
+		Time::HiRes::usleep($self->{watch}{sleep} * 1000) if exists $self->{watch}{sleep};
+		
+		$self->wait($watch_out_path);
+		
 		if(-e $map) {
 			$p = $js_path;
 			$p =~ s!\.$new_ext$!.map!;

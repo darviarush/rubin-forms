@@ -82,7 +82,7 @@ sub trace {
 	my ($self) = @_;
 	my $trace = $self->{trace};
 	my $i = 0;
-	map {
+	reverse map {
 		$_->{file} = file($_->{file});
 		$i++;
 		my $sub = my $x = $trace->[$i]{subroutine} // "~";
@@ -143,6 +143,9 @@ sub color {
 # изменяет путь cygwin на виндовый
 sub _winpath {
 	return "--undef path in winpath--" if !defined $_[0];
+	
+	return $_[0] if $main::_UNIX;
+	
 	local ($`, $');
 	my $file = eval { Cwd::abs_path($_[0]) };
 	$file //= $_[0];

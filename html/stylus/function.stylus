@@ -1,0 +1,127 @@
+/* функции */
+
+wrap(a, b)
+	-webkit-{a} b
+	-moz-{a} b
+	-o-{a} b
+	-ms-{a} b
+	-khtml-{a} b
+	{a} b
+	
+wrapsmall(a, b)
+	-webkit-{a} b
+	-moz-{a} b
+	-khtml-{a} b
+	{a} b
+	
+wrapms(a, b)
+	-webkit-{a} b
+	-moz-{a} b
+	-ms-{a} b
+	{a} b
+
+	
+perspective()
+	wrap perspective arguments
+	
+perspective-origin()
+	wrap perspective-origin arguments
+	
+transform()
+	wrap transform arguments
+		
+transform-origin()
+	wrap transform-origin arguments
+	
+transform-style()
+	wrap transform-style arguments
+	
+
+transition()
+	wrap transition arguments
+	
+transition-delay()
+	wrap transition-delay arguments
+
+transition-duration()
+	wrap transition-duration arguments
+
+transition-property()
+	wrap transition-property arguments
+	
+transition-timing-function()
+	wrap animation-timing-function arguments
+	
+animation()
+	wrap animation arguments
+	
+animation-name()
+	wrap animation-name arguments
+	
+animation-timing-function()
+	wrap animation-timing-function arguments
+	
+animation-iteration-count()
+	wrap animation-iteration-count arguments
+	
+animation-duration()
+	wrap animation-duration arguments
+
+border-radius()
+	wrapsmall border-radius arguments
+	
+box-sizing()
+	wrap box-sizing arguments
+	
+opacity(a)
+	wrapsmall opacity arguments
+	filter unquote('alpha(opacity='+(a*100)+')')
+
+user-select()
+	wrapms user-select arguments
+	
+box-shadow()
+	wrap box-shadow arguments
+	
+/* http://www.broken-links.com/tests/gradients/ */
+linearGradient()
+	background-color: #3BA4C7; 
+	background-image: -moz-linear-gradient(arguments);
+	background-image: -webkit-linear-gradient(arguments);
+	background-image: -khtml-linear-gradient(arguments);
+	background-image: -o-linear-gradient(arguments);
+	background-image: -ms-linear-gradient(arguments);
+	
+	/*pos = top bottom left right
+	args = arguments
+	if args[0] in pos
+		if args[0] == left
+			pos1 = left center
+			pos2 = right center
+
+	
+	background-image: -khtml-gradient(linear, top, #3BA4C7 0% ,#1982A5 100%);
+	background-image: -webkit-gradient(top, #3BA4C7 0% ,#1982A5 100%);
+	
+	background-image: -webkit-linear-gradient(top, #3BA4C7 0%, #1982A5 100%); 
+	background-image: -o-linear-gradient(top, #3BA4C7 0%, #1982A5 100%); 
+	background-image: -ms-linear-gradient(top, #3BA4C7 0% ,#1982A5 100%);
+	background-image: -khtml-gradient(top, #3BA4C7 0% ,#1982A5 100%);
+	
+	filter: unquote("progid:DXImageTransform.Microsoft.gradient( startColorstr='#1982A5', endColorstr='#1982A5',GradientType=0 )");
+	-ms-filter: unquote("progid:DXImageTransform.Microsoft.gradient( startColorstr='#1982A5', endColorstr='#1982A5',GradientType=0 )");
+	*/
+	background-image: linear-gradient(arguments);
+	
+top-gradient(c1, c2)
+	background-color: c1; 
+	background-image: -moz-linear-gradient(top, c1 0%, c2 100%);
+	background-image: -webkit-linear-gradient(top, c1 0%, c2 100%);
+	background-image: -khtml-linear-gradient(top, c1 0%, c2 100%);
+	background-image: -o-linear-gradient(top, c1 0%, c2 100%);
+	background-image: -ms-linear-gradient(top, c1 0% ,c2 100%);
+	background-image: -khtml-gradient(linear, left top, left bottom, color-stop(0%, c1) , color-stop(100%, c2));
+	background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, c1) , color-stop(100%, c2));
+	-ms-filter: unquote("progid:DXImageTransform.Microsoft.gradient( startColorstr='" + c1 + "', endColorstr='" + c2 + "',GradientType=0 )");
+	filter: unquote("progid:DXImageTransform.Microsoft.gradient( startColorstr='" + c1 + "', endColorstr='" + c2 + "',GradientType=0 )");
+	background-image: linear-gradient(top, c1 0% ,c2 100%);   

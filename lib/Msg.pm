@@ -7,6 +7,8 @@ BEGIN {
 	#use Fcntl ':flock';
 	#$SIG{ __DIE__ } = \&Carp::confess;
 	
+	our $_UNIX = !!$ENV{SHLVL}; #not $ENV{TERM} eq "dumb";
+	
 	our $_FRAMEWORK;
 	
 	my $root = ".";
@@ -50,21 +52,20 @@ select $old;
 
 
 my $_LOG = 1;
-my $_COLOR = !!$ENV{SHLVL}; #not $ENV{TERM} eq "dumb";
 
 
 sub msg (@) {
 	if($_LOG == 1) {
 		my ($sep, $next, $reset, $inline) = ", ";
 		my $msg = join($sep, map {
-			my @ret = !defined($_)? ($_COLOR? Term::ANSIColor::colored("undef", "red"): "undef"):
+			my @ret = !defined($_)? ($_UNIX? Term::ANSIColor::colored("undef", "red"): "undef"):
 			ref $_? do { my($x)=Utils::Dump($_); $x=~s/\s+//g if $inline; $x}:
 			$_ eq ":space"? do { $sep = " "; () }:
 			$_ eq ":empty"? do { $sep = ""; () }:
 			$_ eq ":inline"? do { $inline = 1; () }:
 			$_ eq ":inline_end"? do { $inline = 0; () }:
 			$_ eq ":time"? do { POSIX::strftime("%T", localtime) }:
-			/^:([\w ]+)$/? do { if($_COLOR) { $reset = 1; $next = Term::ANSIColor::color($1); } () }:
+			/^:([\w ]+)$/? do { if($_UNIX) { $reset = 1; $next = Term::ANSIColor::color($1); } () }:
 			$_;
 			if(defined $next and @ret) { $ret[0] = "$next$ret[0]"; $next = undef }
 			@ret

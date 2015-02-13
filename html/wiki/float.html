@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8">
+	<title>Свойства float и clear</title>
+</head>
+<body>
+	
+<style>
+.main {
+border: solid 1px gray;
+overflow: auto;
+width: 240px;
+}
+.main div {
+	width: 80px;
+	margin: 10px;
+	border: solid 1px red;
+	padding: 9px
+}
+
+.main div:after {
+content: '';
+display: table;
+clear: both;
+}
+</style>
+
+<div class=main>
+	<div style="float:left">float:left</div>
+	<div style="float:left">float:left</div>
+	<div style="float:right">float:right</div>
+	<div style="float:left">float:left</div>
+	<div style="float:left">float:left</div>
+</div>
+	
+	
+</body>
+</html>
