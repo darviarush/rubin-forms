@@ -135,8 +135,8 @@
 # 100. main.ini:watch:run - запускает процесс и main.ini:watch:cascad - каскадирует с другим watch
 # 101. подумать над названиями фреймворков: ka - жизненная сила, ba - чувства (эмоции), ax (ah) - дух, su (shu) - тень (тёмная сторона)
 
-
 # Ссылки:
+# http://caniuse.com/ - в каком браузере что работает
 # https://sites.google.com/site/moispargalkicss/home/spisok-standartnyh-media-queries - стандартные медиа-запросы css
 # http://habrahabr.ru/post/237671/ - слепой набор
 # https://developer.mozilla.org/ru/docs/Web/JavaScript/Reference/Global_Objects/Array/indexOf - справочник мозилла на русском
@@ -547,39 +547,95 @@ CMath =
 	elastic: (x, p=1) -> Math.pow(2, 10 * --x) * Math.cos 20 * x * Math.PI * p / 3
 
 	
-CCssF =
+CCssCode =
+	code: (code) ->
+		start = "\n$ret.push('"
+		stop = "');\n"
+		for_c = c = 0
+		lineno = 1
+		u = -1
+		S = []
+		# 1 2 3     4     5    6   7     8     9  10          11        12           13   14    15  16
+		# { } for_v for_i in   of  range if    %% присвоение  функция   выражение_js  \'   \n   \r	\t+	
+		re = /// (\{) | (\}) |
+		%for\s+ ([\w\$]+) (?:\s*,\s*([\w\$]+))? \s+ (?:(in)|(of)) \s+ ([^\{\}]+) \{ |
+		%if\s+ ([^\{\}]+) \{ |
+		%%((?:%[^%]|[^%])+)%% | 
+		%([\w\$]+)\s*\{ |
+		%([\w\$]+ \s* \( [^\(\)]* \)) \s* \{ |
+		%([\w\$].*)(?:\r\n|\r|\n) |
+		(['\\]) | (\n) | (\r) | (\t+) ///g
+		code = code.replace re, (m...) ->
+			#say (lineno+":"+c+':'+u+':'+k+': '+i for i, k in m when i? and 0<k and k<17)[0]
+			s = if m[1]? then c++; "{"
+			else if m[2]?
+				#say "}", lineno, c-1, u == c
+				if u == c--
+					#if S.length == 0 then throw "ошибка выполнения "+u+' '+c
+					x = S.pop()
+					u = (S[S.length-1] || [0, -1])[1]
+					[stop, (if x[0] == 10 then "var "+x[2]+"=$ret.join(''); $ret=$rets.pop();"
+					else if x[0] == 11 then "return $ret.join('');\n}"
+					else "}"), start].join('')
+				else "}"
+			else if m[3]?
+				S.push [3, u=++c]
+				for_c++
+				r = [stop]
+				if m[6]?
+					r.push "var ", (arr="_ARR"+for_c), "=", m[7], "; for(var ", m[3], " in ", arr, ") {\n"
+					if m[4]? then r.push "var ", m[4], "=", arr, "[", m[3], "];\n"
+				else if (x = m[7].split /(\.{2,3})/).length == 3 then r.push "for(var ", (i=m[3] || "_I"+for_c), "=", x[0], ", ", (to="_TO"+for_c), "=", x[2], "; ", i, (if x[1]=='..' then "<=" else "<"), to, "; ", i, "++) {"
+				else r.push "var ", (arr="_ARR"+for_c), "=", m[7], "; for(var ", (i=m[4] || "_I"+for_c), "=0, ", (n="_N"+for_c), "=", arr, ".length;", i, "<", n, "; ", i, "++) {\nvar ", m[3], "=", arr, "[", i, "];\n"
+				r.push start
+				r.join("")
+				
+			else if m[8]? then S.push [8, u=++c]; [stop, "if(", m[8], ") {", start].join("")
+			else if m[9]? then ["', (", m[9], "), '"].join("")
+			else if m[10]? then S.push [10, u=++c, m[10]]; [stop, "$rets.push($ret); $ret=[];", start].join("")
+			else if m[11]? then S.push [11, u=++c]; [stop, "function ", m[11], "{var $ret=[];", start].join("")
+			else if m[12]? then lineno++; [stop, m[12], start].join("")
+			else if m[13]? then "\\"+m[13]
+			else if m[14]? then lineno++; "\\n"
+			else if m[15]? then "\\r"
+			else if m[16]? then ""
+			else throw CRoot.raise lineno+": fatal error: regexp не обработан"
+			return s
+	
+		if S.length then throw CRoot.raise "Не закрыта скобка для "+S[S.length-1][0]+" "+code
+		if c!=0 then throw CRoot.raise "Не закрыта скобка "+c+" "+code
+	
+		["_CSS_$=function(){ var $ret=[]; var $rets=[]; ", start, code, stop, "return $ret.join(''); }"].join('')
+
+	exists: (v) -> if r=CInit.param.css.match new RegExp("(?:^|\\d)"+v+"(\\d+)") then parseInt r[1]
+	get: (v, def) -> if (r=CCssCode.exists v)? then r else def
+		
 	w: (root, param = 'w12') ->
 		
-		exists = (v) -> if r=param.match new RegExp("(?:^|\\d)"+v+"(\\d+)") then parseInt r[1]
-		get = (v, def) -> if (r=exists v)? then r else def
+		pa = get "p", 10
+		ma = get "m", 10
 		
-		pa = get "p", 20
-		
-		padding = "#{pa}px"
-		margin = "0 #{pa*2}px 0 -#{pa}px"
-		r = ["<style>", "*{clear:both;margin:0;padding:0;overflow:auto;box-sizing:border-box}", "html,body{width:100%;height:100%}", ".in1,.in2,.in3{ margin:0 auto 0 auto;min-height:100%; padding: 0 #{pa}px 0 #{pa}px}"]
-		float = "float:left;clear:none;padding:#{pa}px;margin:#{margin};"
-		#float = "display:inline-block;text-align:justify;padding:#{padding};margin:#{margin}"
-		#after = ":after{display:inline; float:right; margin-left:#{ma}px;content:'.'}"
+		r = ["<style>", "*{margin:0;padding:0;overflow:auto;clear:both}", "html,body{width:100%;height:100%}", ".in1,.in2,.in3{margin:0 auto;min-height:100%;padding-left:#{ma}px}", ".rest{padding:#{pa/2}px;margin:0 #{ma}px #{ma}px 0;clear:none}", ".col{padding: 0!important;margin:0!important}"]
+		float = "float:left;clear:none;padding:#{pa/2}px;margin:0 #{ma}px #{ma}px 0"
 		
 		add = (t)->
 			#if i==1 then say "width=", width, "w(#{j})=", (width - (j-1)*ma) / j, "k(#{i})=",
-			k = i * (width - (j-1)*pa) / j + (i-1)*pa
-			#k = width * i / j
-			r.push ".w#{t}{width:#{k}px;#{float}}" #, ".offset#{t}{margin-left:#{k}px;float:left;clear:none}"
+			#k = i * ((width-2*pa) - (j-1)*pa) / j + (i-1)*pa
+			col = i * width / j
+			k = col - pa - ma
+			r.push ".w#{t}{width:#{k}px;#{float}}", ".w#{t}.col{width:#{col}px}", ".offset#{t}{margin-left:#{col}px}"
 		
 		inx = get 'in', 1
 		# width, inX
 		widths = [[550, 500, 450], [750, 650, 550], [970, 770, 570], [1170, 970, 770]]
 		display = [568, 768, 992, 1200]
-		#for u, n in display
-			#width = widths[n][inx-1]
-			#width -= pa*2
-			#max_width = (if n<display.length-1 then "and(max-width:#{display[n+1]-1}px)" else "")
-			#r.push "@media(min-width:#{u}px)#{max_width}{", ".in#{inx}{width:#{width}px}", ".in#{inx}:before{content:'.';display:block;width:#{width+ma*8}px}"
-		if 1
-			width = 500
-			r.push ".in#{inx}{width:#{width}px}", ".in#{inx}:before{content:'.';display:block;width:#{width+pa*8}px}"
+		for u, n in display
+			width = widths[n][inx-1]
+			max_width = (if n<display.length-1 then "and(max-width:#{display[n+1]-1}px)" else "")
+			r.push "@media(min-width:#{u}px)#{max_width}{", ".in#{inx}{width:#{width}px}"
+		
+			#width = 500
+			#r.push ".in#{inx}{width:#{width}px}"
 			if rem = exists 'w'			
 				for j in [1..rem]
 					i = 1
@@ -588,11 +644,13 @@ CCssF =
 						add "#{i}_#{j}"
 			r.push "}"
 		
+		
+		
 		if rem = exists 'x'
 			
 			for j in [1..rem]
 				k = 100 / j
-				r.push ".x#{j}{width:#{k}%;#{float}}", "#.offset#{j}{margin-left:#{k}%;#{float}}"
+				r.push ".x#{j}{width:#{k}%;#{float}}", "#.x-offset#{j}{margin-left:#{k}%;#{float}}"
 				for i in [1..j]
 					k = 100 * i / j; t = "#{i}_#{j}"
 					r.push ".x#{t}{width:#{k}%;#{float}}", ".x-offset#{t}{margin-left:#{k}%;#{float}}"
@@ -615,6 +673,11 @@ CInit =
 	link: (name, media) ->
 		if name[0] != '/' then path = CInit.path.replace ///\w+$///, 'css'; name = path+'/'+name
 		if CInit.check name+='.css' then document.writeln('\n<link rel="stylesheet" href="'+name+'" type="text/css"'+(if media then ' media="'+media+'"' else '')+'>'); on else off
+	style: (css) ->
+		(div=CRoot.new("div")).appendTo(CRoot.body()).ping(_method: 'GET', _act: css+'.css').onLoad = do(div)->(code) -> 
+			_CSS_$ = null
+			eval CCssCode.code(code)
+			CRoot.new("style").appendTo(CRoot.head()).html _CSS_$()
 		
 	init_from_param: ->
 		src = if a=document.getElementById "_app_" then a.src else (document.getElementsByTagName('body') || document.getElementsByTagName('head'))[0].innerHTML.match(/// src=['"]?( [^\s'"<>]+ ) [^<>]+> (\s*</\w+>)+ \s* $ ///i)[1].replace(/&amp(?:;|\b)/g, '&')
@@ -631,9 +694,11 @@ CInit =
 				when 'name' then window.name = param.name
 				when 'post' then CInit.post = param.post
 				when 'url' then CInit.url = param.url
-				when 'css' then CCssF.w CRoot, param.css
+				when 'css' then CInit.style 'css/rubin'
 				when 'style'
-					for i in param.style.split(",") then CInit.link i
+					for i in param.style.split ',' then CInit.style i
+				when 'link'
+					for i in param.link.split(",") then CInit.link i
 				when 'theme' 
 					if param.theme == "blueprint"
 						CInit.link "screen", "screen, projection"
@@ -1210,7 +1275,7 @@ CEffect =
 CRoot = null
 unless window.$ then $ = (e) ->
 	if typeof e == 'function' then CRoot._init_functions.push e
-	else if e == 'string' then CRoot.find e
+	else if typeof e == 'string' && !/^</.test e then CRoot.find e
 	else if !e? then new CWidgets
 	else CRoot.wrap e
 
@@ -1345,6 +1410,8 @@ class CWidget
 	#svg: new$.inline "svg", "document.createElementNS('http://www.w3.org/2000/svg', tag)"
 	#xml: new$.inline "xml", "document.createElementNS('http://www.w3.org/1999/xhtml', tag)"
 	
+	emmet: () ->
+	
 	type$.nothing 'createWidget ctype new'
 	type$.all 'rewrap unwrap'
 	type$.any 'wrap'
@@ -1382,8 +1449,8 @@ class CWidget
 		if ownerDocument$
 			-> if (htm=@htm()).element.contains @element then htm else e=@element; (while e.parentNode then e = e.parentNode); @wrap e
 		else -> if @element.ownerDocument then @htm() else e=@element; (while e.parentNode then e = e.parentNode); @wrap e
-	body: -> @wrap(@document().body) || (htm=@htm()).byTag('body') || @new("body").appendTo(htm)
-	head: -> @wrap(@document().head) || (htm=@htm()).byTag('head') || @new("head").appendTo(htm)
+	body: -> @wrap(@document().body) || (htm=@htm()).byTag('body') || htm
+	head: -> @wrap(@document().head) || (htm=@htm()).byTag('head') || htm
 	viewport: if CNavigator.chrome then @::body else @::htm #-> @wrap if (d=@document()).compatMode=="CSS1Compat" then d.documentElement else d.body
 
 	
@@ -1993,6 +2060,11 @@ class CWidget
 	upAll: dir.inline 'upAll', 'e.parentNode'
 	nextnodeAll: dir.inline 'nextnodeAll', 'e.nextSibling'
 	prevnodeAll: dirprev.inline 'prevnodeAll', 'x.push(e)'
+	
+	siblings: -> @up().prevAll().union @up().nextAll()
+	nodes: -> @up().prevnodeAll().union @up().nextnodeAll()
+	level: (args...) -> @up().child args...
+	levelnode: (args...) -> @up().down args...
 
 	child:
 		if nes$ then (i) -> (if arguments.length then @wrap @element.children[if i<0 then @element.children.length+i else i] else new CWidgets @element.children)
@@ -2015,7 +2087,7 @@ class CWidget
 	contains: (w) -> a=w.all(); (return off unless a.length); (for e in a when not @element.contains e then return off); on
 	
 	type$.range 'floor upper prev next up prevnode nextnode child down wrapIn'
-	type$.rangeAll 'floorAll upperAll nextAll prevAll upAll nextnodeAll prevnodeAll'
+	type$.rangeAll 'floorAll upperAll nextAll prevAll upAll nextnodeAll prevnodeAll siblings'
 	type$.all 'inc dec content update insertAfter insertBefore appendTo prependTo swap remove free'
 	type$.attr 'tag number val'
 	type$.join 'outer html text'
@@ -2344,7 +2416,7 @@ class CWidget
 			@morph save: 1, to: to, end1: listen, timeout: timeout, end: do(names)->-> @addClass names
 		else (for name in names then @element.className += (if @element.className == '' then name else unless new RegExp('(^|\\s)'+name+'(\\s|$)').test @element.className then ' ' + name else ''))
 		this
-	removeClass: (names, timeout, listen) ->
+	removeClass: rmClass$ = (names, timeout, listen) ->
 		names = $A names
 		if timeout?
 			from = get_rules_by_class$.call this, names
@@ -2356,6 +2428,7 @@ class CWidget
 				if b and c then ' ' else ''
 			if cls then @element.className = cls else @attr "class", null
 		this
+	rmClass: rmClass$
 	toggleClass: (names, timeout, listen) ->
 		names = $A names
 		if names.length == 1 then names.push null
@@ -2828,11 +2901,11 @@ class CWidget
 	dataType: (val) -> val
 	param: -> x={}; x[@name() || 'val'] = @val(); x
 	#buildQuery: -> [(p=@parent())._tab || p.name(), @name(), p.data?.id || p.$id?.val()]
-	load: (param, args...) -> @loader()._load 'load', param || {}, this, args
-	submit: (param, args...) -> if @valid() then @loader()._load 'submit', extend(@param(), param || {}), this, args else this
-	save: (param, args...) -> if @valid() then @loader()._load 'save', extend(@param(), param || {}), this, args else this
-	ping: (param, args...) -> @loader()._load 'ping', param, this, args
-	erase: (param, args...) -> @loader()._load 'erase', extend(@param(), param || {}), this, args
+	load: (param, args...) -> @loader()._load 'load', param || {}, this, args; this
+	submit: (param, args...) -> (if @valid() then @loader()._load 'submit', extend(@param(), param || {}), this, args); this
+	save: (param, args...) -> (if @valid() then @loader()._load 'save', extend(@param(), param || {}), this, args); this
+	ping: (param, args...) -> @loader()._load 'ping', param, this, args; this
+	erase: (param, args...) -> @loader()._load 'erase', extend(@param(), param || {}), this, args; this
 	
 	loader: ->
 		@_loader ||= if cloader = @element.getAttribute "cloader" then @byId cloader
@@ -3149,8 +3222,8 @@ class CMenuWidget extends CListWidget
 	activate: (new_frame, add) ->
 		if old_frame = @frame
 			if @send("onDeactivate", new_frame) is off then return this
-			old_frame.removeClass "c-active"
-		@frame = new_frame.addClass "c-active"
+			old_frame.removeClass "active"
+		@frame = new_frame.addClass "active"
 		@send "onActivate", old_frame
 		this
 
@@ -3162,7 +3235,7 @@ class CScrollWidget extends CListWidget
 
 		
 class CSelectableWidget extends CListWidget
-	config: {class: {active: 'c-active', select: 'c-select', unactive: 'c-unactive'}}
+	config: {class: {active: 'active', select: 'c-select', unactive: 'c-unactive'}}
 	
 	frame_onclick: (e, frame) -> 
 	

@@ -3,8 +3,8 @@
 <head>
 	<meta charset="UTF-8">
 	<title>Rubin Css Framework</title>
-	<script id=_app_ src="/js/lib.js?css=in1w12x12" type="text/javascript"></script>
-	<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+	<script id=_app_ src="js/lib.js?css=in1w12x12" type="text/javascript"></script>
+	<link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
 
@@ -21,6 +21,207 @@
 	<div class="in1 hr-h v">
 	
 		<h1>Rubin-css</h1>
+		
+		<h2>Сетка</h2>
+		
+		<style>
+			.in1 {
+				outline: solid 1px SlateGrey;
+			}
+			.in1 div {
+				background: lavender;
+				color: SlateGrey;
+				outline: solid 1px SlateGrey;
+			}
+			.in1 .col {
+				background: white;
+			}
+		</style>
+		
+		<div class="w1">.w1</div>
+		
+		<div class="w2">.w2</div>
+		<div class="w2">.w2</div>
+		
+		<div class="w3">.w3</div>
+		<div class="w3">.w3</div>
+		<div class="w3">.w3</div>
+		
+		<div class="w4">.w4</div>
+		<div class="w4">.w4</div>
+		<div class="w4">.w4</div>
+		<div class="w4">.w4</div>
+		
+		<div class="w6">.w6</div>
+		<div class="w6">.w6</div>
+		<div class="w6">.w6</div>
+		<div class="w6">.w6</div>
+		<div class="w6">.w6</div>
+		<div class="w6">.w6</div>
+		
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		<div class="w1_9">.w1_9</div>
+		
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		<div class="w1_12">.w1_12</div>
+		
+		
+		
+		<div class="w4_9">.w4_9</div> <div class="w2_9">.w2_9</div> <div class="w3">.w3_9</div>
+		<div class="w4">.w4</div> <div class="w5_12">.w5_12</div> <div class="w3">.w3</div>
+		
+		<h3>.rest</h3>
+		<p>.rest заполняет всё оставшееся пространство</p>
+		<div class="w3">.w3</div>
+		<div class="w9">.w9</div>
+		<div class="rest">.rest</div>
+		<div class="w3_4">.w3_4</div>
+		<div class="rest">.rest</div>
+		<div class="w7">.w7</div>
+		<div class="w7_10">.w7_10</div>
+		<div class="rest">.rest</div>
+		<div class="rest">.rest</div>
+		
+		
+		<h3>Столбцы</h3>
+		<p>Вложенная сетка должна быть под классом .col</p>
+		
+		<div class="w2_3 col">
+			<p>.w2_3.col - как видите .col не имеет padding-а. Поэтому внутри него всегда применяйте .w1</p>
+			<div class="w3">.w3</div>
+			<div class="w3">.w3</div>
+			<div class="w3">.w3</div>
+			<div class="w3">.w3</div>
+		</div>
+		
+		<div class="w3">.w3</div>
+		<div class="w3">.w3</div>
+		
+		
+		<h3>.offsetX</h3>
+		<p>Позволяет пропустить несколько ячеек сети перед собой</p>
+		<div class="w6">.w6</div>
+		<div class="w6 offset6">.w6.offset6</div>
+		<div class="w6 offset2_6">.w6.offset2_6</div>
+		
+		
+		<h3>Изменение порядка следования ячеек для SEO</h3>
+		
+		<div class="w6">1</div>
+		<div class="w6">2</div>
+		<div class="w4_6 push6">3 &rarr; 2</div>
+		
+		
+		<h2>Расцветка и линии</h2>
+		
+		<h3>Расцветка</h3>
+		
+		<div class="w3 dim-line">
+			<div class="dim">.dim</div>
+			<div class="dim-light">.dim-light</div>
+			<p>.dim-line</p>
+			<p class="dim-header">.dim-header</p>
+			<p class="dim-text">.dim-text</p>
+		</div>
+		
+		<div class="w3 green-line">
+			<div class="green">.green</div>
+			<div class="green-light">.green-light</div>
+			<p>.green-line</p>
+			<p class="green-header">.green-header</p>
+			<p class="green-text">.green-text</p>
+		</div>
+		
+		<div class="w3 orange-line">
+			<div class="orange">.orange</div>
+			<div class="orange-light">.orange-light</div>
+			<p>.orange-line</p>
+			<p class="orange-header">.orange-header</p>
+			<p class="orange-text">.orange-text</p>
+		</div>
+		
+		<div class="w3 violet-line">
+			<div class="violet">.violet</div>
+			<div class="violet-light">.violet-light</div>
+			<p>.violet-line</p>
+			<p class="violet-header">.violet-header</p>
+			<p class="violet-text">.violet-text</p>
+		</div>
+		
+		<div class="w3 blue-line">
+			<div class="blue">.blue</div>
+			<div class="blue-light">.blue-light</div>
+			<p>.blue-line</p>
+			<p class="blue-header">.blue-header</p>
+			<p class="blue-text">.blue-text</p>
+		</div>
+		
+		<div class="w3 red-line">
+			<div class="red">.red</div>
+			<div class="red-light">.red-light</div>
+			<p>.red-line</p>
+			<p class="red-header">.red-header</p>
+			<p class="red-text">.red-text</p>
+		</div>
+		
+		
+		<h2>Контролы</h2>
+		
+		<h3>Табы</h3>
+		
+		<div class="tabbox">
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Вкладка 1</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Вкладка 2</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Вкладка 3</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Вкладка 4</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Вкладка 5</a>
+		</div>
+		
+		
+		<h3>Переключатель</h3>
+		
+		<div class="radiobox">
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
+		</div>
+		
+		<h3>Выбор</h3>
+		
+		<div class="checkbox">
+			<a href="#" onclick="$(this).toggleClass('active'); return false">Выбор 1</a>
+			<a href="#" onclick="$(this).toggleClass('active'); return false" class=active>Выбор 2</a>
+			<a href="#" onclick="$(this).toggleClass('active'); return false">Выбор 3</a>
+			<a href="#" onclick="$(this).toggleClass('active'); return false">Выбор 4</a>
+			<a href="#" onclick="$(this).toggleClass('active'); return false">Выбор 5</a>
+		</div>
+		
+		
+		<h3>Кнопки</h3>
+		
+		
+		
+		<h3></h3>
+		
 		
 		<h2>Настройка css-фреймворка</h2>
 		<p>css-фреймворк встроен в javascript-фреймворк Рубин.</p>
@@ -45,60 +246,7 @@
 		
 		<h2>Сетка</h2>
 		<p>Сетка создаётся параметром css: <code><xmp>&lt;script id=_app_ src="/js/lib.js?css=in1w12&amp;post=json" type="text/javascript"&gt;&lt;/script&gt;</xmp></code>. По умолчанию она - 12. Можно делать любой: cssf=16. Но при увеличении сетки увеличивается и время на её генерацию, а значит - время загрузки страницы.</p>
-		<p>Её классы: w1 - 100%, w2 - 50%, w3 - треть, w4 - 25%, w1_2 - 50%, w2_3 - две трети.</p>
-		
-		
-		<style>
-			.in1 {
-				outline: solid 1px SlateGrey;
-			}
-			.in1 div {
-				background: lavender;
-				color: SlateGrey;
-				outline: solid 1px SlateGrey;
-			}
-			.in1 div div {
-				background: #D6D6FA;
-			}
-		</style>
-		
-		<div class="w1">.w1</div>
-		
-		<div class="w2">.w2</div>
-		<div class="w2">.w2</div>
-		
-		<div class="w3">.w3</div>
-		<div class="w3">.w3</div>
-		<div class="w3">.w3</div>
-		
-		<div class="w1_9">.w1_9</div>
-		<div class="w1_9">.w1_9</div>
-		<div class="w1_9">.w1_9</div>
-		<div class="w1_9">.w1_9</div>
-		<div class="w1_9">.w1_9</div>
-		<div class="w1_9">.w1_9</div>
-		<div class="w1_9">.w1_9</div>
-		<div class="w1_9">.w1_9</div>
-		<div class="w1_9">.w1_9</div>
-		
-		<div class="w1_12">.w1_12</div>
-		<div class="w1_12">.w1_12</div>
-		<div class="w1_12">.w1_12</div>
-		<div class="w1_12">.w1_12</div>
-		<div class="w1_12">.w1_12</div>
-		<div class="w1_12">.w1_12</div>
-		<div class="w1_12">.w1_12</div>
-		<div class="w1_12">.w1_12</div>
-		<div class="w1_12">.w1_12</div>
-		<div class="w1_12">.w1_12</div>
-		<div class="w1_12">.w1_12</div>
-		<div class="w1_12">.w1_12</div>
-		
-		<div class="w4_9">.w4_9</div> <div class="w2_9">.w2_9</div> <div class="w3">.w3_9</div>
-		<div class="w4">.w4</div> <div class="w5_12">.w5_12</div> <div class="w3">.w3</div>
-		
-		
-		
+		<p>Её классы: w1 - по ширине, w2 и w1_2 - половина, w3 и w1_3 - треть, w2_3 - две трети от ширины контейнера (inX)).</p>
 		
 		
 		<!--h3>Вложенные блоки</h3>
