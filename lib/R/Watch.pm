@@ -7,7 +7,12 @@ use POSIX qw(strftime);
 use Msg;
 
 # конструктор: dirs = dir:mtime, watch = file:mtime, file = file:callback, scan = dir: [ext, callback]
-sub new { my ($cls, $app) = @_; bless { app => $app, dirs => {}, watch => {}, file => {}, scan => {} }, $cls }
+sub new {
+	my ($cls, $app) = @_;
+	$app //= $cls->{app};
+	$cls = ref $cls if ref $cls;
+	bless { app => $app, dirs => {}, watch => {}, file => {}, scan => {} }, $cls
+}
 
 sub app { $_[0]->{app} }
 

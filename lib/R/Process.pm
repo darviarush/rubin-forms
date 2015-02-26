@@ -111,6 +111,7 @@ sub spy {
 		my $_watch = $app->ini->{site}{watch};
 		if($_watch) {
 			$app->action->watch;	# перекомпилировать экшены
+			$app->kitty->watch if $app->ini->{site}{kitty};		# перезапуск экшенов на других языках
 			$app->test->watch;		# запуск теста при изменении
 			$self->watch;			# перезагружать сервер, если изменился какой-то из модулей проекта
 		}

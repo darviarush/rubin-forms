@@ -35,6 +35,7 @@ unless window.XMLHttpRequest then window.XMLHttpRequest = IFrameHttpRequest
 
 
 extend CWidget.prototype,
+	
 	pos:
 		if document.getBoundingClientRect then ->
 			box = @element.getBoundingClientRect()

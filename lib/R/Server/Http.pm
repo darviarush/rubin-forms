@@ -25,7 +25,12 @@ sub create {
 	if($_port =~ /^\d+$/) {
 		socket $sd, AF_INET, SOCK_STREAM, getprotobyname("tcp") or die "socket: $!\n";
 		setsockopt $sd, SOL_SOCKET, SO_REUSEADDR, pack("l", 1) or die "setsockopt reuseaddr: $!\n"; # захватываем сокет, если он занят другим процессом
-		bind $sd, sockaddr_in($_port, INADDR_ANY) or die "$$ bind: $!\n";
+		unless( bind $sd, sockaddr_in($_port, INADDR_ANY) ) {
+			if($! == 112) {
+				sleep 2;
+				bind $sd, sockaddr_in($_port, INADDR_ANY) or die "$$ bind: (".int($!).") $!\n";
+			} else { die "$$ bind: (".int($!).") $!\n" }
+		}
 		listen $sd, SOMAXCONN or die "listen: $!\n";
 	} else {
 		socket $sd, PF_UNIX, SOCK_STREAM, 0 or die "socket: $!\n";

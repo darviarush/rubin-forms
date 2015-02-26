@@ -134,6 +134,7 @@
 # 99. i18n - @html и @text переводят автоматически. Секции для переводов по тегу clang
 # 100. main.ini:watch:run - запускает процесс и main.ini:watch:cascad - каскадирует с другим watch
 # 101. подумать над названиями фреймворков: ka - жизненная сила, ba - чувства (эмоции), ax (ah) - дух, su (shu) - тень (тёмная сторона)
+# 102. $ и wrap сделать одинаковыми, т.к. before(1) и $(1) - разные. И разный язык запросов
 
 # Ссылки:
 # http://caniuse.com/ - в каком браузере что работает
@@ -601,56 +602,8 @@ CCssCode =
 	exists: (v) -> if r=CInit.param.css.match new RegExp("(?:^|\\d)"+v+"(\\d+)") then parseInt r[1]
 	get: (v, def) -> if (r=CCssCode.exists v)? then r else def
 		
-	w: (root, param = 'w12') ->
-		
-		pa = get "p", 10
-		ma = get "m", 10
-		
-		r = ["<style>", "*{margin:0;padding:0;overflow:auto;clear:both}", "html,body{width:100%;height:100%}", ".in1,.in2,.in3{margin:0 auto;min-height:100%;padding-left:#{ma}px}", ".rest{padding:#{pa/2}px;margin:0 #{ma}px #{ma}px 0;clear:none}", ".col{padding: 0!important;margin:0!important}"]
-		float = "float:left;clear:none;padding:#{pa/2}px;margin:0 #{ma}px #{ma}px 0"
-		
-		add = (t)->
-			#if i==1 then say "width=", width, "w(#{j})=", (width - (j-1)*ma) / j, "k(#{i})=",
-			#k = i * ((width-2*pa) - (j-1)*pa) / j + (i-1)*pa
-			col = i * width / j
-			k = col - pa - ma
-			r.push ".w#{t}{width:#{k}px;#{float}}", ".w#{t}.col{width:#{col}px}", ".offset#{t}{margin-left:#{col}px}"
-		
-		inx = get 'in', 1
-		# width, inX
-		widths = [[550, 500, 450], [750, 650, 550], [970, 770, 570], [1170, 970, 770]]
-		display = [568, 768, 992, 1200]
-		for u, n in display
-			width = widths[n][inx-1]
-			max_width = (if n<display.length-1 then "and(max-width:#{display[n+1]-1}px)" else "")
-			r.push "@media(min-width:#{u}px)#{max_width}{", ".in#{inx}{width:#{width}px}"
-		
-			#width = 500
-			#r.push ".in#{inx}{width:#{width}px}"
-			if rem = exists 'w'			
-				for j in [1..rem]
-					i = 1
-					add j
-					for i in [1..j]
-						add "#{i}_#{j}"
-			r.push "}"
-		
-		
-		
-		if rem = exists 'x'
-			
-			for j in [1..rem]
-				k = 100 / j
-				r.push ".x#{j}{width:#{k}%;#{float}}", "#.x-offset#{j}{margin-left:#{k}%;#{float}}"
-				for i in [1..j]
-					k = 100 * i / j; t = "#{i}_#{j}"
-					r.push ".x#{t}{width:#{k}%;#{float}}", ".x-offset#{t}{margin-left:#{k}%;#{float}}"
-		
-		r.push "</style>"
-		say r
-		root.head().append r.join "\n"
 	resize: (root) ->
-		root.window()
+		root.interval -> @clear()
 	
 	
 CInit =
@@ -685,7 +638,7 @@ CInit =
 				when 'name' then window.name = param.name
 				when 'post' then CInit.post = param.post
 				when 'url' then CInit.url = param.url
-				when 'css' then CInit.style 'css/rubin'
+				when 'css' then CInit.style '/css/rubin'
 				when 'style'
 					for i in param.style.split ',' then CInit.style i
 				when 'link'

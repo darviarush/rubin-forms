@@ -1,0 +1,1 @@
+/** ex.js - example kitty-cgi **/

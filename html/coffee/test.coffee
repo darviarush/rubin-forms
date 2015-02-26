@@ -113,6 +113,11 @@ CTest.category "потоки"
 
 new CTest "cls-CStream", """
 `CStream` - класс реактивного программирования (FRP)
+
+Ссылки:
+
+1. 
+
 """, """
 #%name-plus, #%name-minus, #%name-result { text-align: center; display: inline-block; width: 100px; border: solid 1px orange; color: white}
 
@@ -550,11 +555,9 @@ new CTest 'obj-CWidget-className', """
 `className` - возвращает строку с именем класса виджета. Так у экземпляра CWidget это будет "CWidget"
 """, ->
 	@is CRoot.className(), "CRoot$"
-	@is $("1").className(), "CNode"
+	@is CRoot.wrap("1").className(), "CNode"
 	@is $("<div></div>").className(), "CWidget"
-	@is $("123<div></div>").className(), "CWidgets"
-	@is $("").className(), "CWidgets"
-
+	@is $("<div></div>123").className(), "CWidgets"
 	
 
 CTest.category "методы создания элементов и виджетов"
@@ -1254,7 +1257,7 @@ new CTest 'obj-CWidget-slice', """
 * третий элемент массива (1 или 0) указывает - включать или нет элемент: [from, 1, 1] - не включать, [to, 1, 1] - включать
 """, ->
 	@is CRoot.slice(0).length, 1
-	w = $ "0 <i>1</i> 2 <b>3</b> 4 <i>5</i> 6 <i>7</i><em>8</em><u>9</u>"
+	w = CRoot.wrap "0 <i>1</i> 2 <b>3</b> 4 <i>5</i> 6 <i>7</i><em>8</em><u>9</u>"
 	@is w.slice(5).length, 5
 	@is w.slice(0, 5).length, 5
 	@is w.slice(0, [5]).length, 6
@@ -1438,7 +1441,7 @@ new CTest 'obj-CWidget-outer', """
 `outer [content]` - возвращает outerHTML элемента. Если указан content, то заменяет элемент виджета на него
 """, ->
 	@is $("<div>2</div>").outer("<b>3</b>").outer(), "<b>3</b>"
-	@is $(" <i></i> <u></u>").outer(), " <i></i> <u></u>"
+	@is CRoot.wrap(" <i></i> <u></u>").outer(), " <i></i> <u></u>"
 	@is (w=$("<div>2</div>")).outer( x=$("<b>3</b>") ).outer(), "<b>3</b>"
 	@is x.element, null
 
@@ -1448,8 +1451,8 @@ new CTest 'obj-CWidget-before', """
 """, ->
 	@is $("<i><b>1</b><b>2</b></i>").child(1).before("3").up().outer(), "<i><b>1</b>3<b>2</b></i>"
 	@is (new CWidgets [$("<i><b>1</b><b>2</b></i>").child(1).element]).before("3").up().outer(), "<i><b>1</b>3<b>2</b></i>"
-	@is (new CWidgets [$("<i><b>1</b><b>2</b></i>").child(1).element]).before(new CWidgets [$("3").element]).up().outer(), "<i><b>1</b>3<b>2</b></i>"
-	@is $("<i><b>1</b><b>2</b></i>").child(1).before(new CWidgets [$("3").element]).up().outer(), "<i><b>1</b>3<b>2</b></i>"
+	@is (new CWidgets [$("<i><b>1</b><b>2</b></i>").child(1).element]).before(new CWidgets [CRoot.wrap("3").element]).up().outer(), "<i><b>1</b>3<b>2</b></i>"
+	@is $("<i><b>1</b><b>2</b></i>").child(1).before(new CWidgets [CRoot.wrap("3").element]).up().outer(), "<i><b>1</b>3<b>2</b></i>"
 
 
 new CTest 'obj-CWidget-insertBefore', """
@@ -1566,7 +1569,7 @@ new CTest 'obj-CWidget-swap', """
 	@is w.outer(), "<i><u>2</u></i>"
 	@is x.up(), null
 	
-	@is (w=$("1")).swap("2"), w		# ничего не делает, т.к. оба элемента не в DOM-е
+	@is (w=CRoot.wrap("1")).swap("2"), w		# ничего не делает, т.к. оба элемента не в DOM-е
 	
 	w = $ "<i><b>1<u>2<em>3</em></u></b></i>"
 	w.swap x=w.child(0).child(0)
