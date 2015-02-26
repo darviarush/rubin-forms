@@ -1,4 +1,61 @@
+/* функции для параметров */
+%exists = CCssCode.exists
 %get = CCssCode.get
+
+
+/* инициализация */
+
+html {margin:0;padding:0;border:0}
+body, div, span, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre, a, abbr, acronym, address, code, del, dfn, em, img, q, dl, dt, dd, ol, ul, li, fieldset, form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td, article, aside, dialog, figure, footer, header, hgroup, nav, section {margin:0;padding:0;border:0;vertical-align:baseline;}
+article, aside, details, figcaption, figure, dialog, footer, header, hgroup, menu, nav, section {display:block;}
+table {border-collapse:separate;border-spacing:0;}
+caption, th, td {text-align:left;font-weight:normal;float:none !important;}
+table, th, td {vertical-align:middle;}
+blockquote:before, blockquote:after, q:before, q:after {content:''}
+blockquote, q {quotes:"" "";}
+img {border:none;}
+:focus {outline:0;}
+
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.42857143;
+  color: #333;
+  background-color: #fff;
+  overflow: auto;
+}
+
+input, button, select, textarea { font-family: inherit; font-size: inherit; line-height: inherit; overflow: hidden; }
+input:hover, button:hover, select:hover, textarea:hover { border-color: orange }
+a { color: #428bca; text-decoration: none; }
+a:hover, a:focus { color: #2a6496; text-decoration: underline; }
+a:focus { outline: thin dotted; outline: 5px auto -webkit-focus-ring-color; outline-offset: -2px; }
+
+h1, h2, h3, h4, h5, h6 { border-width: 10pt 0 5pt 0; border-color: transparent; border-style: solid; }
+
+* { padding: 0; margin: 0; overflow: auto; clear: both } 
+
+
+/* константы */
+%dim = "#778899"
+%ldim = "#E7E7E7"
+%green = "#3CB371"
+%lgreen = "#F0FFF0"
+%orange = "#FFA500"
+%lorange = "#FFF8DC"
+%violet = "#9370DB"
+%lviolet = "#D8BFD8"
+%blue = "#4169E1"
+%lblue = "#F0FFFF"
+%red = "#CD5C5C"
+%lred = "#FFE4E1"
+
+%colors = {dim:dim, green:green, orange:orange, violet:violet, blue:blue, red:red}
+%light = {dim:ldim, green:lgreen, orange:lorange, violet:lviolet, blue:lblue, red:lred}
+
+
+/* сеть */
+
 %pa = get("p", 10)
 %ma = get("m", 10)
 %inx = get('in', 1)
@@ -9,15 +66,6 @@ html,body{ width:100%; height:100% }
 .rest{ padding: %%pa/2%%px; margin: 0 %%ma%%px %%ma%%px 0; clear:none }
 .col { padding: 0 !important; margin: 0 !important }
 %float { float:left; clear:none; padding: %%pa/2%%px; margin: 0 %%ma%%px %%ma%%px 0 }
-
-%add(i, j) {
-	%col = i * width / j
-	%k = col - pa - ma
-	%t = i+"_"+j
-	%if i===j { .w%%j%%, } .w%%t%% { width: %%k%%px; %%float%% }
-	%if i===j { .w%%j%%.col, } .w%%t%%.col { width: %%col%%px}
-	%if i===j { .offset%%j%%, } .offset%%t%% { margin-left: %%col%%px }
-}
 
 %widths = [[550, 500, 450], [750, 650, 550], [970, 770, 570], [1170, 970, 770]]
 %display = [568, 768, 992, 1200]
@@ -42,4 +90,14 @@ html,body{ width:100%; height:100% }
 	}
 }
 
+/* цвета */
+%for name, color of colors {
+	.%%name%% { background-color: %%color%% }
+	.%%name%%-header { color: %%color%%; font-weight: 700; background-color: %%light[name]%% }
+	.%%name%%-text { color: %%color%%; font-weight: 700 }
+}
 
+
+/* тултип */
+.c-tip { background-color: #2a2a2a; background-color: rgba(0, 0, 0, 0.7); color: WhiteSmoke; /*border: solid 1px gray;*/ padding: 5px; border-radius: 3px; font-size: 12px; width: 200px; max-height: 200px; }
+.c-tip h1, .c-tip h2, .c-tip h3, .c-tip h4 { color: LightSkyBlue; }

@@ -523,28 +523,7 @@ CMath =
 	'ease-out': cubicBezier 0,0,0.58,1
 	'ease-in-out': cubicBezier 0.42,0,0.58,1
 	
-	easeIn: (transition, pos, args...) -> transition(pos, args...)
-	easeOut: (transition, pos, args...) -> 1 - transition 1 - pos, args...
-	easeInOut: (transition, pos, args...) -> (if pos <= 0.5 then transition 2 * pos, args... else 2 - transition 2 * (1 - pos), args...) / 2
-
-	linear: (x) -> x
-	quad: (x) -> x*x
-	cubic: (x) -> Math.pow x, 3
-	quart: (x) -> x*x*x*x
-	quint: (x) -> Math.pow x, 5
-	expo: (x) -> Math.pow 2, 8 * (x - 1)
-	circ: (x) -> 1 - Math.sin Math.acos x
-	sine: (x) -> 1 - Math.cos x * Math.PI / 2
-	back: (x, p=1.618) -> Math.pow(x, 2) * ((p + 1) * x - p)
-	bounce: (x) ->
-		a = 0; b = 1
-		loop
-			a += b; b /= 2
-			if x >= (7 - 4 * a) / 11
-				value = b * b - Math.pow (11 - 6 * a - 11 * x) / 4, 2
-				break
-		value
-	elastic: (x, p=1) -> Math.pow(2, 10 * --x) * Math.cos 20 * x * Math.PI * p / 3
+	
 
 	
 CCssCode =
@@ -555,6 +534,18 @@ CCssCode =
 		lineno = 1
 		u = -1
 		S = []
+		
+		re_vars = ///([\w\$]+)\s*=///g
+		vars = (x)->
+			vario = []
+			i = 0
+			while m = re_vars.exec x
+				vario.push m[1]
+				re_vars.lastIndex--
+			re_vars.lastIndex = 0
+			if vario.length then ["var ", vario.join(","), "; "].join("")
+			else ""	
+
 		# 1 2 3     4     5    6   7     8     9  10          11        12           13   14    15  16
 		# { } for_v for_i in   of  range if    %% присвоение  функция   выражение_js  \'   \n   \r	\t+	
 		re = /// (\{) | (\}) |
@@ -581,7 +572,7 @@ CCssCode =
 			else if m[3]?
 				S.push [3, u=++c]
 				for_c++
-				r = [stop]
+				r = [stop, vars(m[7])]
 				if m[6]?
 					r.push "var ", (arr="_ARR"+for_c), "=", m[7], "; for(var ", m[3], " in ", arr, ") {\n"
 					if m[4]? then r.push "var ", m[4], "=", arr, "[", m[3], "];\n"
@@ -594,7 +585,7 @@ CCssCode =
 			else if m[9]? then ["', (", m[9], "), '"].join("")
 			else if m[10]? then S.push [10, u=++c, m[10]]; [stop, "$rets.push($ret); $ret=[];", start].join("")
 			else if m[11]? then S.push [11, u=++c]; [stop, "function ", m[11], "{var $ret=[];", start].join("")
-			else if m[12]? then lineno++; [stop, m[12], start].join("")
+			else if m[12]? then lineno++; [stop, vars(m[12]), m[12], start].join("")
 			else if m[13]? then "\\"+m[13]
 			else if m[14]? then lineno++; "\\n"
 			else if m[15]? then "\\r"
@@ -605,7 +596,7 @@ CCssCode =
 		if S.length then throw CRoot.raise "Не закрыта скобка для "+S[S.length-1][0]+" "+code
 		if c!=0 then throw CRoot.raise "Не закрыта скобка "+c+" "+code
 	
-		["_CSS_$=function(){ var $ret=[]; var $rets=[]; ", start, code, stop, "return $ret.join(''); }"].join('')
+		["_CSS_$=function(){ var $ret=[], $rets=[]; ", start, code, stop, "return $ret.join(''); }"].join('')
 
 	exists: (v) -> if r=CInit.param.css.match new RegExp("(?:^|\\d)"+v+"(\\d+)") then parseInt r[1]
 	get: (v, def) -> if (r=CCssCode.exists v)? then r else def
