@@ -89,7 +89,7 @@ sub ritter {
 		return $response->ajax_redirect if exists $response->{head}{Location} and $app->{request}{head}{Ajax};
 	};
 
-	if(my $error = $@ || $!) {
+	if(my $error = $@ // $!) {
 		my $is_io = $!;
 		$@ = $! = undef;
 		
