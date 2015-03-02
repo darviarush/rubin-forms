@@ -80,7 +80,13 @@ sub new {
 	main::msg "start kitty", $cmd, $wrapper_path;
 	#require AnyEvent;
 	
-	my $pid = open3($in, $out, $out, "$cmd $wrapper_path") or die "Не запустился процесс `$wrapper_path`. $!";
+	my $pid;
+	
+	eval {
+		$pid = open3($in, $out, $out, "$cmd $wrapper_path") or die "Не запустился процесс `$wrapper_path`. $!";
+	};
+	$wrapper_path =~ /\.(\w+)$/, die "Не запускается команда `$cmd` или обёртка `$wrapper_path`: `$!`. Попробуйте указать main.ini:[kitty]:$1" if $@ // $!;
+	
 	my $old = select $out; $|=1; select $in; $|=1; select $old;
 	
 	#Utils::nonblock($err);

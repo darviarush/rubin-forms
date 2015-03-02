@@ -9,6 +9,10 @@
 #																				#
 #################################################################################
 
+set_ini('html_errors', True);
+set_ini('implicit_flush', False);
+
+
 function frisky_kitty($req, $param = null) { echo chr(6).$req.($param!==null? " ".(is_string($param)? $param: json_encode($param)): "")."\n"; flush(); }
 function kitty($req, $param = null) { frisky_kitty($req, $param); return fgets(STDIN); }
 
@@ -21,7 +25,7 @@ while($_kitty_request!==false) {
 	
 	$_kitty_action = $_kitty_actions[$_kitty_request];
 	if(!$_kitty_action) {
-		$_kitty_action = str_replace(array('/', '.', '-'), '__', $_kitty_request);
+		$_kitty_action = 'kitty_' . str_replace(array('/', '.', '-'), '__', $_kitty_request);
 		$_kitty_file = file_get_contents($_kitty_request);
 		
 		$_kitty_first = strrpos($_kitty_file, '<?php');
