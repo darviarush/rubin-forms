@@ -25,17 +25,15 @@ try:
 	import json, codecs, re
 
 
-	def frisky_kitty(req, param = None):
+	def frisky_kitty(req, *v, **kv):
 		r = [chr(6), req]
-		if param is not None:
-			r.append(' ')
-			if type(param) == 'string': r.append(param)
-			else: r.append(json.dumps(param))
+		if len(kv): v.append(kv)
+		if len(v): r.append(' '); r.append(json.dumps(v))
 		print "".join(r)
 		sys.stdout.flush()
 		
-	def kitty(req, param = None):
-		frisky_kitty(req, param)
+	def kitty(req, *v, **kv):
+		frisky_kitty(chr(6)+req, *v, **kv)
 		return sys.stdin.readline()
 
 	actions = {}
@@ -52,7 +50,7 @@ try:
 			file = codecs.open(request, 'rb', 'utf8').read()
 			file = re.sub(r'^', '\t', file, 0, re.M)
 			file = ''.join(["def ", action, "():\n", file])
-			glob = {}
+			glob = {"frisky_kitty": frisky_kitty, "kitty": kitty}
 			loc = {}
 			exec( file, glob, loc )
 			

@@ -1,75 +1,86 @@
-#!/usr/bin/env 
-# -*- coding: utf-8 -*-
+#!/usr/bin/env ruby
+# encoding: UTF-8
 
 #################################################################################
 #																				#
 # Автор:	Косьмина Ярослав													#
 # Сайт:		http://darviarush.narod.ru											#
 #																				#
-# Среда:	http://php.net														#
+# Среда:	https://www.ruby-lang.org											#
 #																				#
 #################################################################################
 
-# локаль
-import sys
-reload(sys)
-sys.setdefaultencoding("utf-8")
+require 'json'
 
+class KittyClass
 
-def escapeHTML(s)
-	return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+	def frisky_kitty(req, param = nil)
+		r = [6.chr, req]
+		if param != nil
+			r << ' '
+			if param.class == String
+				r << param
+			else
+				r << JSON.generate(param)
+			end
+		end
+		puts r.join("")
+		STDOUT.flush()
+	end
+		
+	def kitty(req, param = nil)
+		frisky_kitty(req, param)
+		return STDIN.readline()
+	end
 end
 
 
+def escapeHTML(s)
+	return s.gsub('&', '&amp;').gsub('<', '&lt;').gsub('>', '&gt;').gsub(/\n/, '<br>')
+end
+
+def print_exc(e)
+	puts '<pre>'
+	puts escapeHTML(e.message)
+	for i in e.backtrace
+		puts escapeHTML(i)
+	end
+	puts '</pre>'
+end
+
 
 begin
-
-	import json, codecs, re
-
-
-	def frisky_kitty(req, param = None):
-		r = [chr(6), req]
-		if param is not None:
-			r.append(' ')
-			if type(param) == 'string': r.append(param)
-			else: r.append(json.dumps(param))
-		puts "".join(r)
-		sys.stdout.flush()
-		
-	def kitty(req, param = None):
-		frisky_kitty(req, param)
-		return sys.stdin.readline()
-
+	
+	Kitty = KittyClass.new
+	
 	actions = {}
 
-	request = sys.stdin.readline()
+	request = STDIN.readline()
 
-	while request != '':
-		request = request.rstrip()
+	while request != ''
+		request = request.chomp()
 		
-		action = actions.get(request)
-		if not action:
-			action = 'kitty_' + re.sub(r'[/.-]', '__', request)
+		action = actions[request]
+		if not action
+			action = 'kitty_' << request.gsub(/[\/.-]/, '__')
 		
-			file = codecs.open(request, 'rb', 'utf8').read()
-			file = re.sub(r'^', '\t', file, 0, re.M)
-			file = ''.join(["def ", action, "():\n", file])
-			glob = {}
-			loc = {}
-			exec( file, glob, loc )
+			file = File.read(request)
+			file = ["class KittyClass\ndef ", action, "()\n", file, "\nend\nend\n"].join('')
 			
-			actions[request] = action = loc[action]
+			eval( file )
+			
+			actions[request] = action
+		end
 
-		try:
-			ref = action()
-		except BaseException as e:
-			puts '<pre>'
-			puts escapeHTML(traceback.format_exc())
-			puts '</pre>'
-		request = kitty("end", ref)
-		ref = None
+		begin
+			ref = Kitty.send action
+		rescue Exception => e
+			print_exc(e)
+		end
+		request = Kitty.kitty("end", ref)
+		ref = nil
+	end
 
-rescue StandardError
-	puts '<pre>'
-	puts escapeHTML(traceback.format_exc())
-	puts '</pre>'
+rescue Exception => e
+	print_exc(e)
+end

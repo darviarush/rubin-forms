@@ -77,13 +77,14 @@ sub new {
 	
 	my $cmd = $app->ini->{kitty}{$wrapper} // $wrapper;
 	
-	main::msg "start kitty", $cmd, $wrapper_path;
-	#require AnyEvent;
-	
 	my $pid;
 	
+	$cmd .= " $wrapper_path" unless $cmd =~ s/%s/$wrapper_path/;
+	main::msg "start kitty", $cmd;
+	
+	
 	eval {
-		$pid = open3($in, $out, $out, "$cmd $wrapper_path") or die "Не запустился процесс `$wrapper_path`. $!";
+		$pid = open3($in, $out, $out, $cmd) or die "Не запустился процесс `$wrapper_path`. $!";
 	};
 	$wrapper_path =~ /\.(\w+)$/, die "Не запускается команда `$cmd` или обёртка `$wrapper_path`: `$!`. Попробуйте указать main.ini:[kitty]:$1" if $@ // $!;
 	
@@ -125,19 +126,22 @@ sub request {
 	my $out = $self->{out};
 	while(<$out>) {
 		
-		push(@$body, $_), next unless /\x6/;	# не команда, а вывод
+		push(@$body, $_), next unless /\x06/;	# не команда, а вывод
 		
 		push @$body, $` if length $`;
 		$_ = $';
 		
+		my $isout = s/^\x06//;
+		
 		if(/^end(?:\s+(.+?))?\s*$/) { return $1? $json->decode($1): undef; } # может вернуть json
 		elsif(/^head(?:er)?(?:\s+(.+?))?(?::\s+(.*?)\s*)?$/) {
-			if(defined $2) { $response->{head}{$1} = $2	}
-			elsif(defined $1) { print $in $response->{head}{$1} . "\n" }
-			else { print $in $json->encode($response->{head}) }
+			if(defined $2) { $response->{head}{$1} = $2; print $in "\n" if $isout }
+			elsif(defined $1) { print $in $response->{head}{$1} . "\n" if $isout }
+			else { print $in $json->encode($response->{head}) if $isout }
 		}
 		elsif(/^write\s+(\d+)\s*$/) {
 			my $size = $1;
+			print $in "\n" if $isout;
 			my $bsize = $app->ini->{site}{"buf-size"} // 1024*1024;
 			my $n = int($size / $bsize);
 			my $last = $size % $bsize;
@@ -150,17 +154,23 @@ sub request {
 			push @$body, $buf;
 			$buf = undef;
 		}
-		elsif(/^([\w\.]+)(?:\s+(.+?))?\s*$/) {
+		elsif(/^([\w\.]+)(?:\s+(.+?))?\s*$/) {	# команда от app
 			my ($path, $param) = ($1, $2);
 			my $app_ = $app;
 			my @path = split /\./, $path;
 			my $cmd = pop @path;
 			for $path (@path) { $app_ = $app_->$path }
-			$param = [ $app_->$cmd( @{ $json->decode($param) } ) ];
-			print $in $json->encode($param) . "\n";
+			$param = $json->decode($param) if defined $param;
+			my @param = $app_->$cmd( ref($param) eq 'ARRAY'? @$param: (defined($param)? $param: ()) );
+			if($isout) {
+				$param = @param==1? $param[0]: \@param;
+				main::msg 'json=', \@param;
+				$param = eval { $json->encode($param) };
+				print $in "$param\n";
+			}
 			($app_, $path, $param, @path, $cmd) = ();
 		}
-		else { die "kitty: Неизвестная команда `$_`"; }
+		else { $self->DESTROY; die "kitty: Неизвестная команда `$_`"; }
 	}
 	#main::msg 'экстренное завершение', $., $response->body();
 }

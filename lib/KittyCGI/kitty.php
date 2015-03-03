@@ -9,12 +9,12 @@
 #																				#
 #################################################################################
 
-set_ini('html_errors', True);
-set_ini('implicit_flush', False);
+ini_set('html_errors', True);
+ini_set('implicit_flush', False);
 
 
 function frisky_kitty($req, $param = null) { echo chr(6).$req.($param!==null? " ".(is_string($param)? $param: json_encode($param)): "")."\n"; flush(); }
-function kitty($req, $param = null) { frisky_kitty($req, $param); return fgets(STDIN); }
+function kitty($req, $param = null) { frisky_kitty(chr(6).$req, $param); return fgets(STDIN); }
 
 $_kitty_actions = array();
 
