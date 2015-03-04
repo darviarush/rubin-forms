@@ -14,73 +14,57 @@ require 'json'
 
 class KittyClass
 
-	def frisky_kitty(req, param = nil)
+	def frisky_kitty(req, *param)
 		r = [6.chr, req]
-		if param != nil
-			r << ' '
-			if param.class == String
-				r << param
-			else
-				r << JSON.generate(param)
-			end
+		if param.size != 0
+			r << " "
+			r << JSON.generate(param)
 		end
 		puts r.join("")
 		STDOUT.flush()
 	end
 		
-	def kitty(req, param = nil)
-		frisky_kitty(req, param)
-		return STDIN.readline()
-	end
-end
-
-
-def escapeHTML(s)
-	return s.gsub('&', '&amp;').gsub('<', '&lt;').gsub('>', '&gt;').gsub(/\n/, '<br>')
-end
-
-def print_exc(e)
-	puts '<pre>'
-	puts escapeHTML(e.message)
-	for i in e.backtrace
-		puts escapeHTML(i)
-	end
-	puts '</pre>'
-end
-
-
-begin
-	
-	Kitty = KittyClass.new
-	
-	actions = {}
-
-	request = STDIN.readline()
-
-	while request != ''
-		request = request.chomp()
-		
-		action = actions[request]
-		if not action
-			action = 'kitty_' << request.gsub(/[\/.-]/, '__')
-		
-			file = File.read(request)
-			file = ["class KittyClass\ndef ", action, "()\n", file, "\nend\nend\n"].join('')
-			
-			eval( file )
-			
-			actions[request] = action
+	def kitty(req, *param)
+		frisky_kitty(6.chr << req, *param)
+		line = STDIN.readline()
+		if line[0] == '[' or line[0] == '{'
+			line = JSON.parse(line)
 		end
+		line
+	end
+end
 
-		begin
-			ref = Kitty.send action
-		rescue Exception => e
-			print_exc(e)
-		end
-		request = Kitty.kitty("end", ref)
-		ref = nil
+
+Kitty = KittyClass.new
+
+actions = {}
+
+request = STDIN.readline()
+
+while request != ''
+	request = request.chomp()
+	
+	action = actions[request]
+	if not action
+		action = 'kitty_' << request.gsub(/[\/.-]/, '__')
+	
+		file = File.read(request)
+		file = ["class KittyClass\ndef ", action, "()\n", file, "\nend\nend\n"].join('')
+		
+		eval( file )
+		
+		actions[request] = action
 	end
 
-rescue Exception => e
-	print_exc(e)
+	begin
+		ref = Kitty.send action
+	rescue Exception => e
+		$stderr.puts e.message
+		for i in e.backtrace
+			$stderr.puts i
+		end
+		
+	end
+	request = Kitty.kitty("end", ref)
+	ref = nil
 end

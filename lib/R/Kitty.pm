@@ -70,10 +70,13 @@ package R::Kitty::Process;
 
 use Symbol;
 use IPC::Open3;
+use Time::HiRes qw//;
+use Socket;
+
 
 sub new {
 	my ($cls, $app, $wrapper, $wrapper_path) = @_;
-	my ($in, $out) = (gensym, gensym);
+	my ($in, $out, $err) = (gensym, gensym, gensym);
 	
 	my $cmd = $app->ini->{kitty}{$wrapper} // $wrapper;
 	
@@ -84,21 +87,26 @@ sub new {
 	
 	
 	eval {
-		$pid = open3($in, $out, $out, $cmd) or die "Не запустился процесс `$wrapper_path`. $!";
+		$pid = open3($in, $out, $err, $cmd) or die "Не запустился процесс `$wrapper_path`. $!";
 	};
 	$wrapper_path =~ /\.(\w+)$/, die "Не запускается команда `$cmd` или обёртка `$wrapper_path`: `$!`. Попробуйте указать main.ini:[kitty]:$1" if $@ // $!;
 	
-	my $old = select $out; $|=1; select $in; $|=1; select $old;
+	if($wrapper eq 'js') {
+		socket($in, PF_INET, SOCK_STREAM, getprotobyname('tcp')) or die $!;
+		connect($in, sockaddr_in(8889, inet_aton('localhost'))) or die $!;
+	}
 	
-	#Utils::nonblock($err);
-	#Utils::nonblock($out);
+	my $old = select $out; $|=1; select $err; $|=1; select $in; $|=1; select $old;
+	
+	Utils::nonblock($err);
+	Utils::nonblock($out);
 	
 	my $self = bless {
 		app =>$app,
 		pid=>$pid,
 		in=>$in,
 		out=>$out,
-		#err=>$err,
+		err=>$err,
 		wrapper=>$wrapper,
 		path=>$wrapper_path
 	}, $cls;
@@ -124,61 +132,104 @@ sub request {
 	my $body = $response->{body} = [];
 	
 	my $out = $self->{out};
-	while(<$out>) {
+	my $err = $self->{err};
+	my $ktimeout = $app->ini->{site}{'kitty-timeout'} // 1;
+	my $timeout = $ktimeout;
+	my $test = $app->ini->{site}{'test'};
+	
+	my $bsize = $app->ini->{site}{"buf-size"} // 1024*1024;
+	my $size;
+	
+	my ($ein, $rin, $win) = '';
+	
+	for(;;) {
+	
+		main::msg("kitty: ошибка потока при запросе `$path`"), return if vec($ein, fileno($out), 1) or vec($ein, fileno($err), 1);
+	
+		my $vec = '';
+		vec($vec, fileno($out), 1) = 1;
+		vec($vec, fileno($err), 1) = 1;
 		
-		push(@$body, $_), next unless /\x06/;	# не команда, а вывод
+		my $time = Time::HiRes::time();
 		
-		push @$body, $` if length $`;
-		$_ = $';
+		my $nfound = select $rin=$vec, undef, $ein=$vec, $timeout;
 		
-		my $isout = s/^\x06//;
+		$self->close, main::msg("kitty: превышен интервал запроса $ktimeout сек для `$path`"), return unless $nfound;
+		main::msg("kitty: ошибка в потоках `$path`. $!") if $!;
 		
-		if(/^end(?:\s+(.+?))?\s*$/) { return $1? $json->decode($1): undef; } # может вернуть json
-		elsif(/^head(?:er)?(?:\s+(.+?))?(?::\s+(.*?)\s*)?$/) {
-			if(defined $2) { $response->{head}{$1} = $2; print $in "\n" if $isout }
-			elsif(defined $1) { print $in $response->{head}{$1} . "\n" if $isout }
-			else { print $in $json->encode($response->{head}) if $isout }
+		$timeout -= Time::HiRes::time() - $time;
+		$self->close, main::msg("kitty: превышен интервал запроса $ktimeout сек для `$path`"), return if $timeout<=0;
+		
+		if( vec($rin, fileno($err), 1) ) {
+			my @e = map { chomp $_; $_ } <$err>;
+			main::msg $_ for @e;
+			#if($test) {
+				push @$body, map({ $_ = Utils::escapeHTML($_)."<br>\n"; s/\t/'&nbsp;' x 8/ge; s/ {2,}/ ' ' . ('&nbsp;' x (length($&)-1)) /ge; $_ } @e);
+			#}
 		}
-		elsif(/^write\s+(\d+)\s*$/) {
-			my $size = $1;
-			print $in "\n" if $isout;
-			my $bsize = $app->ini->{site}{"buf-size"} // 1024*1024;
-			my $n = int($size / $bsize);
-			my $last = $size % $bsize;
-			my $buf;
-			for(my $i=0; $i<$n; $i++) {
-				read $out, $buf, $bsize;
-				push @$body, $buf;
-			}
-			my $i=read $out, $buf, $last;
+		next unless vec($rin, fileno($out), 1);
+	
+		if($size) {
+			my $i = read $out, my $buf, $size > $bsize? $bsize: $size;
+			$size -= $i;		
 			push @$body, $buf;
 			$buf = undef;
+			next;
 		}
-		elsif(/^([\w\.]+)(?:\s+(.+?))?\s*$/) {	# команда от app
-			my ($path, $param) = ($1, $2);
-			my $app_ = $app;
-			my @path = split /\./, $path;
-			my $cmd = pop @path;
-			for $path (@path) { $app_ = $app_->$path }
-			$param = $json->decode($param) if defined $param;
-			my @param = $app_->$cmd( ref($param) eq 'ARRAY'? @$param: (defined($param)? $param: ()) );
-			if($isout) {
-				$param = @param==1? $param[0]: \@param;
-				main::msg 'json=', \@param;
-				$param = eval { $json->encode($param) };
-				print $in "$param\n";
+	
+		while(<$out>) {
+			
+			push(@$body, $_), next unless /\x06/;	# не команда, а вывод
+			
+			push @$body, $` if length $`;
+			$_ = $';
+			
+			my $isout = s/^\x06//;
+			
+			if(/^end(?:\s+(.+?))?\s*$/) { return $1? $json->decode($1): undef; } # может вернуть json
+			elsif(/^head(?:er)?(?:\s+(.+?))?(?::\s+(.*?)\s*)?$/) {
+				if(defined $2) { $response->{head}{$1} = $2; print $in "\n" if $isout }
+				elsif(defined $1) { print $in $response->{head}{$1} . "\n" if $isout }
+				else { print $in $json->encode($response->{head}) if $isout }
 			}
-			($app_, $path, $param, @path, $cmd) = ();
+			elsif(/^write\s+(\d+)\s*$/) {
+				$size = $1;
+				print $in "\n" if $isout;
+			}
+			elsif(/^([\w\.]+)(?:\s+(.+?))?\s*$/) {	# команда от app
+				my ($path, $param) = ($1, $2);
+				my $app_ = $app;
+				my @path = split /\./, $path;
+				my $cmd = pop @path;
+				eval {
+					main::msg ':space', 'kitty-cmd:', "`$path`", "`$param`";
+					for $path (@path) { $app_ = $app_->$path }
+					$param = $json->decode($param) if defined $param;
+					my @param = $app_->$cmd( ref($param) eq 'ARRAY'? @$param: (defined($param)? $param: ()) );
+					if($isout) {
+						$param = @param==1? $param[0]: \@param;
+						main::msg 'kitty-out:', \@param;
+						$param = eval { $json->encode($param) };
+						print $in "$param\n";
+					}
+				};
+				main::msg $@ if $@;
+				main::msg "kitty ошибка ввода-вывода: $!" if $!;
+				($app_, $path, $param, @path, $cmd) = ();
+			}
+			else { $self->close; die "kitty: Неизвестная команда `$_`"; }
 		}
-		else { $self->DESTROY; die "kitty: Неизвестная команда `$_`"; }
 	}
 	#main::msg 'экстренное завершение', $., $response->body();
 }
 
-# деструктор
-sub DESTROY {
+# ликвидирует поток
+sub close {
 	my ($self) = @_;
 	kill 9, $self->{pid};
 }
+
+# деструктор
+sub DESTROY { $_[0]->close }
 
 1;

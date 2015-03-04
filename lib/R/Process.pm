@@ -110,7 +110,7 @@ sub spy {
 		# следить за изменениями
 		my $_watch = $app->ini->{site}{watch};
 		if($_watch) {
-			$app->action->watch;	# перекомпилировать экшены
+			$app->action->watch;	# перекомпилирует экшены, а на него в watch/action срабатывает $self->watch;
 			$app->test->watch;		# запуск теста при изменении
 			$self->watch;			# перезагружать сервер, если изменился какой-то из модулей проекта
 		}
@@ -199,10 +199,15 @@ sub loop {
 sub watch {
 	my ($self) = @_;
 	my $watch = $self->{app}->watch;
-	my $dirs = [main::files("qq"), "main.ini", main::dirs("lib"), main::files("bin/qq.pl"), main::files("bin/ini.pl"), main::files($self->{app}->action->{dir_c})];
+	my $dirs = [main::files("qq"), "main.ini", main::dirs("lib"), main::files("bin/qq.pl"), main::files("bin/ini.pl"), main::files($self->{app}->action->{dir_c}), main::files($self->{app}->action->{dir})];
 	$watch->on(qr//, $dirs, sub {
 		my ($path, $app) = @_;
-		my $module = $path =~ m!/.*\.(\w+)\.pl$!? ($1 eq "act"? "action": $1): "module";
+		my $module;
+		my @dir = main::files($app->action->{dir});
+		if(grep { length($path)>length($_) and $_ eq substr $path, 0, length $_ } @dir) {
+			return if $path =~ /\.(?:act|htm)$/;
+			$module = "action";
+		} else { $module = $path =~ m!/.*\.(\w+)\.pl$!? ($1 eq "act"? "action": $1): "module"; }
 		main::msg ":empty", ":time", " - ", ":red", $module, ":reset", " $path";
 		kill HUP, $app->process->{main_pid};
 	});

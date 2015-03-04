@@ -12,9 +12,13 @@
 ini_set('html_errors', True);
 ini_set('implicit_flush', False);
 
-
 function frisky_kitty($req, $param = null) { echo chr(6).$req.($param!==null? " ".(is_string($param)? $param: json_encode($param)): "")."\n"; flush(); }
-function kitty($req, $param = null) { frisky_kitty(chr(6).$req, $param); return fgets(STDIN); }
+function kitty($req, $param = null) {
+	frisky_kitty(chr(6).$req, $param);
+	$line = fgets(STDIN);
+	if($line[0]=='{' or $line[0]=='[') $line = json_decode($line);
+	return $line;
+}
 
 $_kitty_actions = array();
 
@@ -40,6 +44,17 @@ while($_kitty_request!==false) {
 		$_kitty_actions[$_kitty_request] = $_kitty_action;
 	}
 	
-	$_kitty_ref = $_kitty_action();
+	
+	
+	try {
+		$_kitty_ref = $_kitty_action();
+	} catch(Exception $e) {
+		fwrite(STDERR, "Error: " . $e->getMessage() . "\n");
+		
+		foreach(debug_backtrace() as $f) {
+			fwrite(STDERR, $f['file'] . ":" . $f['line'] . ' ' . $f['class'] . ($f['class']? $f['class'].$f['type']: '') . $f['function'] . "\n");
+		}
+	}
+	
 	$_kitty_request = kitty("end", $_kitty_ref);
 }

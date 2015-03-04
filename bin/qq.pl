@@ -36,20 +36,22 @@ $app->stash({});
 $app->server;
 msg ":empty", ":red", $$, ":reset", " Слушаем ", ":green", $app->ini->{site}{port};
 
-# порождаем потоки
-$app->process->fork(*lord);
-
-# бесконечный цикл с cron
-require POSIX;
-my $ppid = POSIX::getppid();
-$app->process->loop(sub {	# будет вызываться раз в секунду
-	$app->process->close, exit unless kill 0, $ppid;
-	#$app->session->delete if time % 3600 == 0;	# раз в час - не доделано
-});
-
 # Обработчик запросов
 sub lord {
 	my ($self) = @_;
 	my $app = $self->{app};
 	$app->server->loop;	# инициализируемся в новом треде
 }
+
+require POSIX;
+my $ppid = POSIX::getppid();
+sub graph {	# будет вызываться раз в секунду
+	$app->process->close, exit unless kill 0, $ppid;
+	#$app->session->delete if time % 3600 == 0;	# раз в час - не доделано
+}
+
+# порождаем потоки
+$app->process->fork(*lord);
+
+# бесконечный цикл с cron
+$app->process->loop(*graph);
