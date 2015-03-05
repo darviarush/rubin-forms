@@ -10,5 +10,4 @@
 
 require('./wrap.js') (file) ->
 	CoffeeScript = require 'coffee-script'
-	CoffeeScript.compile file, {}
-
+	CoffeeScript.compile file, bare: true

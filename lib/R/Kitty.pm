@@ -84,17 +84,11 @@ sub new {
 	
 	$cmd .= " $wrapper_path" unless $cmd =~ s/%s/$wrapper_path/;
 	main::msg "start kitty", $cmd;
-	
-	
+
 	eval {
 		$pid = open3($in, $out, $err, $cmd) or die "Не запустился процесс `$wrapper_path`. $!";
 	};
 	$wrapper_path =~ /\.(\w+)$/, die "Не запускается команда `$cmd` или обёртка `$wrapper_path`: `$!`. Попробуйте указать main.ini:[kitty]:$1" if $@ // $!;
-	
-	if($wrapper eq 'js') {
-		socket($in, PF_INET, SOCK_STREAM, getprotobyname('tcp')) or die $!;
-		connect($in, sockaddr_in(8889, inet_aton('localhost'))) or die $!;
-	}
 	
 	my $old = select $out; $|=1; select $err; $|=1; select $in; $|=1; select $old;
 	
@@ -155,7 +149,7 @@ sub request {
 		my $nfound = select $rin=$vec, undef, $ein=$vec, $timeout;
 		
 		$self->close, main::msg("kitty: превышен интервал запроса $ktimeout сек для `$path`"), return unless $nfound;
-		main::msg("kitty: ошибка в потоках `$path`. $!") if $!;
+		#main::msg("kitty: ошибка в потоках `$path`. $!", vec($ein, fileno($out), 1), vec($ein, fileno($err), 1), vec($rin, fileno($out), 1), vec($rin, fileno($err), 1)) if $!;
 		
 		$timeout -= Time::HiRes::time() - $time;
 		$self->close, main::msg("kitty: превышен интервал запроса $ktimeout сек для `$path`"), return if $timeout<=0;
@@ -186,7 +180,10 @@ sub request {
 			
 			my $isout = s/^\x06//;
 			
-			if(/^end(?:\s+(.+?))?\s*$/) { return $1? $json->decode($1): undef; } # может вернуть json
+			if(/^end(?:\s+(.+?))?\s*$/) { # может вернуть json
+				main::msg 'end', $1;
+				return $1? $json->decode($1): undef;
+			}
 			elsif(/^head(?:er)?(?:\s+(.+?))?(?::\s+(.*?)\s*)?$/) {
 				if(defined $2) { $response->{head}{$1} = $2; print $in "\n" if $isout }
 				elsif(defined $1) { print $in $response->{head}{$1} . "\n" if $isout }
@@ -202,22 +199,22 @@ sub request {
 				my @path = split /\./, $path;
 				my $cmd = pop @path;
 				eval {
-					main::msg ':space', 'kitty-cmd:', "`$path`", "`$param`";
+					#main::msg ':space', 'kitty-cmd:', "`$path`", ($param? "`$param`": ());
 					for $path (@path) { $app_ = $app_->$path }
 					$param = $json->decode($param) if defined $param;
 					my @param = $app_->$cmd( ref($param) eq 'ARRAY'? @$param: (defined($param)? $param: ()) );
 					if($isout) {
 						$param = @param==1? $param[0]: \@param;
-						main::msg 'kitty-out:', \@param;
+						#main::msg 'kitty-out:', \@param;
 						$param = eval { $json->encode($param) };
-						print $in "$param\n";
+						print $in $param, "\n";
 					}
 				};
 				main::msg $@ if $@;
-				main::msg "kitty ошибка ввода-вывода: $!" if $!;
+				#main::msg "kitty ошибка ввода-вывода: $!" if $!;
 				($app_, $path, $param, @path, $cmd) = ();
 			}
-			else { $self->close; die "kitty: Неизвестная команда `$_`"; }
+			else { $self->close; main::msg ":red", "kitty: Неизвестная команда `$_` `$isout`"; print $in "\n" if $isout; }
 		}
 	}
 	#main::msg 'экстренное завершение', $., $response->body();

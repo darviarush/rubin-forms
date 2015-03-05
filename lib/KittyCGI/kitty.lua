@@ -11,67 +11,79 @@
 --																				--
 ----------------------------------------------------------------------------------
 
-require 'json'
+local json = require("json")
 
-function frisky_kitty(req, *param)
-	r = [string.char(6), req]
-	if param.size != 0
+function frisky_kitty(...)
+	local req = table.remove(arg, 1)
+	local r = {string.char(6), req}
+	if #arg ~= 0 then
 		table.insert(r, " ")
-		table.insert(r, JSON.generate(param))
+		table.insert(r, json.encode(arg))
 	end
 	print(table.concat(r))
-	STDOUT.flush()
+	io.flush()
 end
 		
 function kitty(...)
-	arg
-	frisky_kitty(string.char(6) .. req, *param)
-	line = STDIN.readline()
-	if line[0] == '[' or line[0] == '{'
-		line = JSON.parse(line)
+	local req = table.remove(arg, 1)
+	frisky_kitty(string.char(6) .. req, unpack(arg))
+	local line = io.read()
+	local first = string.sub(line, 1, 1)
+	
+	if first == "[" or first == "{" then
+		line = json.decode(line)
 	end
-	line
+	return line
 end
 
 
-function escapeHTML(s)
-	return string.gsub(s, '([&<>\n])', {'&'='&amp;', '<'='&lt;', '>'='&gt;', '\n'='\n<br>'})
-end
 
+local actions = {}
 
-if pcall(function()
+local request = io.read()
+
+while request ~= "" do
+	request = string.gsub(request, "%n$", "")
 	
-	Kitty = KittyClass.new
+	local action = actions[request]
+	if not action then
+		local action_name = 'kitty_' .. string.gsub(request, '[\/.-]', '__')
 	
-	actions = {}
-
-	request = STDIN.readline()
-
-	while request != ''
-		request = request.chomp()
+		local file = io.open(request):read("*a")
+		local less = {}
 		
-		action = actions[request]
-		if not action then
-			action = 'kitty_' .. request.gsub(/[\/.-]/, '__')
+		local k, v -- "(%w+)%s*=[^=]|(%w+(?:%s*,%s*%w+)*)%s+in%s"
+		for k in string.gmatch(file, "(%w+(,%s)%s+in%s)" do
+			print( "k=" .. k )
+			if v then
+				k = v
+			end
+			table.insert(less, k)
+		end
 		
-			file = File.read(request)
-			file = ["class KittyClass\ndef ", action, "()\n", file, "\nend\nend\n"].join('')
-			
-			eval( file )
-			
+		if #less ~= 0 then
+			file = table.concat( { 'local ', table.concat(less, ", "), "; ", file } )
+		end
+		print(file)
+		action = assert(loadstring( file, action_name ))
+		
+		if action == nil then
+			print("Функция `" .. action_name .. "` не скомпиллировалась")
+			action = function() end
+		else
 			actions[request] = action
 		end
-
-		if pcall(function()
-			ref = Kitty.send action
-		end) then
-			print_exc(e)
-		end
-		request = kitty("end", ref)
-		ref = nil
 	end
 
-end) then
-else
-	print('<pre>', , '</pre>')
+	local ref
+	local status, err = pcall(function()
+		ref = action()
+	end)
+	
+	if not status then
+		io.stderr:write(err .. "\n")
+		io.stderr:write(debug.traceback())
+	end
+	request = kitty("end", ref)
+	ref = nil
 end
