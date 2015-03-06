@@ -228,14 +228,21 @@ class CStream
 	
 	# отключающие
 	off: (streams...) -> fork = @fork; (for s in streams when -1 != i=fork.indexOf s then fork.splice i, 1); this
-	
 
-CWidget.extend
-	#stream: -> stream = new CStream; stream
-	stream: (events) -> stream = new CStream; @on events, stream.emitter(); stream
-	observeStream: (events) -> stream = new CStream; @observe events, stream.emitter(); stream
-	ajaxStream: -> stream = new CStream; @on 'Load', stream.emitter(); @on 'Error', stream.errorer(); stream
 	
-CModel.extend
-	stream: (key) -> stream = new Stream; @on key, stream.emitter(); stream
-	retriveStream: (key) -> stream = new Stream; @at key, stream.emitter(); stream
+if window.CWidget
+	CWidget.extend
+		#stream: -> stream = new CStream; stream
+		stream: (events) -> stream = new CStream; @on events, stream.emitter(); stream
+		observeStream: (events) -> stream = new CStream; @observe events, stream.emitter(); stream
+		ajaxStream: -> stream = new CStream; @on 'Load', stream.emitter(); @on 'Error', stream.errorer(); stream
+
+if window.CModel		
+	CModel.extend
+		stream: (key) -> stream = new Stream; @on key, stream.emitter(); stream
+		retriveStream: (key) -> stream = new Stream; @at key, stream.emitter(); stream
+
+		
+class CBox extends CStream
+	
+	
