@@ -53,7 +53,7 @@ while request ~= "" do
 		local less = {}
 		
 		local k, v -- "(%w+)%s*=[^=]|(%w+(?:%s*,%s*%w+)*)%s+in%s"
-		for k in string.gmatch(file, "(%w+(,%s)%s+in%s)" do
+		for k in string.gmatch(file, "(%w+(%s*,%s*%w+)*%s+in%s)") do
 			print( "k=" .. k )
 			if v then
 				k = v
@@ -61,7 +61,7 @@ while request ~= "" do
 			table.insert(less, k)
 		end
 		
-		if #less ~= 0 then
+		if #less > 0 then
 			file = table.concat( { 'local ', table.concat(less, ", "), "; ", file } )
 		end
 		print(file)

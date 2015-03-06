@@ -1,7 +1,7 @@
 # ex.coffee - example kitty-cgi
 
 
-console.log 'Hello Node Js!\n'
+console.log 'Hello CoffeeScript!\n'
 
 
 frisky_kitty "response.head", 'Content-Type', 'text/plain; codepage=utf-8'
