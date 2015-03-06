@@ -4,7 +4,7 @@ package R::Kitty;
 use strict;
 use warnings;
 
-use POSIX ":sys_wait_h";
+use POSIX qw/strftime :sys_wait_h/;
 
 # конструктор
 sub new {
@@ -12,8 +12,14 @@ sub new {
 	bless {app=>$app, wrapper=>{}}, $cls;
 }
 
-# выполняет запрос к файлу kitten-cgi. Если wrapper не указан, то берётся расширение имени реквестера
-sub request {
+sub timeout {
+	my ($self, $timeout) = @_;
+	$self->{timeout} = $timeout;
+	$self
+}
+
+# выполняет запрос к файлу kitty-cgi. Если wrapper не указан, то берётся расширение имени реквестера
+sub run {
 	my ($self, $requester, $wrapper, $wrapper_path) = @_;
 	my $ext;
 	($wrapper)=$requester=~/\.(\w+)$/ unless defined $wrapper;
@@ -21,7 +27,40 @@ sub request {
 	my $ps = $self->{wrapper}{$wrapper};
 	$self->{wrapper}{$wrapper} = $ps = R::Kitty::Process->new($self->{app}, $wrapper, $wrapper_path // "$::_FRAMEWORK/lib/KittyCGI/kitty.$wrapper") if !$ps or 0 > waitpid $ps->{pid}, WNOHANG or 0 == kill 0, $ps->{pid};
 	
+	$ps->{timeout} = $self->{timeout}, $self->{timeout} = undef if defined $self->{timeout};
+	
 	$ps->request($requester);
+}
+
+
+# отправляет запрос для action
+sub request {
+	my ($self, $path) = @_;
+	
+	$self->can('run')->(@_);
+	
+	my $app = $self->{app};
+	my $response = $app->{response};
+	my $body = $response->{body};
+	my $e = $response->{errors};
+	
+	my @e = map { @$body[ $_->[0] .. $_->[1] ] } @$e;
+	main::msg scalar $app->kitty->reg_error(\@e, $path);
+	
+	if($app->ini->{site}{'test'}) {
+
+		if($response->type =~ /^text\/html\b/) {
+			for my $ee (@$e) {
+				my ($from, $to) = @$ee;
+				for(my $i=$from; $i<$to; $i++) {
+					$_ = $body->[$i];
+					$_ = Utils::escapeHTML($_)."<br>"; 
+					s/\t/'&nbsp;' x 8/ge; s/ {2,}/ ' ' . ('&nbsp;' x (length($&)-1)) /ge;
+					$body->[$i] = $_;
+				}
+			}
+		}
+	}
 }
 
 # останавливает все процессы или указанный
@@ -64,6 +103,45 @@ sub route {
 	
 	$self
 }
+
+# переводит ошибки компилляторов в удобоваримую форму для редактора программиста
+sub reg_error {
+	my ($self, $code, $path, $key) = @_;
+	local ($_, $', $`);
+	my $app = $self->{app};
+	
+	($key) = $path =~ /\.(\w+)$/ if not defined $key;
+	
+	my $reg_error = $app->ini->{reg_error}{$key};
+	
+	$_ = ref($code)? join("", @$code): $code;
+	
+	return $_ unless defined $reg_error;
+
+	s!\e\[\d+m!!g unless $main::_UNIX;
+	
+	$self->winpath($path);
+	
+	my $is_err = s!$reg_error!"$path:$+{line}:".($+{char} || 1).": error: ".($+{msg2}? "$+{msg2}: ": "").($+{msg}? $+{msg}:"")!ge;
+	
+	wantarray? ($_, $is_err): $_;
+}
+
+# регулярки для компиле
+sub reg_compile {
+	my ($self, $code, $path, $reg_compile) = @_;
+	
+	$self->winpath($path);
+	
+	$code =~ s!$reg_compile!($+{time} // strftime("%T", localtime))." - compiled $path"!ge;
+	return $code;
+}
+
+sub winpath {
+	my $winpath = $_[0]->{app}->ini->{hung}{winpath};
+	$_[1] = Utils::winpath($_[1]) if defined $winpath and $winpath =~ /^yes$/i;
+}
+
 
 package R::Kitty::Process;
 # процесс обёртки
@@ -114,6 +192,7 @@ sub new {
 	$self
 }
 
+
 # отправляет запрос
 sub request {
 	my ($self, $path) = @_;
@@ -124,12 +203,12 @@ sub request {
 	my $response = $app->response;
 	my $json = $app->json;
 	my $body = $response->{body} = [];
+	my $errors = $response->{errors} = [];
 	
 	my $out = $self->{out};
 	my $err = $self->{err};
-	my $ktimeout = $app->ini->{site}{'kitty-timeout'} // 1;
+	my $ktimeout = $self->{timeout} // $app->ini->{site}{'kitty-timeout'} // 1;
 	my $timeout = $ktimeout;
-	my $test = $app->ini->{site}{'test'};
 	
 	my $bsize = $app->ini->{site}{"buf-size"} // 1024*1024;
 	my $size;
@@ -155,11 +234,9 @@ sub request {
 		$self->close, main::msg("kitty: превышен интервал запроса $ktimeout сек для `$path`"), return if $timeout<=0;
 		
 		if( vec($rin, fileno($err), 1) ) {
-			my @e = map { chomp $_; $_ } <$err>;
-			main::msg $_ for @e;
-			#if($test) {
-				push @$body, map({ $_ = Utils::escapeHTML($_)."<br>\n"; s/\t/'&nbsp;' x 8/ge; s/ {2,}/ ' ' . ('&nbsp;' x (length($&)-1)) /ge; $_ } @e);
-			#}
+			my $pos = @$body;
+			push @$body, <$err>;
+			push @$errors, [$pos, scalar @$body];
 		}
 		next unless vec($rin, fileno($out), 1);
 	
@@ -217,16 +294,17 @@ sub request {
 			else { $self->close; main::msg ":red", "kitty: Неизвестная команда `$_` `$isout`"; print $in "\n" if $isout; }
 		}
 	}
-	#main::msg 'экстренное завершение', $., $response->body();
 }
 
 # ликвидирует поток
 sub close {
 	my ($self) = @_;
-	kill 9, $self->{pid};
+	kill -9, $self->{pid};
+	$self
 }
 
 # деструктор
 sub DESTROY { $_[0]->close }
+
 
 1;

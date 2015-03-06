@@ -12,7 +12,7 @@
 # -----------------------
 # 10. CMenuWidget - подключить др. элемент и получить CLoadTabsWidget
 # 11. drag&drop on CListWidget
-
+ 
 #- 12. CSend всегда возвращает false. Другое значение можно передать по event.ret - в coffeescript всё равно нужно следить за возвратом после массива
 #- act='onclick: load; onkeydown: submit; onmousemove: save' - отправляет хандлер на любую функцию
 #- inject и create - не соотвествуют философии

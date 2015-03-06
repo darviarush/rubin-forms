@@ -118,6 +118,13 @@ sub append {
 	$self
 }
 
+# возвращает body в виде массива
+sub arr_body { @{$_[0]->{body}} }
+
+# возвращает body в виде строки
+sub str_body { join "", @{$_[0]->{body}} }
+
+
 # устанавливает/возвращает лайоуты для текущей акции
 sub layout {
 	my $self = shift;

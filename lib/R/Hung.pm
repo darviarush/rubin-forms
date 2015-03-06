@@ -15,7 +15,7 @@ sub DESTROY { $_[0]->close }
 sub new {
 	my ($cls, $app) = @_;
 	
-	my $self = bless {app => $app}, $cls;
+	my $self = bless {app => $app, pid => []}, $cls;
 	
 	#mkdir "watch";
 	
@@ -34,10 +34,33 @@ sub new {
 		
 		Utils::write("watch/watch.$ext", "");
 		
-		my $process = R::Hung::Process->new($watch, $app);
-		push @{$self->{pid}}, $process->{pid};
-
-		$watching->on(qr/\.(?:$watch->{ext})$/, [main::files(@in)], Utils::closure($process, $process->can("inset")));
+		$watching->on(qr/\.(?:$watch->{ext})$/, [main::files(@in)],
+			$watch->{kitty}? Utils::closure($key, sub {
+				my ($key, $path, $app) = @_;
+				my $watch = $app->ini->{watch}{$key};
+				
+				$path =~ m!/([^/]+)\.\w+$!;
+				my $to = "$watch->{out}/$1.$watch->{outext}";
+				my $map = "$watch->{out}/$1.map";
+				
+				$app->request->{get} = {
+					from => $path,
+					to => $to,
+					map => $map,
+					root => '..',
+				};
+				$app->kitty->timeout(10)->run(main::file($watch->{kitty}));
+				#my $body = [@{ $app->response->{errors} }];
+				#$body = $app->kitty->reg_compile($body, $path, $key);
+				main::msg ":empty", $app->response->arr_body;
+			}):
+			$watch->{run} || $watch->{hung}? do {
+				my $process = R::Hung::Process->new($key, $app);
+				push @{$self->{pid}}, $process->{pid} if defined $process->{pid};
+				Utils::closure($process, $process->can("inset"));
+			}:
+			die("Нет ни hung, ни run, ни kitty в main.ini:[watch::$key]")
+		);
 		
 	}
 
@@ -64,24 +87,25 @@ use Time::HiRes qw//;
 use Symbol;
 
 sub new {
-	my ($cls, $watch, $app) = @_;
+	my ($cls, $key, $app) = @_;
 	my ($in, $out, $pid, $old);
-	if($watch->{hang}) {
+	
+	my $watch = $app->ini->{watch}{$key};
+	
+	if($watch->{hung}) {
 		($in, $out) = (gensym, gensym);
-		$pid = open3($in, $out, $out, $watch->{hang}) or die "Не запустился процесс `$watch->{hang}`. $!";
+		$pid = open3($in, $out, $out, $watch->{hung}) or die "Не запустился процесс `$watch->{hung}`. $!";
 		$old = select $out; $|=1; select $old;
-		main::msg ":space", "Запустился процесс", ":red", $pid, ":bold black", $watch->{hang};
-	} elsif(!$watch->{run}) {
-		die "Нет ни main.ini:watch:hung, ни main.ini:watch:run";
+		main::msg ":space", "Запустился процесс", ":red", $pid, ":bold black", $watch->{hung};
 	}
 	
 	my ($ext) = split /\|/, $watch->{ext};
 	
-	my $self = bless {app=>$app, watch => $watch, ext => $ext, in => $in, out => $out, pid => $pid}, $cls;
+	my $self = bless {app=>$app, key=>$key, watch => $watch, ext => $ext, in => $in, out => $out, pid => $pid}, $cls;
 	
 	#$app->select->on($out, 're', Utils::closure($self, $self->can("")));
 	
-	if($watch->{start}) {
+	if($watch->{start} && $watch->{hung}) {
 		#out(scalar <$out>);
 		out( $self->read_bk );
 	}
@@ -117,6 +141,7 @@ sub wait {
 	$self->{'prev_size' . $file} = -s $file;
 }
 
+# обрабатывает изменение файла - записывает в watch/watch.ext и ожидает изменения watch/watch.out
 sub inset {
 	my ($self, $path, $app) = @_;
 	my $time = Time::HiRes::time;
@@ -135,24 +160,30 @@ sub inset {
 	$js_path =~ s!\.\w+$!.$new_ext!;
 	
 	unlink $map;
-	#main::msg ":green", "cp $path";
 
 	$self->wait($path);
 	
 	Utils::cp($path, $watch_path);
 	
-	my $p = $path;
-	my $winpath = $app->ini->{hung}{winpath};
-	$p = Utils::winpath($p) if defined $winpath and $winpath =~ /^yes$/i;
-	until($_ = join "", $self->read_bk) {
-		main::msg ":red", "Нет ответа компиллятора `$watch->{hung}` на cp $path $watch_path";
-		#Utils::cp($path, $watch_path);
+	if($watch->{run}) {
+		my ($in, $out) = (gensym, gensym);
+		my $pid = open3($in, $out, $out, $watch->{run}) or die "Не запустился процесс `$watch->{run}`. $!";
+		my $old = select $out; $|=1; select $old;
+		$_ = join "", <$out>;
+		$_ = strftime("%T", localtime) . " - compiled $path to $js_path\n" if $_ eq "";
+	} else {
+		$self->wait($path);
+		until($_ = join "", $self->read_bk) {
+			main::msg("Компиллятор `$watch->{hung}` приказал долго жить"), return if kill 0, $self->{pid};
+			main::msg ":red", "Нет ответа компиллятора `$watch->{hung}` на cp $path $watch_path";
+			#Utils::cp($path, $watch_path);
+		}
 	}
 	
-	s!\e\[\d+m!!g unless $main::_UNIX;
+	my $is_err;
+	($_, $is_err) = $app->kitty->reg_error($_, $path);
 	
-	s!$watch->{reg_compile}!($+{time} // strftime("%T", localtime))." ".(-s $watch_path)." - compiled $p"!ge;
-	my $is_err = s!$watch->{reg_error}!"$p:$+{line}:".($+{char} || 1).": error: ".($+{msg2}? "$+{msg2}: ": "").($+{msg}? $+{msg}:"")!ge;
+	$_ = $app->kitty->reg_compile($_, $path, $watch->{reg_compile});
 	
 	my @out = split /\n/, $_;
 	
@@ -163,7 +194,7 @@ sub inset {
 		$self->wait($watch_out_path);
 		
 		if(-e $map) {
-			$p = $js_path;
+			my $p = $js_path;
 			$p =~ s!\.$new_ext$!.map!;
 
 			my $json;
