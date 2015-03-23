@@ -17,7 +17,7 @@ require "watch/action.pl";
 $app->kitty->route($app->action->{act}) if $app->ini->{site}{kitty};
 
 # не даёт некоторым ушлым процессам убивать главный процесс при разрыве соединения. Важно для $app->kitty
-$SIG{PIPE} = sub { main::msg ":red", "SIGPIPE" };
+$SIG{PIPE} = sub { main::msg ":red", "SIGPIPE -> $$" };
 
 # перечитывает main_do.ini по сигналу
 # считывает права на таблицы и их столбцы

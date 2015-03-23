@@ -17,15 +17,15 @@ img {border:none;}
 :focus {outline:0;}
 
 body {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 14px;
-  line-height: 1.42857143;
-  color: #333;
-  background-color: #fff;
-  overflow: auto;
+font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.42857143;
+color: #333;
+background-color: #fff;
+overflow: auto;
 }
 
-input, button, select, textarea { font-family: inherit; font-size: inherit; line-height: inherit; overflow: hidden; }
+input, button, select, textarea { font-family: inherit; font-size: inherit; line-height: inherit; overflow: hidden; border:solid 1px #F0FFFF }
 input:hover, button:hover, select:hover, textarea:hover { border-color: orange }
 a { color: #428bca; text-decoration: none; }
 a:hover, a:focus { color: #2a6496; text-decoration: underline; }
@@ -44,7 +44,7 @@ h1, h2, h3, h4, h5, h6 { border-width: 10pt 0 5pt 0; border-color: transparent; 
 %orange = "#FFA500"
 %lorange = "#FFF8DC"
 %violet = "#9370DB"
-%lviolet = "#D8BFD8"
+%lviolet = "lavender"
 %blue = "#4169E1"
 %lblue = "#F0FFFF"
 %red = "#CD5C5C"
@@ -55,35 +55,36 @@ h1, h2, h3, h4, h5, h6 { border-width: 10pt 0 5pt 0; border-color: transparent; 
 
 
 /* сеть */
-
-%pa = get("p", 10)
+%br = get("b", 1)
+%pa = get("p", 5)
 %ma = get("m", 10)
 %inx = get('in', 1)
 
 *{ margin:0; padding:0; overflow:auto; clear:both }
 html,body{ width:100%; height:100% }
-.in1,.in2,.in3{ margin: 0 auto; min-height: 100%; padding-left: %%ma%%px }
-.rest{ padding: %%pa/2%%px; margin: 0 %%ma%%px %%ma%%px 0; clear:none }
-.col { padding: 0 !important; margin: 0 !important }
-%float { float:left; clear:none; padding: %%pa/2%%px; margin: 0 %%ma%%px %%ma%%px 0 }
+.in%{inx}{ margin: 0 auto; min-height: 100%; padding-left: %{ma}px }
+.col { padding: 0 !important; margin: 0 !important; border: none !important }
+%rest { clear:none; padding: %{pa}px; margin: 0 %{ma}px %{ma}px 0; border: solid %{br}px transparent }
+.rest { %{rest} }
+%float { %{rest}; float:left }
 
 %widths = [[550, 500, 450], [750, 650, 550], [970, 770, 570], [1170, 970, 770]]
 %display = [568, 768, 992, 1200]
 
 %for u, n in display {
 	%width = widths[n][inx-1]
-	@media (min-width: %%u%%px) %if n<display.length-1 { and (max-width: %% display[n+1]-1 %%px) } {
-		.in%%inx%% {width: %%width%%px}
+	@media (min-width: %{u}px) %if n<display.length-1 { and (max-width: %{ display[n+1]-1 }px) } {
+		.in%{inx} {width: %{width}px}
 
 		%if rem = CCssCode.exists('w') {
 			%for j in 1..rem {
 				%for i in 1..j {
 					%col = i * width / j
-					%k = col - pa - ma
+					%k = col - 2*pa - ma - 2*br
 					%t = i+"_"+j
-					%if i===1 { .w%%j%%, } .w%%t%% { width: %%k%%px; %%float%% }
-					%if i===1 { .w%%j%%.col, } .w%%t%%.col { width: %%col%%px}
-					%if i===1 { .offset%%j%%, } .offset%%t%% { margin-left: %%col%%px }
+					%if i===1 { .w%{j}, } .w%{t} { width: %{k}px; %{float} }
+					%if i===1 { .w%{j}.col, } .w%{t}.col { width: %{col}px}
+					%if i===1 { .offset%{j}, } .offset%{t} { margin-left: %{col}px }
 				}
 			}
 		}
@@ -92,12 +93,40 @@ html,body{ width:100%; height:100% }
 
 /* цвета */
 %for name, color of colors {
-	.%%name%% { background-color: %%color%% }
-	.%%name%%-header { color: %%color%%; font-weight: 700; background-color: %%light[name]%% }
-	.%%name%%-text { color: %%color%%; font-weight: 700 }
+	.%{name} { background-color: %{color}; color: %{light[name]} }
+	.%{name}-light { background-color: %{light[name]} }
+	.%{name}-header { color: %{color}; font-weight: 700; background-color: %{light[name]} }
+	.%{name}-text { color: %{color}; font-weight: 700 }
+
+	%for i in 0..1 {
+		%if i!=0 { 
+			%color = light[name]
+			%name += '-light'
+		}
+		/* линии */
+		.%{name}-line { border: solid 1px %{color} }
+		.%{name}-line-h { border-left: solid 1px %{color}; border-right: solid 1px %{color} }
+		.%{name}-line-v { border-top: solid 1px %{color}; border-bottom: solid 1px %{color} }
+		.%{name}-line-l { border-left: solid 1px %{color} }
+		.%{name}-line-r { border-right: solid 1px %{color} }
+		.%{name}-line-b { border-bottom: solid 1px %{color} }
+		.%{name}-line-t { border-top: solid 1px %{color} }
+	}
+
 }
 
 
+/* центрирование */
+.l { text-align: left }
+.r { text-align: right }
+.j { text-align: justify }
+.c { text-align: center; *zoom: 1; text-align: -o-center; text-align: -moz-center; text-align: -webkit-center; text-align: -khtml-center }
+
+/* скругление */
+.rnd { %border-radius: 50% }
+.ra { %border-radius: %{pa}px }
+
+
 /* тултип */
-.c-tip { background-color: #2a2a2a; background-color: rgba(0, 0, 0, 0.7); color: WhiteSmoke; /*border: solid 1px gray;*/ padding: 5px; border-radius: 3px; font-size: 12px; width: 200px; max-height: 200px; }
+.c-tip { background-color: #2a2a2a; background-color: rgba(0, 0, 0, 0.7); color: WhiteSmoke; /*border: solid 1px gray;*/ padding: 5px; %border-radius: 3px; font-size: 12px; width: 200px; max-height: 200px; }
 .c-tip h1, .c-tip h2, .c-tip h3, .c-tip h4 { color: LightSkyBlue; }

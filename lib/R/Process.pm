@@ -183,9 +183,9 @@ sub loop {
 		eval {
 			my @joinable = threads->list(threads::joinable);
 			for my $thr (@joinable) {		# проверяем наших лордов
-				my @return = $thr->join();
-				my $tid = $thr->tid();
-				my $error = $thr->error();
+				my @return = $thr->join;
+				my $tid = $thr->tid;
+				my $error = $thr->error;
 				main::msg ":empty", ":red", "Завершился лорд № $tid", ":reset", ($error? "\nС ошибкой:\n$error": "");
 				#(@return? "\nВернул: ": "")main::msg \@return if @return;
 				threads->create($self->{lord}, $self);
@@ -199,19 +199,20 @@ sub loop {
 sub watch {
 	my ($self) = @_;
 	my $watch = $self->{app}->watch;
-	my $dirs = [main::files("qq"), "main.ini", main::dirs("lib"), main::files("bin/qq.pl"), main::files("bin/ini.pl"), main::files($self->{app}->action->{dir_c}), main::files($self->{app}->action->{dir})];
+	my $dirs = [main::files("qq"), "main.ini", main::dirs("lib"), main::files("bin/qq.pl"), main::files("bin/ini.pl")];
+
 	$watch->on(qr//, $dirs, sub {
 		my ($path, $app) = @_;
-		my $module;
-		my @dir = main::files($app->action->{dir});
-		if(grep { length($path)>length($_) and $_ eq substr $path, 0, length $_ } @dir) {
-			return if $path =~ /\.(?:act|htm)$/;
-			$module = "action";
-		} else { $module = $path =~ m!/.*\.(\w+)\.pl$!? ($1 eq "act"? "action": $1): "module"; }
-		main::msg ":empty", ":time", " - ", ":red", $module, ":reset", " $path";
-		kill HUP, $app->process->{main_pid};
+		main::msg ":empty", ":time", " - ", ":red", "module", ":reset", " $path";
+		$app->process->reset;
 	});
 	$self
+}
+
+# перезагружает сервер
+sub reset {
+	my ($self) = @_;
+	kill HUP, $self->{main_pid};
 }
 
 

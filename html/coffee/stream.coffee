@@ -14,8 +14,9 @@ class CStream
 		else channel.args = [ret]
 		@send channel
 
-	for name, prop of CWidget.prototype when prop instanceof Function
-		@::[name] = do(name)-> (args...) -> @meta callback$, _name: name, _args: args
+	if window.CWidget
+		for name, prop of CWidget.prototype when prop instanceof Function
+			@::[name] = do(name)-> (args...) -> @meta callback$, _name: name, _args: args
 		
 	# конструкторы
 	#@callback: (f, args...) -> stream = new CStream; f (do(stream, args)->-> stream.emit ); stream
@@ -91,7 +92,7 @@ class CStream
 		channel.args = args
 		@send channel
 
-	path: -> @meta emitMapPath, _paths: (for arg in args then if arg then arg.split /\./)
+	path: -> @meta emitMapPath, _paths: (for arg in arguments then if arg then arg.split /\./)
 		
 	emitMap = (channel) -> channel.args = [@_callback.apply channel.src, channel.args]; @send channel
 	emitMapTo = (channel) -> channel.args = @_args; @send channel
@@ -230,6 +231,7 @@ class CStream
 	off: (streams...) -> fork = @fork; (for s in streams when -1 != i=fork.indexOf s then fork.splice i, 1); this
 
 	
+	
 if window.CWidget
 	CWidget.extend
 		#stream: -> stream = new CStream; stream
@@ -244,5 +246,9 @@ if window.CModel
 
 		
 class CBox extends CStream
+
+	for k, v of CStream.prototype when k not in ['constructor', 'meta', 'metaError', 'emit', 'emits', 'error', 'errors', 'emitValue', 'emitError', 'send', 'sendError']
+		CBox::[k] = do(v)-> box = v.apply this, arguments; box.emit box._box = @_box; box
 	
-	
+	constructor: ->
+		

@@ -333,6 +333,9 @@ CNavigator = do ->
 	n.summary = _summary.join " "
 	n.agent = Ag
 	n.platform = Platform
+	
+	n.vendor = if IE>8 then "-ms-" else if IE then null else if n.FF then "-moz-" else if n.khtml then "-khtml-" else if n.webkit then "-webkit-" else if n.opera then "-o-" else null
+	
 	n
 	
 
@@ -529,6 +532,7 @@ CMath =
 	
 CCssCode =
 	code: (code) ->
+		vendor = CNavigator.vendor
 		start = "\n$ret.push('"
 		stop = "');\n"
 		for_c = c = 0
@@ -552,9 +556,10 @@ CCssCode =
 		re = /// (\{) | (\}) |
 		%for\s+ ([\w\$]+) (?:\s*,\s*([\w\$]+))? \s+ (?:(in)|(of)) \s+ ([^\{\}]+) \{ |
 		%if\s+ ([^\{\}]+) \{ |
-		%%((?:%[^%]|[^%])+)%% | 
+		%\{ ([^\{\}]+) \} | 
 		%([\w\$]+)\s*\{ |
 		%([\w\$]+ \s* \( [^\(\)]* \)) \s* \{ |
+		%([\w-]+ \s* : [^;\{\}]+) |
 		%([\w\$].*)(?:\r\n|\r|\n) |
 		(['\\]) | (\n) | (\r) | (\t+) ///g
 		code = code.replace re, (m...) ->
@@ -586,11 +591,12 @@ CCssCode =
 			else if m[9]? then ["', (", m[9], "), '"].join("")
 			else if m[10]? then S.push [10, u=++c, m[10]]; [stop, "$rets.push($ret); $ret=[];", start].join("")
 			else if m[11]? then S.push [11, u=++c]; [stop, "function ", m[11], "{var $ret=[];", start].join("")
-			else if m[12]? then lineno++; [stop, vars(m[12]), m[12], start].join("")
-			else if m[13]? then "\\"+m[13]
-			else if m[14]? then lineno++; "\\n"
-			else if m[15]? then "\\r"
-			else if m[16]? then ""
+			else if m[12]? then say m; (if vendor then [vendor, m[12], "; ", m[12]].join "" else m[12])
+			else if m[13]? then lineno++; [stop, vars(m[13]), m[13], start].join("")
+			else if m[14]? then "\\"+m[14]
+			else if m[15]? then lineno++; "\\n"
+			else if m[16]? then "\\r"
+			else if m[17]? then ""
 			else throw CRoot.raise lineno+": fatal error: regexp не обработан"
 			return s
 	

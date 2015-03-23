@@ -17,14 +17,22 @@ sub erase {
 
 # ставит на watch
 sub watch {
-	my ($self, $watch) = @_;
+	my ($self, $watch, $compile) = @_;
 	my $dir = [main::dirs($self->{dir})];
-	($watch // $self->{app}->watch)->on(qr/\.act$/, $dir, Utils::closure($self, sub {
-		my ($self, $path) = @_;
+	my $prt = $compile? sub{}: sub{
+		my ($self, $module, $path) = @_;
+		main::msg(":empty", ":time", " - ", ":red", $module, ":reset", " $path");
+		$self->{app}->process->reset;
+	};
+	
+	($watch // $self->{app}->watch)->on(qr/\.act$/, $dir, Utils::closure($self, $prt, sub {
+		my ($self, $print, $path) = @_;
 		$self->compile_action($path);
-	}))->on(qr/\.htm$/, $dir, Utils::closure($self, sub { 
-		my ($self, $path) = @_;
+		$print->($self, 'action', $path);
+	}))->on(qr/\.htm$/, $dir, Utils::closure($self, $prt, sub {
+		my ($self, $print, $path) = @_;
 		$self->compile_htm($path);
+		$print->($self, 'htm', $path);
 	}))
 }
 
@@ -37,7 +45,7 @@ sub compile {
 	}
 
 	my $watch = R::Watch->new;
-	$self->watch($watch);
+	$self->watch($watch, 1);
 	$watch->fire;
 	$self
 }
