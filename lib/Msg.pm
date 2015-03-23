@@ -57,11 +57,13 @@ my $_LOG = 1;
 sub msg (@) {
 	if($_LOG == 1) {
 		my ($sep, $next, $reset, $inline) = ", ";
+		my $newline = 1;
 		my $msg = join($sep, map {
 			my @ret = !defined($_)? ($_UNIX? Term::ANSIColor::colored("undef", "red"): "undef"):
 			ref $_? do { my($x)=Utils::Dump($_); $x=~s/\s+//g if $inline; $x}:
 			$_ eq ":space"? do { $sep = " "; () }:
 			$_ eq ":empty"? do { $sep = ""; () }:
+			$_ eq ":nonewline"? do { $newline = undef; () }:
 			$_ eq ":inline"? do { $inline = 1; () }:
 			$_ eq ":inline_end"? do { $inline = 0; () }:
 			$_ eq ":time"? do { POSIX::strftime("%T", localtime) }:
@@ -69,7 +71,9 @@ sub msg (@) {
 			$_;
 			if(defined $next and @ret) { $ret[0] = "$next$ret[0]"; $next = undef }
 			@ret
-		} @_).($reset? Term::ANSIColor::color('reset'): "")."\n";
+		} @_);
+		$msg .= Term::ANSIColor::color('reset') if $reset;
+		$msg .= "\n" if $newline;
 		print STDERR $msg;
 	}
 	return $_[$#_];

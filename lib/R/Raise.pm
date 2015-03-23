@@ -25,13 +25,12 @@ sub trace {
 	
 	for(my $i=1; my @param = caller($i); $i++) {
 		my ($package, $file, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = @param;
-		#$subroutine =~ s!^main::(\w+)$!$1!;
 		$subroutine =~ s!(^|::)__ANON__$!$1~!;
 		$subroutine =~ s!^main(::[^:]+)$!$1!;
 		
 		push @$TRACE, {file=>$file, line=>$line, subroutine=> ($is_require? "require ": "").$subroutine} if $subroutine ne "(eval)";
 	}
-
+	
 	$trace
 }
 
@@ -94,7 +93,7 @@ sub trace {
 		if($_->{subroutine}) {
 			$_->{sub} = $sub;
 			$_
-		} elsif(@$trace!=$i and $trace->[$i]{subroutine}) {
+		} elsif(@$trace!=$i and $trace->[$i]{subroutine} and $sub ne "~") {
 			($_, {file => $_->{file}, line => $_->{line}, sub => $sub })
 		}
 		else {$_}

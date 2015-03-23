@@ -39,11 +39,20 @@ sub new {
 				my ($key, $path, $app) = @_;
 				my $watch = $app->ini->{watch}{$key};
 				
-				$path =~ m!/([^/]+)\.\w+$!;
-				my $to = "$watch->{out}/$1.$watch->{outext}";
-				my $map = "$watch->{out}/$1.map";
+				my $to = $path;
+				my $out = $watch->{out};
+				for my $from (split /\s*,\s*/, $watch->{in}) {
+					last if $to =~ s!(^|/)$from!$1$out!;
+				}
+				my $ext = quotemeta $watch->{ext};
+				my $map = $to;
+				$to =~ s!\.$ext$!.$watch->{outext}!;
+				
+				my $mapext = $watch->{map} // "map";
+				$map =~ s!\.$ext$!.$mapext!;
 				
 				$app->request->{get} = {
+					from_abs => ($main::_UNIX? $path: Utils::winpath($path)),
 					from => $path,
 					to => $to,
 					map => $map,
@@ -52,7 +61,7 @@ sub new {
 				$app->kitty->timeout(10)->run(main::file($watch->{kitty}));
 				#my $body = [@{ $app->response->{errors} }];
 				#$body = $app->kitty->reg_compile($body, $path, $key);
-				main::msg ":empty", $app->response->arr_body;
+				main::msg ":empty", ":nonewline", $app->response->arr_body;
 			}):
 			$watch->{run} || $watch->{hung}? do {
 				my $process = R::Hung::Process->new($key, $app);

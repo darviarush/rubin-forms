@@ -258,7 +258,7 @@ sub request {
 			my $isout = s/^\x06//;
 			
 			if(/^end(?:\s+(.+?))?\s*$/) { # может вернуть json
-				main::msg 'end', $1;
+				#main::msg 'end', $1;
 				return $1? $json->decode($1): undef;
 			}
 			elsif(/^head(?:er)?(?:\s+(.+?))?(?::\s+(.*?)\s*)?$/) {

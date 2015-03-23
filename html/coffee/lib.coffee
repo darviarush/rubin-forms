@@ -135,7 +135,7 @@
 # 100. main.ini:watch:run - запускает процесс и main.ini:watch:cascad - каскадирует с другим watch
 # 101. подумать над названиями фреймворков: ka - жизненная сила, ba - чувства (эмоции), ax (ah) - дух, su (shu) - тень (тёмная сторона)
 # 102. $ и wrap сделать одинаковыми, т.к. before(1) и $(1) - разные. И разный язык запросов
-
+ 
 # Ссылки:
 # http://caniuse.com/ - в каком браузере что работает
 # https://sites.google.com/site/moispargalkicss/home/spisok-standartnyh-media-queries - стандартные медиа-запросы css

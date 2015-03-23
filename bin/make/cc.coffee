@@ -14,4 +14,4 @@ pat = (s) -> s = ""+s; if s.length == 1 then "0"+s else s
 d = new Date()
 d = pat(d.getHours())+':'+pat(d.getMinutes())+':'+pat(d.getSeconds())
 
-console.log d + ' - compiled ' + watch.from
+console.log d + ' - compiled ' + watch.from_abs
