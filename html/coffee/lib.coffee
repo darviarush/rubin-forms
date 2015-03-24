@@ -304,7 +304,7 @@ CNavigator = do ->
 	n.FF = typeof InstallTrigger != 'undefined'
 	n.chrome = !!w.chrome
 	n.chromium = /cros i686/i.test(Platform)
-	n.webkit = w.webkitURL != null
+	n.webkit = 'webkitURL' of w #.webkitURL != null
 	#isWebkit = 'WebkitAppearance' in document.documentElement.style;
 	n.safari = w.WheelEvent && !n.FF && !n.chrome && !IE && (/a/.__proto__!='//' && 6 || !d.head && 5 || d.hasFocus && 4 || d.adoptNode && 3 || 2)
 	#/constructor/i.test(w.HTMLElement)
@@ -434,39 +434,8 @@ CParam =
 
 # https://github.com/gka/chroma.js/blob/master/src/conversions/rgb2lab.coffee
 class CColor
-	constructor: (r, g, b, a) -> @r = parseInt r; @g = parseInt g; @b = parseInt b; @a = parseFloat a
 
-	px: 'rgba'
-	toHsl: -> @constructor.rgbToHsl @r, @g, @b
-	toHsla: -> (h=@toHsl()).push @a; h
-	toRgb: -> [@r, @g, @b]
-	toRgba: -> [@r, @g, @b, @a]
-	toNumber: -> @r*256*256*256+@g*256*256+@b*256+parseInt @a*255
-	@fromHsl: (h, s, l) -> new CColor @hslToRgb(h, s, l)..., 1
-	@fromRgb: (r, g, b) -> new CColor r, g, b, 1
-	@fromRgba: (r, g, b, a) -> new CColor r, g, b, a
-	@fromHsla: (h, s, l, a) -> rgb = @hslToRgb h, s, l; new CColor rgb..., a
-	@fromNumber: (color) -> new CColor r=parseInt(color/256/256/256), g=parseInt((color-r=r*256*256*256)/256/256), b=parseInt((color-r-g=g*256*256)/256), (color-r-g-b*256) / 255
-	@fromHex: (hex) -> if hex.length == 4 then new CColor hex[1]*16, hex[2]*16, hex[3]*16, 1 else new CColor hex.slice(1,3), hex.slice(3,5), hex.slice(5), 1
-	rgba: rgba$ = -> "rgba(#{@r}, #{@g}, #{@b}, #{@a})"
-	rgb: -> "rgb(#{@r}, #{@g}, #{@b})"
-	hex: -> pad=CMath.pad; to=CRadix.to; "##{pad to @r, 16}#{pad to @g, 16}#{pad to @b, 16}"
-	smallhex: -> to=CRadix.to; "##{to parseInt(@r/16), 16}#{to parseInt(@g/16), 16}#{to parseInt(@b/16), 16}"
-	hsl: -> x=@toHsl(); "hsl(#{x[0]}, #{x[1]}%, #{x[2]}%)"
-	hsla: -> x=@toHsl(); "hsla(#{x[0]}, #{x[1]}%, #{x[2]}%, #{@a})"
-	name: -> n=@constructor.build_names() unless n=@constructor.names; n[@hex()]
-	iname: ->	# приблизительное имя
-		n=@constructor.build_names() unless n=@constructor.names
-		return name if name=n[@hex()]
-		min = Number.POSITIVE_INFINITY; fhex = @constructor.fromHex
-		for color, name of n when min > dis=@distance fhex color then min = dis; c = name
-		c
-	distancea: (color) -> sqr = CMath.quad; Math.sqrt sqr(@r - color.r)+sqr(@g - color.g)+sqr(@b - color.b)+sqr((@a - color.a)*255)
-	distance: (color) -> sqr = CMath.quad; Math.sqrt sqr(@r - color.r)+sqr(@g - color.g)+sqr(@b - color.b)
-	valueOf: -> @[@px]()
-	toString: @::valueOf
-	
-	@rgbToHsl: (r, g, b) ->
+	@rgbToHsl: rgbToHsl$ = (r, g, b) ->
 		r /= 255 ; g /= 255 ; b /= 255 ; max = Math.max(r, g, b); min = Math.min(r, g, b); l = (max + min) / 2
  
 		if max == min then h = s = 0
@@ -480,7 +449,7 @@ class CColor
 			h /= 6
 		[ h, s, l ]
 		
-	@hslToRgb: (h, s, l) ->
+	@hslToRgb: hslToRgb$ = (h, s, l) ->
 		if s == 0 then r = g = b = l
 		else
 			hue2rgb = (p, q, t) -> (if t < 0 then t += 1 else if t > 1 then t -= 1); if t < 1/6 then p + (q - p) * 6 * t else if t < 1/2 then q else if t < 2/3 then p + (q - p) * (2/3 - t) * 6 else p
@@ -488,7 +457,52 @@ class CColor
 			q = if l < 0.5 then l * (1 + s) else l + s - l * s
 			p = 2 * l - q
 			r = hue2rgb p, q, h + 1/3 ;	g = hue2rgb p, q, h; b = hue2rgb p, q, h - 1/3
-		[ r * 255, g * 255, b * 255 ]
+		[ parseInt(r * 255), parseInt(g * 255), parseInt(b * 255) ]
+
+	constructor: (r, g, b, a) -> @r = parseInt r; @g = parseInt g; @b = parseInt b; @a = parseFloat a
+
+	#px: 'rgba'
+	toHsl: -> rgbToHsl$ @r, @g, @b
+	toHsla: -> (h=@toHsl()).push @a; h
+	toRgb: -> [@r, @g, @b]
+	toRgba: -> [@r, @g, @b, @a]
+	toNumber: -> @r*256*256*256+@g*256*256+@b*256+parseInt @a*255
+	@fromHsl: (h, s, l) -> new CColor hslToRgb$(h, s, l)..., 1
+	@fromRgb: (r, g, b) -> new CColor r, g, b, 1
+	@fromRgba: (r, g, b, a) -> new CColor r, g, b, a
+	@fromHsla: (h, s, l, a) -> rgb = hslToRgb$ h, s, l; new CColor rgb..., a
+	@fromNumber: (color) -> new CColor r=parseInt(color/256/256/256), g=parseInt((color-r=r*256*256*256)/256/256), b=parseInt((color-r-g=g*256*256)/256), (color-r-g-b*256) / 255
+	@fromHex: (hex) -> if hex.length == 4 then new CColor hex[1]*16, hex[2]*16, hex[3]*16, 1 else new CColor hex.slice(1,3), hex.slice(3,5), hex.slice(5), 1
+	rgba: rgba$ = -> "rgba(#{@r}, #{@g}, #{@b}, #{@a})"
+	rgb: -> "rgb(#{@r}, #{@g}, #{@b})"
+	hex: -> pad=CMath.pad; to=CRadix.to; "##{pad to @r, 16}#{pad to @g, 16}#{pad to @b, 16}"
+	smallhex: -> to=CRadix.to; "##{to parseInt(@r/16), 16}#{to parseInt(@g/16), 16}#{to parseInt(@b/16), 16}"
+	hsl: -> x=@toHsl(); "hsl(#{x[0]}, #{x[1]*100}%, #{x[2]*100}%)"
+	hsla: -> x=@toHsl(); "hsla(#{x[0]}, #{x[1]*100}%, #{x[2]*100}%, #{@a})"
+	name: -> n=@constructor.build_names() unless n=@constructor.names; n[@hex()]
+	iname: ->	# приблизительное имя
+		n=@constructor.build_names() unless n=@constructor.names
+		return name if name=n[@hex()]
+		min = Number.POSITIVE_INFINITY; fhex = @constructor.fromHex
+		for color, name of n when min > dis=@distance fhex color then min = dis; c = name
+		c
+	
+	red: (x)-> if arguments.length then @r = x; this else @r
+	green: (x)-> if arguments.length then @g = x; this else @g
+	blue: (x)-> if arguments.length then @b = x; this else @b
+	alpha: (x)-> if arguments.length then @a = x; this else @a
+	
+	hue: (x)-> h=@toHsl(); if arguments.length then [@r, @g, @b] = hslToRgb$ x, h[1], h[2]; this else h[0]
+	saturate: (x)-> h=@toHsl(); if arguments.length then [@r, @g, @b] = hslToRgb$ h[0], x, h[2]; this else h[1]
+	lightness: (x)-> h=@toHsl(); if arguments.length then [@r, @g, @b] = hslToRgb$ h[0], h[1], x; this else h[2]
+
+	sqr = (x)-> x*x
+	distancea: (color) -> Math.sqrt sqr(@r - color.r)+sqr(@g - color.g)+sqr(@b - color.b)+sqr((@a - color.a)*255)
+	distance: (color) -> Math.sqrt sqr(@r - color.r)+sqr(@g - color.g)+sqr(@b - color.b)
+	valueOf: valueOf$ = -> if @px then @[@px]() else if @a==1 then @name() || @hex() else @rgba()
+	toString: valueOf$
+	
+	
 	
 	@build_names: -> @names = n = {}; (for name, hex of @colors then n[hex] = name); n
 	
@@ -551,18 +565,23 @@ CCssCode =
 			if vario.length then ["var ", vario.join(","), "; "].join("")
 			else ""	
 
-		# 1 2 3     4     5    6   7     8     9  10          11        12           13   14    15  16
-		# { } for_v for_i in   of  range if    %% присвоение  функция   выражение_js  \'   \n   \r	\t+	
+		# 1 2 3     4     5    6   7     8     9   10          11        12           13   14    15  16
+		# { } for_v for_i in   of  range if    %{} присвоение  функция   выражение_js  \'   \n   \r	\t+	
 		re = /// (\{) | (\}) |
 		%for\s+ ([\w\$]+) (?:\s*,\s*([\w\$]+))? \s+ (?:(in)|(of)) \s+ ([^\{\}]+) \{ |
 		%if\s+ ([^\{\}]+) \{ |
 		%\{ ([^\{\}]+) \} | 
 		%([\w\$]+)\s*\{ |
 		%([\w\$]+ \s* \( [^\(\)]* \)) \s* \{ |
-		%([\w-]+ \s* : [^;\{\}]+) |
 		%([\w\$].*)(?:\r\n|\r|\n) |
 		(['\\]) | (\n) | (\r) | (\t+) ///g
-		code = code.replace re, (m...) ->
+		#code = code.replace /// %([\w-]+ \s* : [^;\}]+) ///g, if vendor then -> [vendor, m[1], "; ", m[1]].join "" else '$1'
+		#code = code.replace /// ([^:]+) \s* : -%- ([^;\}]+) ///g, if vendor then -> [vendor, m[1], "; ", m[1]].join "" else '$1: $2'
+		re_in = '%\\{[^\\{\\}]*\\}'
+		code = code
+		.replace /// %((?:[\w-]|#{re_in})+ \s* : (?:#{re_in}|[^;\{\}])+) ///g, if vendor then (z, a) -> [vendor, a, "; ", a].join "" else '$1'
+		.replace /// ((?:[\w-]|#{re_in})+) \s* : \s* -%- ((?:#{re_in}|[^;\{\}])+) ///g, if vendor then (z, a, b)-> [a, ": ", vendor, b, "; ", a, ": ", b].join "" else '$1: $2'
+		.replace re, (m...) ->
 			#say (lineno+":"+c+':'+u+':'+k+': '+i for i, k in m when i? and 0<k and k<17)[0]
 			s = if m[1]? then c++; "{"
 			else if m[2]?
@@ -591,12 +610,11 @@ CCssCode =
 			else if m[9]? then ["', (", m[9], "), '"].join("")
 			else if m[10]? then S.push [10, u=++c, m[10]]; [stop, "$rets.push($ret); $ret=[];", start].join("")
 			else if m[11]? then S.push [11, u=++c]; [stop, "function ", m[11], "{var $ret=[];", start].join("")
-			else if m[12]? then say m; (if vendor then [vendor, m[12], "; ", m[12]].join "" else m[12])
-			else if m[13]? then lineno++; [stop, vars(m[13]), m[13], start].join("")
-			else if m[14]? then "\\"+m[14]
-			else if m[15]? then lineno++; "\\n"
-			else if m[16]? then "\\r"
-			else if m[17]? then ""
+			else if m[12]? then lineno++; [stop, vars(m[12]), m[12], start].join("")
+			else if m[13]? then "\\"+m[13]
+			else if m[14]? then lineno++; "\\n"
+			else if m[15]? then "\\r"
+			else if m[16]? then ""
 			else throw CRoot.raise lineno+": fatal error: regexp не обработан"
 			return s
 	
@@ -610,7 +628,7 @@ CCssCode =
 		
 	resize: (root) ->
 		root.interval -> @clear()
-	
+
 	
 CInit =
 	requires: {}
@@ -624,10 +642,11 @@ CInit =
 		if name[0] != '/' then path = CInit.path.replace ///\w+$///, 'css'; name = path+'/'+name
 		if CInit.check name+='.css' then document.writeln('\n<link rel="stylesheet" href="'+name+'" type="text/css"'+(if media then ' media="'+media+'"' else '')+'>'); on else off
 	style: (css) ->
-		(div=CRoot.new("div")).appendTo(CRoot.body()).ping(_method: 'GET', _act: css+'.css').onLoad = do(div)->(code) -> 
+		CRoot.new("div").appendTo(CRoot.body()).ping(_method: 'GET', _act: css+'.css').onLoad = (code) ->
+			@free()
 			_CSS_$ = null
 			eval CCssCode.code(code)
-			CRoot.new("style").appendTo(CRoot.head()).html _CSS_$()
+			@head().append @new("style").html _CSS_$()
 		
 	init_from_param: ->
 		src = if a=document.getElementById "_app_" then a.src else (document.getElementsByTagName('body') || document.getElementsByTagName('head'))[0].innerHTML.match(/// src=['"]?( [^\s'"<>]+ ) [^<>]+> (\s*</\w+>)+ \s* $ ///i)[1].replace(/&amp(?:;|\b)/g, '&')
@@ -1224,7 +1243,7 @@ CEffect =
 
 CRoot = null
 unless window.$ then $ = (e) ->
-	if typeof e == 'function' then CRoot._init_functions.push e
+	if typeof e == 'function' then CRoot._ready_functions.push e
 	else if typeof e == 'string' && !/^</.test e then CRoot.find e
 	else if !e? then new CWidgets
 	else CRoot.wrap e
@@ -1360,7 +1379,7 @@ class CWidget
 	#svg: new$.inline "svg", "document.createElementNS('http://www.w3.org/2000/svg', tag)"
 	#xml: new$.inline "xml", "document.createElementNS('http://www.w3.org/1999/xhtml', tag)"
 	
-	emmet: () ->
+	#emmet: (e) ->	
 	
 	type$.nothing 'createWidget ctype new'
 	type$.all 'rewrap unwrap'
@@ -2857,13 +2876,15 @@ class CWidget
 	ping: (param, args...) -> @loader()._load 'ping', param, this, args; this
 	erase: (param, args...) -> @loader()._load 'erase', extend(@param(), param || {}), this, args; this
 	
-	loader: ->
-		@_loader ||= if cloader = @element.getAttribute "cloader" then @byId cloader
+	loader: (loader) ->
+		if arguments.length then @_loader = loader; this
 		else
-			parent = this
-			while not parent._loader and parent = parent.parent() then null
-			if parent then parent._loader
-			else @tooltip(html: '<div cview=loading></div>', ctype: 'tooltip').tooltip().last()
+			@_loader ||= if cloader = @element.getAttribute "cloader" then @byId cloader
+			else
+				parent = this
+				while not parent._loader and parent = parent.parent() then null
+				if parent then parent._loader
+				else @tooltip(html: '<div cview=loading></div>', ctype: 'tooltip').tooltip().last()
 
 	loading: -> !!@loader().request
 
@@ -3474,12 +3495,13 @@ class CLoaderWidget extends CWidget
 		request = @request.request
 		customer = @request.customer
 		try
-			@request.data = data = customer.dataType(request.responseText)
+			@request.data = data = customer.dataType request.responseText
 		catch e
 			return @loaded_error "Ошибка в ответе сервера", e
 		do @ohComplete
 		args = @request.args
 		customer.send "onComplete", data, @request, args...
+
 		switch @request.type
 			when "upload"
 				customer.add data

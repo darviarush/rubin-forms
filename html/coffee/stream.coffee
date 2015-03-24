@@ -246,9 +246,5 @@ if window.CModel
 
 		
 class CBox extends CStream
-
-	for k, v of CStream.prototype when k not in ['constructor', 'meta', 'metaError', 'emit', 'emits', 'error', 'errors', 'emitValue', 'emitError', 'send', 'sendError']
-		CBox::[k] = do(v)-> box = v.apply this, arguments; box.emit box._box = @_box; box
-	
-	constructor: ->
-		
+	constructor: (@_box) ->
+	meta: -> box = super ; box.emitValue box._box = @_box; box

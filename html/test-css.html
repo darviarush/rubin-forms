@@ -5,6 +5,21 @@
 	<title>Rubin Css Framework</title>
 	<script id=_app_ src="js/lib.js?css=in1w12" type="text/javascript"></script>
 	<link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+	
+<script><!--
++function() {
+
+	var hash = location.hash.replace(/^#/, '')
+	
+	if(hash) $(function() {
+		if($('head style').length) {
+			var a = CRoot.first('a[name='+hash+']')
+			if(a) a.element.scrollIntoView()
+		}
+		else CRoot.timeout(10, arguments.callee)
+	})
+}()
+--></script>
 </head>
 <body>
 
@@ -84,8 +99,6 @@
 			<div class="w1_12">.w1_12</div>
 			<div class="w1_12">.w1_12</div>
 			
-			
-			
 			<div class="w4_9">.w4_9</div> <div class="w2_9">.w2_9</div> <div class="w3">.w3_9</div>
 			<div class="w4">.w4</div> <div class="w5_12">.w5_12</div> <div class="w3">.w3</div>
 		</div>
@@ -105,14 +118,15 @@
 			<div class="rest">.rest</div>
 		</div>
 		
-		<h3>Столбцы</h3>
+		<h3><a name="Столбцы"></a><a href="#Столбцы"># Столбцы</a></h3>
 		<p>Вложенная сетка должна быть под классом .col</p>
 		
 		<div class="test-w">
 			
 			<div class="w1">.w1</div>
 			<div class="w2_3 col">
-				<p>.w2_3.col - как видите .col не имеет padding-а. Поэтому внутри него всегда применяйте .w1</p>
+				<p>.w2_3.col - как видите, .col не имеет padding-а, margin-а и border-а</p>
+				<div class="rest">Поэтому всегда внутри него для текста применяйте .rest</div>
 				<div class="w3">.w3</div>
 				<div class="w3">.w3</div>
 				<div class="w3">.w3</div>
@@ -121,6 +135,16 @@
 			
 			<div class="w3">.w3</div>
 			<div class="w3">.w3</div>
+			
+			<div class="w3" style="background: AliceBlue; border-color: LightSteelBlue">
+				<p>А вот .w3 с вложениями</p>
+				<div class="fill">.fill</div>
+				<div class="first w6">.first.w6</div>
+				<div class="last w6">.last.w6</div>
+				<div class="first w9">.first.w9</div>
+				<div class="w9">.w9</div>
+				<div class="last w9">.last.w9</div>
+			</div>
 		</div>
 		
 		<h3>.offsetX</h3>
@@ -134,6 +158,8 @@
 		
 		
 		<h3>Изменение порядка следования ячеек для SEO</h3>
+		
+		<p>Необходим параметр seo1</p>
 		
 		<div class="test-w">
 			<div class="w6">1</div>
@@ -230,10 +256,34 @@
 		
 		<h3>Кнопки</h3>
 		
+		<p>
+			<a class=btn href="#" onclick="return false">.btn</a>
+			<a class="btn dim" href="#" onclick="return false">.btn.dim</a>
+			<a class="btn green" href="#" onclick="return false">.btn.green</a>
+			<a class="btn orange" href="#" onclick="return false">.btn.orange</a>
+			<a class="btn violet" href="#" onclick="return false">.btn.violet</a>
+			<a class="btn blue" href="#" onclick="return false">.btn.blue</a>
+			<a class="btn red" href="#" onclick="return false">.btn.red</a>
+			<a href="#" onclick="return false">link</a>
+		</p>
 		
+		<h2>Типография</h2>
+		<h3>Заголовки</h3>
+		<h1>h1. Заголовок</h1>
+		<h2>h2. Заголовок</h2>
+		<h3>h3. Заголовок</h3>
+		<h4>h4. Заголовок</h4>
+		<h5>h5. Заголовок</h5>
+		<h6>h6. Заголовок</h6>
 		
-		<h3></h3>
-		
+		<xmp>
+			<h1>h1. Заголовок</h1>
+			<h2>h2. Заголовок</h2>
+			<h3>h3. Заголовок</h3>
+			<h4>h4. Заголовок</h4>
+			<h5>h5. Заголовок</h5>
+			<h6>h6. Заголовок</h6>
+		</xmp>
 		
 		<h2>Настройка css-фреймворка</h2>
 		<p>css-фреймворк встроен в javascript-фреймворк Рубин.</p>
