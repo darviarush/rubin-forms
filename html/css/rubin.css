@@ -12,11 +12,18 @@
 
 /* инициализация */
 
+html {
+font-family: sans-serif;
+-ms-text-size-adjust: 100%;
+-webkit-text-size-adjust: 100%;
+}
+
+
 html {margin:0;padding:0;border:0}
-body, div, span, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre, a, abbr, acronym, address, code, del, dfn, em, img, q, dl, dt, dd, ol, ul, li, fieldset, form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td, article, aside, dialog, figure, footer, header, hgroup, nav, section {margin:0;padding:0;border:0;vertical-align:baseline;}
-article, aside, details, figcaption, figure, dialog, footer, header, hgroup, menu, nav, section {display:block;}
+body, div, span, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre, a, abbr, acronym, address, code, del, dfn, em, img, q, dl, dt, dd, ol, ul, li, fieldset, form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td, article, aside, dialog, figure, footer, header, hgroup, nav, section {margin:0;padding:0;border:0;vertical-align:middle;}
+article, aside, details, figcaption, figure, footer, header, hgroup, menu, nav, section, summary, dialog, main {display:block;}
 table {border-collapse:separate;border-spacing:0;}
-caption, th, td {text-align:left;font-weight:normal;float:none !important;}
+caption, th, td {text-align:center;font-weight:normal;float:none !important;padding: %{pa}px}
 table, th, td {vertical-align:middle;}
 blockquote:before, blockquote:after, q:before, q:after {content:''}
 blockquote, q {quotes:"" "";}
@@ -32,7 +39,7 @@ background-color: #fff;
 overflow: auto;
 }
 
-input, button, select, textarea { font-family: inherit; font-size: inherit; line-height: inherit; overflow: hidden; border:solid 1px #E7E7E7 }
+input, button, select, textarea { font-family: inherit; font-size: inherit; line-height: inherit; overflow: hidden; border:solid 1px #E7E7E7; padding: %{pa}px; }
 input:hover, button:hover, select:hover, textarea:hover { border-color: orange }
 a { color: #428bca; text-decoration: none; }
 a:hover, a:focus { color: #2a6496; text-decoration: underline; }
@@ -41,7 +48,7 @@ a:focus { outline: thin dotted; outline: 5px auto -webkit-focus-ring-color; outl
 h1, h2, h3, h4, h5, h6 { border-width: 10pt 0 5pt 0; border-color: transparent; border-style: solid; }
 
 html,body{ width:100%; height:100% }
-* { padding: 0; margin: 0; overflow: auto; clear: both }
+* { padding: 0; margin: 0; overflow: auto; clear: both; vertical-align:middle }
 
 %inline_block {display: -moz-inline-stack; display: inline-block; *display: inline; *zoom: 1}
 
@@ -61,14 +68,22 @@ html,body{ width:100%; height:100% }
 %red = "#CD5C5C"
 %lred = "#FFE4E1"
 
-%colors = {dim:dim, green:green, orange:orange, violet:violet, blue:blue, red:red}
+%dark = {dim:dim, green:green, orange:orange, violet:violet, blue:blue, red:red}
 %light = {dim:ldim, green:lgreen, orange:lorange, violet:lviolet, blue:lblue, red:lred}
+%colors = extend({}, dark)
+%for name, color of light {
+	%colors[name+'-light'] = color
+}
+
+
 
 /* кнопки */
 .btn {
 %{inline_block};
 background: %{blue}; background-repeat: repeat-x;
 padding: %{pa}px %{2*pa}px;
+text-align: center;
+margin: 5px 0;
 %border-radius: %{ma}px;
 %box-shadow: 1px 1px 1px #778899;
 }
@@ -85,11 +100,17 @@ padding: %{pa}px %{2*pa}px;
 
 %widths = [[550, 500, 450], [750, 650, 550], [970, 770, 570], [1170, 970, 770]]
 %display = [568, 768, 992, 1200]
+%sizes = ["x", "s", "m", "l"]
 
 %for u, n in display {
 	%width = widths[n][inx-1]
+	%sizeName = sizes[n]
 	@media (min-width: %{u}px) %if n<display.length-1 { and (max-width: %{ display[n+1]-1 }px) } {
+	
 		.in%{inx} {width: %{width}px}
+		
+		.no-%{sizeName} {display:none}
+		%for sn in sizes { %if sn !== sizeName { .only-%{sn} {display:none} } }
 
 		%if rem = exists('w') {
 			%for j in 1..rem {
@@ -97,11 +118,11 @@ padding: %{pa}px %{2*pa}px;
 					%col = i * width / j
 					%k = col - 2*pa - ma - 2*br
 					%t = i+"_"+j
-					%if i===1 { .w%{j}, } .w%{t} { width: %{k}px; %{float} }
-					%if i===1 { .w%{j}.col, } .w%{t}.col { width: %{col}px }
-					%if i===1 { .offset%{j}, } .offset%{t} { margin-left: %{col}px }
-					%if i===1 { .i%{j}, } .i%{t} { width: %{k-2*pa-2*br}px; padding: %{pa}px }
-					%if i===1 { .h%{j}, } .h%{t} { height: %{k}px }
+					%if i===1 { .w%{j}, .w%{sizeName+j}, } .w%{t}, .w%{sizeName+t} { width: %{k}px; %{float} }
+					%if i===1 { .w%{j}.col, .w%{sizeName+j}.col } .w%{t}.col, .w%{sizeName+t}.col { width: %{col}px }
+					%if i===1 { .offset%{j}, .offset%{sizeName+j}, } .offset%{sizeName+t}, .offset%{t} { margin-left: %{col}px }
+					%if i===1 { .i%{sizeName+j}, .i%{j}, } .i%{sizeName+t}, .i%{t} { width: %{k-2*pa-2*br}px; padding: %{pa}px }
+					%if i===1 { .h%{sizeName+j}, .h%{j}, } .h%{sizeName+t}, .h%{t} { height: %{k}px }
 				}
 			}
 		}
@@ -115,41 +136,43 @@ padding: %{pa}px %{2*pa}px;
 .fill { %{rest.replace(/margin:[^;]*;?/, '')}; margin: 0 %{-pa}px %{ma}px %{-pa-br}px; border-right-width: 0 !important}
 
 
-/* цвета */
-%for name, color of colors {
+%for name, color of dark {
 	.%{name} { background-color: %{color}; color: %{light[name]} }
 	.%{name}-light { background-color: %{light[name]} }
 	.%{name}-header { color: %{color}; font-weight: 700; background-color: %{light[name]} }
-	.%{name}-text { color: %{color}; font-weight: 700 }
-
-	%for i in 0..1 {
-		%if i!=0 {
-			/* кнопки */
-			%r1 = CRoot.rgba(color)
-			%l1 = r1.lightness() + 0.15; r1.lightness(l1 > 1? 1: l1)
-			%if name === 'blue' { .btn, }
-			.%{name}.btn {
-				background-image: -%-linear-gradient(to bottom, %{r1}, %{color});
-				border: solid 1px %{color}
-			}
-		
-			%color = light[name]
-			%name += '-light'
-		}
-		/* линии */
-		.%{name}-line { border: solid 1px %{color} }
-		.%{name}-line-h { border-left: solid 1px %{color}; border-right: solid 1px %{color} }
-		.%{name}-line-v { border-top: solid 1px %{color}; border-bottom: solid 1px %{color} }
-		.%{name}-line-l { border-left: solid 1px %{color} }
-		.%{name}-line-r { border-right: solid 1px %{color} }
-		.%{name}-line-b { border-bottom: solid 1px %{color} }
-		.%{name}-line-t { border-top: solid 1px %{color} }
-		
-
+	.%{name}-text { background-color: %{light[name]}; color: %{color}; }
+	
+	/* кнопки */
+	%r1 = CRoot.rgba(color)
+	%l1 = r1.lightness() + 0.15; r1.lightness(l1 > 1? 1: l1)
+	%if name === 'blue' { .btn, }
+	.%{name}.btn {
+		background-image: -%-linear-gradient(to bottom, %{r1}, %{color});
+		border: solid 1px %{color}
 	}
-
 }
 
+
+/* цвета */
+%for name, color of colors {
+	/* линии */
+	.%{name}-line { border: solid 1px %{color} }
+	.%{name}-line-h { border-left: solid 1px %{color}; border-right: solid 1px %{color} }
+	.%{name}-line-v { border-top: solid 1px %{color}; border-bottom: solid 1px %{color} }
+	.%{name}-line-l { border-left: solid 1px %{color} }
+	.%{name}-line-r { border-right: solid 1px %{color} }
+	.%{name}-line-b { border-bottom: solid 1px %{color} }
+	.%{name}-line-t { border-top: solid 1px %{color} }
+	
+	/* проверочная сетка */
+	/*if { .showgrid, } .showgrid {
+		background-image: -%-linear-gradient(to right, %{color} );
+	}*/
+}
+
+
+/* проверочная сетка */
+/*.showgrid { background-repeat: repeat }*/
 
 /* центрирование */
 .l { text-align: left }
@@ -169,3 +192,39 @@ padding: %{pa}px %{2*pa}px;
 /* тултип */
 .c-tip { background-color: #2a2a2a; background-color: rgba(0, 0, 0, 0.7); color: WhiteSmoke; /*border: solid 1px gray;*/ padding: 5px; %border-radius: 3px; font-size: 12px; width: 200px; max-height: 200px; }
 .c-tip h1, .c-tip h2, .c-tip h3, .c-tip h4 { color: LightSkyBlue; }
+
+
+/* типография */
+
+code {
+padding: 2px 4px;
+font-size: 90%;
+color: #c7254e;
+background-color: #f9f2f4;
+white-space: nowrap;
+border-radius: 4px;
+}
+
+
+/* таблицы */
+th {font-weight: 700}
+.table-fill {width:100%}
+.table-l th, .table-l td { text-align: left }
+.table-j th, .table-j td { text-align: justify }
+.table-r th, .table-r td { text-align: right }
+.table-t th, .table-t td { vertical-align: top }
+.table-b th, .table-b td { text-align: bottom }
+
+.table, .table-border {border-collapse:collapse}
+.table > tr, .table > * > tr { border-bottom: solid %{br}px %{ldim} }
+.table tr:last-child { border-bottom: 0 }
+.table-border, .table-border td, .table-border th { border: solid %{br}px %{ldim} }
+.table-zebra > tr:nth-of-type(odd), .table-zebra > * > tr:nth-of-type(odd) { background-color: white }
+
+%for name, color of colors {
+	%if name == 'dim-light' {.table-cursor > tr:hover, .table-cursor > * > tr:hover, }
+	.table-cursor-%{name} > tr:hover, .table-cursor-%{name} > * > tr:hover { background-color: %{color} }
+	
+	%if name == 'dim-light' { .table-border, .table-border td, .table-border th, }
+	.table-border-%{name}, .table-border-%{name} td, .table-border-%{name} th { border: solid %{br}px %{color} }
+}

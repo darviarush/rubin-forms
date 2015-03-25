@@ -120,7 +120,7 @@
 # 89. form target=id - указывает до какого id разворачивать layout. Сервер смотрит: если id принадлежит инклуду, то возвращает одну страницу и указатель - изменить только параметр _f=id=url,...
 # 90. css - распознавание префиксов срабатывает только при запросе: get/set/hasCss. Префиксы на обработчики событий
 # 91. widget.type - createWidget должен короткие имена классов собирать в ассоциативный массив (?). C*Widget и html-xs = HtmlXs
-# 92. fly - делает виджет плавающим в окне. @fly top|bottom, [без_ограничений]
+# 92. fly - делает виджет плавающим в окне. @fly [элементы-top|bottom], [расстояние_остановки_до_элемента]. @fly() - без ограничений
 # 93. переделать CTemplate.compile
 # 94. CBox в stream
 # 95. Растягивающиеся тултипы и окошки через таскание мышкой границы
@@ -646,7 +646,7 @@ CInit =
 			@free()
 			_CSS_$ = null
 			eval CCssCode.code(code)
-			@head().append @new("style").html _CSS_$()
+			@head().append @new("style").html say _CSS_$()
 		
 	init_from_param: ->
 		src = if a=document.getElementById "_app_" then a.src else (document.getElementsByTagName('body') || document.getElementsByTagName('head'))[0].innerHTML.match(/// src=['"]?( [^\s'"<>]+ ) [^<>]+> (\s*</\w+>)+ \s* $ ///i)[1].replace(/&amp(?:;|\b)/g, '&')
@@ -1986,12 +1986,14 @@ class CWidget
 		else e=@element; (for v in val.all() then e.appendChild v)
 		this
 	appendTo: (val, args...) -> @wrap(val).append this, args...; this
+	appendRet: (val, args...) -> @append val = @wrap val, args...; val
 	prepend: (val, timeout, listen) ->
 		val = @wrap val
 		if timeout? then append_anim$.call this, 'prepend', val, timeout, listen
 		else f=(e=@element).firstChild; (for v in val.all() then e.insertBefore v, f)
 		this
 	prependTo: (val, args...) -> @wrap(val).prepend this, args...; this
+	prependRet: (val, args...) -> @prepend val = @wrap val, args...; val
 	wrapIn: (val) -> @before val=@wrap val; (while r=val.child 0 then val=r); val.content this
 	wrapInAll: @::wrapIn.inline('wrapInAll')
 	swap_arr$ = ['prevnode', 'nextnode', 'up']
@@ -3042,6 +3044,18 @@ class CIframeWidget extends CImgWidget
 		else throw @raise "Неизвестный науке метод "+method
 
 
+# элементы
+class CElementWidget extends CWidget
+	constructor: ->
+		super
+		counter = if @constructor::hasOwnProperty '_counter' then ++@constructor::_counter else @constructor::_counter = 0
+		@send "onBeforeCreate", counter
+		do @defineHandlers if 0 == counter
+		do @setHandlers
+		do @setListens
+		do @setModel
+		@send 'onCreate', counter
+
 # формы
 class CFormWidget extends CWidget
 	_default_assign: 'val'
@@ -3213,7 +3227,8 @@ class CSelectableWidget extends CListWidget
 	
 class CAutocompleteWidget extends CTemplateWidget
 
-	
+
+
 	
 
 # http://habrahabr.ru/company/mailru/blog/207048/
@@ -3423,7 +3438,7 @@ class CTipFocusWidget extends CTooltipWidget
 	#for ie: onfocus_parent: @::onfocusin
 	#onblur_parent: @::onfocusout
 
-		
+	
 # загрузчики
 class CLoaderWidget extends CWidget
 	constructor: ->

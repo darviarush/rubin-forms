@@ -8,9 +8,21 @@
 	
 <script><!--
 +function() {
-
-	var hash = location.hash.replace(/^#/, '')
 	
+	$(function() {
+		var items = $('.in1 > h1, .in1 > h2, .in1 > h3').items()
+		
+		for(var i=0; i<items.length; i++) {
+			var item = items[i]
+			href=item.text().replace(/\s/g, '_')
+			item.content().wrapIn(item.new('a').attr('href', '#'+href))
+			item.first().prepend('# ')
+			item.prepend(item.new('a').attr('name', href))
+		}
+	})
+	
+	
+	var hash = location.hash.replace(/^#/, '')
 	if(hash) $(function() {
 		if($('head style').length) {
 			var a = CRoot.first('a[name='+hash+']')
@@ -118,7 +130,7 @@
 			<div class="rest">.rest</div>
 		</div>
 		
-		<h3><a name="Столбцы"></a><a href="#Столбцы"># Столбцы</a></h3>
+		<h3>Столбцы</h3>
 		<p>Вложенная сетка должна быть под классом .col</p>
 		
 		<div class="test-w">
@@ -157,6 +169,107 @@
 		</div>
 		
 		
+		<h3>Разрешения экрана</h3>
+		
+		<table>
+		<tr><th>префикс<th>разрешение<th>класc скрывает<th>класс показывает
+		<tr><td>wl<td>1200<td>.no-l<td>.only-l
+		<tr><td>wm<td>992<td>.no-m<td>.only-m
+		<tr><td>ws<td>768<td>.no-s<td>.only-s
+		<tr><td>wx<td>568<td>.no-x<td>.only-x
+		</table>
+		
+		
+		<h3>Утилиты адаптивности</h3>
+		
+		<table class=table-border>
+      <thead>
+        <tr>
+          <th></th>
+          <th>
+            Очень маленькие устройство <small>Телефоны  (&lt;768px)</small>         </th>
+          <th>
+            Малые устройства
+         <small>Планшеты (≥768px)</small>
+          </th>
+          <th>
+            Средние устройства
+        <small>Настольные (≥992px)</small>
+          </th>
+          <th>
+            Большие устройства
+       <small>Настольные (≥1200px)</small>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th><code>.only-x</code></th>
+          <td class="green-text">Видимый</td>
+          <td class="dim-text">Скрытый</td>
+          <td class="dim-text">Скрытый</td>
+          <td class="dim-text">Скрытый</td>
+        </tr>
+        <tr>
+          <th><code>.only-s</code></th>
+          <td class="dim-text">Скрытый</td>
+          <td class="green-text">Видимый</td>
+          <td class="dim-text">Скрытый</td>
+          <td class="dim-text">Скрытый</td>
+        </tr>
+        <tr>
+          <th><code>.only-m</code></th>
+          <td class="dim-text">Скрытый</td>
+          <td class="dim-text">Скрытый</td>
+          <td class="green-text">Видимый</td>
+          <td class="dim-text">Скрытый</td>
+        </tr>
+        <tr>
+          <th><code>.only-l</code></th>
+          <td class="dim-text">Скрытый</td>
+          <td class="dim-text">Скрытый</td>
+          <td class="dim-text">Скрытый</td>
+          <td class="green-text">Видимый</td>
+        </tr>
+      </tbody>
+      <tbody>
+        <tr>
+          <th><code>.no-x</code></th>
+          <td class="dim-text">Скрытый</td>
+          <td class="green-text">Видимый</td>
+          <td class="green-text">Видимый</td>
+          <td class="green-text">Видимый</td>
+        </tr>
+        <tr>
+          <th><code>.no-s</code></th>
+          <td class="green-text">Видимый</td>
+          <td class="dim-text">Скрытый</td>
+          <td class="green-text">Видимый</td>
+          <td class="green-text">Видимый</td>
+        </tr>
+        <tr>
+          <th><code>.no-m</code></th>
+          <td class="green-text">Видимый</td>
+          <td class="green-text">Видимый</td>
+          <td class="dim-text">Скрытый</td>
+          <td class="green-text">Видимый</td>
+        </tr>
+        <tr>
+          <th><code>.no-l</code></th>
+          <td class="green-text">Видимый</td>
+          <td class="green-text">Видимый</td>
+          <td class="green-text">Видимый</td>
+          <td class="dim-text">Скрытый</td>
+        </tr>
+      </tbody>
+    </table>
+		
+		<p>При меньшем 568px разрешении будет каша</p>
+		<p>Классы .no-... скрывают элемент при соответствующем разрешении</p>
+		<p>Классы .only-... показывают элемент только при указанном разрешении</p>
+		<p>Проверяем: разрешение сейчас <code class=only-x>568</code><code class=only-s>768</code><code class=only-m>992</code><code class=only-l>1200</code>, класс <code class=only-x>.only-x</code><code class=only-s>.only-s</code><code class=only-m>.only-m</code><code class=only-l>.only-l</code></p>
+		
+		
 		<h3>Изменение порядка следования ячеек для SEO</h3>
 		
 		<p>Необходим параметр seo1</p>
@@ -166,6 +279,193 @@
 			<div class="w6">2</div>
 			<div class="w4_6 push6">3 &rarr; 2</div>
 		</div>
+		
+		<h2>Таблицы</h2>
+		
+		<h3>Обычные. Без класса</h3>
+		
+		<table class="border">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Имя</th>
+          <th>Фамилия</th>
+          <th>Пользователь</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td rowspan="2">1</td>
+          <td>Mark</td>
+          <td>Otto</td>
+          <td>@mdo</td>
+        </tr>
+        <tr>
+          <td>Mark</td>
+          <td>Otto</td>
+          <td>@TwBootstrap</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Jacob</td>
+          <td>Thornton</td>
+          <td>@fat</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td colspan="2">Larry the Bird</td>
+          <td>@twitter</td>
+        </tr>
+      </tbody>
+    </table>
+		
+		<h3>C границами строк</h3>
+		
+		<table class="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Имя</th>
+          <th>Фамилия</th>
+          <th>Пользователь</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td rowspan="2">1</td>
+          <td>Mark</td>
+          <td>Otto</td>
+          <td>@mdo</td>
+        </tr>
+        <tr>
+          <td>Mark</td>
+          <td>Otto</td>
+          <td>@TwBootstrap</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Jacob</td>
+          <td>Thornton</td>
+          <td>@fat</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td colspan="2">Larry the Bird</td>
+          <td>@twitter</td>
+        </tr>
+      </tbody>
+    </table>
+		
+		
+		<h3>C границами</h3>
+		
+		<table class="table-border">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Имя</th>
+          <th>Фамилия</th>
+          <th>Пользователь</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td rowspan="2">1</td>
+          <td>Mark</td>
+          <td>Otto</td>
+          <td>@mdo</td>
+        </tr>
+        <tr>
+          <td>Mark</td>
+          <td>Otto</td>
+          <td>@TwBootstrap</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Jacob</td>
+          <td>Thornton</td>
+          <td>@fat</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td colspan="2">Larry the Bird</td>
+          <td>@twitter</td>
+        </tr>
+      </tbody>
+    </table>
+		
+		<h3>"Зебра"</h3>
+		<table class="table-zebra dim-light table-fill">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Имя</th>
+          <th>Фамилия</th>
+          <th>Пользователь</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td rowspan="2">1</td>
+          <td>Mark</td>
+          <td>Otto</td>
+          <td>@mdo</td>
+        </tr>
+        <tr>
+          <td>Mark</td>
+          <td>Otto</td>
+          <td>@TwBootstrap</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Jacob</td>
+          <td>Thornton</td>
+          <td>@fat</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td colspan="2">Larry the Bird</td>
+          <td>@twitter</td>
+        </tr>
+      </tbody>
+    </table>
+	
+		<h3>Курсор строк</h3>
+		
+		<table class="table-cursor">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Имя</th>
+          <th>Фамилия</th>
+          <th>Пользователь</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td rowspan="2">1</td>
+          <td>Mark</td>
+          <td>Otto</td>
+          <td>@mdo</td>
+        </tr>
+        <tr>
+          <td>Mark</td>
+          <td>Otto</td>
+          <td>@TwBootstrap</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Jacob</td>
+          <td>Thornton</td>
+          <td>@fat</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td colspan="2">Larry the Bird</td>
+          <td>@twitter</td>
+        </tr>
+      </tbody>
+    </table>
 		
 		<h2>Расцветка и линии</h2>
 		
@@ -235,6 +535,7 @@
 		
 		<h3>Переключатель</h3>
 		
+		<p>.radiobox</p>
 		<div class="radiobox">
 			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
 			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
@@ -242,6 +543,70 @@
 			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
 			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
 		</div>
+		
+		<p>.radiobox.dim</p>
+		<div class="radiobox dim">
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
+		</div>
+		
+		<p>.radiobox.green</p>
+		<div class="radiobox green">
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
+		</div>
+		
+		<p>.radiobox.orange</p>
+		<div class="radiobox orange">
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
+		</div>
+		
+		<p>.radiobox.violet</p>
+		<div class="radiobox violet">
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
+		</div>
+		
+		<p>.radiobox.blue</p>
+		<div class="radiobox blue">
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
+		</div>
+		
+		<p>.radiobox.red</p>
+		<div class="radiobox red">
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
+			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
+		</div>
+		
+		<xmp>
+			<div class="radiobox red">
+				<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
+				<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
+				<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
+				<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
+				<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
+			</div>		
+		</xmp>
 		
 		<h3>Выбор</h3>
 		
@@ -255,8 +620,10 @@
 		
 		
 		<h3>Кнопки</h3>
-		
-		<p>
+		<style>
+			.b-x a { vertical-align: middle }
+		</style>
+		<p class=b-x>
 			<a class=btn href="#" onclick="return false">.btn</a>
 			<a class="btn dim" href="#" onclick="return false">.btn.dim</a>
 			<a class="btn green" href="#" onclick="return false">.btn.green</a>
@@ -267,14 +634,41 @@
 			<a href="#" onclick="return false">link</a>
 		</p>
 		
+		<h3>Элементы на сетке</h3>
+		<p>
+			Текст1 <a class="btn i6" href="#" onclick="return false">.btn.i6</a> <input value="input">
+			<select>
+			<option>select</option>
+			</select>
+			<textarea name="" cols="30" rows="1">textarea</textarea> <a class="btn red" href="#" onclick="return false">.btn.red</a>
+			текст2
+			
+			Текст1 <a class="btn i6" href="#" onclick="return false">.btn.i6</a> <input value="input">
+			<select>
+			<option>select</option>
+			</select>
+			<textarea name="" cols="30" rows="1">textarea</textarea> <a class="btn red" href="#" onclick="return false">.btn.red</a>
+			текст2
+			
+			Текст1 <a class="btn i6" href="#" onclick="return false">.btn.i6</a> <input value="input">
+			<select>
+			<option>select</option>
+			</select>
+			<textarea name="" cols="30" rows="1">textarea</textarea> <a class="btn red" href="#" onclick="return false">.btn.red</a>
+			текст2
+		</p>
+		
 		<h2>Типография</h2>
 		<h3>Заголовки</h3>
+		
+		<div>
 		<h1>h1. Заголовок</h1>
 		<h2>h2. Заголовок</h2>
 		<h3>h3. Заголовок</h3>
 		<h4>h4. Заголовок</h4>
 		<h5>h5. Заголовок</h5>
 		<h6>h6. Заголовок</h6>
+		</div>
 		
 		<xmp>
 			<h1>h1. Заголовок</h1>
