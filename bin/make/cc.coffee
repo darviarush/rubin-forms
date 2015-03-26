@@ -7,7 +7,7 @@ file = fs.readFileSync watch.from, {encoding: 'utf8'}
 
 file = CoffeeScript.compile file, bare: true, sourceMap: true, file: watch.to, sourceRoot: watch.root, sourceFiles: [watch.from]
 
-fs.writeFileSync watch.to, file.js
+fs.writeFileSync watch.to, [file.js, "\n\n//# sourceMappingURL=", watch.map.match(///[^/]+$///)[0] ].join ""
 fs.writeFileSync watch.map, file.v3SourceMap
 
 pat = (s) -> s = ""+s; if s.length == 1 then "0"+s else s

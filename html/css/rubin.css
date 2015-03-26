@@ -12,12 +12,6 @@
 
 /* инициализация */
 
-html {
-font-family: sans-serif;
--ms-text-size-adjust: 100%;
--webkit-text-size-adjust: 100%;
-}
-
 
 html {margin:0;padding:0;border:0}
 body, div, span, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre, a, abbr, acronym, address, code, del, dfn, em, img, q, dl, dt, dd, ol, ul, li, fieldset, form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td, article, aside, dialog, figure, footer, header, hgroup, nav, section {margin:0;padding:0;border:0;vertical-align:middle;}
@@ -49,6 +43,7 @@ h1, h2, h3, h4, h5, h6 { border-width: 10pt 0 5pt 0; border-color: transparent; 
 
 html,body{ width:100%; height:100% }
 * { padding: 0; margin: 0; overflow: auto; clear: both; vertical-align:middle }
+
 
 %inline_block {display: -moz-inline-stack; display: inline-block; *display: inline; *zoom: 1}
 
@@ -119,9 +114,7 @@ margin: 5px 0;
 					%k = col - 2*pa - ma - 2*br
 					%t = i+"_"+j
 					%if i===1 { .w%{j}, .w%{sizeName+j}, } .w%{t}, .w%{sizeName+t} { width: %{k}px; %{float} }
-					%if i===1 { .w%{j}.col, .w%{sizeName+j}.col } .w%{t}.col, .w%{sizeName+t}.col { width: %{col}px }
-					%if i===1 { .offset%{j}, .offset%{sizeName+j}, } .offset%{sizeName+t}, .offset%{t} { margin-left: %{col}px }
-					%if i===1 { .i%{sizeName+j}, .i%{j}, } .i%{sizeName+t}, .i%{t} { width: %{k-2*pa-2*br}px; padding: %{pa}px }
+					%if i===1 { .offset%{j}, .offset-%{sizeName+j}, } .offset-%{sizeName+t}, .offset%{t} { margin-left: %{col}px }
 					%if i===1 { .h%{sizeName+j}, .h%{j}, } .h%{sizeName+t}, .h%{t} { height: %{k}px }
 				}
 			}
@@ -134,7 +127,7 @@ margin: 5px 0;
 .first { margin-left: %{-pa-br}px }
 .last { margin-right: %{-pa}px; border-right-width: 0 !important}
 .fill { %{rest.replace(/margin:[^;]*;?/, '')}; margin: 0 %{-pa}px %{ma}px %{-pa-br}px; border-right-width: 0 !important}
-
+.row { margin: 0 -%{ma+pa+br}px 0 -%{pa+br}px }
 
 %for name, color of dark {
 	.%{name} { background-color: %{color}; color: %{light[name]} }

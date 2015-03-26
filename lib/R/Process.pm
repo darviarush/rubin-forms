@@ -199,7 +199,7 @@ sub loop {
 sub watch {
 	my ($self) = @_;
 	my $watch = $self->{app}->watch;
-	my $dirs = [main::files("qq"), "main.ini", main::dirs("lib"), main::files("bin/qq.pl"), main::files("bin/ini.pl")];
+	my $dirs = [main::files("qq"), "main.ini", main::dirs("bin/make"), main::dirs("lib"), main::files("bin/qq.pl"), main::files("bin/ini.pl")];
 
 	$watch->on(qr//, $dirs, sub {
 		my ($path, $app) = @_;
