@@ -4,8 +4,8 @@
 
 /* параметры */
 %br = get("b", 1)
-%pa = get("p", 10) / 2
-%ma = get("m", 10)
+%pa = get("p", 6)
+%ma = get("m", 6)
 %inx = get('in', 1)
 
 
@@ -42,7 +42,7 @@ a:focus { outline: thin dotted; outline: 5px auto -webkit-focus-ring-color; outl
 h1, h2, h3, h4, h5, h6 { border-width: 10pt 0 5pt 0; border-color: transparent; border-style: solid; }
 
 html,body{ width:100%; height:100% }
-* { padding: 0; margin: 0; overflow: auto; clear: both; vertical-align:middle }
+* { padding: 0; margin: 0; overflow: hidden; clear: both; vertical-align:middle }
 
 
 %inline_block {display: -moz-inline-stack; display: inline-block; *display: inline; *zoom: 1}
@@ -59,15 +59,16 @@ html,body{ width:100%; height:100% }
 %violet = "#9370DB"
 %lviolet = "lavender"
 %blue = "#4169E1"
-%lblue = "#F0FFFF"
+%lblue = "AliceBlue"
 %red = "#CD5C5C"
 %lred = "#FFE4E1"
 
 %dark = {dim:dim, green:green, orange:orange, violet:violet, blue:blue, red:red}
 %light = {dim:ldim, green:lgreen, orange:lorange, violet:lviolet, blue:lblue, red:lred}
-%colors = extend({}, dark)
-%for name, color of light {
-	%colors[name+'-light'] = color
+%colors = {}
+%for name, color of dark {
+	%colors[name] = color
+	%colors[name+'-light'] = light[name]
 }
 
 
@@ -79,23 +80,66 @@ background: %{blue}; background-repeat: repeat-x;
 padding: %{pa}px %{2*pa}px;
 text-align: center;
 margin: 5px 0;
-%border-radius: %{ma}px;
+%border-radius: %{ma*2}px;
 %box-shadow: 1px 1px 1px #778899;
 }
 .btn:hover { background-image:none !important }
 .btn:link { text-decoration:none; color: white !important; }
-.btn:active { position:relative; top: 1px; left: 1px; %box-shadow: none; }
+.btn:active { position:relative; left:1px; margin: 6px 0 4px 0; %box-shadow: none; }
 .btn:visited { }
 
 
 /* сеть */
-.in%{inx}{ margin: 0 auto; min-height: 100%; padding-left: %{ma}px }
-%rest { clear:none; padding: %{pa}px; margin: 0 %{ma}px %{ma}px 0; border: solid %{br}px transparent }
-%float { %{rest}; float:left }
+.in%{inx}{ margin: 0 auto; min-height: 100% }
+
+%float { float:left; display:block; clear:none; padding: %{pa+ma+br}px }
 
 %widths = [[550, 500, 450], [750, 650, 550], [970, 770, 570], [1170, 970, 770]]
 %display = [568, 768, 992, 1200]
 %sizes = ["x", "s", "m", "l"]
+/*cells = []*/
+
+%grid(rem, width, sizeName) {
+	%for j in 1..rem {
+		/*cells.push('.w'+sizeName+j); if(n==0) cells.push('.w'+j)*/
+		%for i in 1..j {
+			%col = i * width / j
+			%k = col - 2*(pa + ma + br)
+			%t = i+"_"+j
+			/*cells.push('.w'+sizeName+t); if(n==0) cells.push('.w'+t)*/
+			%if i===1 { .w%{j}, .w%{sizeName+j}, } .w%{t}, .w%{sizeName+t} { width: %{k}px; %{float} }
+			%if i===1 { .col.w%{j}, .col.w%{sizeName+j}, } .col.w%{t}, .col.w%{sizeName+t} { width: %{col}px }
+			%if i===1 { .offset%{j}, .offset%{sizeName+j}, } .offset%{sizeName+t}, .offset%{t} { margin-left: %{col}px }
+			%if i===1 { .h%{sizeName+j}, .h%{j}, } .h%{sizeName+t}, .h%{t} { height: %{k}px }
+			%if i===1 { .push%{sizeName+j}, .push%{j}, } .push%{sizeName+t}, .push%{t} { left: %{col}px }
+			%if i===1 { .pull%{sizeName+j}, .pull%{j}, } .pull%{sizeName+t}, .pull%{t} { right: %{col}px }
+		}
+	}
+}
+
+%showgrid(rem, width) {
+	%col = width / rem
+	.showgrid%{rem} {
+		background-image: linear-gradient(transparent 1.4em, %{dim} 1.4em),
+		linear-gradient(90deg,
+			%{lblue} 0px,
+			%{lblue} %{ma}px,
+			%{dim} %{ma}px,
+			%{dim} %{ma+br}px,
+			%{lred} %{ma+br}px,
+			%{lred} %{ma+br+pa}px,
+			transparent %{ma+br+pa}px,
+			transparent %{col-(ma+br+pa)}px,
+			%{lblue} %{col-(ma+br+pa)}px,
+			%{lblue} %{col-(ma+br)}px,
+			%{dim} %{col-(ma+br)}px,
+			%{dim} %{col-ma}px,
+			%{lred} %{col-ma}px
+			);
+		background-size: %{col}px 1.42857143em;
+		background-repeat: repeat;
+	}
+}
 
 %for u, n in display {
 	%width = widths[n][inx-1]
@@ -108,30 +152,69 @@ margin: 5px 0;
 		%for sn in sizes { %if sn !== sizeName { .only-%{sn} {display:none} } }
 
 		%if rem = exists('w') {
+			%{grid(rem, width, sizeName)}
+		}
+		
+		/* проверочная сетка */
+		%if exists('showgrid') {
+			%for i in 1..rem {
+				%{showgrid(i, width, dark.red, dark.blue, dark.dim)}
+			}
+		}
+		
+		%if rem = exists('x') {
 			%for j in 1..rem {
 				%for i in 1..j {
-					%col = i * width / j
-					%k = col - 2*pa - ma - 2*br
+					%col = i * 100 / j
 					%t = i+"_"+j
-					%if i===1 { .w%{j}, .w%{sizeName+j}, } .w%{t}, .w%{sizeName+t} { width: %{k}px; %{float} }
-					%if i===1 { .offset%{j}, .offset-%{sizeName+j}, } .offset-%{sizeName+t}, .offset%{t} { margin-left: %{col}px }
-					%if i===1 { .h%{sizeName+j}, .h%{j}, } .h%{sizeName+t}, .h%{t} { height: %{k}px }
+					%if i===1 { .x%{j}, .x%{sizeName+j}, } .x%{t}, .x%{sizeName+t} { width: %{k}px; %{float} }
+					%if i===1 { .s%{j}, .s%{sizeName+j}, } .s%{sizeName+t}, .s%{t} { margin-left: %{col}px }
 				}
 			}
 		}
+		
 	}
 }
 
-.rest { %{rest} }
-.col { padding: 0; margin: 0; border: none !important }
+%blocks = ["h1", "h2", "h3", "h4", "h5", "h6", "p"]
+
+%for row in ["in1", "in2", "in3", "col", "row"] {%for p in blocks {.%{row} > %{p}, }}
+.par { padding-left: %{pa}px; padding-right: %{pa}px }
+
+
+.col { margin:0; padding:0; border-width:0 !important }
 .first { margin-left: %{-pa-br}px }
 .last { margin-right: %{-pa}px; border-right-width: 0 !important}
-.fill { %{rest.replace(/margin:[^;]*;?/, '')}; margin: 0 %{-pa}px %{ma}px %{-pa-br}px; border-right-width: 0 !important}
-.row { margin: 0 -%{ma+pa+br}px 0 -%{pa+br}px }
+.row { margin: 0 -%{ma+pa+br}px !important; border-width: 0 !important; padding: 0 !important }
 
+%border {border: solid %{br}px transparent}
+
+
+%for name of colors {%for a in ["", "-h", "-v", "-l", "-r", "-t", "-b"] {.%{name}-lines%{a} > div, }}
+.pos-2 > div { margin: %{ma}px; padding: %{pa}px; %{border} }
+.pos-0 > div { margin: %{pa+ma}px; padding:0; %{border} }
+.pos-1 > div { margin: %{pa/2+ma}px; padding: %{pa/2}px; %{border} }
+.pos-3 > div { margin: %{ma/2}px; padding: %{pa/2+ma/2}px; %{border} }
+.pos-4 > div { margin: 0; padding: %{pa+ma}px; %{border} }
+
+
+%for name of colors {%for a in ["", "-h", "-v", "-l", "-r", "-t", "-b"] {.%{name}-line%{a}, }}
+.pos2 { margin: %{ma}px !important; padding: %{pa}px !important; %{border} }
+.pos0 { margin: %{pa+ma}px !important; padding:0 !important; %{border} }
+.pos1 { margin: %{pa/2+ma}px !important; padding: %{pa/2}px !important; %{border} }
+.pos3 { margin: %{ma/2}px !important; padding: %{pa+ma/2}px !important; %{border} }
+.pos4 { margin: 0 !important; padding: %{pa+ma}px !important; %{border} }
+
+
+
+
+
+/* цвета */
 %for name, color of dark {
-	.%{name} { background-color: %{color}; color: %{light[name]} }
-	.%{name}-light { background-color: %{light[name]} }
+	.%{name}s div { background-color: %{color}; color: %{light[name]} }
+	.%{name} { background-color: %{color} !important; color: %{light[name]} !important }
+	.%{name}s-light div { background-color: %{light[name]}; color: black; }
+	.%{name}-light { background-color: %{light[name]} !important; color: black !important; }
 	.%{name}-header { color: %{color}; font-weight: 700; background-color: %{light[name]} }
 	.%{name}-text { background-color: %{light[name]}; color: %{color}; }
 	
@@ -146,26 +229,18 @@ margin: 5px 0;
 }
 
 
-/* цвета */
+/* границы */
 %for name, color of colors {
-	/* линии */
-	.%{name}-line { border: solid 1px %{color} }
-	.%{name}-line-h { border-left: solid 1px %{color}; border-right: solid 1px %{color} }
-	.%{name}-line-v { border-top: solid 1px %{color}; border-bottom: solid 1px %{color} }
-	.%{name}-line-l { border-left: solid 1px %{color} }
-	.%{name}-line-r { border-right: solid 1px %{color} }
-	.%{name}-line-b { border-bottom: solid 1px %{color} }
-	.%{name}-line-t { border-top: solid 1px %{color} }
-	
-	/* проверочная сетка */
-	/*if { .showgrid, } .showgrid {
-		background-image: -%-linear-gradient(to right, %{color} );
-	}*/
+	.%{name}-lines div, .%{name}-line { border-color: %{color} }
+	.%{name}-lines-h div, .%{name}-line-h { border-left-color: %{color}; border-right-color: %{color} }
+	.%{name}-lines-v div, .%{name}-line-v { border-top-color: %{color}; border-bottom-color: %{color} }
+	.%{name}-lines-l div, .%{name}-line-l { border-left-color: %{color} }
+	.%{name}-lines-r div, .%{name}-line-r { border-right-color: %{color} }
+	.%{name}-lines-b div, .%{name}-line-b { border-bottom-color: %{color} }
+	.%{name}-lines-t div, .%{name}-line-t { border-top-color: %{color} }
 }
 
 
-/* проверочная сетка */
-/*.showgrid { background-repeat: repeat }*/
 
 /* центрирование */
 .l { text-align: left }
@@ -175,11 +250,11 @@ margin: 5px 0;
 
 
 /* округление наполовину */
-.rnd { %border-radius: 1em; padding: 0 1em 0 1em }
+.rnd { %border-radius: 50% }
 
 /* скругление */
 %for i in 1...5 {
-	%if i === 1 { .ra, } .ra%{i} { %border-radius: %{ma/i}px }
+	%if i === 1 { .ra, } .ra%{i} { %border-radius: %{2*pa/i}px }
 }
 
 /* тултип */
@@ -211,13 +286,12 @@ th {font-weight: 700}
 .table, .table-border {border-collapse:collapse}
 .table > tr, .table > * > tr { border-bottom: solid %{br}px %{ldim} }
 .table tr:last-child { border-bottom: 0 }
-.table-border, .table-border td, .table-border th { border: solid %{br}px %{ldim} }
+.table-border, .table-border td, .table-border th { border: solid %{br}px %{dim} }
 .table-zebra > tr:nth-of-type(odd), .table-zebra > * > tr:nth-of-type(odd) { background-color: white }
 
 %for name, color of colors {
-	%if name == 'dim-light' {.table-cursor > tr:hover, .table-cursor > * > tr:hover, }
+	%if name === 'dim-light' {.table-cursor > tr:hover, .table-cursor > * > tr:hover, }
 	.table-cursor-%{name} > tr:hover, .table-cursor-%{name} > * > tr:hover { background-color: %{color} }
 	
-	%if name == 'dim-light' { .table-border, .table-border td, .table-border th, }
-	.table-border-%{name}, .table-border-%{name} td, .table-border-%{name} th { border: solid %{br}px %{color} }
+	.%{name}-line > tr > td, .%{name}-line > tr > th, %{name}-line > * > tr > td, .%{name}-line > * > tr > th { border: solid %{br}px %{color} }
 }

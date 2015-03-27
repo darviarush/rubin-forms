@@ -2,10 +2,11 @@
 <html lang="ru">
 <head>
 	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Rubin Css Framework</title>
-	<script id=_app_ src="js/lib.js?css=in1w12" type="text/javascript"></script>
+	<script id=_app_ src="js/lib.js?css=in1w12showgrid1" type="text/javascript"></script>
 	<link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
-	
 <script><!--
 +function() {
 	
@@ -40,9 +41,9 @@
 		<a href="">Модульная сетка</a>
 		
 	</div-->
-	<div style="position:fixed;width:0;height:100%;border-left:dotted 1px #ccc;left:50%;margin-left:10px">&nbsp;</div>
+	<!--div style="position:fixed;width:0;height:100%;border-left:dotted 1px #ccc;left:50%;margin-left:10px">&nbsp;</div>
 	<div style="position:fixed;width:0;height:100%;border-left:dotted 1px #ccc;left:50%;margin-left:1px">&nbsp;</div>
-	<div style="position:fixed;width:0;height:100%;border-left:dotted 1px #ccc;left:50%;margin-left:-9px">&nbsp;</div>
+	<div style="position:fixed;width:0;height:100%;border-left:dotted 1px #ccc;left:50%;margin-left:-9px">&nbsp;</div-->
 	
 	
 	<div class="in1 hr-h v">
@@ -58,14 +59,18 @@
 			.test-w div {
 				background: lavender;
 				color: SlateGrey;
-				border: solid 1px SlateGrey;
+				outline: solid 1px SlateGrey;
 			}
 			.test-w .col {
 				background: AliceBlue;
 			}
+			
+			.test-w .row {
+				background: GhostWhite;
+			}
 		</style>
 		
-		<div class="test-w">
+		<div class="dim-lines violets-light">
 			
 			<div class="w1">.w1</div>
 			
@@ -115,49 +120,6 @@
 			<div class="w4">.w4</div> <div class="w5_12">.w5_12</div> <div class="w3">.w3</div>
 		</div>
 		
-		<h3>.rest</h3>
-		<p>.rest заполняет всё оставшееся пространство</p>
-		
-		<div class="test-w">
-			<div class="w3">.w3</div>
-			<div class="w9">.w9</div>
-			<div class="rest">.rest</div>
-			<div class="w3_4">.w3_4</div>
-			<div class="rest">.rest</div>
-			<div class="w7">.w7</div>
-			<div class="w7_10">.w7_10</div>
-			<div class="rest">.rest</div>
-			<div class="rest">.rest</div>
-		</div>
-		
-		<h3>Столбцы</h3>
-		<p>Вложенная сетка должна быть под классом .col</p>
-		
-		<div class="test-w">
-			
-			<div class="w1">.w1</div>
-			<div class="w2_3 col">
-				<p>.w2_3.col - как видите, .col не имеет padding-а, margin-а и border-а</p>
-				<div class="rest">Поэтому всегда внутри него для текста применяйте .rest</div>
-				<div class="w3">.w3</div>
-				<div class="w3">.w3</div>
-				<div class="w3">.w3</div>
-				<div class="w3">.w3</div>
-			</div>
-			
-			<div class="w3">.w3</div>
-			<div class="w3">.w3</div>
-			
-			<div class="w3" style="background: AliceBlue; border-color: LightSteelBlue">
-				<p>А вот .w3 с вложениями</p>
-				<div class="fill">.fill</div>
-				<div class="first w6">.first.w6</div>
-				<div class="last w6">.last.w6</div>
-				<div class="first w9">.first.w9</div>
-				<div class="w9">.w9</div>
-				<div class="last w9">.last.w9</div>
-			</div>
-		</div>
 		
 		<h3>.offsetX</h3>
 		<p>Позволяет пропустить несколько ячеек сети перед собой</p>
@@ -168,10 +130,154 @@
 			<div class="w6 offset2_6">.w6.offset2_6</div>
 		</div>
 		
+		<h3>Изменение порядка следования ячеек</h3>
+		
+		<p>Классы <code>.pushX</code> устанавливают в нужную позицию слева, а <code>.pullX</code> справа</p>
+		
+		<div class="blue-lines blues-light">
+			<div class="w3">1-й</div>
+			<div class="w3">2-й</div>
+			<div class="w3">3-й</div>
+			<div class="w3">1-й 2-й строки</div>
+			<div class="w3">2-й 2-й строки</div>
+			<div class="w3">3-й 2-й строки</div>
+		</div>
+		
+		<div class="green-lines greens-light">
+			<div class="w3">1-й</div>
+			<div class="w3">2-й</div>
+			<div class="w3">3-й</div>
+			<div class="w3">1-й 2-й строки</div>
+			<div class="w3">2-й 2-й строки</div>
+			<div class="w3">3-й 2-й строки</div>			
+		
+			<div class="w3">1-й</div>
+			<div class="w3">2-й</div>
+			<div class="w3 push2_3">.push2_3: 3-й элемент устанавливаем на место второго</div>
+			<div class="w3">.w3 1-й блок</div>
+			<div class="w3">.w3 2-й блок</div>
+			<div class="w3 push2_3">.push2_3: 3-й элемент устанавливаем на место второго</div>
+		</div>
+		
+		<h3>Границы</h3>
+		
+		<p>Границы создаются <code>.posX</code>, а для дочерних блоков <code>.pos-X</code>. По умолчанию действует .pos3, если указан класс границы</p>
+		
+		<div class="showgrid5 red-lines oranges-light">
+			<div class="w5 pos0"><code>.pos0</code> - граница прилегает к тексту</div>
+			<div class="w5 pos1"><code>.pos1</code> - граница на расстоянии &frac12; поля от условного края</div>
+			<div class="w5"><code>.pos2</code> - условный край. Граница по умолчанию</div>
+			<div class="w5 pos3"><code>.pos3</code> - граница на расстоянии &frac12; отступа от края</div>
+			<div class="w5 pos4"><code>.pos4</code> - граница на краю</div>
+		</div>
+		
+		<h3>Вложенные блоки</h3>
+		<p>Вложенная сетка должна быть под <code>.row</code></p>
+		
+		
+			<div class="w2_3 blue-light blue-line blues-light blue-lines">
+				.w2_3<br>
+				Следующие блоки .w3 обёрнуты в .row:
+				<div class="row orange">
+					<div class="w3">.w3</div>
+					<div class="w3">.w3</div>
+					<div class="w3">.w3</div>
+					<div class="w3">.w3<br>
+						Ещё одно .row
+						<div class="row orange">
+							<div class="w6">.w6</div>
+							<div class="w6">.w6<br>
+								и ещё .row
+								<div class="row orange">
+									<div class="w12">.w12</div>
+									<div class="w12">.w12</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+			<div class="w3">.w3</div>
+			<div class="w3">.w3</div>
+			
+			<div class="w3" style="background: AliceBlue; border-color: LightSteelBlue">
+				А вот .w3 с вложениями
+				<div class="fill">.fill</div>
+				<div class="first w6">.first.w6</div>
+				<div class="last w6">.last.w6</div>
+				<div class="first w9">.first.w9</div>
+				<div class="w9">.w9</div>
+				<div class="last w9">.last.w9</div>
+			</div>
+			
+			<div class="w3 col">
+				<p>.w3.col (текст в теге <code>p</code>)</p>
+				<div class="w6">.w6</div>
+				<div class="w6">.w6</div>
+				<div class="w12">.w12</div>
+				<div class="w12">.w12</div>
+			</div>
+			
+			<div class="w3">.w3</div>
+			<div class="w3">.w3</div>
+		</div>
+		
+		
+		<h3>Перенос</h3>
+		<p>При высоких блоках несколько блоков справа будут заполнять пространство, чтобы они переносились на другую строку можно использовать тег <code>&lt;br&gt;</code> или <code>&lt;p&gt;</code> или <code>&lt;hX&gt;</code></p>
+		
+		<div class="test-w">
+			<div class="w2_3">.w2_3<br>ещё строка<br>и ещё</div>
+			<div class="w3">.w3</div>
+			<div class="w3">.w3</div>
+			
+			<div class="w2_3">.w2_3<br>ещё строка<br>и ещё</div>
+			<div class="w3">.w3</div><br>
+			<p><code>&lt;br&gt;</code></p>
+			<div class="w3">.w3</div>
+		</div>
+		
+		<h3>Плавающие границы</h3>
+		<p>Границы блока можно сдвигать на нужное расстояние ближе или дальше от блока</p>
+		
+		<div class="w3 pos4 red-light red-line">.pos4</div><div class="w2_3 orange-light orange-line">.w2_3</div>
+		<div class="w3 pos3 blue-light blue-line">.pos3</div><div class="w2_3 orange-light orange-line">.w2_3</div>
+		<div class="w3 violet-light violet-line">.pos2 - по умолчанию</div><div class="w2_3 orange-light orange-line">.w2_3</div>
+		<div class="w3 pos1 orange-light orange-line">.pos1</div><div class="w2_3 orange-light orange-line">.w2_3</div>
+		<div class="w3 pos0 green-light green-line">.pos0</div><div class="w2_3 orange-light orange-line">.w2_3</div>
+		
+		<p>Вложены в .row</p>
+		<div class="w2_3 pos4 red-light red-line">
+			.w2_3.pos4
+			<div class="row">
+			<div class="w2_3 pos3 blue-light blue-line">
+				.pos3
+				<div class="row">
+				<div class="w2_3 violet-light violet-line">
+					.pos2 - по умолчанию
+					<div class="row">
+					<div class="w2_3 pos1 orange-light orange-line">
+						.pos1
+						<div class="row">
+						<div class="w2_3 pos0 green-light green-line">
+							.pos0
+						</div>
+						</div>
+					</div>
+					</div>
+				</div>
+				</div>
+			</div>
+			</div>
+		</div>
+		
+		<div class="w3 violet-line violet-light">.w3</div>
+		
 		
 		<h3>Разрешения экрана</h3>
 		
-		<table>
+		<table class=table-border>
 		<tr><th>префикс<th>разрешение<th>класc скрывает<th>класс показывает
 		<tr><td>wl<td>1200<td>.no-l<td>.only-l
 		<tr><td>wm<td>992<td>.no-m<td>.only-m
@@ -270,16 +376,6 @@
 		<p>Проверяем: разрешение сейчас <code class=only-x>568</code><code class=only-s>768</code><code class=only-m>992</code><code class=only-l>1200</code>, класс <code class=only-x>.only-x</code><code class=only-s>.only-s</code><code class=only-m>.only-m</code><code class=only-l>.only-l</code></p>
 		
 		
-		<h3>Изменение порядка следования ячеек для SEO</h3>
-		
-		<p>Необходим параметр seo1</p>
-		
-		<div class="test-w">
-			<div class="w6">1</div>
-			<div class="w6">2</div>
-			<div class="w4_6 push6">3 &rarr; 2</div>
-		</div>
-		
 		<h2>Таблицы</h2>
 		
 		<h3>Обычные. Без класса</h3>
@@ -359,7 +455,9 @@
 		
 		<h3>C границами</h3>
 		
-		<table class="table-border">
+		<p><code>.red-line</code></p>
+		
+		<table class="red-line">
       <thead>
         <tr>
           <th>#</th>
@@ -395,6 +493,8 @@
     </table>
 		
 		<h3>"Зебра"</h3>
+		<p><code>.table-zebra</code></p>
+		
 		<table class="table-zebra dim-light table-fill">
       <thead>
         <tr>
@@ -659,25 +759,24 @@
 		</p>
 		
 		<h2>Типография</h2>
-		<h3>Заголовки</h3>
+		<h3>Строки текста и блоки</h3>
 		
-		<div>
-		<h1>h1. Заголовок</h1>
-		<h2>h2. Заголовок</h2>
-		<h3>h3. Заголовок</h3>
-		<h4>h4. Заголовок</h4>
-		<h5>h5. Заголовок</h5>
-		<h6>h6. Заголовок</h6>
-		</div>
-		
-		<xmp>
+		<div class="w1 col showgrid5 red-lines">
 			<h1>h1. Заголовок</h1>
 			<h2>h2. Заголовок</h2>
 			<h3>h3. Заголовок</h3>
 			<h4>h4. Заголовок</h4>
 			<h5>h5. Заголовок</h5>
 			<h6>h6. Заголовок</h6>
-		</xmp>
+			
+			<p>p. Параграф</p>
+			
+			<div class="w5">.w3</div><br>
+			<div class="w5">.w3. Несколько строк<br>Строка 1<br>Строка 2<br>Строка 3</div>
+			
+			<p>p. Несколько строк<br>Строка 1<br>Строка 2<br>Строка 3</p>
+		</div>
+		
 		
 		<h2>Настройка css-фреймворка</h2>
 		<p>css-фреймворк встроен в javascript-фреймворк Рубин.</p>
