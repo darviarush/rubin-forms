@@ -2586,6 +2586,47 @@ class CWidget
 
 	speeds$ = slow: 200, fast: 600, norm: 400
 
+	anime$ = (p) ->
+		if typeof p == 'string' then p = $H p
+		if p.effect then p = extend {}, CEffect[p.effect], p
+		duration = p.duration || p.timeout
+		duration = speeds$[duration] || duration || 400
+		if typeof duration == 'number' then duration += 'ms'
+		delete p.duration
+		delete p.timeout
+		name = p.name || @id() || CMath.uniqid()
+		delete p.name
+		
+		s = count: 'animation-iteration-count', ease: 'animation-timing-function', state: 'animation-play-state', direction: 'animation-direction', delay: 'animation-delay'
+		
+		cssp = animation: [name, duration].join(" ")
+		css = []
+		css.push '@', anime$.animationVendor, 'keyframes ', name, '{'
+		for key of p
+			if r = s[key] then cssp[r] = p[key]; continue
+			k = key
+			if typeof k == 'number' or typeof k == 'string' and /^-?\d+\.\d+$/.test k then k += '%'
+			css.push k, "{"
+			for k, v of $H p[key]
+				css.push k, ':', v, ';'
+			css.push "}"
+		css.push "}"
+		
+		(@_anime_style ||= @head().appendRet "<style></style>").html css.join ""
+		
+		@css cssp
+
+		this
+		
+	anime: ->
+		if 'animation-name' of div$.style then anime$.animationVendor = ""
+		else if CNavigator.vendor+'animation-name' of div$.style then anime$.animationVendor = CNavigator.vendor
+		else # 'эмуляция
+		anime$.type$ = arguments.callee.type$
+		@::anime = anime$
+		anime$.apply this, arguments
+		this
+	
 	# animate: (param, duration, ease, complete) ->
 		# @_animate = p = if typeof duration == 'object' then duration else duration: duration, ease: ease, complete: complete
 		# p.param = param
@@ -2767,7 +2808,7 @@ class CWidget
 			
 		
 	
-	type$.all 'timeout interval clear animate morph anim'
+	type$.all 'timeout interval clear animate morph anim anime'
 
 	
 	# методы шейпов
