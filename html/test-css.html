@@ -26,7 +26,7 @@
 	var hash = location.hash.replace(/^#/, '')
 	if(hash) $(function() {
 		if($('head style').length) {
-			var a = CRoot.first('a[name='+hash+']')
+			var a = CRoot.first('a[name="'+hash+'"]')
 			if(a) a.element.scrollIntoView()
 		}
 		else CRoot.timeout(10, arguments.callee)
@@ -70,7 +70,7 @@
 			}
 		</style>
 		
-		<div class="dim-lines violets-light">
+		<div class="dims-line violets-light">
 			
 			<div class="w1">.w1</div>
 			
@@ -121,49 +121,41 @@
 		</div>
 		
 		
-		<h3>.offsetX</h3>
-		<p>Позволяет пропустить несколько ячеек сети перед собой</p>
+		<h3>Пропуск блоков</h3>
+		<p>Для пропуска нескольких ячеек сети используйте пустой тег <code>&lt;p class=wX /&gt;</code> - он не подвержен влиянию цветов</p>
 		
-		<div class="test-w">
+		<div class="dims-line violets-light">
 			<div class="w6">.w6</div>
-			<div class="w6 offset6">.w6.offset6</div>
-			<div class="w6 offset2_6">.w6.offset2_6</div>
+			<p class="w6">.w6</p>
+			<div class="w6 offset6">.w6</div>
+			<p class="w2_6">.w2_6</p>
+			<div class="w6">.w6</div>
 		</div>
 		
 		<h3>Изменение порядка следования ячеек</h3>
 		
-		<p>Классы <code>.pushX</code> устанавливают в нужную позицию слева, а <code>.pullX</code> справа</p>
-		
-		<div class="blue-lines blues-light">
-			<div class="w3">1-й</div>
-			<div class="w3">2-й</div>
-			<div class="w3">3-й</div>
-			<div class="w3">1-й 2-й строки</div>
-			<div class="w3">2-й 2-й строки</div>
-			<div class="w3">3-й 2-й строки</div>
+		<p>Классы <code>.pushX</code> сдвигают влево на указанное деление, а <code>.pullX</code> - вправо</p>
+
+		<div class="greens-line greens-light">		
+			<div class="w3 pull2_3">1-й на место 3-го <code>.pull2_3</code></div>
+			<div class="w3 push3">2-й на место 1-го <code>.push3</code></div>
+			<div class="w3 push3">3-й элемент на место 2-го <code>.push3</code></div>
 		</div>
 		
-		<div class="green-lines greens-light">
-			<div class="w3">1-й</div>
-			<div class="w3">2-й</div>
-			<div class="w3">3-й</div>
-			<div class="w3">1-й 2-й строки</div>
-			<div class="w3">2-й 2-й строки</div>
-			<div class="w3">3-й 2-й строки</div>			
 		
-			<div class="w3">1-й</div>
-			<div class="w3">2-й</div>
-			<div class="w3 push2_3">.push2_3: 3-й элемент устанавливаем на место второго</div>
-			<div class="w3">.w3 1-й блок</div>
-			<div class="w3">.w3 2-й блок</div>
-			<div class="w3 push2_3">.push2_3: 3-й элемент устанавливаем на место второго</div>
+		<p>Классы <code>.upX</code> сдвигают вверх на указанное деление, а <code>.downX</code> - вниз</p>
+		
+		<div class="blues-line blues-light">
+			<div class="w3 h12 down12">1-й <code>.br.h12.down12</code></div><br>
+			<div class="w3 h12 up12">2-й <code>.h12.up12</code></div>
 		</div>
+
 		
 		<h3>Границы</h3>
 		
 		<p>Границы создаются <code>.posX</code>, а для дочерних блоков <code>.pos-X</code>. По умолчанию действует .pos3, если указан класс границы</p>
 		
-		<div class="showgrid5 red-lines oranges-light">
+		<div class="showgrid5 reds-line oranges-light">
 			<div class="w5 pos0"><code>.pos0</code> - граница прилегает к тексту</div>
 			<div class="w5 pos1"><code>.pos1</code> - граница на расстоянии &frac12; поля от условного края</div>
 			<div class="w5"><code>.pos2</code> - условный край. Граница по умолчанию</div>
@@ -175,53 +167,53 @@
 		<p>Вложенная сетка должна быть под <code>.row</code></p>
 		
 		
-			<div class="w2_3 blue-light blue-line blues-light blue-lines">
-				.w2_3<br>
-				Следующие блоки .w3 обёрнуты в .row:
-				<div class="row orange">
-					<div class="w3">.w3</div>
-					<div class="w3">.w3</div>
-					<div class="w3">.w3</div>
-					<div class="w3">.w3<br>
-						Ещё одно .row
-						<div class="row orange">
-							<div class="w6">.w6</div>
-							<div class="w6">.w6<br>
-								и ещё .row
-								<div class="row orange">
-									<div class="w12">.w12</div>
-									<div class="w12">.w12</div>
-								</div>
+		<div class="w2_3 blue-light blue-line blues-light blues-line">
+			.w2_3<br>
+			Следующие блоки .w3 обёрнуты в .row:
+			<div class="row violet-light">
+				<div class="w3">.w3</div>
+				<div class="w3">.w3</div>
+				<div class="w3">.w3</div>
+				<div class="w3">.w3<br>
+					Ещё одно .row
+					<div class="row orange-light">
+						<div class="w6">.w6</div>
+						<div class="w6">.w6<br>
+							и ещё .row
+							<div class="row red-light">
+								<div class="w12">.w12</div>
+								<div class="w12">.w12</div>
 							</div>
 						</div>
 					</div>
 				</div>
 			</div>
-			
-			<div class="w3">.w3</div>
-			<div class="w3">.w3</div>
-			
-			<div class="w3" style="background: AliceBlue; border-color: LightSteelBlue">
-				А вот .w3 с вложениями
-				<div class="fill">.fill</div>
-				<div class="first w6">.first.w6</div>
-				<div class="last w6">.last.w6</div>
-				<div class="first w9">.first.w9</div>
-				<div class="w9">.w9</div>
-				<div class="last w9">.last.w9</div>
-			</div>
-			
-			<div class="w3 col">
-				<p>.w3.col (текст в теге <code>p</code>)</p>
-				<div class="w6">.w6</div>
-				<div class="w6">.w6</div>
-				<div class="w12">.w12</div>
-				<div class="w12">.w12</div>
-			</div>
-			
-			<div class="w3">.w3</div>
-			<div class="w3">.w3</div>
 		</div>
+		
+		<div class="w3">.w3</div>
+		<div class="w3">.w3</div>
+		
+		<div class="w3" style="background: AliceBlue; border-color: LightSteelBlue">
+			А вот .w3 с вложениями
+			<div class="fill">.fill</div>
+			<div class="first w6">.first.w6</div>
+			<div class="last w6">.last.w6</div>
+			<div class="first w9">.first.w9</div>
+			<div class="w9">.w9</div>
+			<div class="last w9">.last.w9</div>
+		</div>
+		
+		<div class="w3 col">
+			<p>.w3.col (текст в теге <code>p</code>)</p>
+			<div class="w6">.w6</div>
+			<div class="w6">.w6</div>
+			<div class="w12">.w12</div>
+			<div class="w12">.w12</div>
+		</div>
+		
+		<div class="w3">.w3</div>
+		<div class="w3">.w3</div>
+
 		
 		
 		<h3>Перенос</h3>
@@ -293,7 +285,7 @@
         <tr>
           <th></th>
           <th>
-            Очень маленькие устройство <small>Телефоны  (&lt;768px)</small>         </th>
+            Очень маленькие устройства <small>Телефоны  (&lt;768px)</small>         </th>
           <th>
             Малые устройства
          <small>Планшеты (≥768px)</small>
@@ -735,6 +727,9 @@
 		</p>
 		
 		<h3>Элементы на сетке</h3>
+		
+		<div class="showgrid4">
+		
 		<p>
 			Текст1 <a class="btn i6" href="#" onclick="return false">.btn.i6</a> <input value="input">
 			<select>
@@ -754,14 +749,24 @@
 			<select>
 			<option>select</option>
 			</select>
-			<textarea name="" cols="30" rows="1">textarea</textarea> <a class="btn red" href="#" onclick="return false">.btn.red</a>
+			<textarea cols="30" rows="1">textarea</textarea> <a class="btn red" href="#" onclick="return false">.btn.red</a>
 			текст2
 		</p>
+		
+		<input type="text" class="w4" value="input1">
+		<select class="w4">
+			<option value="">select1</option>
+		</select>
+		<textarea class="w4" cols="30" rows="1">textarea1</textarea>
+		<a href="#" onclick="return false" class="w4 btn red">кнопка1</a>
+		
+		</div>
+		
 		
 		<h2>Типография</h2>
 		<h3>Строки текста и блоки</h3>
 		
-		<div class="w1 col showgrid5 red-lines">
+		<div class="w1 col showgrid5 reds-line">
 			<h1>h1. Заголовок</h1>
 			<h2>h2. Заголовок</h2>
 			<h3>h3. Заголовок</h3>

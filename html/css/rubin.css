@@ -33,7 +33,9 @@ background-color: #fff;
 overflow: auto;
 }
 
-input, button, select, textarea { font-family: inherit; font-size: inherit; line-height: inherit; overflow: hidden; border:solid 1px #E7E7E7; padding: %{pa}px; }
+input, button, select, textarea { font-family: inherit; font-size: inherit; line-height: inherit; overflow: hidden; border:solid 1px #E7E7E7 }
+input, button, textarea { padding: %{pa}px }
+select {height: %{20+2*pa+2*br}px}
 input:hover, button:hover, select:hover, textarea:hover { border-color: orange }
 a { color: #428bca; text-decoration: none; }
 a:hover, a:focus { color: #2a6496; text-decoration: underline; }
@@ -67,54 +69,61 @@ html,body{ width:100%; height:100% }
 %light = {dim:ldim, green:lgreen, orange:lorange, violet:lviolet, blue:lblue, red:lred}
 %colors = {}
 %for name, color of dark {
-	%colors[name] = color
-	%colors[name+'-light'] = light[name]
+	%colors[name] = color; colors[name+'-light'] = light[name]
 }
-
-
-
-/* кнопки */
-.btn {
-%{inline_block};
-background: %{blue}; background-repeat: repeat-x;
-padding: %{pa}px %{2*pa}px;
-text-align: center;
-margin: 5px 0;
-%border-radius: %{ma*2}px;
-%box-shadow: 1px 1px 1px #778899;
-}
-.btn:hover { background-image:none !important }
-.btn:link { text-decoration:none; color: white !important; }
-.btn:active { position:relative; left:1px; margin: 6px 0 4px 0; %box-shadow: none; }
-.btn:visited { }
 
 
 /* сеть */
-.in%{inx}{ margin: 0 auto; min-height: 100% }
+.in%{inx}{ margin: 0 auto !important; min-height: 100% }
 
 %float { float:left; display:block; clear:none; padding: %{pa+ma+br}px }
 
-%widths = [[550, 500, 450], [750, 650, 550], [970, 770, 570], [1170, 970, 770]]
-%display = [568, 768, 992, 1200]
-%sizes = ["x", "s", "m", "l"]
-/*cells = []*/
+/*568 [550, 500, 450] */
+%widths = [[750, 650, 550], [970, 770, 570], [1170, 970, 770]]
+%display = [768, 992, 1200]
+%sizes = ["s", "m", "l"]
+%sizesx = ["x"].concat(sizes)
 
-%grid(rem, width, sizeName) {
-	%for j in 1..rem {
-		/*cells.push('.w'+sizeName+j); if(n==0) cells.push('.w'+j)*/
-		%for i in 1..j {
-			%col = i * width / j
-			%k = col - 2*(pa + ma + br)
-			%t = i+"_"+j
-			/*cells.push('.w'+sizeName+t); if(n==0) cells.push('.w'+t)*/
-			%if i===1 { .w%{j}, .w%{sizeName+j}, } .w%{t}, .w%{sizeName+t} { width: %{k}px; %{float} }
-			%if i===1 { .col.w%{j}, .col.w%{sizeName+j}, } .col.w%{t}, .col.w%{sizeName+t} { width: %{col}px }
-			%if i===1 { .offset%{j}, .offset%{sizeName+j}, } .offset%{sizeName+t}, .offset%{t} { margin-left: %{col}px }
-			%if i===1 { .h%{sizeName+j}, .h%{j}, } .h%{sizeName+t}, .h%{t} { height: %{k}px }
-			%if i===1 { .push%{sizeName+j}, .push%{j}, } .push%{sizeName+t}, .push%{t} { left: %{col}px }
-			%if i===1 { .pull%{sizeName+j}, .pull%{j}, } .pull%{sizeName+t}, .pull%{t} { right: %{col}px }
+
+%grid(rem, width, sizes, gval) {
+	%join(p) {%if i===1{.%{p+suffix+j}, }.%{p+suffix+t}}
+	%for suffix in sizes {
+		%for j in 1..rem {
+			%for i in 1..j {
+				%col = i * width / j
+				%k = col - 2*(pa + ma + br)
+				%t = i+"_"+j
+				
+				%{join("w")} { width: %{k}px }
+				%{join("col.w")} { width: %{col}px }
+				%{join("h")} { height: %{k}px }
+				%{join("push")} { left: -%{col}px }
+				%{join("pull")} { left: %{col}px }
+				%{join("up")} { top: -%{col}px }
+				%{join("down")} { top: %{col}px }
+			}
 		}
 	}
+}
+
+%addtogrid(rem, classes, styles) {
+	%names = []
+	%for suffix in ["", "x", "s", "m", "l"] {
+		%for j in 1..rem {
+			%for i in 1..j {
+				%t = i+"_"+j
+				%for cls in classes {
+					%names.push([".", cls, suffix, t].join("")); if(i===1) names.push([".", cls, suffix, j].join(""))
+				}
+			}
+		}
+	}
+	%{names.join(", ")} {%{styles}}
+}
+
+%if rem = exists('w') {
+	%{addtogrid(rem, ["w"], float)}
+	%{addtogrid(rem, ["pull", "push", "up", "down"], "position:relative")}
 }
 
 %showgrid(rem, width) {
@@ -141,6 +150,16 @@ margin: 5px 0;
 	}
 }
 
+
+@media (max-width: %{display[0]}px) {
+	%for sn in sizes {.only-%{sn}, }
+	.no-x {display:none}
+}
+
+%if rem = exists('w') {
+	%{grid(rem, CRoot.viewWidth(), ["x"])}
+}
+
 %for u, n in display {
 	%width = widths[n][inx-1]
 	%sizeName = sizes[n]
@@ -148,11 +167,11 @@ margin: 5px 0;
 	
 		.in%{inx} {width: %{width}px}
 		
+		%for sn in sizesx {%if sn !== sizeName {.only-%{sn}, }}
 		.no-%{sizeName} {display:none}
-		%for sn in sizes { %if sn !== sizeName { .only-%{sn} {display:none} } }
 
 		%if rem = exists('w') {
-			%{grid(rem, width, sizeName)}
+			%{grid(rem, width, [""].concat(sizes.slice(n)))}
 		}
 		
 		/* проверочная сетка */
@@ -161,18 +180,19 @@ margin: 5px 0;
 				%{showgrid(i, width, dark.red, dark.blue, dark.dim)}
 			}
 		}
-		
-		%if rem = exists('x') {
+	}
+
+	%if rem = exists('x') {
+		@media (min-width: %{u}px) {
 			%for j in 1..rem {
 				%for i in 1..j {
 					%col = i * 100 / j
 					%t = i+"_"+j
-					%if i===1 { .x%{j}, .x%{sizeName+j}, } .x%{t}, .x%{sizeName+t} { width: %{k}px; %{float} }
-					%if i===1 { .s%{j}, .s%{sizeName+j}, } .s%{sizeName+t}, .s%{t} { margin-left: %{col}px }
+					%if i===1 { .x%{j}, .x%{sizeName+j}, } .x%{t}, .x%{sizeName+t} { width: %{k}%; %{float} }
+					%if i===1 { .s%{j}, .s%{sizeName+j}, } .s%{sizeName+t}, .s%{t} { margin-left: %{col}% }
 				}
 			}
 		}
-		
 	}
 }
 
@@ -185,61 +205,62 @@ margin: 5px 0;
 .col { margin:0; padding:0; border-width:0 !important }
 .first { margin-left: %{-pa-br}px }
 .last { margin-right: %{-pa}px; border-right-width: 0 !important}
-.row { margin: 0 -%{ma+pa+br}px !important; border-width: 0 !important; padding: 0 !important }
-
-%border {border: solid %{br}px transparent}
-
-
-%for name of colors {%for a in ["", "-h", "-v", "-l", "-r", "-t", "-b"] {.%{name}-lines%{a} > div, }}
-.pos-2 > div { margin: %{ma}px; padding: %{pa}px; %{border} }
-.pos-0 > div { margin: %{pa+ma}px; padding:0; %{border} }
-.pos-1 > div { margin: %{pa/2+ma}px; padding: %{pa/2}px; %{border} }
-.pos-3 > div { margin: %{ma/2}px; padding: %{pa/2+ma/2}px; %{border} }
-.pos-4 > div { margin: 0; padding: %{pa+ma}px; %{border} }
-
-
-%for name of colors {%for a in ["", "-h", "-v", "-l", "-r", "-t", "-b"] {.%{name}-line%{a}, }}
-.pos2 { margin: %{ma}px !important; padding: %{pa}px !important; %{border} }
-.pos0 { margin: %{pa+ma}px !important; padding:0 !important; %{border} }
-.pos1 { margin: %{pa/2+ma}px !important; padding: %{pa/2}px !important; %{border} }
-.pos3 { margin: %{ma/2}px !important; padding: %{pa+ma/2}px !important; %{border} }
-.pos4 { margin: 0 !important; padding: %{pa+ma}px !important; %{border} }
-
-
-
+.row { margin: %{pa+br}px -%{ma+pa+br}px !important; border-width: 0 !important; padding: %{ma}px 0 !important }
 
 
 /* цвета */
 %for name, color of dark {
 	.%{name}s div { background-color: %{color}; color: %{light[name]} }
-	.%{name} { background-color: %{color} !important; color: %{light[name]} !important }
 	.%{name}s-light div { background-color: %{light[name]}; color: black; }
-	.%{name}-light { background-color: %{light[name]} !important; color: black !important; }
-	.%{name}-header { color: %{color}; font-weight: 700; background-color: %{light[name]} }
-	.%{name}-text { background-color: %{light[name]}; color: %{color}; }
-	
-	/* кнопки */
-	%r1 = CRoot.rgba(color)
-	%l1 = r1.lightness() + 0.15; r1.lightness(l1 > 1? 1: l1)
-	%if name === 'blue' { .btn, }
-	.%{name}.btn {
-		background-image: -%-linear-gradient(to bottom, %{r1}, %{color});
-		border: solid 1px %{color}
-	}
 }
 
+
+%for name, color of dark {
+	.%{name}, div.%{name} { background-color: %{color}; color: %{light[name]} }
+	.%{name}-light, div.%{name}-light { background-color: %{light[name]}; color: black}
+	.%{name}-header, div.%{name}-header { color: %{color}; font-weight: 700; background-color: %{light[name]} }
+	.%{name}-text, div.%{name}-text { background-color: %{light[name]}; color: %{color}; }
+}
 
 /* границы */
+%border {border: solid %{br}px transparent}
+%pos2 { margin: %{ma}px; padding: %{pa}px; %{border} }
+
 %for name, color of colors {
-	.%{name}-lines div, .%{name}-line { border-color: %{color} }
-	.%{name}-lines-h div, .%{name}-line-h { border-left-color: %{color}; border-right-color: %{color} }
-	.%{name}-lines-v div, .%{name}-line-v { border-top-color: %{color}; border-bottom-color: %{color} }
-	.%{name}-lines-l div, .%{name}-line-l { border-left-color: %{color} }
-	.%{name}-lines-r div, .%{name}-line-r { border-right-color: %{color} }
-	.%{name}-lines-b div, .%{name}-line-b { border-bottom-color: %{color} }
-	.%{name}-lines-t div, .%{name}-line-t { border-top-color: %{color} }
+	.%{name}s-line div { %{pos2}; border-color: %{color} }
+	.%{name}s-line-h div { %{pos2}; border-left-color: %{color}; border-right-color: %{color} }
+	.%{name}s-line-v div { %{pos2}; border-top-color: %{color}; border-bottom-color: %{color} }
+	.%{name}s-line-l div { %{pos2}; border-left-color: %{color} }
+	.%{name}s-line-r div { %{pos2}; border-right-color: %{color} }
+	.%{name}s-line-b div { %{pos2}; border-bottom-color: %{color} }
+	.%{name}s-line-t div { %{pos2}; border-top-color: %{color} }
 }
 
+
+.pos-2 div { margin: %{ma}px; padding: %{pa}px; %{border} }
+.pos-0 div { margin: %{pa+ma}px; padding:0; %{border} }
+.pos-1 div { margin: %{pa/2+ma}px; padding: %{pa/2}px; %{border} }
+.pos-3 div { margin: %{ma/2}px; padding: %{pa/2+ma/2}px; %{border} }
+.pos-4 div { margin: 0; padding: %{pa+ma}px; %{border} }
+
+
+%for name, color of colors {
+	.%{name}-line, div.%{name}-line { %{pos2}; border-color: %{color} }
+	.%{name}-line-h, div.%{name}-line-h { %{pos2}; border-left-color: %{color}; border-right-color: %{color} }
+	.%{name}-line-v, div.%{name}-line-v { %{pos2}; border-top-color: %{color}; border-bottom-color: %{color} }
+	.%{name}-line-l, div.%{name}-line-l { %{pos2}; border-left-color: %{color} }
+	.%{name}-line-r, div.%{name}-line-r { %{pos2}; border-right-color: %{color} }
+	.%{name}-line-b, div.%{name}-line-b { %{pos2}; border-bottom-color: %{color} }
+	.%{name}-line-t, div.%{name}-line-t { %{pos2}; border-top-color: %{color} }
+}
+
+.pos2, div.pos2 { margin: %{ma}px; padding: %{pa}px; %{border} }
+.pos0, div.pos0 { margin: %{pa+ma}px; padding:0; %{border} }
+.pos1, div.pos1 { margin: %{pa/2+ma}px; padding: %{pa/2}px; %{border} }
+.pos3, div.pos3 { margin: %{ma/2}px; padding: %{pa+ma/2}px; %{border} }
+.pos4, div.pos4 { margin: 0; padding: %{pa+ma}px; %{border} }
+
+input, select, textarea, button { margin: %{ma}px !important; padding: %{pa}px !important; border: solid %{br}px %{ldim} }
 
 
 /* центрирование */
@@ -254,7 +275,7 @@ margin: 5px 0;
 
 /* скругление */
 %for i in 1...5 {
-	%if i === 1 { .ra, } .ra%{i} { %border-radius: %{2*pa/i}px }
+	%if i === 1 { .ra, } .ra%{i} { %border-radius: %{(ma+pa)/i}px }
 }
 
 /* тултип */
@@ -294,4 +315,30 @@ th {font-weight: 700}
 	.table-cursor-%{name} > tr:hover, .table-cursor-%{name} > * > tr:hover { background-color: %{color} }
 	
 	.%{name}-line > tr > td, .%{name}-line > tr > th, %{name}-line > * > tr > td, .%{name}-line > * > tr > th { border: solid %{br}px %{color} }
+}
+
+
+/* кнопки */
+.btn {
+%{inline_block};
+background-repeat: repeat-x;
+padding: %{pa}px;
+text-align: center;
+margin: %{ma}px;
+%border-radius: %{ma*2}px;
+%box-shadow: 1px 1px 1px #778899;
+}
+.btn:hover { background-image:none !important }
+.btn:link { text-decoration:none; color: white !important; }
+.btn:active { margin: %{ma+1}px %{ma-1}px %{ma-1}px %{ma+1}px !important; %box-shadow: none; }
+.btn:visited { }
+
+%for name, color of dark {
+	%r1 = CRoot.rgba(color)
+	%l1 = r1.lightness() + 0.15; r1.lightness(l1 > 1? 1: l1)
+	%if name === 'blue' { .btn, }.%{name}.btn {
+		background-color: %{color};
+		background-image: -%-linear-gradient(to bottom, %{r1}, %{color});
+		border: solid 1px %{color}
+	}
 }
