@@ -42,23 +42,29 @@ request = sys.stdin.readline()
 while request != '':
 	request = request.rstrip()
 	
-	action = actions.get(request)
-	if not action:
-		action = 'kitty_' + re.sub(r'[/.-]', '__', request)
-	
-		file = codecs.open(request, 'rb', 'utf8').read()
-		file = re.sub(r'^', '\t', file, 0, re.M)
-		file = ''.join(["def ", action, "():\n", file])
-		glob = {"frisky_kitty": frisky_kitty, "kitty": kitty}
-		loc = {}
-		exec( file, glob, loc )
+	if request[0] == '(':
+		try:
+			ref = eval(request)
+		except BaseException as e:
+			sys.stderr.write( traceback.format_exc() )
+	else:
+		action = actions.get(request)
+		if not action:
+			action = 'kitty_' + re.sub(r'[/.-]', '__', request)
 		
-		actions[request] = action = loc[action]
+			file = codecs.open(request, 'rb', 'utf8').read()
+			file = re.sub(r'^', '\t', file, 0, re.M)
+			file = ''.join(["def ", action, "():\n", file])
+			glob = {"frisky_kitty": frisky_kitty, "kitty": kitty}
+			loc = {}
+			exec( file, glob, loc )
+			
+			actions[request] = action = loc[action]
 
-	try:
-		ref = action()
-	except BaseException as e:
-		sys.stderr.write( traceback.format_exc() )
+		try:
+			ref = action()
+		except BaseException as e:
+			sys.stderr.write( traceback.format_exc() )
 
 	request = kitty("end", ref)
 	ref = None

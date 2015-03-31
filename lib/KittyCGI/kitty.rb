@@ -44,27 +44,41 @@ request = STDIN.readline()
 while request != ''
 	request = request.chomp()
 	
-	action = actions[request]
-	if not action
-		action = 'kitty_' << request.gsub(/[\/.-]/, '__')
-	
-		file = File.read(request)
-		file = ["class KittyClass\ndef ", action, "()\n", file, "\nend\nend\n"].join('')
-		
-		eval( file )
-		
-		actions[request] = action
-	end
-
-	begin
-		ref = Kitty.send action
-	rescue Exception => e
-		$stderr.puts e.message
-		for i in e.backtrace
-			$stderr.puts i
+	if request[0] == '('
+		begin
+			ref = eval request
+		rescue Exception => e
+			$stderr.puts e.message
+			for i in e.backtrace
+				$stderr.puts i
+			end
 		end
 		
+	else
+		
+		action = actions[request]
+		if not action
+			action = 'kitty_' << request.gsub(/[\/.-]/, '__')
+		
+			file = File.read(request)
+			file = ["class KittyClass\ndef ", action, "()\n", file, "\nend\nend\n"].join('')
+			
+			eval( file )
+			
+			actions[request] = action
+		end
+
+		begin
+			ref = Kitty.send action
+		rescue Exception => e
+			$stderr.puts e.message
+			for i in e.backtrace
+				$stderr.puts i
+			end
+			
+		end
 	end
+		
 	request = Kitty.kitty("end", ref)
 	ref = nil
 end
