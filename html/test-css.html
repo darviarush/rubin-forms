@@ -20,6 +20,8 @@
 			item.first().prepend('# ')
 			item.prepend(item.new('a').attr('name', href))
 		}
+		
+		$("[ctype]").items()
 	})
 	
 	
@@ -614,108 +616,91 @@
 		
 		<h2>Контролы</h2>
 		
-		<h3>Табы</h3>
+		<h3>Вкладки</h3>
 		
-		<div class="tabbox">
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Вкладка 1</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Вкладка 2</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Вкладка 3</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Вкладка 4</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Вкладка 5</a>
-		</div>
-		
+		<p ctype=sel class="tabs">
+			<a href="#" class=active>Вкладка 1</a>
+			<a href="#">Вкладка 2</a>
+			<a href="#">Вкладка 3</a>
+			<a href="#">Вкладка 4</a>
+			<a href="#">Вкладка 5</a>
+		</p>
 		
 		<h3>Переключатель</h3>
 		
-		<p>.radiobox</p>
-		<div class="radiobox">
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
-		</div>
+		<p>.checkbox</p>
+		<p ctype=sel class="checkbox">
+			<a href="#" class=active>Выбор 1</a>
+			<a href="#">Выбор 2</a>
+			<a href="#">Выбор 3</a>
+			<a href="#">Выбор 4</a>
+			<a href="#">Выбор 5</a>
+		</p>
 		
-		<p>.radiobox.dim</p>
-		<div class="radiobox dim">
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
-		</div>
+		<p ctype=sel class="checkbox dim">
+			<a href="#">Выбор 1</a>
+			<a href="#" class=active>Выбор 2</a>
+			<a href="#">Выбор 3</a>
+			<a href="#">Выбор 4</a>
+			<a href="#">Выбор 5</a>
+		</p>
 		
-		<p>.radiobox.green</p>
-		<div class="radiobox green">
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
-		</div>
+		<p ctype=sel class="checkbox green">
+			<a href="#">Выбор 1</a>
+			<a href="#" class=active>Выбор 2</a>
+			<a href="#">Выбор 3</a>
+			<a href="#">Выбор 4</a>
+			<a href="#">Выбор 5</a>
+		</p>
 		
-		<p>.radiobox.orange</p>
-		<div class="radiobox orange">
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
-		</div>
+		<p ctype=sel class="checkbox orange">
+			<a href="#">Выбор 1</a>
+			<a href="#" class=active>Выбор 2</a>
+			<a href="#">Выбор 3</a>
+			<a href="#">Выбор 4</a>
+			<a href="#">Выбор 5</a>
+		</p>
 		
-		<p>.radiobox.violet</p>
-		<div class="radiobox violet">
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
-		</div>
+		<p ctype=sel class="checkbox violet">
+			<a href="#">Выбор 1</a>
+			<a href="#" class=active>Выбор 2</a>
+			<a href="#">Выбор 3</a>
+			<a href="#">Выбор 4</a>
+			<a href="#">Выбор 5</a>
+		</p>
 		
-		<p>.radiobox.blue</p>
-		<div class="radiobox blue">
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
-		</div>
+		<p ctype=sel class="checkbox blue">
+			<a href="#">Выбор 1</a>
+			<a href="#" class=active>Выбор 2</a>
+			<a href="#">Выбор 3</a>
+			<a href="#">Выбор 4</a>
+			<a href="#">Выбор 5</a>
+		</p>
 		
-		<p>.radiobox.red</p>
-		<div class="radiobox red">
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
-			<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
-		</div>
+		<p ctype=sel class="checkbox red">
+			<a href="#">Выбор 1</a>
+			<a href="#" class=active>Выбор 2</a>
+			<a href="#">Выбор 3</a>
+			<a href="#">Выбор 4</a>
+			<a href="#">Выбор 5</a>
+		</p>
 		
 		<xmp>
-			<div class="radiobox red">
-				<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 1</a>
-				<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false" class=active>Выбор 2</a>
-				<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 3</a>
-				<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 4</a>
-				<a href="#" onclick="$(this).addClass('active').siblings().rmClass('active'); return false">Выбор 5</a>
-			</div>		
+			<p ctype=sel class="checkbox red">
+				<a href="#">Выбор 1</a>
+				<a href="#" class=active>Выбор 2</a>
+				<a href="#">Выбор 3</a>
+				<a href="#">Выбор 4</a>
+				<a href="#">Выбор 5</a>
+			</p>		
 		</xmp>
-		
-		<h3>Выбор</h3>
-		
-		<div class="checkbox">
-			<a href="#" onclick="$(this).toggleClass('active'); return false">Выбор 1</a>
-			<a href="#" onclick="$(this).toggleClass('active'); return false" class=active>Выбор 2</a>
-			<a href="#" onclick="$(this).toggleClass('active'); return false">Выбор 3</a>
-			<a href="#" onclick="$(this).toggleClass('active'); return false">Выбор 4</a>
-			<a href="#" onclick="$(this).toggleClass('active'); return false">Выбор 5</a>
-		</div>
 		
 		
 		<h3>Кнопки</h3>
 		<style>
 			.b-x a { vertical-align: middle }
 		</style>
-		<p class=b-x>
+		<p>
 			<a class=btn href="#" onclick="return false">.btn</a>
 			<a class="btn dim" href="#" onclick="return false">.btn.dim</a>
 			<a class="btn green" href="#" onclick="return false">.btn.green</a>

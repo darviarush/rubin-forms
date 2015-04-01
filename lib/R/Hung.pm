@@ -51,12 +51,21 @@ sub new {
 				my $mapext = $watch->{map} // "map";
 				$map =~ s!\.$ext$!.$mapext!;
 				
+				my $drop = length($::_FRAMEWORK) + 6;	# /html/ - 6 символов
+				my $source = substr($path, $drop);
+				my $i = 0;
+				$i++ while $source =~ /\//g;
+				my $root = $i? "../" x $i: ".";
+				
 				$app->request->{get} = {
 					from_abs => ($main::_UNIX? $path: Utils::winpath($path)),
 					from => $path,
 					to => $to,
 					map => $map,
-					root => '..',
+					root => $root,
+					file => substr($to, $drop),
+					source => $source,
+					#framework => $::_FRAMEWORK
 				};
 				$app->kitty->timeout(10)->run(main::file($watch->{kitty}));
 				#my $body = [@{ $app->response->{errors} }];

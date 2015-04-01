@@ -5,13 +5,9 @@ fs = require 'fs'
 
 file = fs.readFileSync watch.from, {encoding: 'utf8'}
 
-file = CoffeeScript.compile file, bare: true, sourceMap: true, file: watch.to, sourceRoot: watch.root, sourceFiles: [watch.from]
+file = CoffeeScript.compile file, bare: true, sourceMap: true, file: watch.file, sourceRoot: watch.root, sourceFiles: [watch.source]
 
 fs.writeFileSync watch.to, [file.js, "\n\n//# sourceMappingURL=", watch.map.match(///[^/]+$///)[0] ].join ""
 fs.writeFileSync watch.map, file.v3SourceMap
 
-pat = (s) -> s = ""+s; if s.length == 1 then "0"+s else s
-d = new Date()
-d = pat(d.getHours())+':'+pat(d.getMinutes())+':'+pat(d.getSeconds())
-
-console.log d + ' - compiled ' + watch.from_abs
+console.log (new Date() + "").replace(/^.*(\d\d:\d\d:\d\d).*$/, "$1") + ' - compiled ' + watch.from_abs

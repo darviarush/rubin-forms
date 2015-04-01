@@ -546,91 +546,10 @@ CMath =
 	
 
 	
-CCssCode =
-	code: (code) ->
-		vendor = CNavigator.vendor
-		start = "\n$ret.push('"
-		stop = "');\n"
-		for_c = c = 0
-		lineno = 1
-		u = -1
-		S = []
 		
-		re_vars = ///([\w\$]+)\s*=///g
-		vars = (x)->
-			vario = []
-			i = 0
-			while m = re_vars.exec x
-				vario.push m[1]
-				re_vars.lastIndex--
-			re_vars.lastIndex = 0
-			if vario.length then ["var ", vario.join(","), "; "].join("")
-			else ""	
-
-		# 1 2 3     4     5    6   7     8     9   10          11        12           13   14    15  16
-		# { } for_v for_i in   of  range if    %{} присвоение  функция   выражение_js  \'   \n   \r	\t+	
-		re = /// (\{) | (\}) |
-		%for\s+ ([\w\$]+) (?:\s*,\s*([\w\$]+))? \s+ (?:(in)|(of)) \s+ ([^\{\}]+) \{ |
-		%if\s+ ([^\{\}]+) \{ |
-		%\{ ([^\{\}]+) \} | 
-		%([\w\$]+)\s*\{ |
-		%([\w\$]+ \s* \( [^\(\)]* \)) \s* \{ |
-		%([\w\$].*)(?:\r\n|\r|\n) |
-		(['\\]) | (\n) | (\r) | (\t+) ///g
-		#code = code.replace /// %([\w-]+ \s* : [^;\}]+) ///g, if vendor then -> [vendor, m[1], "; ", m[1]].join "" else '$1'
-		#code = code.replace /// ([^:]+) \s* : -%- ([^;\}]+) ///g, if vendor then -> [vendor, m[1], "; ", m[1]].join "" else '$1: $2'
-		re_in = '%\\{[^\\{\\}]*\\}'
-		code = code
-		.replace /// %((?:[\w-]|#{re_in})+ \s* : (?:#{re_in}|[^;\{\}])+) ///g, if vendor then (z, a) -> [vendor, a, "; ", a].join "" else '$1'
-		.replace /// ((?:[\w-]|#{re_in})+) \s* : \s* -%- ((?:#{re_in}|[^;\{\}])+) ///g, if vendor then (z, a, b)-> [a, ": ", vendor, b, "; ", a, ": ", b].join "" else '$1: $2'
-		.replace re, (m...) ->
-			#say (lineno+":"+c+':'+u+':'+k+': '+i for i, k in m when i? and 0<k and k<17)[0]
-			s = if m[1]? then c++; "{"
-			else if m[2]?
-				#say "}", lineno, c-1, u == c
-				if u == c--
-					#if S.length == 0 then throw "ошибка выполнения "+u+' '+c
-					x = S.pop()
-					u = (S[S.length-1] || [0, -1])[1]
-					[stop, (if x[0] == 10 then "var "+x[2]+"=$ret.join(''); $ret=$rets.pop();"
-					else if x[0] == 11 then "return $ret.join('');\n}"
-					else "}"), start].join('')
-				else "}"
-			else if m[3]?
-				S.push [3, u=++c]
-				for_c++
-				r = [stop, vars(m[7])]
-				if m[6]?
-					r.push "var ", (arr="_ARR"+for_c), "=", m[7], "; for(var ", m[3], " in ", arr, ") {\n"
-					if m[4]? then r.push "var ", m[4], "=", arr, "[", m[3], "];\n"
-				else if (x = m[7].split /(\.{2,3})/).length == 3 then r.push "for(var ", (i=m[3] || "_I"+for_c), "=", x[0], ", ", (to="_TO"+for_c), "=", x[2], "; ", i, (if x[1]=='..' then "<=" else "<"), to, "; ", i, "++) {"
-				else r.push "var ", (arr="_ARR"+for_c), "=", m[7], "; for(var ", (i=m[4] || "_I"+for_c), "=0, ", (n="_N"+for_c), "=", arr, ".length;", i, "<", n, "; ", i, "++) {\nvar ", m[3], "=", arr, "[", i, "];\n"
-				r.push start
-				r.join("")
-				
-			else if m[8]? then S.push [8, u=++c]; [stop, "if(", m[8], ") {", start].join("")
-			else if m[9]? then ["', (", m[9], "), '"].join("")
-			else if m[10]? then S.push [10, u=++c, m[10]]; [stop, "$rets.push($ret); $ret=[];", start].join("")
-			else if m[11]? then S.push [11, u=++c]; [stop, "function ", m[11], "{var $ret=[];", start].join("")
-			else if m[12]? then lineno++; [stop, vars(m[12]), m[12], start].join("")
-			else if m[13]? then "\\"+m[13]
-			else if m[14]? then lineno++; "\\n"
-			else if m[15]? then "\\r"
-			else if m[16]? then ""
-			else throw CRoot.raise lineno+": fatal error: regexp не обработан"
-			return s
+	#resize: (root) ->
+	#	root.interval -> @clear()
 	
-		if S.length then throw CRoot.raise "Не закрыта скобка для "+S[S.length-1][0]+" "+code
-		if c!=0 then throw CRoot.raise "Не закрыта скобка "+c+" "+code
-	
-		["_CSS_$=function(){ var $ret=[], $rets=[]; ", start, code, stop, "return $ret.join(''); }"].join('')
-
-	exists: (v) -> if r=CInit.param.css.match new RegExp("(?:^|\\d)"+v+"(\\d+)") then parseInt r[1]
-	get: (v, def) -> if (r=CCssCode.exists v)? then r else def
-		
-	resize: (root) ->
-		root.interval -> @clear()
-
 	
 CInit =
 	requires: {}
@@ -643,12 +562,6 @@ CInit =
 	link: (name, media) ->
 		if name[0] != '/' then path = CInit.path.replace ///\w+$///, 'css'; name = path+'/'+name
 		if CInit.check name+='.css' then document.writeln('\n<link rel="stylesheet" href="'+name+'" type="text/css"'+(if media then ' media="'+media+'"' else '')+'>'); on else off
-	style: (css) ->
-		CRoot.new("div").appendTo(CRoot.body()).ping(_method: 'GET', _act: css+'.css').onLoad = (code) ->
-			@free()
-			_CSS_$ = null
-			eval CCssCode.code(code)
-			@head().append @new("style").html say _CSS_$()
 		
 	init_from_param: ->
 		src = if a=document.getElementById "_app_" then a.src else (document.getElementsByTagName('body') || document.getElementsByTagName('head'))[0].innerHTML.match(/// src=['"]?( [^\s'"<>]+ ) [^<>]+> (\s*</\w+>)+ \s* $ ///i)[1].replace(/&amp(?:;|\b)/g, '&')
@@ -682,6 +595,9 @@ CInit =
 					for i in CInit.pack = param.pack.split(",") then CInit.require i
 				else throw CRoot.raise "Нет параметра #{key} в инициализаторе библиотеки"
 		undefined
+		
+	exists: (v) -> if r=CInit.param.css.match new RegExp("(?:^|\\d)"+v+"(\\d+)") then parseInt r[1]
+	get: (v, def) -> if (r=CInit.exists v)? then r else def
 
 
 unless window.XMLHttpRequest and not IE then CInit.require "old"
@@ -1591,7 +1507,7 @@ class CWidget
 	setHandlersOnElements: (list) ->
 		path = []
 		p = this
-		while p and p.element.id and h = p.constructor.handlers
+		while p and (p instanceof CListWidget or p.element.id) and h = p.constructor.handlers
 			for name, i in path when not h = h[name] then break
 			if i==path.length then for name of h when a=h[name]["@"]
 				widget = if name == 'frame' then list || @child() else @byName name
@@ -2034,10 +1950,10 @@ class CWidget
 	nextnodeAll: dir.inline 'nextnodeAll', 'e.nextSibling'
 	prevnodeAll: dirprev.inline 'prevnodeAll', 'x.push(e)'
 	
-	siblings: -> @up().prevAll().union @up().nextAll()
-	nodes: -> @up().prevnodeAll().union @up().nextnodeAll()
+	siblings: -> @prevAll().union @nextAll()
+	siblingnodes: -> @prevnodeAll().union @nextnodeAll()
 	level: (args...) -> @up().child args...
-	levelnode: (args...) -> @up().down args...
+	nodes: (args...) -> @up().down args...
 
 	child:
 		if nes$ then (i) -> (if arguments.length then @wrap @element.children[if i<0 then @element.children.length+i else i] else new CWidgets @element.children)
@@ -3261,7 +3177,9 @@ class CListWidget extends CTemplateWidget
 
 class CMenuWidget extends CListWidget
 
-	frame_onclick: (e, frame) -> @activate frame, e.ctrl()
+	initialize: -> super ; @frame = @child().filter(".active").item(0); this
+
+	frame_onclick: (e, frame) -> @activate frame, e.ctrlKey
 
 	activate: (new_frame, add) ->
 		if old_frame = @frame
@@ -3271,6 +3189,10 @@ class CMenuWidget extends CListWidget
 		@send "onActivate", old_frame
 		this
 
+
+class CSelWidget extends CMenuWidget
+	frame_onclick: (e) -> super ; off
+	
 
 class CScrollWidget extends CListWidget
 	onscroll_window: ->

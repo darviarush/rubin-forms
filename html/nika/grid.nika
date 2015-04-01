@@ -1,6 +1,6 @@
 /* функции для параметров */
-%exists = CCssCode.exists
-%get = CCssCode.get
+%exists = CInit.exists 
+%get = CInit.get
 
 /* параметры */
 %br = get("b", 1)
@@ -24,7 +24,7 @@ blockquote, q {quotes:"" "";}
 img {border:none;}
 :focus {outline:0;}
 
-body {
+body { 
 font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 font-size: 14px;
 line-height: 1.42857143;
