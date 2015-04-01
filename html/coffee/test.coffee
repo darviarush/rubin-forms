@@ -1995,7 +1995,7 @@ new CTest 'obj-CWidget-pseudo', """
 	p=(w=@w()).pseudo(':hover')
 	p.css 'background', 'royalblue'
 	@is w.rgba('background-color')+"", 'rgba(0, 0, 0, 0)'
-	@is p.rgba('background-color')+"", 'rgba(65, 105, 225, 1)'
+	@is p.rgba('background-color')+"", 'royalblue'
 
 
 new CTest 'obj-CWidget-hasCss', """
@@ -2591,6 +2591,54 @@ new CTest 'obj-CWidget-clear', """
 См. #clear, #timeout
 """, ->
 	@ok CRoot.clear
+
+	
+new CTest 'obj-CWidget-anime', """
+`anime param` - формирует @keyframes
+
+`param` - параметры @keyframes и анимации или команда
+
+Параметры анимации:
+- name - название анимации. Если не указано будет создано уникальное (uniqid1, например)
+- timeout или duration - продолжительность анимации в миллисекундах
+- count - количество повторений анимации: infinite, 0, 1...
+- delay - задержка перед началом анимации в миллисекундах
+- ease - временная функция: ease, ease-in, ease-out, ease-in-out или произвольная bezier(x, y, z, m)
+- state - состояние анимации: running или paused
+- direction - направление анимации normal или alternate
+
+Параметры @keyframes, это ключи со стилями: from: {...}, to: {...}, '1%': {...}, 1: {...} или объединённые: 'from,50%': {...}
+
+`param` как команда:
+
+- 'paused' - приостановить анимацию
+- 'running' - продолжить анимацию
+- 'remove' - удалить связанный с анимацией стиль
+
+""", """
+.anime-square {position:absolute; background: orange; border: solid 1px brown; cursor:pointer}
+""", """
+
+<div id=$name class=anime-square onclick="this.widget.anime({})">margin-left: 100px; margin-top: 50px</div>
+
+""", ->
+	@count 6
+	self = this
+	w = @w()
+	w.anime
+		'margin-left': 100
+		'margin-top': 50
+		'background-color': 'rgba(33,12,45,0.6)'
+		color: '#fa6'
+		'border-color': 'red'
+	, -> 
+		self.is '100px', @css 'margin-left'
+		self.is '50px', @css 'margin-top'
+		self.is 'rgba(33, 12, 45, 0.6)', ""+@rgba 'background-color'
+		self.is '#FA6', @rgba('color').smallhex()
+		self.is 'red', @rgba('border-color').name()
+		
+	@w("plus").css('margin-left', 10).animate 'margin-left': "+=100pt", 1000, 100, -> self.is$f @pt("10px") + 100, @pt('margin-left'), 0.01
 
 
 new CTest 'obj-CWidget-animate', """

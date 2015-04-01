@@ -4,8 +4,8 @@
 
 /* параметры */
 %br = get("b", 1)
-%pa = get("p", 6)
-%ma = get("m", 6)
+%pa = get("p", 4)
+%ma = get("m", 10)
 %inx = get('in', 1)
 
 

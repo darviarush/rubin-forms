@@ -2268,6 +2268,8 @@ class CWidget
 		css_set_fn: css_set_fn
 		css_get_fn: css_get_fn
 		css_has_fn: css_has_fn
+		
+	cssRet: (name) -> ret = (if typeof name == 'object' then @css Object.keys(name) else @css name); @css.apply this, arguments; ret
 	
 	# http://www.js-doc.ru/documentation/dhtml_doc/dhtml10.docs
 	
@@ -2343,10 +2345,19 @@ class CWidget
 	
 	#cssText: (text) -> if arguments.length then @element.style.cssText = text else @element.style.cssText
 	
-	fly: (flag) ->
-		if flag then from = @new("div").css width: 'auto', height: 'auto', margin: 0, padding: 0
-		@on 'scroll', if flag == 1 then do(from)->->
-			#if 
+	fly: (widgetTop, widgetBottom) ->
+		doc = @wrap document
+		doc.off 'scroll', @_fly if @_fly
+		@_fly_position = @css 'position'
+		if @_fly_position == 'fixed' then @_fly_position = 'absolute'
+		@_fly_fixed = null
+		doc.on 'scroll', @_fly = do(widgetTop, widgetBottom)=> =>
+			if widgetTop and widgetTop.bottom() >= @top() or widgetBottom and widgetBottom.top() >= @bottom()
+				@css 'position', @_fly_position
+				@_fly_fixed = 0
+			else if not @_fly_fixed then @_fly_position = @cssRet 'position', 'fixed'; @_fly_fixed = 1
+			this
+		@_fly()
 	
 	toggle$ = (args, s) -> args[if (i=args.indexOf s) != -1 then (i+1) % args.length else 0]
 	
@@ -2586,36 +2597,41 @@ class CWidget
 
 	speeds$ = slow: 200, fast: 600, norm: 400
 
+	anime$param$ = count: 'animation-iteration-count', ease: 'animation-timing-function', state: 'animation-play-state', direction: 'animation-direction', delay: 'animation-delay'
+	
 	anime$ = (p) ->
-		if typeof p == 'string' then p = $H p
-		if p.effect then p = extend {}, CEffect[p.effect], p
-		duration = p.duration || p.timeout
-		duration = speeds$[duration] || duration || 400
-		if typeof duration == 'number' then duration += 'ms'
-		delete p.duration
-		delete p.timeout
-		name = p.name || @id() || CMath.uniqid()
-		delete p.name
-		
-		s = count: 'animation-iteration-count', ease: 'animation-timing-function', state: 'animation-play-state', direction: 'animation-direction', delay: 'animation-delay'
-		
-		cssp = animation: [name, duration].join(" ")
-		css = []
-		css.push '@', anime$.animationVendor, 'keyframes ', name, '{'
-		for key of p
-			if r = s[key] then cssp[r] = p[key]; continue
-			k = key
-			if typeof k == 'number' or typeof k == 'string' and /^-?\d+\.\d+$/.test k then k += '%'
-			css.push k, "{"
-			for k, v of $H p[key]
-				css.push k, ':', v, ';'
+		if p == 'paused' || p == 'running' then @setCss anime$param$.state, p
+		if p == 'remove'
+			@_anime_style?.free()
+			for k, v of anime$param$ then @css v, null
+			@css 'animation', null
+		else
+			if typeof p == 'string' then p = $H p
+			if p.effect then p = extend {}, CEffect[p.effect], p
+			duration = p.duration || p.timeout
+			duration = speeds$[duration] || duration || 400
+			if typeof duration == 'number' then duration += 'ms'
+			delete p.duration
+			delete p.timeout
+			name = p.name || @id() || CMath.uniqid()
+			delete p.name
+			
+			cssp = animation: [name, duration].join(" ")
+			css = []
+			css.push '@', anime$.animationVendor, 'keyframes ', name, '{'
+			for key of p
+				if r = anime$param$[key] then cssp[r] = p[key]; continue
+				k = key
+				if typeof k == 'number' or typeof k == 'string' and /^-?\d+\.\d+$/.test k then k += '%'
+				css.push k, "{"
+				for k, v of $H p[key]
+					css.push k, ':', v, ';'
+				css.push "}"
 			css.push "}"
-		css.push "}"
-		
-		(@_anime_style ||= @head().appendRet "<style></style>").html css.join ""
-		
-		@css cssp
-
+			
+			(@_anime_style ||= @head().appendRet "<style></style>").html css.join ""
+			
+			@css cssp
 		this
 		
 	anime: ->

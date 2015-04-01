@@ -5,6 +5,7 @@ requires 'LWP::UserAgent';
 requires 'LWP::ConnCache';
 requires 'MIME::Lite';
 requires 'MIME::Base64';
+requires 'JSON::XS';
 
 #requires 'Env::Path';
 #requires 'Sphinx::Search';

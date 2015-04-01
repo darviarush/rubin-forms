@@ -61,7 +61,8 @@ sub new {
 				$app->kitty->timeout(10)->run(main::file($watch->{kitty}));
 				#my $body = [@{ $app->response->{errors} }];
 				#$body = $app->kitty->reg_compile($body, $path, $key);
-				main::msg ":empty", ":nonewline", $app->response->arr_body;
+				my ($body, $is_err) = $app->kitty->reg_error($app->response->str_body, $path);
+				R::Hung::Process::out(split /\n/, $body);
 			}):
 			$watch->{run} || $watch->{hung}? do {
 				my $process = R::Hung::Process->new($key, $app);
