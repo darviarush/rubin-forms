@@ -342,3 +342,15 @@ margin: %{ma}px;
 		border: solid 1px %{color}
 	}
 }
+
+
+/* вкладки */
+/*
+<div class=tabs>
+<a href=...>
+</div> */
+
+%for name, color of colors {
+	%if color === 'dim' {.tabs > *, }.%{name}-tabs > * { border-style: solid; border-width: %{br}px; border-bottom-color: %{color}; margin: 0px; padding: %{pa+ma}px; %border-radius: %{ma}px %{ma}px 0px 0px }
+	%if color === 'dim' {.tabs > .active, }.%{name}-tabs > .active { border-color: %{color} %{color} transparent %{color} }
+}
