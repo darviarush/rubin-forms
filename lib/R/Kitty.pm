@@ -122,7 +122,8 @@ sub reg_error {
 	
 	$self->winpath($path);
 	
-	my $is_err = s!$reg_error!"$path:$+{line}:".($+{char} || 1).": error: ".($+{msg2}? "$+{msg2}: ": "").($+{msg}? $+{msg}:"")!ge;
+	my $is_err = s!$reg_error! (defined($+{file})? $+{file}: $path).":$+{line}:".($+{char} || 1).": ".
+	(defined($+{msg})? "error: ": "").($+{msg2}? "$+{msg2}: ": "").($+{msg}? $+{msg}:"").($+{warn}? "warning: $+{warn}":"").($+{info}? $+{info}:"")!ge;
 	
 	wantarray? ($_, $is_err): $_;
 }

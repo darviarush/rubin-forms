@@ -578,7 +578,7 @@ CInit =
 				when 'name' then window.name = param.name
 				when 'post' then CInit.post = param.post
 				when 'url' then CInit.url = param.url
-				when 'css' then CInit.style '/css/rubin'
+				when 'css' then
 				when 'style'
 					for i in param.style.split ',' then CInit.style i
 				when 'link'
@@ -2534,13 +2534,15 @@ class CWidget
 			
 			cssp = animation: [name, duration].join(" ")
 			css = []
+			to = {}
 			css.push '@', anime$.animationVendor, 'keyframes ', name, '{'
-			for key of p
-				if r = anime$param$[key] then cssp[r] = p[key]; continue
+			for key, val of p
+				if r = anime$param$[key] then cssp[r] = val; continue
+				if not val instanceof Array then to[key] = val; continue
 				k = key
 				if typeof k == 'number' or typeof k == 'string' and /^-?\d+\.\d+$/.test k then k += '%'
 				css.push k, "{"
-				for k, v of $H p[key]
+				for k, v of val
 					css.push k, ':', v, ';'
 				css.push "}"
 			css.push "}"

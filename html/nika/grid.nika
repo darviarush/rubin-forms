@@ -5,8 +5,22 @@
 /* параметры */
 %br = get("b", 1)
 %pa = get("p", 4)
-%ma = get("m", 5)
 %inx = get('in', 1)
+
+
+/* вендорные префиксы */
+%$vendor = CNavigator.vendor
+%$style = document.createElement('div').style
+%if(!'animation' in $style) $keyframes_vendor = $vendor
+%test(prop) {%if !prop in $style {%{$vendor}}%{prop}}
+
+%-vendor-box-shadow {%{test('box-shadow')}}
+%-vendor-border-radius {%{test('border-radius')}}
+
+%background-image(...) {background-image: %{arg}}
+%-vendor-background-image(...) {background-image: %if /^\w+-gradient/.test(arg) {%{$vendor}}%{arg}}
+%$style.backgroundImage = 'linear-gradient(transparent 1.4em)'
+%if($style.backgroundImage) VendorBackgroundImage = backgroundImage
 
 
 
@@ -47,7 +61,7 @@ html,body{ width:100%; height:100% }
 * { padding: 0; margin: 0; overflow: hidden; clear: both; vertical-align:middle }
 
 
-%inline_block {display: -moz-inline-stack; display: inline-block; *display: inline; *zoom: 1}
+%inline-block {display: -moz-inline-stack; display: inline-block; *display: inline; *zoom: 1}
 
 
 /* константы цвета */
@@ -65,6 +79,8 @@ html,body{ width:100%; height:100% }
 %red = "#CD5C5C"
 %lred = "#FFE4E1"
 
+%sizes = {tiny: 1, small: 1, minor: 1, normal: 1, major: 1, big: 1, huge: 1, divine: 1}
+%actions = {dim:'default', green:'info', orange:'warn', violet:'primary', blue:'confirm', red:'alert'}
 %dark = {dim:dim, green:green, orange:orange, violet:violet, blue:blue, red:red}
 %light = {dim:ldim, green:lgreen, orange:lorange, violet:lviolet, blue:lblue, red:lred}
 %colors = {}
@@ -76,16 +92,56 @@ html,body{ width:100%; height:100% }
 /* сеть */
 .in%{inx}{ margin: 0 auto !important; min-height: 100% }
 
-%float { float:left; display:block; clear:none; padding: %{pa+ma+br}px }
+%float { float:left; display:block; clear:none; padding: %{pa}px }
 
 /*568 [550, 500, 450] */
 %widths = [[750, 650, 550], [970, 770, 570], [1170, 970, 770]]
 %display = [768, 992, 1200]
-%sizes = ["s", "m", "l"]
-%sizesx = ["x"].concat(sizes)
+%suffixes = ["w", "s", "m", "l"]
+
+%grid(rem, width, suffixes) {
+	%min = width / rem + pa
+	%for suffix in suffixes {
+		%fix = suffix === 'w'? '': '-'+suffix
+		%lfix = suffix === 'w'? '': suffix
+		%for i in 1..rem {
+			%col = width / (rem-i+1)
+			%k = col - 2*pa
+			.%{suffix}%{i} { width: %{k}px }
+			.%{suffix}%{i}.dir { width: %{col}px }
+			.h%{lfix}%{i} { height: %{k}px }
+			.offset%{fix}%{i} { margin-left: %{col}px }
+			.push%{fix}%{i} { left: -%{col}px }
+			.pull%{fix}%{i} { left: %{col}px }
+			.up%{fix}%{i} { top: -%{col}px }
+			.down%{fix}%{i} { top: %{col}px }
+			.add%{fix}%{i} { padding: %{min}px }
+			.addl%{fix}%{i} { padding-left: %{min}px }
+			.addr%{fix}%{i} { padding-right: %{min}px }
+			.addt%{fix}%{i} { padding-top: %{min}px }
+			.addb%{fix}%{i} { padding-bottom: %{min}px }
+			
+		}
+	}
+}
+
+%addtogrid(rem, classes, styles) {
+	%names = []
+	%for suffix in suffixes {
+		%fix = suffix === 'w'? '': '-'+suffix
+		%for i in 1..rem {
+			%for cls in classes {
+				%if(cls === '') fix = suffix
+				%names.push([".", cls, fix, i].join(""))
+			}
+		}
+	}
+	%{names.join(", ")} {%{styles}}
+}
 
 
-%grid(rem, width, sizes, unit) {
+
+%fluidgrid(rem, width, sizes, unit) {
 	%join(p) {%if i===1{.%{p+suffix+j}, }.%{p+suffix+t}}
 	%for suffix in sizes {
 		%for j in 1..rem {
@@ -106,7 +162,7 @@ html,body{ width:100%; height:100% }
 	}
 }
 
-%addtogrid(rem, classes, styles) {
+%addtofluidgrid(rem, classes, styles) {
 	%names = []
 	%for suffix in ["", "x", "s", "m", "l"] {
 		%for j in 1..rem {
@@ -122,7 +178,7 @@ html,body{ width:100%; height:100% }
 }
 
 %if rem = exists('w') {
-	%{addtogrid(rem, ["w"], float)}
+	%{addtogrid(rem, [""], float)}
 	%{addtogrid(rem, ["pull", "push", "up", "down"], "position:relative")}
 }
 
@@ -153,11 +209,11 @@ html,body{ width:100%; height:100% }
 
 @media (max-width: %{display[0]}px) {
 	%for sn in sizes {.only-%{sn}, }
-	.no-x {display:none}
+	.no-w {display:none}
 }
 
 %if rem = exists('w') {
-	%{grid(rem, CRoot.viewWidth(), ["x"])}
+	%{grid(rem, CRoot.viewWidth(), ["w"])}
 }
 
 %for u, n in display {
@@ -198,7 +254,7 @@ html,body{ width:100%; height:100% }
 
 %blocks = ["h1", "h2", "h3", "h4", "h5", "h6", "p"]
 
-%for row in ["in1", "in2", "in3", "col", "row"] {%for p in blocks {.%{row} > %{p}, }}
+%for row in ["in1", "in2", "in3", "dir", "row"] {%for p in blocks {.%{row} > %{p}, }}
 .par { padding-left: %{pa}px; padding-right: %{pa}px }
 
 
@@ -273,15 +329,15 @@ input, select, textarea, button { margin: %{ma}px !important; padding: %{pa}px !
 
 
 /* округление наполовину */
-.rnd { %border-radius: 50% }
+.rnd { border-radius: 50% }
 
 /* скругление */
 %for i in 1...5 {
-	%if i === 1 { .ra, } .ra%{i} { %border-radius: %{(ma+pa)/i}px }
+	%if i === 1 { .ra, } .ra%{i} { border-radius: %{(ma+pa)/i}px }
 }
 
 /* тултип */
-.c-tip { background-color: #2a2a2a; background-color: rgba(0, 0, 0, 0.7); color: WhiteSmoke; /*border: solid 1px gray;*/ padding: 5px; %border-radius: 3px; font-size: 12px; width: 200px; max-height: 200px; }
+.c-tip { background-color: #2a2a2a; background-color: rgba(0, 0, 0, 0.7); color: WhiteSmoke; /*border: solid 1px gray;*/ padding: 5px; border-radius: 3px; font-size: 12px; width: 200px; max-height: 200px; }
 .c-tip h1, .c-tip h2, .c-tip h3, .c-tip h4 { color: LightSkyBlue; }
 
 
@@ -327,12 +383,12 @@ background-repeat: repeat-x;
 padding: %{pa}px;
 text-align: center;
 margin: %{ma}px;
-%border-radius: %{ma*2}px;
-%box-shadow: 1px 1px 1px #778899;
+border-radius: %{ma*2}px;
+box-shadow: 1px 1px 1px #778899;
 }
 .btn:hover { background-image:none !important }
 .btn:link { text-decoration:none; color: white !important; }
-.btn:active { margin: %{ma+1}px %{ma-1}px %{ma-1}px %{ma+1}px !important; %box-shadow: none; }
+.btn:active { margin: %{ma+1}px %{ma-1}px %{ma-1}px %{ma+1}px !important; box-shadow: none; }
 .btn:visited { }
 
 %for name, color of dark {
@@ -340,7 +396,7 @@ margin: %{ma}px;
 	%l1 = r1.lightness() + 0.15; r1.lightness(l1 > 1? 1: l1)
 	%if name === 'blue' { .btn, }.%{name}.btn {
 		background-color: %{color};
-		background-image: -%-linear-gradient(to bottom, %{r1}, %{color});
+		background-image:  linear-gradient(to bottom, %{r1}, %{color});
 		border: solid 1px %{color}
 	}
 }
@@ -352,7 +408,7 @@ margin: %{ma}px;
 
 %color = ldim
 .tabs {  }
-.tabs a { border-style: solid; border-color: %{color}; border-width: 0 0 %{br}px 0; margin: 0; padding: %{ma+br+pa}px %{ma+br+pa}px %{ma+pa}px %{ma+br+pa}px; display: block; float:left; clear:none; text-decoration:none; %border-radius: %{pa}px %{pa}px 0px 0px }
+.tabs a { border-style: solid; border-color: %{color}; border-width: 0 0 %{br}px 0; margin: 0; padding: %{ma+br+pa}px %{ma+br+pa}px %{ma+pa}px %{ma+br+pa}px; display: block; float:left; clear:none; text-decoration:none; border-radius: %{pa}px %{pa}px 0px 0px }
 .tabs a:hover { background-color: %{color} }
 .tabs .active:hover { background-color: transparent }
 .tabs .active { border-width: %{br}px %{br}px 0 %{br}px; padding: %{ma+pa}px %{ma+pa}px %{ma+br+pa}px %{ma+pa}px; cursor:default; color: #555 }

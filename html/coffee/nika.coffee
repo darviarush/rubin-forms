@@ -1,7 +1,5 @@
 CNika = (module || {}).exports = 
 	code: (code, file = "(string)") ->
-		#vendor = CNavigator.vendor
-		vendor = ""
 		start = "\n$ret.push('"
 		stop = "');\n"
 		for_c = c = 0
@@ -9,9 +7,12 @@ CNika = (module || {}).exports =
 		u = -1
 		S = []
 		camel = (s)-> s.replace /// -(\w) ///g, (a, b)-> b.toUpperCase()
+		acamel = (s)-> s.replace /// (?:^|-)(\w) ///g, (a, b)-> b.toUpperCase()
 		decamel = (s)-> s.replace /// [A-Z] ///g, (a) -> "-" + a.toLowerCase()
+		flag_call_fn = null
+		$vendor = {}
 		
-		re_vars = ///([\w\$]+)\s*=///g
+		re_vars = ///(?:^|[^\w\.\$])([\w\$]+)\s*=///g
 		vars = (x)->
 			vario = []
 			i = 0
@@ -22,37 +23,32 @@ CNika = (module || {}).exports =
 			if vario.length then ["var ", vario.join(","), "; "].join("")
 			else ""	
 
-		# 1 2 3     4     5    6   7     8     9   10          11        12              13           14    15  16  17  18
-		# { } for_v for_i in   of  range if    %{} присвоение  функция   вызов-функции   выражение_js  \'   \n   \r	\t+	;
+		# 1 2 3     4     5    6   7     8     9   10          11        12         13              14    15  16  17  18 19
+		# { } for_v for_i in   of  range if    %{} присвоение  функция   аргументы  вызов-функции   выражение_js  \'   \n   \r	\t+	;  @keyframes
 		re = /// (\{) | (\}) |
 		%for\s+ ([\w\$]+) (?:\s*,\s*([\w\$]+))? \s+ (?:(in)|(of)) \s+ ([^\{\}]+) \{ |
 		%if\s+ ([^\{\}]+) \{ |
 		%\{ ([^\{\}]+) \} | 
 		%([\w\$-]+)\s*\{ |
-		%([\w\$-]+ \s* \( [^\(\)]* \)) \s* \{ |
-		%([\w\$-]+) \s* : |
+		%([\w\$-]+) \s* (\( [^\(\)]* \)) \s* \{ |
+		([\w\$-]+) \s* : |
 		%([\w\$].*)(?:\r\n|\r|\n) |
-		(['\\]) | (\n) | (\r) | (\t+) ///g
-		#code = code.replace /// %([\w-]+ \s* : [^;\}]+) ///g, if vendor then -> [vendor, m[1], "; ", m[1]].join "" else '$1'
-		#code = code.replace /// ([^:]+) \s* : -%- ([^;\}]+) ///g, if vendor then -> [vendor, m[1], "; ", m[1]].join "" else '$1: $2'
-		#.replace /// %((?:[\w-]|#{re_in})+ \s* : (?:#{re_in}|[^;\{\}])+) ///g, if vendor then (z, a) -> [vendor, a, "; ", a].join "" else '$1'
-		#.replace /// ((?:[\w-]|#{re_in})+) \s* : \s* -%- ((?:#{re_in}|[^;\{\}])+) ///g, if vendor then (z, a, b)-> [a, ": ", vendor, b, "; ", a, ": ", b].join "" else '$1: $2'
-		
-		re_in = '%\\{[^\\{\\}]*\\}'
+		(['\\]) | (\n) | (\r) | (\t+) | (@keyframes)\b ///g
 		
 		code = code
-		#.replace /// %((?:[\w-]|#{re_in})+ \s* : (?:#{re_in}|"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|[^;\{\}])+) ///g, 
 		.replace re, (m...) ->
-			#say (lineno+":"+c+':'+u+':'+k+': '+i for i, k in m when i? and 0<k and k<17)[0]
-			s = if m[1]? then c++; "{"
+			if m[1]? then c++; "{"
 			else if m[2]?
-				#say "}", lineno, c-1, u == c
 				(if flag_call_fn == c then flag_call_fn = null; "'), '" else "") + if u == c--
 					#if S.length == 0 then throw "ошибка выполнения "+u+' '+c
 					x = S.pop()
 					u = (S[S.length-1] || [0, -1])[1]
-					[stop, (if x[0] == 10 then "var "+x[2]+"=$ret.join(''); $ret=$rets.pop();"
-					else if x[0] == 11 then "return $ret.join('');\n}"
+					[stop, (if x[0] == 10
+						if /^-vendor-/.test name = x[2] then $vendor[name.slice 8] = 2
+						"var "+camel(name)+"=$ret.join(''); $ret=$rets.pop();"
+					else if x[0] == 11
+						if /^-vendor-/.test name = x[2] then $vendor[name.slice 8] = 1
+						"return $ret.join('');\n}"
 					else "}"), start].join('')
 				else "}"
 			else if m[3]?
@@ -69,22 +65,26 @@ CNika = (module || {}).exports =
 				
 			else if m[8]? then S.push [8, u=++c]; [stop, "if(", m[8], ") {", start].join("")
 			else if m[9]? then ["', (", m[9], "), '"].join("")
-			else if m[10]? then S.push [10, u=++c, camel m[10]]; [stop, "$rets.push($ret); $ret=[];", start].join("")
-			else if m[11]? then S.push [11, u=++c]; [stop, "function ", camel(m[11]), "{var $ret=[];", start].join("")
-			else if m[12]? then flag_call_fn = c; ["', ", camel(m[12]), "('"].join("")
-			else if m[13]? then lineno++; [stop, vars(m[13]), m[13], start].join("")
-			else if m[14]? then "\\"+m[14]
-			else if m[15]? then lineno++; "\\n"
-			else if m[16]? then "\\r"
-			else if m[17]? then ""
-			else if m[18]? then (if flag_call_fn == c then flag_call_fn = null; "'), ';" else ";")
+			else if m[10]? then S.push [10, u=++c, m[10]]; [stop, "$rets.push($ret); $ret=[];", start].join("")
+			else if m[11]? then S.push [11, u=++c, m[11]]; [stop, "function ", camel(m[11]), (if m[12] == '(...)' then r=1; '()' else m[12]), "{var $ret=[]", (if r then ", arg = arguments.length===1? arguments[0]: Array.prototype.slice.call(arguments).join('');" else ";"), start].join("")
+			else if m[13]?
+				if vendor=$vendor[v=m[13]]
+					if vendor == 1 then flag_call_fn = c; ["', Vendor", acamel(v), "('"].join("")
+					else ["', Vendor", acamel(v), ", ':"].join("")
+				else v+":"
+			else if m[14]? then lineno++; [stop, vars(m[14]), m[14], start].join("")
+			else if m[15]? then "\\"+m[15]
+			else if m[16]? then lineno++; "\\n"
+			else if m[17]? then "\\r"
+			else if m[18]? then ""
+			else if m[19]? then (if flag_call_fn == c then flag_call_fn = null; "'), '" else "") + ";"
+			else if m[20]? then "@', $keyframes_vendor, 'keyframes"
 			else throw new Error file+":"+lineno+": fatal error: regexp не обработан"
-			return s
 	
-		if S.length then throw new Error file+":"+lineno+"Не закрыта скобка для "+S[S.length-1][0]
-		if c!=0 then throw new Error file+":"+lineno+"Не закрыта скобка "+c
+		if S.length then throw new Error file+":"+lineno+": Не закрыта скобка для "+S[S.length-1][0]
+		if c!=0 then throw new Error file+":"+lineno+": Не закрыта скобка "+c
 	
-		["_Nika_$=function(){ var $ret=[], $rets=[]; ", start, code, stop, "return $ret.join(''); }"].join('')
+		["_Nika_$=function(){ var $ret=[], $rets=[], $keyframes_vendor=''; ", start, code, stop, "return $ret.join(''); }"].join('')
 
 	load: (css) ->
 		CRoot.new("div").appendTo(CRoot.body()).ping(_method: 'GET', _act: css+'.css').onLoad = (code) ->
