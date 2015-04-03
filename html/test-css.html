@@ -5,7 +5,7 @@
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Rubin Css Framework</title>
-	<script id=_app_ src="js/lib.js?css=in1w24x12showgrid1&pack=css/grid" type="text/javascript"></script>
+	<script id=_app_ src="js/lib.js?css=in1w12showgrid1&pack=css/grid" type="text/javascript"></script>
 	<link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 <script><!--
 +function() {
@@ -124,14 +124,12 @@
 		
 		
 		<h3>Пропуск блоков</h3>
-		<p>Для пропуска нескольких ячеек сети используйте пустой тег <code>&lt;p class=wX /&gt;</code> - он не подвержен влиянию цветов</p>
+		<p>Для пропуска нескольких ячеек сети используйте <code>.offsetX</code></p>
 		
 		<div class="dims-line violets-light">
 			<div class="w6">.w6</div>
-			<p class="w6">.w6</p>
 			<div class="w6 offset6">.w6</div>
-			<p class="w2_6">.w2_6</p>
-			<div class="w6">.w6</div>
+			<div class="w6 offset2_6">.w6.offset2_6</div>
 		</div>
 		
 		<h3>Изменение порядка следования ячеек</h3>
@@ -143,27 +141,72 @@
 			<div class="w3 push3">2-й на место 1-го <code>.push3</code></div>
 			<div class="w3 push3">3-й элемент на место 2-го <code>.push3</code></div>
 		</div>
-		
-		
-		<p>Классы <code>.upX</code> сдвигают вверх на указанное деление, а <code>.downX</code> - вниз</p>
-		
-		<div class="blues-line blues-light">
-			<div class="w3 h12 down12">1-й <code>.br.h12.down12</code></div><br>
-			<div class="w3 h12 up12">2-й <code>.h12.up12</code></div>
-		</div>
 
+		
+		<h3>Цвета</h3>
+		<p>Класс <code>.цвет</code> закрашивает блок указанным цветом</p>
+		<p>Класс <code>.цвет<u>s</u></code> закрашивает вложенные блоки указанным цветом</p>
+		<p class=warn>Используйте <code>.цвет</code> для изменения раскараски виджетов</p>
+		
+		<div class="showgrid5">
+			<div class="w6 dim">.dim</div>
+			<div class="w6 blue">.blue</div>
+			<div class="w6 orange">.orange</div>
+			<div class="w6 green">.green</div>
+			<div class="w6 violet">.violet</div>
+			<div class="w6 red">.red</div>
+			
+			<div class="w6 dim-light">.dim-light</div>
+			<div class="w6 blue-light">.blue-light</div>
+			<div class="w6 orange-light">.orange-light</div>
+			<div class="w6 green-light">.green-light</div>
+			<div class="w6 violet-light">.violet-light</div>
+			<div class="w6 red-light">.red-light</div>
+		</div>
 		
 		<h3>Границы</h3>
 		
-		<p>Границы создаются <code>.posX</code>, а для дочерних блоков <code>.pos-X</code>. По умолчанию действует .pos3, если указан класс границы</p>
+		<p>Класс <code>.цвет-line-позиция</code> закрашивает границу указанным цветом в указанной позиции</p>
+		<p>Класс <code>.цвет<u>s</u>-line-позиция</code> закрашивает границу вложенных блоков указанным цветом в указанной позиции</p>
 		
-		<div class="showgrid5 reds-line oranges-light">
-			<div class="w5 pos0"><code>.pos0</code> - граница прилегает к тексту</div>
-			<div class="w5 pos1"><code>.pos1</code> - граница на расстоянии &frac12; поля от условного края</div>
-			<div class="w5"><code>.pos2</code> - условный край. Граница по умолчанию</div>
-			<div class="w5 pos3"><code>.pos3</code> - граница на расстоянии &frac12; отступа от края</div>
-			<div class="w5 pos4"><code>.pos4</code> - граница на краю</div>
+		<div class="w6 dim-line">.dim-line</div>
+		<div class="w6 blue-line">.blue-line</div>
+		<div class="w6 orange-line">.orange-line</div>
+		<div class="w6 green-line">.green-line</div>
+		<div class="w6 violet-line">.violet-line</div>
+		<div class="w6 red-line">.red-line</div>
+		
+		<div class="w6 dim-light-line">.dim-light-line</div>
+		<div class="w6 blue-light-line">.blue-light-line</div>
+		<div class="w6 orange-light-line">.orange-light-line</div>
+		<div class="w6 green-light-line">.green-light-line</div>
+		<div class="w6 violet-light-line">.violet-light-line</div>
+		<div class="w6 red-light-line">.red-light-line</div>
+		
+		<div class="oranges-light">
+			<div class="w7 violet-line">.violet-line</div>
+			<div class="w7 violet-line-v">.violet-line-v</div>
+			<div class="w7 violet-line-h">.violet-line-h</div>
+			<div class="w7 violet-line-l">.violet-line-l</div>
+			<div class="w7 violet-line-r">.violet-line-r</div>
+			<div class="w7 violet-line-t">.violet-line-t</div>
+			<div class="w7 violet-line-b">.violet-line-b</div>
 		</div>
+		
+		
+		<h3>Боксы</h3>
+		<p><code>.box</code> добавляет рамку и скруглённые уголки "выезжая" за пределы блока в который вложен. В самом боксе должны быть другие блоки</p>
+		
+		<div class="w3">
+			<div class="box red-light">
+				<input type="text" class="w3" placeholder=".w3 > box > input.w3">
+			</div>
+		</div>
+		
+		<div class="w2_3 violet-line">.w2_3<br>...</div>
+		<div class="w3 violet-light">.w3</div>
+		<div class="w3 violet-light">.w3</div>
+		<div class="w3 violet-light">.w3</div>
 		
 		<h3>Вложенные блоки</h3>
 		<p>Вложенная сетка должна быть под <code>.row</code></p>
@@ -191,31 +234,6 @@
 				</div>
 			</div>
 		</div>
-		
-		<div class="w3">.w3</div>
-		<div class="w3">.w3</div>
-		
-		<div class="w3" style="background: AliceBlue; border-color: LightSteelBlue">
-			А вот .w3 с вложениями
-			<div class="fill">.fill</div>
-			<div class="first w6">.first.w6</div>
-			<div class="last w6">.last.w6</div>
-			<div class="first w9">.first.w9</div>
-			<div class="w9">.w9</div>
-			<div class="last w9">.last.w9</div>
-		</div>
-		
-		<div class="w3 col">
-			<p>.w3.col (текст в теге <code>p</code>)</p>
-			<div class="w6">.w6</div>
-			<div class="w6">.w6</div>
-			<div class="w12">.w12</div>
-			<div class="w12">.w12</div>
-		</div>
-		
-		<div class="w3">.w3</div>
-		<div class="w3">.w3</div>
-
 		
 		
 		<h3>Перенос</h3>
