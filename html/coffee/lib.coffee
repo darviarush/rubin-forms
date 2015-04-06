@@ -26,10 +26,10 @@
 # 18. lint - ваше приложение может работать под браузерами: IE6+, FF1+, ...
 
 #* 19. tagName -> ctype
-#* 20. parent сделать функцией и смотреть по id
+#* 20. form сделать функцией и смотреть по id
 
 # -----------------------
-# 20.а. При изменении parent изменять и обработчики событий на нём
+# 20.а. При изменении form изменять и обработчики событий на нём
 
 #* 21. css - key - проверять на существование функции, если есть - запустить
 #* 22. css - rgb, rgba. css цвета возвращает в hex. @rgba 'background-color' - в массиве 
@@ -56,7 +56,7 @@
 # 31. Добавить model в любой json-ответ
 # 32. autocompleter
 
-#* 33. переделать link-и для инклудов на обычные, иначе поисковики индексировать не смогут. Установить onclick на body и перехватывать от <a>. -Для этого устанавливать обработчики всех событий на body и делать event.target().send и event.target().parent?().send
+#* 33. переделать link-и для инклудов на обычные, иначе поисковики индексировать не смогут. Установить onclick на body и перехватывать от <a>. -Для этого устанавливать обработчики всех событий на body и делать event.target().send и event.target().form?().send
 #* 34. history
 
 # -----------------------
@@ -80,7 +80,7 @@
 # 45. Разместить на heroku test
 
 #* 46. В темплейт добавить хелперы
-#* 47. Переделать send - вызывать обработчики для всех уровней. Обработчики вызываются начиная от верхнего parent-а. Если нужно остановить - то @stopHandlersQueue = on. Значение от предыдущего обработчика передаётся в @return - не сделано, т.к. зачем?
+#* 47. Переделать send - вызывать обработчики для всех уровней. Обработчики вызываются начиная от верхнего form-а. Если нужно остановить - то @stopHandlersQueue = on. Значение от предыдущего обработчика передаётся в @return - не сделано, т.к. зачем?
 
 # -----------------------
 #* 48. сделать в CInit параметр для создания стилей .w\d+ и .mobile, .pad, .computer
@@ -108,7 +108,7 @@
 #	Добавить команду qq compile - которая будет перекомпиливать всё - stylus, coffeescript, шаблоны и спрайты: qq css + qq sprite + qq coffee + qq action
 #	qq watch - висит и перекомпиливает. qq с test в ini - добавляет qq watch
 # 79. встроенный crontab - R::Cron->new->on(1, sub {}); и для сигналов: 
-# 80. parent заменить на form. Исключить установку _form в конструкторе, использовать атрибут cform (?)
+# 80. form заменить на form. Исключить установку _form в конструкторе, использовать атрибут cform (?)
 # 81. использовать в проекте: http://www.git-tower.com/blog/css3-transforms/
 # 82. new as emmet
 # 83. функция options, для опций. Если тип следующего операнда не подходит, то он пропускается: options "x:io y:s f:f", (opt) ->
@@ -595,9 +595,6 @@ CInit =
 					for i in CInit.pack = param.pack.split(",") then CInit.require i
 				else throw CRoot.raise "Нет параметра #{key} в инициализаторе библиотеки"
 		undefined
-		
-	exists: (v) -> if r=CInit.param.css.match new RegExp("(?:^|\\d)"+v+"(\\d+)") then parseInt r[1]
-	get: (v, def) -> if (r=CInit.exists v)? then r else def
 
 
 unless window.XMLHttpRequest and not IE then CInit.require "old"
@@ -693,9 +690,11 @@ extend CSend,
 	
 	mousedown: (e) -> which=e.event.which; p = CEvent.prototype; (if which == 1 then p.left = on); (if which == 2 then p.mid = on); (if which == 3 then p.right = on)
 	mouseup: (e) -> which=e.event.which; p = CEvent.prototype; (if which == 1 then p.left = off); (if which == 2 then p.mid = off); (if which == 3 then p.right = off)
-	click: -> CEvent::left = on
-	click_end: -> CEvent::left = off
+	click: -> CEvent::left = on ; return
+	click_end: -> CEvent::left = off ; return
 
+#say  'onmouseenter' of document
+	
 unless 'onmouseenter' of document then extend CSend,
 	mouseenter_type: 'mouseover'
 	mouseover: (e, widget) ->
@@ -1123,7 +1122,7 @@ CHelper =
 	# атрибуты, классы, стили
 	visible: (a) -> if a then "" else 'display:none'
 	style: (a) -> if a then "style=\"#{a}\"" else ''
-	img: (a) -> "/images/#{CRadix.to(a, 62, '/')}"
+	img: (a) -> if !a or !(a = parseInt a) then "/img/" else "/images/#{CRadix.to(a, 62, '/')}"
 	
 	
 CValid =
@@ -1171,7 +1170,7 @@ class CWidget
 
 	model: new CModel({}, {}, "main")
 
-	constructor: (element, @_parent) ->
+	constructor: (element, @_form) ->
 		throw @raise "element не HTMLElement", element unless element and element.tagName
 		throw @raise "element уже имеет виджет ", element.widget if element.widget
 		@element = element
@@ -1194,24 +1193,24 @@ class CWidget
 		
 	
 	# служебные методы
-	parent: (parent) ->
+	form: (form) ->
 		if arguments.length
 			# удаляем эвенты - можно не удалять
-			#if @_parent then 
+			#if @_form then 
 			# устанавливаем эвенты
-			#if prev = @parent() then prev.detach this
-			@_parent = parent
+			#if prev = @form() then prev.detach this
+			@_form = form
 			this
 		else
-			unless @_parent
+			unless @_form
 				element = @element
-				@_parent = if cparent = element.getAttribute "cparent" then @byId cparent
+				@_form = if cform = element.getAttribute "cform" then @byId cform
 				else if element.id and match=element.id.match(/^(.+)-\w+$/) then @byId match[1]
 				else null
 
-			throw @raise "parent не CWidget: "+@_parent unless !@_parent or @_parent && @_parent instanceof CWidget
-			@_parent
-	parentAll: -> p = this ; while p = p.parent() then p
+			throw @raise "form не CWidget: "+@_form unless !@_form or @_form && @_form instanceof CWidget
+			@_form
+	formAll: -> p = this ; while p = p.form() then p
 	
 	valueOf: -> '<'+@className()+' '+(@element && (@element.id && "#"+@element.id || @element.className && '.'+@element.className.split(' ').join(".") || @element.tagName))+'>'
 	toString: CWidget::valueOf
@@ -1223,14 +1222,14 @@ class CWidget
 	
 	type$.nothing 'raise warn className'
 	type$.join 'valueOf toString'
-	type$.attr 'parent'
+	type$.attr 'form'
 	
 	# методы создания елементов и виджетов
-	createWidget: (element, parent) ->
+	createWidget: (element, form) ->
 		if widget=element.widget then return widget
 		cls = @ctype element
 		if cview = element.getAttribute? 'cview' then CTemplate.apply element, cls
-		new cls element, parent
+		new cls element, form
 
 	ctype: (element) ->
 		return CNode if element.nodeType != 1
@@ -1268,21 +1267,21 @@ class CWidget
 		else (div = wrapDiv$).innerHTML = element
 		div
 	
-	wrap: (element, parent) ->
+	wrap: (element, form) ->
 		if element instanceof CWidget then element
 		else unless element? then null
 		else if widget=element.widget then widget
 		else if (type=typeof element) == "string"
 			div = text2elem$ element
-			if div.childNodes.length==1 then element = div.firstChild; div.innerHTML = ""; @createWidget element, parent
+			if div.childNodes.length==1 then element = div.firstChild; div.innerHTML = ""; @createWidget element, form
 			else widget = new CWidgets _slice$.call div.childNodes; div.innerHTML = ""; widget
 		else if element instanceof Array then toElements$.call this, element
-		else if type == "number" then new CNode document.createTextNode(element), parent
+		else if type == "number" then new CNode document.createTextNode(element), form
 		else if element instanceof RegExp then @wrap(@document()).find String(element).slice 1, -1
-		else @createWidget element, parent
+		else @createWidget element, form
 	
-	unwrap: -> @send 'onDestroy', 'unwrap'; @parent()?.detach this ; e=@element; @element = @element.widget = null ; new CWidgets [e]
-	rewrap: (cls) -> p = @parent(); e = @unwrap()._all[0]; w = (if typeof cls == 'function' then new cls e, p else cls.unwrap(); cls.element = e; e.widget = cls; cls.parent p); (if p and p.id()+'-'+w.name() == w.id() then p.attach w); w
+	unwrap: -> @send 'onDestroy', 'unwrap'; @form()?.detach this ; e=@element; @element = @element.widget = null ; new CWidgets [e]
+	rewrap: (cls) -> p = @form(); e = @unwrap()._all[0]; w = (if typeof cls == 'function' then new cls e, p else cls.unwrap(); cls.element = e; e.widget = cls; cls.form p); (if p and p.id()+'-'+w.name() == w.id() then p.attach w); w
 	
 	new$ = (tag, ctype, param) ->
 		if typeof ctype == 'object' then param = ctype; ctype = undefined
@@ -1517,7 +1516,7 @@ class CWidget
 					listener._belong = p
 					widget.on type, listener
 			path.unshift if /^\d+$/.test name = @name() then 'frame' else name
-			p = p.parent()
+			p = p.form()
 		this		
 
 	readyRun$ = 0
@@ -1629,7 +1628,7 @@ class CWidget
 		fire_html$: fire_html$
 	
 	attach: (name) -> this["$"+name] = w = @byName name; (if !(x=this[name]) or x instanceof CWidget then this[name] = w); @_elements.push name 
-	detach: (name) -> (if typeof name != 'string' then x=name; name = name.name()); (if (x?=this[name]) instanceof CWidget then delete this[name]); x?.parent null ; (if -1 != idx=(e=@_elements).indexOf name then e.splice idx, 1); delete this["$"+name]; this
+	detach: (name) -> (if typeof name != 'string' then x=name; name = name.name()); (if (x?=this[name]) instanceof CWidget then delete this[name]); x?.form null ; (if -1 != idx=(e=@_elements).indexOf name then e.splice idx, 1); delete this["$"+name]; this
 
 	getElements: ->
 		id = @element.id
@@ -1649,7 +1648,7 @@ class CWidget
 		unless widget
 			if (root=@root()) == @htm() then throw @raise "byName к неизвестному name="+name
 			unless widget = root.first "[id=#{id}]", this then throw @raise "byName('"+name+"') - "+this+" не вставлен в документ. Его id недоступны"
-		if this != p=widget.parent() then throw @raise "У элемента `"+id+"`"+widget+" указан неверный parent `"+p+'`'
+		if this != p=widget.form() then throw @raise "У элемента `"+id+"`"+widget+" указан неверный form `"+p+'`'
 		widget
 
 	unless qs$ = document.querySelector && IE!=8 then CInit.require "lib/nwmatcher-1.2.5"
@@ -1728,7 +1727,7 @@ class CWidget
 	type$.nothing 'all empty length item items invoke map reduce result grep exists filter union slice queryIndex'
 
 	# методы клонирования элемента
-	clone: (id, parent, cls) ->
+	clone: (id, form, cls) ->
 		element = @element.cloneNode true
 		element.widget = null
 
@@ -1743,13 +1742,13 @@ class CWidget
 			replace=id+"-"
 			for e in es when id and e.id then e.id=e.id.replace regexp, replace
 			
-		new (if cls then (if typeof cls == 'string' then window[cls] else cls) else @constructor)(element, parent)
+		new (if cls then (if typeof cls == 'string' then window[cls] else cls) else @constructor)(element, form)
 
 
-	clonehtml: (id, parent, cls) ->
+	clonehtml: (id, form, cls) ->
 		id ||= CMath.uniqid()
 		html=@outer().replace new RegExp('\\b([Ii][Dd]=[\'"]?)'+@id()+'([\\s>\'"-])', 'g'), '$1'+id+'$2'
-		if parent || cls then html=html.replace new RegExp('\\b([Ii][Dd]=[\'"]?'+id+'[\\s>\'"])'), '$1'+(if parent then ' cparent='+parent.id() else '')+(if cls then ' ctype='+(if cls instanceof Function then cls.getName() else cls) else '')
+		if form || cls then html=html.replace new RegExp('\\b([Ii][Dd]=[\'"]?'+id+'[\\s>\'"])'), '$1'+(if form then ' cform='+form.id() else '')+(if cls then ' ctype='+(if cls instanceof Function then cls.getName() else cls) else '')
 	
 	type$.all 'clone'
 	
@@ -2515,7 +2514,7 @@ class CWidget
 
 	anime$param$ = count: 'animation-iteration-count', ease: 'animation-timing-function', state: 'animation-play-state', direction: 'animation-direction', delay: 'animation-delay'
 	
-	anime$ = (p) ->
+	anime$ = (p, end, iteration, start) ->
 		if p == 'paused' || p == 'running' then @setCss anime$param$.state, p
 		if p == 'remove'
 			@_anime_style?.free()
@@ -2550,6 +2549,9 @@ class CWidget
 			(@_anime_style ||= @head().appendRet "<style></style>").html css.join ""
 			
 			@css cssp
+			
+			# http://www.sitepoint.com/css3-animation-javascript-event-handlers/ - про анимации
+			if end then @on 'animationend', end
 		this
 		
 	anime: ->
@@ -2848,7 +2850,7 @@ class CWidget
 	onInvalid: -> @tooltip(escapeHTML(@attr("cerr") || "Ошибка - невалидное значение")).tooltip().open(); off
 	dataType: (val) -> val
 	param: -> x={}; x[@name() || 'val'] = @val(); x
-	#buildQuery: -> [(p=@parent())._tab || p.name(), @name(), p.data?.id || p.$id?.val()]
+	#buildQuery: -> [(p=@form())._tab || p.name(), @name(), p.data?.id || p.$id?.val()]
 	load: (param, args...) -> @loader()._load 'load', param || {}, this, args; this
 	submit: (param, args...) -> (if @valid() then @loader()._load 'submit', extend(@param(), param || {}), this, args); this
 	save: (param, args...) -> (if @valid() then @loader()._load 'save', extend(@param(), param || {}), this, args); this
@@ -2860,9 +2862,9 @@ class CWidget
 		else
 			@_loader ||= if cloader = @element.getAttribute "cloader" then @byId cloader
 			else
-				parent = this
-				while not parent._loader and parent = parent.parent() then null
-				if parent then parent._loader
+				form = this
+				while not form._loader and form = form.form() then null
+				if form then form._loader
 				else @tooltip(html: '<div cview=loading></div>', ctype: 'tooltip').tooltip().last()
 
 	loading: -> !!@loader().request
@@ -2914,12 +2916,12 @@ class CWidgets extends CWidget
 
 # виджеты нод
 class CNode extends CWidget
-	constructor: (@element, @_parent) -> throw @raise "element уже имеет виджет ", @element.widget if @element.widget; @element.widget = this
+	constructor: (@element, @_form) -> throw @raise "element уже имеет виджет ", @element.widget if @element.widget; @element.widget = this
 	text: (text) -> if arguments.length then @element.data = text else @element.data
 	html: @::text
 	val: @::text
 	outer: @::text
-	parent: (parent) -> if arguments.length then @_parent=parent; this else @_parent
+	form: (form) -> if arguments.length then @_form=form; this else @_form
 	tag: (tag) -> if arguments.length then throw @raise "Для CNode.tag изменение ноды по имени не определено" else @element.nodeName
 	
 	Send$ = (event) -> CSend this, event
@@ -2936,20 +2938,20 @@ class CButtonWidget extends CWidget
 
 	
 class CSubmitWidget extends CButtonWidget
-	onclick: (e) -> @parent().submit(); e.stop(); off
+	onclick: (e) -> @form().submit(); e.stop(); off
 class CLoadWidget extends CButtonWidget
-	onclick: (e) -> @parent().load(); e.stop(); off
+	onclick: (e) -> @form().load(); e.stop(); off
 class CUploadWidget extends CButtonWidget
-	onclick: (e) -> @parent().upload(); e.stop(); off
+	onclick: (e) -> @form().upload(); e.stop(); off
 class CSaveWidget extends CButtonWidget
-	onclick: (e) -> @parent().save(); e.stop(); off
+	onclick: (e) -> @form().save(); e.stop(); off
 class CEraseWidget extends CButtonWidget
-	onclick: (e) -> @parent().erase(); e.stop(); off
+	onclick: (e) -> @form().erase(); e.stop(); off
 class CPingWidget extends CButtonWidget
-	onclick: (e) -> @parent().ping(); e.stop(); off
+	onclick: (e) -> @form().ping(); e.stop(); off
 
 class CResetWidget extends CButtonWidget
-	onclick: (e) -> @parent().reset(); e.stop(); off
+	onclick: (e) -> @form().reset(); e.stop(); off
 
 	
 class CInputWidget extends CWidget
@@ -3112,7 +3114,7 @@ class CTemplateWidget extends CFormWidget
 					html = t[if n.length then "-"+n.join "-" else ""].template
 					break
 				unless /^\d+$/.test name = p.name() then n.unshift name
-				p = p.parent()
+				p = p.form()
 		html
 	initTemplate: ->
 		html = @getTemplate()
@@ -3162,7 +3164,7 @@ class CListWidget extends CTemplateWidget
 			@element.innerHTML = @_template @data=@dataType(data), @element.id
 			@child().setValid data.valid || @data.valid
 			do @setHandlersOnElements
-		else for ch in @child().items() when ch.parent() == this then ch.val()
+		else for ch in @child().items() when ch.form() == this then ch.val()
 
 	upload: (param, args...) -> @loader()._load('upload', param, this, args);	this
 	add: (data) ->
@@ -3220,7 +3222,7 @@ class CSortableHTML5Widget extends CListWidget
 
 	ondragstart: (e) ->
 		#say 'dragstart'
-		if (t=e.target()).parent() == this
+		if (t=e.target()).form() == this
 			@_sortable = t
 			@timeout 0, => @_sortable.addClass 'sort'
 			e.event.dataTransfer.effectAllowed = 'move'
@@ -3231,15 +3233,15 @@ class CSortableHTML5Widget extends CListWidget
 	ondragover: (e) ->
 		#say 'dragover', e.target() == this
 		if this == t=e.target() then e.cancel()
-		if t.parent() == this
+		if t.form() == this
 			e.cancel()
 			if t != @_sortable
 				if t.next() == @_sortable then t.before @_sortable else @_sortable.before t
 		this
 	
 	ondrop: (e) ->
-		#say 'drop', e.target() == this, e.target().parent() == this
-		if (t=e.target()) == this or t.parent() == this
+		#say 'drop', e.target() == this, e.target().form() == this
+		if (t=e.target()) == this or t.form() == this
 			e.cancel()
 			#@_sortable.removeClass 'sort'
 			@send "onSorted", @_sortable
@@ -3278,7 +3280,7 @@ class CSortableWidget extends CListWidget
 		if e.left
 			sort.left e.x() - @_distance_x
 			sort.top e.y() - @_distance_y
-			for item in floor.items() when item.parent() == this then self = item; break
+			for item in floor.items() when item.form() == this then self = item; break
 			if self
 				if self.next() == @_void then self.before @_void else @_void.before self
 		else do @dragend
@@ -3347,20 +3349,17 @@ class CCenterModalWidget extends CModalWidget
 	onBeforeOpen: -> @center()
 	
 	
-class CTooltipWidget extends CWidget
+class CTooltipWidget extends CElementWidget
 	
-	config: { pos: 'top', scale: 'center', scalex: 'after', scaley: 'mid', height: 10, width: 30, corner: 'mid', focus: 1, mouse: 1, open: 'fadeIn', close: 'fadeOut', class: 'c-tip', turn: 1, close_button: "<div class='fr ico-close-red cp' onclick='$(this).up().close()'></div>" }
+	config: { pos: 'top', scale: 'center', scalex: 'after', scaley: 'mid', height: 10, width: 30, corner: 'mid', focus: 1, mouse: 1, open: 'fadeIn', close: 'fadeOut', class: 'c-tip', turn: 1, close_button: "<div class='ico-close-red' onclick='$(this).up().close()'></div>" }
 	
 	constructor: ->
 		super
 		@addClass @config.class if @config.class
 		@css 'overflow', 'visible'
-		do @initialize
-		#say CTemplate.fromArgs @attr 'cstyle'
-		#do @conf say CTemplate.fromArgs @attr 'cstyle'
-		
-	initialize: ->
-	
+
+	owner: (owner) -> if arguments.length then @_owner = owner; this else @_owner ||= @byId(@attr('cowner')) || @form()
+
 	conf: (msg = {}) ->
 		if msg.display == 1 then display = 1 ; delete msg.display
 		if msg.open == 1 then open = 1 ; delete msg.open
@@ -3373,8 +3372,8 @@ class CTooltipWidget extends CWidget
 		if msg.html then @content msg.html
 		if close then @prepend p.close_button
 		{pos, scale, height, width, scalex, scaley, corner, turn}=p
-		position = if (parent=@parent()).contains this then 'relative' else 'position'
-		@[position] parent, pos, scale, scalex, scaley, height
+		position = if (owner=@owner()).contains this then 'relative' else 'position'
+		@[position] owner, pos, scale, scalex, scaley, height
 		if turn
 			vw = @viewWidth()
 			vh = @viewHeight()
@@ -3386,7 +3385,7 @@ class CTooltipWidget extends CWidget
 					pos = @position.rotate[pos]
 					scale = @position.normalize pos, scale
 					corner = @position.normalize pos, corner
-					@[position] parent, pos, scale, scalex, scaley, height
+					@[position] owner, pos, scale, scalex, scaley, height
 					{left, top, right, bottom} = @viewPos()
 					#say right, bottom, vw, vh, pos, scale, scalex, scaley, height
 					if left >= 0 and top >= 0 and right <= vw and bottom <= vh then break
@@ -3397,36 +3396,35 @@ class CTooltipWidget extends CWidget
 		do @open if open
 		this
 	
-	open: -> @animate "end"; @morph @config.open
-	close: -> @animate "end"; @morph @config.close
+	open: -> @show(); @css transition: 'opacity 1s', opacity: 1 #@animate "end"; @morph @config.open
+	close: -> @css opacity: 0 #@animate "end"; @morph @config.close
+	ontransitionend: -> @hide()
 	display: -> @show()
 	hidden: -> @hide()
 	#onAnimate: -> @timeout @config.timeout, 'close' if @config.timeout
 
 
 class CTipWidget extends CTooltipWidget
-	initialize: -> @parent().setHandler 'mouseenter', 'mouseleave'; @setHandler 'mouseenter', 'mouseleave'
 	onmouseenter: (e) -> if @config.mouse then @open()
-	onmouseleave: (e) -> if @config.mouse then @close()
-	onmouseenter_parent: @::onmouseenter
-	onmouseleave_parent: @::onmouseleave
+	onmouseleave: (e) -> if @config.mouse and not(@owner().left() <= e.x() <= @owner().right() and @owner().top() <= e.y() <= @owner().bottom()) then @close()
+	onmouseenter_owner: @::onmouseenter
+	onmouseleave_owner: @::onmouseleave
 
 	
 class CTipFocusWidget extends CTooltipWidget
-	initialize: -> @parent().setHandler 'focusin', 'focusout'
 	onfocus: (e) -> if @config.focus then @open()
 	onblur: (e) -> if @config.focus then @close()
-	onfocus_parent: @::onfocusin
-	onblur_parent: @::onfocusout
-	#for ie: onfocus_parent: @::onfocusin
-	#onblur_parent: @::onfocusout
+	onfocus_owner: @::onfocusin
+	onblur_owner: @::onfocusout
+	#for ie: onfocus_form: @::onfocusin
+	#onblur_form: @::onfocusout
 
 	
 # загрузчики
 class CLoaderWidget extends CWidget
 	constructor: ->
 		super
-		parent._loader = this if (parent=@parent()) and not parent._loader
+		form._loader = this if (form=@form()) and not form._loader
 		do @initialize
 		
 	initialize: -> @novid()
@@ -3538,10 +3536,15 @@ class CLoaderWidget extends CWidget
 	ohComplete: -> @novid()
 	ohLoad: -> @request.sender.tooltip null
 	ohError: ->
+		text = @request?.request.responseText || ""
+		err = @request.error
 		content = @wrap "<div cview=ajax_error></div>"
-		if text = @request?.request.responseText then content.first(".c-tip-content").update text, @request
-		if @request.error then content.first("h3").text @request.error
+		body = content.first(".c-tip-content")
+		if ///^application/json///.test @request?.request.getResponseHeader 'Content-Type' then body.val fromJSON(text).error
+		else body.update text, @request
+		if err then content.first("h3").text err
 		@request.sender.tooltip ctype: 'tooltip', close: 1, open: 1, html: content, timeout: 5000, class: 'c-error'
+
 
 
 class CStatusWidget extends CLoaderWidget
@@ -3582,7 +3585,7 @@ class CRouterWidget extends CWidget
 				param._act = CUrl.to url
 				#if not a._loader and not a.attr 'cloader' then a.loader this
 				a.load param
-		this
+		return
 	
 	prev_url$ = null
 	
@@ -3614,7 +3617,7 @@ CView =
 </div>
 '''],
 	ajax_error: [CWidget, '''
-<div class='fl mb mr ico-ajax-error'></div><h3>Ошибка</h3><div class=c-tip-content></div>
+<div class='ico-ajax-error'></div><h3>Ошибка</h3><div class=c-tip-content></div>
 	''']
 	
 	

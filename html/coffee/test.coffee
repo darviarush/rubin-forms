@@ -520,10 +520,10 @@ CTest.category "служебные методы"
 
 
 new CTest 'cls-CWidget', """
-`CWidget element, [parent]` - класс виджет
+`CWidget element, [form]` - класс виджет
 
 element - элемент который оборачивается виджетом
-parent - виджет, который будет главным над этим
+form - виджет, который будет главным над этим
 
 Порождает циклическую ссылку
 
@@ -564,9 +564,9 @@ CTest.category "методы создания элементов и виджет
 
 
 new CTest 'obj-CWidget-wrap', """
-`wrap array|element|string|number|widget|null, [parent]` - создаёт на основе своего аргумента виджет. Если аргументом является виджет или элемент имеющий виджет, то возвращается этот виджет. Возвращает или виджет или коллекцию, если же аргумент undefined или null - то null
+`wrap array|element|string|number|widget|null, [form]` - создаёт на основе своего аргумента виджет. Если аргументом является виджет или элемент имеющий виджет, то возвращается этот виджет. Возвращает или виджет или коллекцию, если же аргумент undefined или null - то null
 
-2. parent - родительский виджет для порождённого виджета. Родительский виджет, это форма, она позволяет устанавливать обработчики на свои элементы.
+2. form - родительский виджет для порождённого виджета. Родительский виджет, это форма, она позволяет устанавливать обработчики на свои элементы.
 
 См. #createWidget, #CFormWidget
 """, ->
@@ -611,7 +611,7 @@ new CTest 'obj-CWidget-rewrap', """
 	
 	
 new CTest 'obj-CWidget-createWidget', """
-`createWidget element, [cls], [parent]` - определяет класс виджета и создаёт его. Возвращает созданный виджет. Если у элемента уже есть виджет - возвращает его. При этом cls и parent - игнорируются
+`createWidget element, [cls], [form]` - определяет класс виджета и создаёт его. Возвращает созданный виджет. Если у элемента уже есть виджет - возвращает его. При этом cls и form - игнорируются
 """, ->
 	div = document.createElement 'div'
 	div.setAttribute 'ctype', 'img'
@@ -871,7 +871,7 @@ new CTest 'obj-CWidget-defineHandlers', """
 * методы начинающиеся на on и записанные буквами нижнего регистра - устанавливаются на элемент: onclick, onchange
 * начинающиеся на имя элемента формы - используется формами (CForm): bt_onclick
 * формы могут быть вложенными: `form2__form3__bt_onclick`
-* заканчивающиеся на описатель: onscroll_window, onload_window, onmouseleave_parent
+* заканчивающиеся на описатель: onscroll_window, onload_window, onmouseleave_form
 
 См. #setHandler, #send, #getHandlersOnElements, #setListens
 """, ->
@@ -925,7 +925,7 @@ new CTest 'obj-CWidget-setHandlersOnElements', """
 
 	
 new CTest 'obj-CWidget-setListens', """
-`setListens` - устанавливает описатели определённые defineHandlers на окно, parent и т.д.
+`setListens` - устанавливает описатели определённые defineHandlers на окно, form и т.д.
 """, ->
 	@count 1
 	self = this
@@ -1057,13 +1057,13 @@ new CTest 'obj-CWidget-detach', """
 """, ->
 	w = $("<div id=obj-CWidget-attach-form ctype=form><div id=obj-CWidget-attach-form-lis></div></div>")
 	lis = w.byId "obj-CWidget-attach-form-lis"
-	@is lis.parent(), w
+	@is lis.form(), w
 	@is w._elements[0], 'lis'
 	@is w.lis, lis
 	w.detach 'lis'
-	@is lis._parent, null
-	@is lis.parent(), w
-	@is lis._parent, w
+	@is lis._form, null
+	@is lis.form(), w
+	@is lis._form, w
 	@ok not(lis of w)
 	@is w._elements.length, 0
 	
@@ -1088,7 +1088,7 @@ new CTest 'obj-CWidget-byId', """
 
 
 new CTest 'obj-CWidget-byName', """
-`byName name` - ищет в документе и возвращает виджет по его имени в форме. Аналогично @byId id-формы + тире + имя. Заодно проверяет parent
+`byName name` - ищет в документе и возвращает виджет по его имени в форме. Аналогично @byId id-формы + тире + имя. Заодно проверяет form
 """, ->
 	form = CRoot.wrap("<div id=obj-CWidget-byName-form><div id=obj-CWidget-byName-form-v></div></div>").appendTo /body/
 	@is form.byName("v"), form.byId "obj-CWidget-byName-form-v"
@@ -1317,20 +1317,20 @@ new CTest 'obj-CWidget-filter', """
 CTest.category "методы клонирования элемента"
 
 new CTest 'obj-CWidget-clone', """
-`clone [id], [parent], [cls]` - возвращает клонированный элемент, с новым id, парентом и классом виджета, если последние указаны
+`clone [id], [form], [cls]` - возвращает клонированный элемент, с новым id, парентом и классом виджета, если последние указаны
 """, ->
 	w = CRoot.wrap("<div id=exid ctype=img><b id=exid-b></b></div>").clone "exid2", CRoot, CInputWidget
 	@is w.id(), 'exid2'
 	@is w.child(0).id(), 'exid2-b'
-	@is w.parent(), CRoot
+	@is w.form(), CRoot
 	@instanceof w, CInputWidget
 
 	
 new CTest 'obj-CWidget-clonehtml', """
-`clonehtml [id], [parent], [cls]` - возвращает html клона элемента, с новым id, парентом и классом виджета, если последние указаны
+`clonehtml [id], [form], [cls]` - возвращает html клона элемента, с новым id, парентом и классом виджета, если последние указаны
 """, ->
 	html = CRoot.wrap("<div id=exid><b id=exid-b></b></div>").clonehtml "exid2", CRoot.wrap("<div id=exid3></div>"), CInputWidget
-	@is html, '<div id="exid2" cparent=exid3 ctype=CInputWidget><b id="exid2-b"></b></div>'
+	@is html, '<div id="exid2" cform=exid3 ctype=CInputWidget><b id="exid2-b"></b></div>'
 
 	
 
@@ -2631,7 +2631,7 @@ new CTest 'obj-CWidget-anime', """
 		'background-color': 'rgba(33,12,45,0.6)'
 		color: '#fa6'
 		'border-color': 'red'
-	, -> 
+	, ->
 		self.is '100px', @css 'margin-left'
 		self.is '50px', @css 'margin-top'
 		self.is 'rgba(33, 12, 45, 0.6)', ""+@rgba 'background-color'
@@ -3463,7 +3463,7 @@ new CTest 'cls-CTemplateWidget', """
 
 - класс c-template указывает, что шаблон находится в теле элемента
 - атрибут cinit указывает, что шаблон находится в комментарии - первой ноде элемента
-- в остальных случаях пробует получить свой шаблон из шаблона parent-ов
+- в остальных случаях пробует получить свой шаблон из шаблона формы в которой находится
 
 См. #CListWidget, #CFormWidget
 """, ->

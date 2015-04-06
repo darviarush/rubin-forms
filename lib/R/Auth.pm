@@ -239,6 +239,7 @@ sub form_load {
 	my $form = $forms->{$action};
 	my $tab = $form->{tab} // $form->{name};
 	my $view = [keys %{$form->{fields}}];
+	#$view = [keys %{$form->{}{fields}}] if !@$view && $form->{is_list};
 	#$self->check_role('view', $tab, $view);
 	
 	main::msg '----------------------------', $action, $view, $where;

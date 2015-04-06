@@ -1,12 +1,12 @@
 /* функции для параметров */
-%exists = CInit.exists 
-%get = CInit.get
+%exists = function(v) { if(r=CInit.param.css.match(new RegExp("(?:^|\\d)"+v+"(\\d+|(\\d+)?\\.\\d+)"))) return parseInt(r[1]) }
+%get = function(v, def) { return (r=exists(v))!=null? r: def }
 
 /* параметры */
 %br = get("b", 1)
 %pa = get("p", 4)
 %ma = get("p", 4)
-%box = get("p", 4)
+%box = get("p", 0.4)
 %inx = get("in", 1)
 
 
@@ -20,7 +20,9 @@
 %-vendor-box-shadow {%{test('box-shadow')}}
 %-vendor-border-radius {%{test('border-radius')}}
 %-vendor-transform {%{test('transform')}}
+%-vendor-transition {%{test('transition')}}
 %-vendor-opacity {%{test('opacity')}}
+%-vendor-animation {%{test('animation')}}
 
 
 
@@ -29,7 +31,7 @@
 %$style.backgroundImage = 'linear-gradient(to bottom, red, blue)'
 %if($style.backgroundImage) VendorBackgroundImage = backgroundImage
 
-
+/* *filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#febf01', endColorstr='#febf01',GradientType=0 ); /* IE6-8 */
 
 /* инициализация */
 
@@ -66,7 +68,8 @@ h1, h2, h3, h4, h5, h6 { border-width: 10pt 0 5pt 0; border-color: transparent; 
 
 html,body{ width:100%; height:100% }
 
-* { padding: 0; margin: 0; vertical-align:middle; overflow: auto; box-sizing: border-box; clear: both; }
+* { padding: 0; margin: 0; box-sizing: border-box; clear: both; vertical-align:middle; }
+div:after {clear:both; content: ""; display: block;}
 
 %inline-block {display: -moz-inline-stack; display: inline-block; *display: inline; *zoom: 1}
 
@@ -111,6 +114,10 @@ color: white !important;
 .btn:link { text-decoration:none }
 .btn:active { transform: translate(1px, 1px); box-shadow: none; }
 .btn:visited { }
+
+.flat {cursor:pointer; opacity: 0.7; transition: opacity 0.2s}
+.flat:hover {opacity: 1}
+.flat:active {opacity: 0.5}
 
 /* сеть */
 .in%{inx}{ margin: 0 auto !important; min-height: 100% }
@@ -215,7 +222,6 @@ color: white !important;
 
 		%if $rem {
 			%{grid($rem, Suffix)}
-			%console.log($ret.join(""))
 		}
 
 	}	
@@ -225,8 +231,6 @@ color: white !important;
 .dir {margin-right:0; margin-bottom:0; padding:0; border-width: 0}
 .row {margin: -%{pa+br}px }
 
-/* бокс */
-.box { padding: %{box}pt; margin: %{box}pt; border-radius: %{box+1}pt }
 
 /* сброс */
 .w0 {width: auto}
@@ -237,8 +241,8 @@ color: white !important;
 
 /* цвета */
 %for name, color of dark {
-	.%{name}s div { background-color: %{color}; color: %{light[name]} }
-	.%{name}s-light div { background-color: %{light[name]}; color: #555; }
+	.%{name}s > div { background-color: %{color}; color: %{light[name]} }
+	.%{name}s-light > div { background-color: %{light[name]}; color: #555; }
 }
 
 
@@ -251,13 +255,13 @@ color: white !important;
 
 /* границы */
 %for name, color of colors {
-	.%{name}s-line div { border: solid %{br}px %{color} }
-	.%{name}s-line-h div { border-left: solid %{br}px %{color}; border-right: solid %{br}px %{color} }
-	.%{name}s-line-v div { border-top: solid %{br}px %{color}; border-bottom: solid %{br}px %{color} }
-	.%{name}s-line-l div { border-left: solid %{br}px %{color} }
-	.%{name}s-line-r div { border-right: solid %{br}px %{color} }
-	.%{name}s-line-b div { border-bottom: solid %{br}px %{color} }
-	.%{name}s-line-t div { border-top: solid %{br}px %{color} }
+	.%{name}s-line > div { border: solid %{br}px %{color} }
+	.%{name}s-line-h > div { border-left: solid %{br}px %{color}; border-right: solid %{br}px %{color} }
+	.%{name}s-line-v > div { border-top: solid %{br}px %{color}; border-bottom: solid %{br}px %{color} }
+	.%{name}s-line-l > div { border-left: solid %{br}px %{color} }
+	.%{name}s-line-r > div { border-right: solid %{br}px %{color} }
+	.%{name}s-line-b > div { border-bottom: solid %{br}px %{color} }
+	.%{name}s-line-t > div { border-top: solid %{br}px %{color} }
 }
 
 %for name, color of colors {
@@ -270,11 +274,21 @@ color: white !important;
 	.%{name}-line-t, div.%{name}-line-t { border-top: solid %{br}px %{color} }
 }
 
+/* бокс */
+.box { padding: %{box}em; margin: %{box}em; border-radius: %{box*2}em }
+.box > div { padding: %{box}em }
+.box > div > input,  .box > div > select,  .box > div > textarea, .box > div > button, .box > div > .btn { width: 100% }
+
+/* отступы */
+.pa div, .p { padding: 0.2em }
+
+
 /* центрирование */
 .l { text-align: left }
 .r { text-align: right }
 .j { text-align: justify }
 .c { text-align: center; text-align: -o-center; text-align: -moz-center; text-align: -webkit-center; text-align: -khtml-center; *text-align: center; *zoom: 1; }
+.a > * { width: 100% }
 
 
 /* округление наполовину */
@@ -285,9 +299,27 @@ color: white !important;
 	%if i === 1 { .ra, } .ra%{i} { border-radius: %{(ma+pa)/i}px }
 }
 
-/* тултип */
-.c-tip { background-color: #2a2a2a; background-color: rgba(0, 0, 0, 0.7); color: WhiteSmoke; /*border: solid 1px gray;*/ padding: 5px; border-radius: 3px; font-size: 12px; width: 200px; max-height: 200px; }
-.c-tip h1, .c-tip h2, .c-tip h3, .c-tip h4 { color: LightSkyBlue; }
+
+/* padding-и и маргины */
+.p { padding: 4pt }
+.pa4 {padding: 4pt}
+.m { margin: 4pt }
+.m-lt { margin: 4pt 0pt 0pt 4pt }
+.m-rb { margin: 0pt 4pt 4pt 0pt }
+.ico {margin: 4pt}
+.mr {margin-right: 4pt}
+.ml {margin-left: 4pt}
+.mt {margin-top: 4pt}
+.mb {margin-bottom: 4pt}
+
+/* линии на границе */
+.hr { border: solid 1px #E7E7E7 }
+.hr-h { border-left: solid 1px #E7E7E7; border-right: solid 1px #E7E7E7 }
+.hr-v { border-top: solid 1px #E7E7E7; border-bottom: solid 1px #E7E7E7 }
+.hr-l { border-left: solid 1px #E7E7E7 }
+.hr-r { border-right: solid 1px #E7E7E7 }
+.hr-b { border-bottom: solid 1px #E7E7E7 }
+.hr-t { border-top: solid 1px #E7E7E7 }
 
 
 /* типография */
@@ -357,3 +389,52 @@ th {font-weight: 700}
 
 
 /* меню */
+.menu { padding: %{pa}px }
+.menu > a { display:block; padding: %{pa/2}px %{pa}px; }
+.menu > a:hover { background-color: %{lblue}; text-decoration:none; }
+
+/* символы */
+@font-face {
+font-family: 'Glyphicons Halflings';
+src: url('/css/fonts/glyphicons-halflings-regular.eot');
+src: url('/css/fonts/glyphicons-halflings-regular.eot?#iefix') format('embedded-opentype'), url('/css/fonts/glyphicons-halflings-regular.woff2') format('woff2'), url('/css/fonts/glyphicons-halflings-regular.woff') format('woff'), url('/css/fonts/glyphicons-halflings-regular.ttf') format('truetype'), url('/css/fonts/glyphicons-halflings-regular.svg#glyphicons_halflingsregular') format('svg');
+}
+
+%symbols = {'arrow-up': '\\e093'}
+%for name, sym of symbols {
+	.sym-%{name}:after { content: "%{sym}" }
+}
+%for name, sym of symbols {.sym-%{name},}.sym {%{inlineBlock};
+margin-top: 5px;
+margin-bottom: 10px;
+font-size: 24px;
+font-family: 'Glyphicons Halflings';
+font-style: normal;
+font-weight: 400;
+line-height: 1;
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+
+/* загрузка файла */
+.load-file { position:relative; }
+.load-file:hover {  }
+.load-file input { position: absolute; width: 100%; height: 100%; border:0 !important; padding:0!important; margin:0!important; opacity:0 }
+
+/* тултип */
+.c-tip, .tip { background-color: #2a2a2a; background-color: rgba(0, 0, 0, 0.7); color: WhiteSmoke; /*border: solid 1px gray;*/ padding: 5px; border-radius: 3px; font-size: 12px; width1: 400px; max-height: 200px; z-index: 1000; opacity: 0 }
+.c-tip h1, .c-tip h2, .c-tip h3, .c-tip h4 { color: LightSkyBlue; clear:none }
+.ico-close-red {float:right}
+
+.tip { border-radius: 0 !important;  }
+
+/* футер */
+.orange_gradient {
+color: Ivory;
+font-weight: 900;
+background: linear-gradient(to bottom,  rgba(254,191,1,1) 0%,rgba(254,191,1,0.6) 50%,rgba(254,191,1,1) 100%); /* W3C */
+border-radius: 0 0 1em 1em;
+
+}
+
+.orange_gradient a {font-weight: normal}

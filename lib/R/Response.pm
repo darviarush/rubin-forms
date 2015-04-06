@@ -170,6 +170,7 @@ sub render {
 		@ret = $self->wrap;
 	} elsif(defined(my $act = $action->{act}{$_action})) {
 		@ret = $act->($app, $request, $response);
+		$response->head('Content-Type', 'application/json; charset=utf-8');
 	} elsif(exists $app->connect->info->{$_action}) {
 		#main::msg "update";
 		@ret = $app->auth->action_main;
