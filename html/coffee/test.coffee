@@ -1174,6 +1174,7 @@ new CTest 'obj-CWidget-byXYAll', """
 """, ->
 	{left, top} = @w().pos()
 	all = CRoot.byXYAll left+30, top+30
+	say left, top, @w().pos(), all
 	@is all.length, 3
 	@is all.item(0), @w 3
 	@is all.item(1), @w 2
@@ -2613,13 +2614,16 @@ new CTest 'obj-CWidget-anime', """
 
 - 'paused' - приостановить анимацию
 - 'running' - продолжить анимацию
+- 'toggle' - устанавливает `direction` в `alternate` и перезапускает анимацию
 - 'remove' - удалить связанный с анимацией стиль
 
 """, """
 .anime-square {position:absolute; background: orange; border: solid 1px brown; cursor:pointer}
 """, """
 
-<div id=$name class=anime-square onclick="this.widget.anime({})">margin-left: 100px; margin-top: 50px</div>
+<div id=$name class=anime-square onclick="this.widget.anime('toggle')">margin-left: 100px; margin-top: 50px</div>
+
+<div id=$name-plus class=animate-square><input type=button value="влево" onclick="w=this.parentNode.widget; w.anime({'margin-left': w.px('margin-left')-w.px('150pt')})"> <input type=button value="вправо" onclick="w=this.parentNode.widget; w.anime({'margin-left': w.px('margin-left')-w.px('150pt')})"></div>
 
 """, ->
 	@count 6
@@ -2632,13 +2636,16 @@ new CTest 'obj-CWidget-anime', """
 		color: '#fa6'
 		'border-color': 'red'
 	, ->
+		say 'pause'
+		@anime 'paused'
 		self.is '100px', @css 'margin-left'
 		self.is '50px', @css 'margin-top'
 		self.is 'rgba(33, 12, 45, 0.6)', ""+@rgba 'background-color'
 		self.is '#FA6', @rgba('color').smallhex()
 		self.is 'red', @rgba('border-color').name()
+	say w._anime_style.html()
 		
-	@w("plus").css('margin-left', 10).animate 'margin-left': "+=100pt", 1000, 100, -> self.is$f @pt("10px") + 100, @pt('margin-left'), 0.01
+	@w("plus").anime from: {'margin-left': 10}, to: {'margin-left': 10+CRoot.px("100pt")}, -> self.is$f @pt("10px") + 100, @pt('margin-left'), 0.01
 
 
 new CTest 'obj-CWidget-animate', """

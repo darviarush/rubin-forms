@@ -14,17 +14,19 @@
 %$vendor = CNavigator.vendor
 %$style = document.createElement('div').style
 %if(!'animation' in $style) $keyframes_vendor = $vendor
-%test(prop) {%if !(prop in $style) {%{$vendor}}%{prop}}
+%$vendorProp = {}
+%test(prop) {%if !(prop in $style) {%{$vendor}%$vendorProp[prop] = $vendor+prop
+}%{prop}}
 
 %-vendor-box-sizing {%{test('box-sizing')}}
 %-vendor-box-shadow {%{test('box-shadow')}}
 %-vendor-border-radius {%{test('border-radius')}}
 %-vendor-transform {%{test('transform')}}
-%-vendor-transition {%{test('transition')}}
 %-vendor-opacity {%{test('opacity')}}
 %-vendor-animation {%{test('animation')}}
 
-
+%$transition = (('transition' in $style)? '': $vendor)+'transition'
+%-vendor-transition(...) {%{$transition}: %{arg.replace(/[\w-]+/, function(a){ return vendorProp[a] || a})}}
 
 %background-image(...) {background-image: %{arg}}
 %-vendor-background-image(...) {background-image: %{arg.replace(/(\w+-gradient\()/g, $vendor+'$1')}}

@@ -249,7 +249,7 @@ extend_uniq String.prototype, CString =
 	lcFirst: -> @charAt(0).toLowerCase() + @slice(1)
 	uc: -> @ucFirst().toCamelCase()
 	lc: -> @lcFirst().fromCamelCase()
-	toCamelCase: -> @replace /-\w/g, (a)-> a.slice(1).toUpperCase()
+	toCamelCase: -> @replace /-(\w)/g, (a, b)-> b.toUpperCase()
 	fromCamelCase: -> @replace /[A-Z]/g, (a)-> '-'+a.toLowerCase()
 
 # https://github.com/kriskowal/es5-shim/blob/master/es5-shim.js
@@ -336,7 +336,18 @@ CNavigator = do ->
 	n.agent = Ag
 	n.platform = Platform
 	
-	n.vendor = if IE>8 then "-ms-" else if IE then null else if n.FF then "-moz-" else if n.khtml then "-khtml-" else if n.webkit then "-webkit-" else if n.opera then "-o-" else null
+	v = ''
+	s = ''
+	
+	n.vendor = if IE>8 then s = "ms"; v = "MS"; "-ms-"
+	else if n.FF then s = "Moz"; v = "moz"; "-moz-"
+	else if n.khtml then s = "Khtml"; v = "Khtml"; "-khtml-"
+	else if n.webkit then s = "webkit"; v = "webkit"; "-webkit-"
+	else if n.opera then s = "O"; v = "o"; "-o-"
+	else ""
+	
+	n.onvendor = v
+	n.cssvendor = s
 	
 	n
 	
@@ -501,6 +512,9 @@ class CColor
 	sqr = (x)-> x*x
 	distancea: (color) -> Math.sqrt sqr(@r - color.r)+sqr(@g - color.g)+sqr(@b - color.b)+sqr((@a - color.a)*255)
 	distance: (color) -> Math.sqrt sqr(@r - color.r)+sqr(@g - color.g)+sqr(@b - color.b)
+	
+	copy: -> new CColor @r, @g, @b, @a
+	
 	valueOf: valueOf$ = -> if @px then @[@px]() else if @a==1 then @name() || @hex() else @rgba()
 	toString: valueOf$
 	
@@ -693,8 +707,7 @@ extend CSend,
 	click: -> CEvent::left = on ; return
 	click_end: -> CEvent::left = off ; return
 
-#say  'onmouseenter' of document
-	
+
 unless 'onmouseenter' of document then extend CSend,
 	mouseenter_type: 'mouseover'
 	mouseover: (e, widget) ->
@@ -706,7 +719,13 @@ unless 'onmouseenter' of document then extend CSend,
 		to=e.relatedTarget()
 		while to and to != widget then to = to.up()
 		if to != widget then e.type='mouseleave'; widget.send 'on'+e.type, e, widget
-	
+
+unless 'onanimationend' of document then do ->
+	vendor = CNavigator.onvendor
+	for event in ['Start', 'Iteration', 'End']
+		name = vendor+'Animation'+event
+		CSend['animation'+event.lcFirst()+'_type'] = name
+		
 
 # http://habrahabr.ru/post/118318/
 # http://unixpapa.com/js/mouse.html - mouse buttons
@@ -1654,7 +1673,19 @@ class CWidget
 	unless qs$ = document.querySelector && IE!=8 then CInit.require "lib/nwmatcher-1.2.5"
 	# https://github.com/jquery/sizzle/wiki/Sizzle-Documentation
 	
-	byXYAll$ = (x, y) -> k = -1000 ; self = widget = @$0$ x, y; c=[]; e=[]; (while widget then e.push z=widget.element; c.push [z.style.zIndex, z.style.position]; widget.css 'z-index': k--, position: 'relative'; widget = @$0$ x, y; (break if self==widget)); (for z, i in c then e[i].widget.css 'z-index': z[0], position: z[1]); new CWidgets e
+	byXYAll$ = (x, y) ->
+		k = -1000
+		self = widget = @$0$ x, y
+		c=[]; e=[]
+		while widget
+			e.push z=widget.element
+			c.push [z.style.zIndex, z.style.position]
+			widget.css 'z-index': k--, position: 'relative'
+			widget = @$0$ x, y
+			break if self==widget
+		for z, i in c then e[i].widget.css 'z-index': z[0], position: z[1]
+		new CWidgets e
+		
 	byXY: (x, y) ->
 		vl=@viewLeft(); vt=@viewTop()
 		@wrap if not(vl <= x <= @viewRight()) or not(vt <= y <= @viewBottom())
@@ -1668,6 +1699,7 @@ class CWidget
 		else
 			@document().elementFromPoint x - vl, y - vt
 	byViewXY: (x, y) -> @byXY x + @viewLeft(), y + @viewTop()
+	#byXYAll$ = (x, y) -> (new CWidgets (while m = @$0$ x, y then m.novid())).vid()
 	byXYAll: byXYAll$.inline 'byXYAll', 'byXY'
 	byViewXYAll: byXYAll$.inline 'byViewXYAll', 'byViewXY'
 	
@@ -2122,17 +2154,20 @@ class CWidget
 	
 	# методы стилей (свойства css)
 	isCase$ = typeof div$.style['background-color'] == 'string'
-	with_css_prefix = {float: "cssFloat"}
+	vendor$ = CNavigator.vendor
+	real_vendor$ = CNavigator.cssvendor
+	with_vendor_prefix = {}
+	css_good = {float: "cssFloat"}
+	css_bad = {}
 	css_px = {}
 	css_color = {}
 	css_not_px = {}
-	css_set_fn =
-		vscroll: (key, val) -> @vscroll val
-		hscroll: (key, val) -> @hscroll val
-	css_get_fn =
-		vscroll: -> @vscroll()+"px"
-		hscroll: -> @hscroll()+"px"
-	css_has_fn = {}
+	css_fn =
+		vscroll: (key, val) -> if arguments.length > 1 then @vscroll val else @vscroll()+"px"
+		hscroll: (key, val) -> if arguments.length > 1 then @hscroll val else @hscroll()+"px"
+	addCss: (prop, fn) -> css_fn[prop] = fn; this
+	
+	'''
 	div$.style.color = 'rgba(1,1,1,.5)'
 	is_rgba$ = !!div$.style.color
 	for style$ of div$.style
@@ -2141,48 +2176,86 @@ class CWidget
 		div$.style[style$] = '1px'
 		if div$.style[style$] == '1px' then css_px[to_style$] = 1 else div$.style[style$] = '#AAAAAA'; if div$.style[style$] then css_color[to_style$] = 1 else css_not_px[to_style$] = 1
 		# http://alrra.github.io/little-helpers/vendor-prefixes/
-		if (match=style$.match /^([wW]ebkit|Moz|Khtml|ms|O|Apple|[iI]cab|[Ee]pub|Wap|Xv|Prince|[Rr]o)([A-Z].*)/) and typeof div$.style[(s = match[2]).lcFirst()] != 'string' then with_css_prefix[s.lc()] = style$ # css3
+		if (match=style$.match /^([wW]ebkit|Moz|Khtml|ms|O|Apple|[iI]cab|[Ee]pub|Wap|Xv|Prince|[Rr]o)([A-Z].*)/) and typeof div$.style[(s = match[2]).lcFirst()] != 'string' then with_vendor_prefix[s.lc()] = style$ # css3
 		#document.write k+'<br>'
+	'''
 	
-	toCssCase = if isCase$ then (s) -> with_css_prefix[s] || s else (s) -> with_css_prefix[s] || s.toCamelCase()
-	
+	toCssCase = (key) -> 
+		unless real = css_good[key]
+			unless key of css_bad
+				z = key.toCamelCase()
+				if 'string' == typeof div$.style[z] then css_good[key] = real = z
+				else if 'string' == typeof div$.style[z=real_vendor$+z.ucFirst()]
+					css_good[key] = real = z
+					with_vendor_prefix[key] = vendor$+key
+				else css_bad[key] = 1 ; real = ""
+			else real = ""
+		real
+		
 	hasCss: (key, val) ->
-		if fn = css_has_fn[key] then fn.call this, key, val
-		else if arguments.length == 1 then 'string' == typeof @getCss key
-		else div$.style[key = toCssCase key]=''; div$.style[key] = val; !!div$.style[key]
+		real=toCssCase key
+		if arguments.length == 1 then 'string' == typeof div$.style[real]
+		else div$.style[real] = ''; div$.style[real] = val; !!div$.style[real]
+
+	toCssStyle: (key, val, important) ->
+		pe = @_pseudoElement
+		@_pseudoElement = {style: style={}}
+		@setCss key, val
+		@_pseudoElement = pe
+		for real of style then null
+		val = (with_vendor_prefix[key] || key) + ": " + style[real]
+		if important then val += " !important"
+		val
+		
 	setCss: (key, val, important) ->
-		if (fn=css_set_fn[key]) and off != fn.call this, key, val, important then return this
-		key = toCssCase old=key
+		if (fn=css_fn[key]) and off != fn.call this, key, val, important then return this
+		return this unless real = toCssCase key
 		if typeof val == 'number' 
 			if key of css_px then val+='px'
 			else if key of css_color then val = CColor.fromNumber val
 			else if key of css_not_px then val
-			else if wdiv$.hasCss old, '1px' then val+='px'; css_px[key] = 1
-			else if wdiv$.hasCss old, '#AAAAAA' then val = CColor.fromNumber val; css_color[key] = 1
+			else if @hasCss key, '1px' then val+='px'; css_px[key] = 1
+			else if @hasCss key, '#AAAAAA' then val = CColor.fromNumber val; css_color[key] = 1
 			else css_not_px[key] = 1
 		style = (@_pseudoElement || @element).style
-		if important then style.setProperty key.lc(), val, "!important" else style[key] = val
+		if important then style.setProperty with_vendor_prefix[key] || key, val, "!important" else style[real] = val
 		this
 	getCssStyle: (key, pseudoClass) ->
 		if @_pseudoElement then @_pseudoElement.style
 		else if @document().contains @element then getComputedStyle @element, pseudoClass
 		else @element.style
-	getCssValue: (key, pseudoClass) -> @getCssStyle(key, pseudoClass).getPropertyCSSValue toCssCase key
+	getCssValue: (key, pseudoClass) ->
+		toCssCase key
+		@getCssStyle(key, pseudoClass).getPropertyCSSValue with_vendor_prefix[key] || key
 	getCss: (key, pseudoClass) ->
-		if (fn=css_get_fn[key]) and off != ret=fn.call this, key, pseudoClass then return ret
-		@getCssStyle(key, pseudoClass)[toCssCase key]
+		if (fn=css_fn[key]) and off != ret=fn.call this, key, pseudoClass then return ret
+		@getCssStyle(key, pseudoClass)[ toCssCase key ]
 	saveCss: -> if @_pseudoElement? then @css.apply this, arguments else @_pseudoElement = @element; ret = @css.apply this, arguments; delete @_pseudoElement; ret
 		
-	css: (name, val, important) -> if arguments.length==0 then r={}; (for k in @element.style then r[k = toCssCase k] = @getCss k); r else if name instanceof Array then r={}; (for k in name then r[k]=@getCss k); r else if name instanceof Object then (for k of name then @setCss k, name[k], val); this else if arguments.length >= 2 and val != null then @setCss name, val, important; this else @getCss name
+	css: (name, val, important) ->
+		if arguments.length==0
+			r={}
+			for k in @element.style then r[k] = @getCss k
+			r
+		else if name instanceof Array
+			r={}
+			for k in name then r[k] = @getCss k
+			r
+		else if name instanceof Object
+			for k of name then @setCss k, name[k], val
+			this
+		else if arguments.length >= 2 and val != null
+			@setCss name, val, important
+		else @getCss name
 	extend @::css,
-		with_css_prefix: with_css_prefix
+		css_good: css_good
+		css_bad: css_bad
+		with_vendor_prefix: with_vendor_prefix
 		toCssCase: toCssCase
 		css_not_px: css_not_px
 		css_px: css_px
 		css_color: css_color
-		css_set_fn: css_set_fn
-		css_get_fn: css_get_fn
-		css_has_fn: css_has_fn
+		css_fn: css_fn
 		
 	cssRet: (name) -> ret = (if typeof name == 'object' then @css Object.keys(name) else @css name); @css.apply this, arguments; ret
 	
@@ -2512,55 +2585,62 @@ class CWidget
 
 	speeds$ = slow: 200, fast: 600, norm: 400
 
-	anime$param$ = count: 'animation-iteration-count', ease: 'animation-timing-function', state: 'animation-play-state', direction: 'animation-direction', delay: 'animation-delay'
+	anime_style$ = count: 'animation-iteration-count', ease: 'animation-timing-function', state: 'animation-play-state', direction: 'animation-direction', delay: 'animation-delay'
+	anime_on$ = end: 1, start: 1, iteration: 1
+	anime_off$ = timeout:1, duration:1, name:1
 	
-	anime$ = (p, end, iteration, start) ->
-		if p == 'paused' || p == 'running' then @setCss anime$param$.state, p
-		if p == 'remove'
+	
+	if wdiv$.hasCss 'animation-name'
+		animationVendor$ = if with_vendor_prefix['animation-name'] then CNavigator.vendor else ""
+	else CInit.require "animate" # эмуляция
+	
+	anime: (p, end) ->
+		if p == 'paused' || p == 'running' then @setCss anime_style$.state, p
+		else if p == 'toggle' then @setCss anime_style$.direction, 'alternate'; @setCss anime_style$.state, 'running'
+		else if p == 'remove'
 			@_anime_style?.free()
-			for k, v of anime$param$ then @css v, null
+			for k, v of anime_style$ then @css v, null
 			@css 'animation', null
+			@off 'animationend'
 		else
 			if typeof p == 'string' then p = $H p
 			if p.effect then p = extend {}, CEffect[p.effect], p
+			
 			duration = p.duration || p.timeout
 			duration = speeds$[duration] || duration || 400
 			if typeof duration == 'number' then duration += 'ms'
-			delete p.duration
-			delete p.timeout
 			name = p.name || @id() || CMath.uniqid()
-			delete p.name
 			
 			cssp = animation: [name, duration].join(" ")
 			css = []
-			to = {}
-			css.push '@', anime$.animationVendor, 'keyframes ', name, '{'
-			for key, val of p
-				if r = anime$param$[key] then cssp[r] = val; continue
-				if not val instanceof Array then to[key] = val; continue
-				k = key
-				if typeof k == 'number' or typeof k == 'string' and /^-?\d+\.\d+$/.test k then k += '%'
+			to = null
+			
+			add = (k, val) =>
 				css.push k, "{"
-				for k, v of val
-					css.push k, ':', v, ';'
+				for k, v of val then css.push @toCssStyle(k, v), ";"
 				css.push "}"
+			
+			css.push '@', animationVendor$, 'keyframes ', name, '{'
+			for key, val of p
+				if r = anime_style$[key] then cssp[r] = val
+				else if key of anime_on$ then @on 'animation'+key, val
+				else if key of anime_off$ then
+				else if val instanceof Object
+					k = key
+					if typeof k == 'number' or typeof k == 'string' and /^-?\d+\.\d+$/.test k then k += '%'
+					add k, val
+				else
+					(to ||= {})[key] = val
+			if to then add 'to', to
 			css.push "}"
 			
 			(@_anime_style ||= @head().appendRet "<style></style>").html css.join ""
 			
-			@css cssp
-			
 			# http://www.sitepoint.com/css3-animation-javascript-event-handlers/ - про анимации
 			if end then @on 'animationend', end
-		this
-		
-	anime: ->
-		if 'animation-name' of div$.style then anime$.animationVendor = ""
-		else if CNavigator.vendor+'animation-name' of div$.style then anime$.animationVendor = CNavigator.vendor
-		else # 'эмуляция
-		anime$.type$ = arguments.callee.type$
-		@::anime = anime$
-		anime$.apply this, arguments
+			
+			@css cssp
+			
 		this
 	
 	# animate: (param, duration, ease, complete) ->
@@ -2626,7 +2706,7 @@ class CWidget
 			
 			if to
 				to1 = to.split /\s+/
-				if to1.length == 1 and (v1 = @getCss(key).split /\s+/).length > 1 then to1 = [x=to1[0], x, x, x]
+				if to1.length == 1 and (v1 = @getCss(key)?.split /\s+/)?.length > 1 then to1 = [x=to1[0], x, x, x]
 				if to1.length > 1 then to = []; ci = []; (for t, i in to1 then m = t.match ///^(.*?)([a-z%]+)$///; to[i]=m[1]; ci[i]=m[2]); px = 'pxvector'
 				else
 					if ci = to.match ///[a-z%]+$/// then px = ci = ci[0]; to = to.slice 0, to.length-ci.length; (if px == '%' then px = "pv")
