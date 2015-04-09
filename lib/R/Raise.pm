@@ -64,7 +64,7 @@ sub new {
 	else {
 		for my $e (split /\n/, $error) {
 			$e =~ s!^syntax error at (\S+) line (\d+), (.*)$!! and push @$trace, { file=>$file=$1, line=>$line=$2, msg=>$3, action=>'syntax error'} or
-			$e =~ s! at (\S+) line (\d+)(?:, <GEN\d+> line \d+)?(, .*)?\.?\s*$!! and push @$trace, { file=>$file=$1, line=>$line=$2, msg=>$3? $e.$3: $e}
+			$e =~ s! at (\S+) line (\d+)(?:, <GEN\d+> line \d+)?(,? .*)?\.?\s*$!! and push @$trace, { file=>$file=$1, line=>$line=$2, msg=>$3? $e.$3: $e}
 			or push @$trace, { file=> $file // "?", line=> $line // "?", msg => $e };
 		}
 		
@@ -169,10 +169,10 @@ sub asString {
 sub html {
 	my ($self) = @_;
 	my $i = 0;
-	("<style><!--
+	join "", ("<style><!--
 .e-container .e-even {background: lavender}
 .e-container .e-odd {background: AliceBlue}
-.e-container .e-even, e-container .e-odd { padding: 4pt 4pt 4pt 20pt; overflow: visible; color: black }
+.e-container .e-even, .e-container .e-odd { padding: 4pt 4pt 4pt 20pt; overflow: visible; color: black }
 --></style>
 <div class=e-container>
 ", # style='overflow: auto; width: 100%; height: 153px'

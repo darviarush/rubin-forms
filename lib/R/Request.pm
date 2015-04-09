@@ -16,7 +16,7 @@ sub new {
 }
 
 # для разбора url. Используется вместе с reset
-our $RE_LOCATION = qr!((/([^\s\?]*?(?:/\d+)?)_?(?:(-?\d+)((?:_-?\d+)*)|(\.\w+))?)(?:\?(\S+))?)!;
+our $RE_LOCATION = qr!((/([^\s\?]*?(?:/\d+)?)_?(?:(-?\d+)((?:_-?\d+)*)|\.(\w+))?)(?:\?(\S+))?)!;
 
 # устанавливает новые значения
 sub reset {
@@ -75,17 +75,15 @@ sub post {
 	my ($self, $name) = @_;
 	my $post = $self->{post};
 	unless(defined $post) {
-		if(defined $self->{body}) {
-			my $head = $self->{head};
-			my ($type, $len, $rbfile) = ($head->{'Content-Type'}, $head->{'Content-Length'}, $head->{'REQUEST_BODY_FILE'});
-			if(defined $rbfile) {
-				my $f;
-				open $f, $rbfile or die "NOT OPEN REQUEST_BODY_FILE=$rbfile $!";
-				$self->{post} = $post = Utils::param_from_post($f, $type, $len);
-				close $f;
-			} else {
-				$self->{post} = $post = Utils::param_from_post(IO::String->new($self->{body}), $type, $len);
-			}
+		my $head = $self->{head};
+		my ($type, $len, $rbfile) = ($head->{'Content-Type'}, $head->{'Content-Length'}, $head->{'REQUEST_BODY_FILE'});
+		if(defined $rbfile) {
+			my $f;
+			open $f, $rbfile or die "NOT OPEN REQUEST_BODY_FILE=$rbfile $!";
+			$self->{post} = $post = Utils::param_from_post($f, $type, $len);
+			close $f;
+		} elsif($len && defined $self->{body}) {
+			$self->{post} = $post = Utils::param_from_post(IO::String->new($self->{body}), $type, $len);
 		} else {
 			$self->{post} = $post = {};
 		}

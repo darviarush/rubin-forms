@@ -83,14 +83,19 @@ sub status {
 sub error {
 	my($self, $status, $error) = @_;
 	
+	my $recursive_error = $self->{is_error};
+	
 	$self->{status} = $status;
+	$self->{is_error} = [$status, $error];
 	
 	my $action = "error/$status";
-	return $self->render($action, {error=>$error}) if $self->{app}->action->{htm}{$action};
-
+	
+	return $self->render($action, {error=>$error}) if !$recursive_error and exists $self->{app}->action->{htm}{$action};
 	
 	$self->type('text/plain');
-	my $msg = $error // "$status " . $self->{app}->serverHttpStatus->{$status};
+	my $httpStatus = $self->{app}->serverHttpStatus;
+	my $msg = "$status " . $httpStatus->{$status} . "\n" . ($error // "");
+	$msg .= "\n\nRecursive error from $recursive_error->[0] " . $httpStatus->{$recursive_error->[0]} . "\n" . ($recursive_error->[1] // "") if $recursive_error;
 	$self->body($msg);
 }
 
@@ -169,8 +174,8 @@ sub render {
 	elsif(defined $action_htm and !$ajax) {
 		@ret = $self->wrap;
 	} elsif(defined(my $act = $action->{act}{$_action})) {
+		$response->type('application/json; charset=utf-8');
 		@ret = $act->($app, $request, $response);
-		$response->head('Content-Type', 'application/json; charset=utf-8');
 	} elsif(exists $app->connect->info->{$_action}) {
 		#main::msg "update";
 		@ret = $app->auth->action_main;

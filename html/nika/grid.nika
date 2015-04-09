@@ -428,7 +428,7 @@ line-height: 1;
 .c-tip h1, .c-tip h2, .c-tip h3, .c-tip h4 { color: LightSkyBlue; clear:none }
 .ico-close-red {float:right}
 
-.tip { border-radius: 0 !important;  }
+.tip { border-radius: 0 !important; position: absolute }
 
 /* футер */
 .orange_gradient {

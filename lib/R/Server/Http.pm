@@ -43,13 +43,6 @@ sub create {
 	$self
 }
 
-# инициализации в новом треде
-# sub bind {
-	# my ($self) = @_;
-	# close $self->{ns} if $self->{ns};
-	# $self
-# }
-
 # бесконечный цикл ожидания и выполнения запросов
 sub loop {
 	my ($self, $ritter) = @_;
@@ -94,7 +87,6 @@ sub impulse {
 	$self->stat_start if $_test;
 	
 	if(my @param = $HTTP =~ m!^(\w+) $R::Request::RE_LOCATION (HTTP\/\d\.\d)\r?$!o) {
-		
 		# считываем заголовки
 		my ($head, $body);
 		/: (.*?)\r?$/ and $head->{$`} = $1 while defined($_ = <$ns>) and !/^\r?$/;

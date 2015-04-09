@@ -270,30 +270,46 @@ sub param_from_post {
 	if($type =~ m!^multipart/form-data;\s*boundary=!i) {
 		my $boundary = qr/^--$'(--)?\r?\n/;
 		my $param = {};
-		my $this_is_header = 0;
 		my $is_val = 0;
-		my $buf = [];
+		my @buf;
+		my $val;
+		my ($head, $is_head);
 		my ($name, $encoding) = ("");
 		while(<$stdin>) {
+			#main::msg(":nonewline", $_);
 			if($_ =~ $boundary) {
 				my $the_end = $1;
+				@buf = "" if @buf == 0;
+				$buf[$#buf] =~ s/\r?\n//;
 				if($name ne "") {
-					$buf = $buf->[0] || "", $buf =~ s/\r?\n// if $is_val and @$buf <= 1;
-					$param->{$name} = $buf;
+					if($is_val and @buf == 1) {
+						$val = $buf[0];
+					} else {
+						$val = {body => join('', @buf), head=>$head};
+					}
+					if(exists $param->{$name}) {
+						my $p = $param->{$name};
+						$param->{$name} = $p = [$p] unless ref $p eq "ARRAY";
+						push @$p, $val;
+					}
+					else {$param->{$name} = $val}
 				}
 				last if $the_end;
-				$this_is_header = 1;
-				$buf = [];
+				$is_head = 1;
+				$head = {};
+				@buf = ();
 				$is_val = 0;
 				$name = "";
-				$encoding = "";
-			} elsif(/^\r?$/) {
-				$this_is_header = 0;
-			} elsif($this_is_header) {
-				$name = $1, $is_val = !/\bfilename=/ if /^Content-Disposition: .*\bname=['"]?([\$\w-]+)/i;
-				$encoding = $1 if /Content-Transfer-Encoding: ([\w-]+)/;
+				#$encoding = "";
+			} elsif($is_head && /^\r?$/) {
+				$is_head = undef;
+			} elsif($is_head) {
+				$name = $1, $is_val = !/\bfilename=/ if /^Content-Disposition: .*?\bname=['"]?([\$\w-]+)/i;
+				#$encoding = $1 if /Content-Transfer-Encoding: ([\w-]+)/;
+				s/\r?\n//;
+				/: /; $head->{$`} = $';
 			} else {
-				push @$buf, $_;
+				push @buf, $_;
 			}
 		}
 		$param;
@@ -487,7 +503,7 @@ sub TIEARRAY {
 }
 sub FETCHSIZE { $_[0]->{len} }
 sub FETCH { my ($self, $i) = @_; my ($file, $buf_size, $buf) = ($self->{file}, $self->{buf_size}); seek $file, $i*$buf_size, 0; read $file, $buf, $buf_size; $buf }
-sub CLEAR { untie @Utils::_BODY }	# @_BODY = (); уничтожит
+#sub CLEAR { untie @Utils::_BODY }	# @_BODY = (); уничтожит
 sub DESTROY { close $_[0]->{file} }
 
 package Utils;
@@ -588,6 +604,16 @@ sub winpath {
 
 # создаёт каталоги в пути
 sub mkpath { local ($_, $`, $'); $_ = $_[0]; mkdir $` while /\//g; $! = undef; }
+
+# удаляет все пустые директории вверх
+sub rmpath {
+	local ($_, $`, $');
+	$_ = $_[0];
+	my @path;
+	push @path, $` while /\//g;
+	rmdir $_ or last for reverse @path;
+	$! = undef;
+}
 
 # возвращает путь к каталогу картинки без /image/. Параметр - id
 sub img_path { $_[1] = 62; $_[2] = '/'; goto &to_radix; }

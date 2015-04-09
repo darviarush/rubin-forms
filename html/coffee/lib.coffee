@@ -720,11 +720,16 @@ unless 'onmouseenter' of document then extend CSend,
 		while to and to != widget then to = to.up()
 		if to != widget then e.type='mouseleave'; widget.send 'on'+e.type, e, widget
 
-unless 'onanimationend' of document then do ->
-	vendor = CNavigator.onvendor
-	for event in ['Start', 'Iteration', 'End']
-		name = vendor+'Animation'+event
-		CSend['animation'+event.lcFirst()+'_type'] = name
+do ->
+	style = document.createElement('div').style
+	unless 'transition' of style then CSend['transitionend_type'] = CNavigator.onvendor+'TransitionEnd'
+			
+	unless 'animation' of style
+		vendor = CNavigator.onvendor
+		for event in ['Start', 'Iteration', 'End']
+			name = vendor+'Animation'+event
+			CSend['animation'+event.lcFirst()+'_type'] = name
+	return
 		
 
 # http://habrahabr.ru/post/118318/
@@ -2598,11 +2603,12 @@ class CWidget
 		if p == 'paused' || p == 'running' then @setCss anime_style$.state, p
 		else if p == 'toggle' then @setCss anime_style$.direction, 'alternate'; @setCss anime_style$.state, 'running'
 		else if p == 'remove'
-			@_anime_style?.free()
+			@_anime?.style.free()
 			for k, v of anime_style$ then @css v, null
 			@css 'animation', null
 			@off 'animationend'
 		else
+			@_anime ||= {}
 			if typeof p == 'string' then p = $H p
 			if p.effect then p = extend {}, CEffect[p.effect], p
 			
@@ -2634,7 +2640,7 @@ class CWidget
 			if to then add 'to', to
 			css.push "}"
 			
-			(@_anime_style ||= @head().appendRet "<style></style>").html css.join ""
+			(@_anime.style ||= @head().appendRet "<style></style>").html css.join ""
 			
 			# http://www.sitepoint.com/css3-animation-javascript-event-handlers/ - про анимации
 			if end then @on 'animationend', end
@@ -2931,11 +2937,12 @@ class CWidget
 	dataType: (val) -> val
 	param: -> x={}; x[@name() || 'val'] = @val(); x
 	#buildQuery: -> [(p=@form())._tab || p.name(), @name(), p.data?.id || p.$id?.val()]
-	load: (param, args...) -> @loader()._load 'load', param || {}, this, args; this
-	submit: (param, args...) -> (if @valid() then @loader()._load 'submit', extend(@param(), param || {}), this, args); this
-	save: (param, args...) -> (if @valid() then @loader()._load 'save', extend(@param(), param || {}), this, args); this
+	add_ref$ = (param={}, p2={}) -> (if form=@form() then p2.ref$ = id: form.data.id, tab: form._tab || form.name()); extend p2, param
+	load: (param, args...) -> @loader()._load 'load', add_ref$.call(this, param), this, args; this
+	submit: (param, args...) -> (if @valid() then @loader()._load 'submit', add_ref$.call(this, @param(), param), this, args); this
+	save: (param, args...) -> (if @valid() then @loader()._load 'save', add_ref$.call(this, @param(), param), this, args); this
 	ping: (param, args...) -> @loader()._load 'ping', param, this, args; this
-	erase: (param, args...) -> @loader()._load 'erase', extend(@param(), param || {}), this, args; this
+	erase: (param, args...) -> @loader()._load 'erase', add_ref$.call(this, @param(), param), this, args; this
 	
 	loader: (loader) ->
 		if arguments.length then @_loader = loader; this

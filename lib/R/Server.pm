@@ -54,21 +54,24 @@ sub stat_end {
 # выдаёт файл
 sub file {
 	my ($self) = @_;
+
 	my $app = $self->{app};
 	my $request = $app->request;
 	my $response = $app->response;
 	eval {
-		my $root = abs_path(".");
-		if($root ne substr abs_path($request->html), 0, length $root) {
-			$response->error(403, "403 ".$app->serverHttpStatus->{403});
+		my $path = $request->html;
+		
+		if($path =~ m!\.\./!) {
+			$response->error(403, "Попытка запроса файла извне репозитория");
+		} elsif(!($path = main::file($path))) {
+			$response->error(404, "Такого файла на диске нет");
 		} else {
-			my $path = $request->html;
 			$response->type( $app->serverHttpMime->{$request->ext} );
 			$response->head( "Content-Length" => -s $path );
-			$response->body( Utils::file2array($path, $app->ini->{site}{buf_size} // 1024*1024) );
+			$response->{body} = Utils::file2array($path, $app->ini->{site}{buf_size} // 1024*1024);
 		}
 	};
-	$response->error(404, $! // $@) if $! // $@;
+	$response->error(500, $@ // $!) if $@ // $!;
 }
 
 # Обработчик с файлами
@@ -122,23 +125,6 @@ sub ritter {
 	$app->{stash} = {};
 	
 }
-
-
-
-# фреймы - механизм лайоутов и таргетов форм
-# sub submit {
-	# my ($self) = @_;
-	# my $app = $self->{app};
-	# my ($ret) = $self->wrap(1);
-	# $app->response->type("text/plain");
-	# return {
-		# head => {
-			# stash => $app,
-			# url => $app->{request}{url},
-		# },
-		# body => $ret
-	# }
-# }
 
 
 1;

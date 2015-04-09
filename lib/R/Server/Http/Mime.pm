@@ -9,7 +9,7 @@ sub new { return {
     "xml" => "text/xml",
     "gif" => "image/gif",
     "jpeg jpg" => "image/jpeg",
-    "js" => "application/javascript",
+    "js" => "text/javascript", #"application/javascript",
     "atom" => "application/atom+xml",
     "rss" => "application/rss+xml",
 

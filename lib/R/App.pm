@@ -20,6 +20,7 @@ sub AUTOLOAD {
 	die "$AUTOLOAD: ".($@ // $!) if $@ // $!;
 	no strict "refs";
 	my $sub = *{$AUTOLOAD}{CODE};
+	use strict "refs";
 	
 	if(@_ == 1) {
 		my ($self) = @_;
@@ -28,7 +29,7 @@ sub AUTOLOAD {
 		my $load = $prop; $load =~ s![A-Z]!/$&!g;
 		$load = $base."/".ucfirst($load).".pm";
 		require $load;
-		$_[0]->{$prop} = $new->new($_[0]);
+		$self->{$prop} = $new->new($_[0]);
 	}
 		
 	goto &$sub;

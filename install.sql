@@ -1,3 +1,8 @@
+-- []
+CREATE TABLE img (
+id int primary key AUTO_INCREMENT
+) ENGINE=INNODB;
+
 -- [auth]
 
 CREATE TABLE sess (
