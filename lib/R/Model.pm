@@ -14,49 +14,14 @@ sub new {
 	bless {app=>$app, base=>'model', models=>[]}, $cls;
 }
 
-# загружает все модели
-sub load {
-
-	find({
-		no_chdir => 1,
-		wanted => sub {
-			my $path = $File::Find::name;
-			if($path =~ /.pm$/) {
-				require $path;
-			}
-		}
-	}, main::files($self->{base}));
-}
-
-# инсталлирует базу
-sub install {
-	my ($self) = @_;
-	
-	my $models = $self->{models};
-	
-	for my $model (@$models) {
-		$model->setup;
-		$model->fields->postsetup;
-	}
-	
-	for my $model (@$models) {
-		$model->setup;
-		$model->fields->postsetup;
-	}
-}
-
-# возвращает запрос
-sub query {
-	my ($self, $model, @args) = @_;
-	$self->models
-}
-
 # возвращает модель
 sub AUTOLOAD {
 	$AUTOLOAD =~ /([^:]+)$/;
 	my $prop = $1;
+	my $Prop = ucfirst $prop;
 	
-	eval "sub $AUTOLOAD { my (\$self, \$val) = \@_; if(\@_ == 1) { \$self->{'$prop'} } else { \$self->{'$prop'} = \$val; \$self }}";
+	my $eval = "sub $AUTOLOAD { my (\$self, \$val) = \@_; R::Rows::$Prop->new(\$val) }";
+	eval $eval;
 	die "$AUTOLOAD: ".($@ // $!) if $@ // $!;
 	no strict "refs";
 	my $sub = *{$AUTOLOAD}{CODE};
@@ -66,11 +31,12 @@ sub AUTOLOAD {
 		my ($self) = @_;
 		my $base = $self->{base};
 		my $app = $self->{app};
-		my $new = $prop; $new =~ s![A-Z]!::$&!g; $new = $base."::".ucfirst $new;
-		my $load = $prop; $load =~ s![A-Z]!/$&!g;
-		$load = $base."/".ucfirst($load).".pm";
+		my $load = $Prop; #$load =~ s!__!/!g; #$load =~ s![A-Z]!/$&!g;
+		$load = main::file($base."/".$load.".pm");
 		require $load;
-		$self->{$prop} = $new->new($app);
+		my $meta = $app->modelMetafieldset;
+		my $fieldset = $meta->fieldset($prop);	# должен отработать обязательно конструктор филдсета - создать поля в классе модели
+		$fieldset->sync if $app->ini->{site}{test} && $app->ini->{site}{autosync};
 	}
 		
 	goto &$sub;

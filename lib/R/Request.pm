@@ -116,4 +116,19 @@ sub html {
 	#$_action = 'index' if $_action eq "";
 #}
 
+# возвращает текущую сессию
+sub session {
+	my ($self) = @_;
+	$::app->model->session($self->cookie("sess"));
+}
+
+# возвращает текущего пользователя
+sub user {
+	my ($self) = @_;
+	$self->session->user;
+}
+
+
+
+
 1;

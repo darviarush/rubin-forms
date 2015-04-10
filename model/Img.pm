@@ -9,16 +9,12 @@ use Image::Magick;
 
 # вызывается при создании объекта
 sub setup {
-	my ($self) = @_;
-	
-	# добавляем поля объекту
-	$self->{dir} = 'html/images';
-	$self->{name} = 'orig.jpg';
-	$self->{tab} = 'img';
+	my ($fields) = @_;
 	
 	# добавляем столбцы в таблицу
-	#$self->fields->add(ext => 'tinyint')
-	#->add_ref();
+	$fields->
+	
+	compute('body')
 	
 }
 
@@ -36,14 +32,17 @@ sub orig {
 	$self->path . $self->{name}
 }
 
-# добавляет картинку и устанавливает id
-sub add {
+# вычисляемый столбец
+sub body {
 	my ($self, $body) = @_;
-	my $app = $self->{app};
-	$self->{id} = $app->auth->add($self->{tab});
-	my $path = $self->path;
-	Utils::mkpath($path);
-	Utils::write($self->orig, $body);
+	if(@_>1) {
+		$self->{id} = $::app->auth->add($self->{tab})->last_id unless defined $self->{id};
+		my $path = $self->path;
+		Utils::mkpath($path);
+		Utils::write($self->orig, $body);
+	} else {
+		Utils::read($self->orig);
+	}
 	return $self;
 }
 
@@ -64,7 +63,7 @@ sub erase_files {
 # удаляет картинку
 sub erase {
 	my ($self) = @_;
-	
+	$self->SUPER::erase;
 	Utils::rmpath($self->path) if $self->erase_files == 0;
 	$self
 }

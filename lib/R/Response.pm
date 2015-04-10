@@ -178,7 +178,8 @@ sub render {
 		@ret = $act->($app, $request, $response);
 	} elsif(exists $app->connect->info->{$_action}) {
 		#main::msg "update";
-		@ret = $app->auth->action_main;
+		#@ret = $app->auth->action_main;
+		@ret = $app->modelMetafieldset->action;
 	} else {
 		$response->error(404);
 	}
