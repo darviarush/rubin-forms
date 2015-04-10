@@ -19,18 +19,6 @@ sub fieldset {
 	$self->{fieldset}{$name} ||= R::Model::Fieldset->new($name);
 }
 
-# экшн
-sub action {
-	my ($self) = @_;
-
-	my $name = $::app->request->{action};
-	main::msg 'name', $name;
-	#eval {
-		$::app->model->$name;
-	#};
-	#$::app->response->error(404) if $@;
-}
-
 # загружает все модели
 sub load_all_models {
 

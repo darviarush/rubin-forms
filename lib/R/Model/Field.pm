@@ -6,6 +6,7 @@ sub new {
 	my ($cls, $fieldset, $name, $type) = @_;
 	my $col = $name;
 	$col =~ s/[A-Z]/ "_" . lc $& /ge;
+	
 	bless {
 		cls=>$cls,
 		tab=>$fieldset->{tab},
@@ -23,11 +24,11 @@ sub add_method {
 	no strict "refs";
 	$name ||= $self->{name};
 	my $model = $self->{model};
-	my $fs = ucfirst $self->{model};
-	my $SUB = "R::Rows::$fs::$name";
+	my $fs = ucfirst $model;
+	my $SUB = "R::Rows::${fs}::$name";
 	
 	unless(*{$SUB}{CODE}) {
-		eval $self->{ref}?
+		eval($self->{ref}?
 		"sub $SUB {
 			my (\$self, \$val) = \@_;
 			if(\@_>1) {
@@ -59,7 +60,7 @@ sub add_method {
 			else {
 				\$::app->auth->query('$self->{tab}', ['$self->{col}'], {id=>\$self->{id}})
 			}
-		}";
+		}");
 		die "$SUB: ".($@ // $!) if $@ // $!;
 	}
 	use strict "refs";
@@ -83,9 +84,9 @@ sub sql {
 sub alter {
 	my ($self, $after, $rename) = @_;
 	my $c = $::app->connect;
-	"ALTER TABLE " . $c->SQL_WORD($self->{tab}) . " " . 
-	($rename == 1? "MODIFY": $rename? "CHANGE": "ADD") . " COLUMN " . $c->SQL_WORD($self->{col}) . ($rename && $rename!=1? $c->SQL_WORD($rename): "")
-	" " . $self->sql . ($after == 1? " FIRST": $after? " AFTER " . $c->SQL_WORD($after): "");
+	join "", "ALTER TABLE ", $c->SQL_WORD($self->{tab}), " ",
+	($rename == 1? "MODIFY": $rename? "CHANGE": "ADD"), " COLUMN ", $c->SQL_WORD($self->{col}), ($rename && $rename!=1? " " . $c->SQL_WORD($rename): ()),
+	" ", $self->sql, ($after == 1? " FIRST": $after? " AFTER " . $c->SQL_WORD($after): "");
 }
 
 # синхронизирует филд с базой
@@ -130,7 +131,7 @@ package R::Model::FieldCompute;
 # конструктор
 sub new {
 	my ($cls, $fieldset, $name) = @_;
-	bless {fieldset=>$fieldset, name=>$name}, $cls;
+	bless {fieldset=>$fieldset, name=>$name, model=>$fieldset->{name}}, $cls;
 }
 
 # это вычисляемый филд

@@ -4,6 +4,24 @@ package R::Model::Row;
 # конструктор
 sub new {
 	my ($cls, $id) = @_;
+	
+	if(ref $id) {
+		
+		if(ref $id eq $cls) {
+			$id = $id->{id};
+		}
+		else {
+			my $bean = bless {id => $id->{id}}, $cls;
+			my ($model) = $cls =~ /([^:]+)$/;
+			my $field = $::app->modelMetafieldset->fieldset(lcfirst $model)->{field};
+			while(my($k, $v) = each %$val) {
+				$bean->$k($v) if exists $field->{$k};
+			}
+			return $bean;
+		}
+		
+	}
+	
 	bless {id=>$id}, $cls;
 }
 

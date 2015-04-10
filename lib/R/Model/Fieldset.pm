@@ -13,6 +13,7 @@ our $engine = "INNODB";
 # конструктор
 sub new {
 	my ($cls, $name) = @_;
+	
 	my $tab = $name;
 	$tab =~ s![A-Z]!"_" . lcfirst $&!ge;
 	my $self = bless {
@@ -75,14 +76,16 @@ sub col {
 sub ref {
 	my ($self, $name, $to_model) = @_;
 	my $field = $self->field($name . "_id", '');
+	$field->{null} = 1;
+	
 	
 	$to_model ||= $name;
 	
-	$self->add_method($name . "_id");
+	$field->add_method($name . "_id");
 	
 	$field->{ref} = $to_model;
 	
-	$self->add_method;
+	$field->add_method;
 	
 	#$::app->modelMetafieldset->fieldset($to_model)->back_ref($field, $self);
 	
@@ -99,7 +102,7 @@ sub back_ref {
 sub pk {
 	my ($self, $type) = @_;
 	if(defined $type) {
-		my $pk = $self->{field}{'id'};
+		my $pk = $self->field('id', $type);
 		$pk->{type} = $type;
 		$pk->{autoincrement} = 0;
 	} elsif(exists $self->{field}{'id'}) {
@@ -121,6 +124,13 @@ sub null {
 	$_[0]->last->{null} = 1;
 	$_[0]
 }
+
+# делает филд обязательным
+sub require {
+	$_[0]->last->{null} = 0;
+	$_[0]
+}
+
 
 # добавляет значение по умолчанию к последнему филду
 sub default {

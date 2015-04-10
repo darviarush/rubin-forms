@@ -20,25 +20,27 @@ sub AUTOLOAD {
 	my $prop = $1;
 	my $Prop = ucfirst $prop;
 	
+	#no strict "refs";
+	#my $sub = *{$AUTOLOAD}{CODE} = Utils::closure(sub { my ($self, $val) = @_; ${"R::Rows::${Prop}::"}->new($val) })
+	#use strict "refs";
+	
 	my $eval = "sub $AUTOLOAD { my (\$self, \$val) = \@_; R::Rows::$Prop->new(\$val) }";
 	eval $eval;
 	die "$AUTOLOAD: ".($@ // $!) if $@ // $!;
 	no strict "refs";
 	my $sub = *{$AUTOLOAD}{CODE};
 	use strict "refs";
-	
-	if(@_ == 1) {
-		my ($self) = @_;
-		my $base = $self->{base};
-		my $app = $self->{app};
-		my $load = $Prop; #$load =~ s!__!/!g; #$load =~ s![A-Z]!/$&!g;
-		$load = main::file($base."/".$load.".pm");
-		require $load;
-		my $meta = $app->modelMetafieldset;
-		my $fieldset = $meta->fieldset($prop);	# должен отработать обязательно конструктор филдсета - создать поля в классе модели
-		$fieldset->sync if $app->ini->{site}{test} && $app->ini->{site}{autosync};
-	}
 		
+	my ($self) = @_;
+	my $base = $self->{base};
+	my $app = $self->{app};
+	my $load = $Prop; #$load =~ s!__!/!g; #$load =~ s![A-Z]!/$&!g;
+	$load = main::file($base."/".$load.".pm");
+	require $load;
+	my $meta = $app->modelMetafieldset;
+	my $fieldset = $meta->fieldset($prop);	# должен отработать обязательно конструктор филдсета - создать поля в классе модели
+	$fieldset->sync if $app->ini->{site}{test} && $app->ini->{site}{autosync};
+
 	goto &$sub;
 }
 

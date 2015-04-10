@@ -1,5 +1,5 @@
-package R::Rows::Session;
-# сессия
+package R::Rows::User;
+# модель пользователя
 
 use base R::Model::Row;
 

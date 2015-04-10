@@ -179,7 +179,11 @@ sub render {
 	} elsif(exists $app->connect->info->{$_action}) {
 		#main::msg "update";
 		#@ret = $app->auth->action_main;
-		@ret = $app->modelMetafieldset->action;
+		
+		my $name = $request->{action};
+		my $bean = $app->model->$name($request->param);
+		
+		@ret = {id=>$bean->{id}};
 	} else {
 		$response->error(404);
 	}
