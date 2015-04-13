@@ -30,9 +30,6 @@ $SIG{USR1} = Utils::closure($app, sub {
 });
 $SIG{USR1}->();
 
-# чтобы создать метод stash
-$app->stash({});
-
 # Открываем сокет 
 # наш скрипт будет слушать порт $ini->{site}{port} (9000)
 # длина очереди соединений (backlog)- 5 штук
@@ -50,7 +47,7 @@ require POSIX;
 my $ppid = POSIX::getppid();
 sub graph {	# будет вызываться раз в секунду
 	$app->process->close, exit unless kill 0, $ppid;
-	#$app->session->delete if time % 3600 == 0;	# раз в час - не доделано
+	#$app->model->session->delete if time % 3600 == 0;	# раз в час - не доделано
 }
 
 # порождаем потоки

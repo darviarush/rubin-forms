@@ -4,7 +4,8 @@ package R::Model::Fieldset;
 use strict;
 use warnings;
 
-use R::Model::Field;
+use R::Model::Field qw//;
+use R::Model::Index qw//;
 
 #our $pk_type = 'int primary key AUTO_INCREMENT';
 our $pk_type = "int unsigned";
@@ -22,7 +23,8 @@ sub new {
 		tab => $tab,	# имя таблицы в базе
 		field=>{},		# филды имя=>филд
 		fieldset=>[],	# порядок филдов
-		indexes=>[],	# индексы
+		index=>{},		# индексы
+		indexref=>{},	# индексы-ссылки
 		engine => undef,
 		options => [],	# дополнительные опции таблицы
 		data => [],
@@ -34,9 +36,12 @@ sub new {
 	my $row = $::app->model->$name;
 	
 	$row->can("setup")->($self);
+	
+	$::app->{metaFieldset}{cls}{ref $row} = $self;
 
 	$self
 }
+
 
 
 # добавляет вычислимый столбец
@@ -74,20 +79,22 @@ sub col {
 
 # добавляет поле-ссылку
 sub ref {
-	my ($self, $name, $to_model) = @_;
+	my ($self, $name, $to_model, $fk_name) = @_;
 	my $field = $self->field($name . "_id", '');
 	$field->{null} = 1;
 	
-	
-	$to_model ||= $name;
-	
 	$field->add_method($name . "_id");
 	
+	$to_model ||= $name;
 	$field->{ref} = $to_model;
 	
-	$field->add_method;
+	my $fk = $::app->modelMetafieldset->fieldset($to_model)->back_ref($field);
 	
-	#$::app->modelMetafieldset->fieldset($to_model)->back_ref($field, $self);
+	$fk_name ||= "fk_" . $field->tab . "__" . $field->col . "__to__" . $fk->tab . "__" . $fk->col;
+	
+	$self->{indexref}{$field->name} = R::Model::IndexRef->new($fk_name, $field, $fk);
+	
+	$field->add_method;
 	
 	$self
 }
@@ -95,7 +102,59 @@ sub ref {
 # объявляет обратную ссылку
 sub back_ref {
 	my ($self, $field) = @_;
-	#$field->{type} = ;
+	my $id = $self->{field}{id};
+	
+	$field->{type} = $id->{type};
+	
+	my $name = $field->model . "s";
+	
+	my $ref = R::Model::Field->new($self, $name);
+	$ref->add_method($name, "
+if(\@_>1) {
+	
+	\$self
+} else {
+	\$self->find(" . $field->model . "_id => \$self->{id})
+}
+");
+	
+	$id
+}
+
+# ссылка многие-ко-многим
+sub m2m {
+	my ($self, $name, $to_model) = @_;
+	
+	my $to_fieldset = $::app->metaFieldset->fieldset($to_model);
+	
+	my $m2m = "m2m_${name}_" . $self->name . "_" . $to_fieldset->name;
+	
+	my $fieldset = $::app->metaFieldset->fieldset($m2m)->
+	pk(undef)->
+	ref($self->{name})->
+	ref($to_model);
+	
+	my $ref = R::Model::Field->new($self, $name);
+	$ref->add_method(undef, "
+if(\@_>1) {
+	
+	\$self
+} else {
+	\$self->${m2m}s->$to_model
+}
+");
+	
+	my $ref2 = R::Model::Field->new($to_fieldset, $name);
+	$ref2->add_method(undef, "
+if(\@_>1) {
+	
+	\$self
+} else {
+	\$self->${m2m}s->$self->{name}
+}
+");
+	
+	$self
 }
 
 # добавляет или удаляет pk
@@ -105,6 +164,7 @@ sub pk {
 		my $pk = $self->field('id', $type);
 		$pk->{type} = $type;
 		$pk->{autoincrement} = 0;
+		$pk->{pk} = 1;
 	} elsif(exists $self->{field}{'id'}) {
 		delete $self->{field}{'id'};
 		shift @{$self->{fieldset}};
@@ -146,13 +206,16 @@ sub comment {
 	$self
 }
 
+# синонимы
+sub remark { goto &comment }
+sub rem { goto &comment }
+
 # добавляет индекс
 sub _add_index {
-	my ($keyword, $self, $idx) = @_;
-	my $connect = $::app->connect;
+	my ($keyword, $self, $idx, $name) = @_;
 	my @idx = split /\s*,\s*/, $idx // $self->last;
-	$_ = $connect->SQL_WORD($_) for @idx;
-	push @{$self->{indexes}}, "$keyword(" . join(",", @idx) . ")";
+	$name ||= "idx_" . join "__", @idx;
+	$self->{indexes}{$name} = R::Model::Index->new($keyword, [@idx], $name, $self->{tab});
 	$self
 }
 
@@ -179,41 +242,69 @@ sub testdata {
 }
 
 
-# синхронизация
+# синхронизация таблицы
 sub sync {
 	my ($self) = @_;
+	
+	return $self if $self->{sync};
+	$self->{sync} = 1;
 	
 	my $c = $::app->connect;
 	my $tab = $self->{tab};
 	my $info = $c->info->{$tab};
 
+	while(my ($name, $indexref) = each %{$self->{indexref}}) {
+		$indexref->fk->fieldset->sync;
+	}
+	
 	if(!$info) {
-		$c->dbh->do($self->create_table);
+		my $sql = $self->create_table;
+		main::msg $sql;
+		$c->dbh->do($sql);
 	} else {
 		my %is;
 		for my $field (@{$self->{fieldset}}) {
-			$field->sync;
-			$is{$field->{col}} = 1;
+			if(!$field->compute) {
+				$field->sync;
+				$is{$field->{col}} = 1;
+			}
 		}
 		
 		while(my ($k, $v) = each %$info) {
-			$c->dbh->do("ALTER TABLE " . $c->SQL_WORD($tab) . " DROP COLUMN " . $c->SQL_WORD($k)) if !$is{$k};
+			$c->dbh->do(main::msg "ALTER TABLE " . $c->word($tab) . " DROP COLUMN " . $c->word($k)) if !$is{$k};
+		}
+		
+		while(my ($name, $index) = each %{$self->{index}}) {
+			$index->sync;
+		}
+		
+		while(my ($name, $indexref) = each %{$self->{indexref}}) {
+			$indexref->sync;
 		}
 	}
 	
+	$self;
 }
 
 # возвращает create table
 sub create_table {
 	my ($self) = @_;
-	my @sql = ("CREATE TABLE ", $::app->connect->SQL_WORD($self->{tab}), " (\n");
+	
+	my $connect = $::app->connect;
+	
+	my @sql = ("CREATE TABLE ", $connect->word($self->{tab}), " (\n");
+	my @col;
 	for my $field (@{$self->{fieldset}}) {
-		push @sql, $field->sql, ",\n" unless $field->compute;
+		push @col, $field->sql unless $field->compute;
 	}
 	
-	push @sql, join(", ", @{$self->{indexes}}), "\n";
+	while(my ($key, $idx) = %{$self->{index}}) {
+		push @col, $idx->sql;
+	}
 	
-	push @sql, ") ENGINE=", ($self->{engine} || $engine), (@{$self->{options}}? " " . join(" ", @{$self->{options}}): ());
+	push @sql, join ",\n", @col;
+	
+	push @sql, "\n) ENGINE=", ($self->{engine} || $engine), (@{$self->{options}}? " " . join(" ", @{$self->{options}}): ());
 	join "", @sql;
 }
 
@@ -221,7 +312,7 @@ sub create_table {
 sub rename {
 	my ($self, $tab) = @_;
 	my $c = $::app->connect;
-	join "", "ALTER TABLE ", $c->SQL_WORD($self->{tab}), " RENAME ", $c->SQL_WORD($tab);
+	join "", "ALTER TABLE ", $c->word($self->{tab}), " RENAME ", $c->word($tab);
 }
 
 1;

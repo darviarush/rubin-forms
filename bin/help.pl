@@ -1,33 +1,52 @@
 #= [name]
 #> возвращает список команд
 
-use Term::ANSIColor qw(:constants);
+use Msg;
+#use Term::ANSIColor qw(:constants);
 use File::Find;
 use utf8;
 use Cwd qw/cwd/;
 
 binmode STDOUT, ":utf8";
+binmode STDERR, ":utf8";
 
-$name = $ARGV[1];
+my $name = $ARGV[1];
 if($name) {
-	($path) = dirs("bin/$name.pl");
+	my ($path) = dirs("bin/$name.pl");
 	$_ = Utils::read($path, 'utf-8');
 	$name .= " $1" if /^#= ([^\r\n]+)/m;
-	print BOLD . BLACK . "$name\n\n" . RESET;
-	print "$1\n" while /^#> ([^\r\n]+)/gm;
+	main::msg ":bold black", "$name\n";
+	main::msg $1 while /^#> ([^\r\n]+)/gm;
 	exit;
 }
 
+my %CAT;
+
 find({ no_chdir=>1, wanted=> sub {
 	return unless $File::Find::name =~ /([^\/]+)\.pl$/;
-	$name = $1;
+	my $name = $1;
 	$_ = Utils::read($File::Find::name, 'UTF-8');
-	($args) = /^#= ([^\r\n]+)/m;
-	($help) = /^#> ([^\r\n]+)/m;
-	$name .= " $args" if defined $args;
-	$len = length $name;
-	print BOLD . BLACK . $name . RESET . (" " x  (20 - $len)) . ($help? " ".$help: "") . "\n";
+	my ($cat) = /^#== (.*?)\s*$/m;
+	my ($args) = /^#= ([^\r\n]+)/m;
+	my ($help) = /^#> ([^\r\n]+)/m;
 	
+	$CAT{$cat || ""}{$name} = {args=>$args, help=>$help};
 }}, dirs "bin");
+
+
+for my $cat (sort keys %CAT) {
+
+	main::msg ":empty", ":bold", "\n+ ", ":bold black", $cat if $cat ne "";
+
+	my $category = $CAT{$cat};
+	
+	for my $name (sort keys %$category) {
+		my $args = $category->{$name}{args};
+		my $help = $category->{$name}{help};
+		$name .= " $args" if defined $args;
+		my $len = length $name;
+		main::msg ":empty", ":bold black", $name, ":reset", (" " x  (20 - $len)) . ($help? " ".$help: "");
+	}
+}
 
 1;

@@ -13,12 +13,8 @@ sub setup {
 	col(email => "varchar(255)")->
 	col(pass => "varchar(255)")->
 	col(is_admin => "tinyint")->default(0)->
-	col(name => "varchar(255)")->
-	ref(ava => "img")->
-	col(description => 'mediumtext')->
 	
 	index('email, pass')
-
 }
 
 1;

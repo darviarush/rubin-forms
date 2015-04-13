@@ -87,12 +87,69 @@ sub get_info {
 	return $info;
 }
 
+# кеширует информацию о ключах таблиц
+sub index_info {
+	my ($self) = @_;
+	$self->{index_info} //= $self->get_index_info
+}
+
+# возвращает информацию о ключах таблиц
+sub get_index_info {
+	my ($self) = @_;
+	my $info = $self->info;
+	my $dbh = $self->{dbh};
+	my $ref = {};
+	while(my($tab, $v) = each %$info) {
+		my $sql = "SHOW INDEX FROM " . $self->word($tab);
+		my $rows = $dbh->selectall_arrayref($sql, {Slice=>{}});
+		my $prev = "";
+		my $cur;
+		for my $row (@$rows) {
+			my $name = $row->{Key_name};
+			my $idx = $row->{Column_name};
+			my $i = $row->{Seq_in_index} - 1;
+			
+			if($prev ne $name) {
+				my $ne = $row->{Non_unique};
+				$cur = $ref->{$tab}{$name} = {idx=>[], name=>$name, type=>$ne? 'INDEX': 'UNIQUE'};
+				$prev = $name;
+			}
+			$cur->{idx}[$i] = $idx;
+		}
+		
+	}
+	$ref
+}
+
+
+# кеширует информацию о внешних ключах таблиц
+sub info_fk {
+	my ($self) = @_;
+	$self->{info_fk} //= $self->get_info_fk
+}
+
+# возвращает информацию о внешних ключах таблиц
+sub get_info_fk {
+	my ($self) = @_;
+	my $sql = "SELECT TABLE_NAME,COLUMN_NAME,CONSTRAINT_NAME,
+REFERENCED_TABLE_NAME,REFERENCED_COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE
+WHERE TABLE_SCHEMA=?
+AND referenced_column_name IS not null";
+	my $rows = $self->dbh->selectall_arrayref($sql, {Slice=>{}}, $self->basename);
+	my $info = {};
+	for my $row (@$rows) {
+		$info->{$row->{TABLE_NAME}}{$row->{CONSTRAINT_NAME}} = $row;
+	}
+	$info
+}
+
+
 # возвращает текущее время в формате базы
 sub now { main::msg 'nnn?', @_[1..$#_]; strftime("%F %T", @_>1? localtime @_[1..$#_]: localtime) }
 
 
 # оборачивает в `` если нужно
-sub SQL_WORD {
+sub word {
 	my ($self, $col) = @_;
 	exists $self->{sql_word}{uc $col}? "`$col`": $col;
 }
@@ -100,7 +157,7 @@ sub SQL_WORD {
 # формирует колумн
 sub SQL_COL {
 	my ($self, $col, $as) = @_;
-	join "", ($as? ($self->SQL_WORD($as), "."): ()), $self->SQL_WORD($col);
+	join "", ($as? ($self->word($as), "."): ()), $self->word($col);
 }
 
 # возвращает алиас таблицы. То есть бывает, что таблица содержит несколько ссылок на другую таблицу, тогда они не могут называться все как таблица на которую ссылаются. И так: author_id, soauthor_id - alias_tab = {soauthor_id => author_id}
@@ -165,8 +222,8 @@ sub INS_SET {
 # формирует столбцы
 sub FIELDS {
 	my ($self, $fields) = @_;
-	return map { $self->SQL_WORD($_) } @$fields if ref $fields eq "ARRAY";
-	return map { ($fields->{$_}, ' as ', $self->SQL_WORD($_)) } keys %$fields if ref $fields eq "HASH";
+	return map { $self->word($_) } @$fields if ref $fields eq "ARRAY";
+	return map { ($fields->{$_}, ' as ', $self->word($_)) } keys %$fields if ref $fields eq "HASH";
 	return $fields;
 }
 
@@ -181,10 +238,10 @@ sub FIELDS_NAMES {
 # формирует столбцы с таблицей
 sub FOR_TAB_FIELDS {
 	my ($self, $fields, $as) = @_;
-	$as = $self->SQL_WORD($as);
-	return map { ($as.".".$self->SQL_WORD($_)) } @$fields if ref $fields eq "ARRAY";
-	return map { ($as.".".$fields->{$_}, ' as ', $self->SQL_WORD($_)) } keys %$fields if ref $fields eq "HASH";
-	return map { $as.".".$self->SQL_WORD($_) } split /,\s*/, $fields;
+	$as = $self->word($as);
+	return map { ($as.".".$self->word($_)) } @$fields if ref $fields eq "ARRAY";
+	return map { ($as.".".$fields->{$_}, ' as ', $self->word($_)) } keys %$fields if ref $fields eq "HASH";
+	return map { $as.".".$self->word($_) } split /,\s*/, $fields;
 }
 
 # возвращает таблицу и её алиас, если он указан
@@ -198,7 +255,7 @@ sub sel {
 	my ($self, $tab, $view, @args) = @_;
 	my @view = $self->FIELDS($view);
 	die "not fields in sql query for `$tab`" unless @view;
-	my $sql = join "", "SELECT ", join(", ", @view), " FROM ", $self->SQL_WORD($tab), $self->query_add(" ", \@args);
+	my $sql = join "", "SELECT ", join(", ", @view), " FROM ", $self->word($tab), $self->query_add(" ", \@args);
 	main::msg $sql if $self->{app}->ini->{site}{'log-level'} >= 1;
 	$sql
 }
@@ -242,7 +299,7 @@ sub query_join {
 	($arg->{limit}? ("${sep}LIMIT ", $arg->{limit}): ())
 }
 
-sub flat2volume { my ($self, $join, @args) = @_; my ($tab) = @args; my ($as); ($as, $tab) = $self->TAB($tab); return {tab => $self->SQL_WORD($tab), as => $self->SQL_WORD($as), args=>[@args], join=>$join}; }
+sub flat2volume { my ($self, $join, @args) = @_; my ($tab) = @args; my ($as); ($as, $tab) = $self->TAB($tab); return {tab => $self->word($tab), as => $self->word($as), args=>[@args], join=>$join}; }
 
 # выборки
 sub sel_join {
@@ -280,7 +337,7 @@ sub sel_join {
 		}
 		push @$real, @real;
 	}
-	my $sql = join "", "SELECT ", join(", ", @view), "\nFROM ", $self->SQL_WORD($table), ($table ne $as_table? (' as ', $as_table): ()), @join, $self->query_join($push, "\n");
+	my $sql = join "", "SELECT ", join(", ", @view), "\nFROM ", $self->word($table), ($table ne $as_table? (' as ', $as_table): ()), @join, $self->query_join($push, "\n");
 	
 	wantarray? ($sql, $fields, $real_fields): $sql;
 }
@@ -394,7 +451,7 @@ sub last_count { $_[0]->{last_count} }
 sub erase {
 	my ($self, $tab, $where) = @_;
 	my $cond = $self->DO_WHERE($where);
-	$CURR_SQL = join "", "DELETE FROM ", $self->SQL_WORD($tab), " WHERE ", $cond;
+	$CURR_SQL = join "", "DELETE FROM ", $self->word($tab), " WHERE ", $cond;
 	$self->{last_count} = $self->{dbh}->do($CURR_SQL) + 0;
 	$CURR_SQL = undef;
 	$self
@@ -405,9 +462,9 @@ sub add {
 	my ($self, $tab, $param) = @_;
 	if(%$param) {	
 		my $SET = $self->DO_SET($param);
-		$CURR_SQL = join "", "INSERT INTO ", $self->SQL_WORD($tab), " SET ", $SET;
+		$CURR_SQL = join "", "INSERT INTO ", $self->word($tab), " SET ", $SET;
 	} else {
-		$CURR_SQL = join "", "INSERT INTO ", $self->SQL_WORD($tab), " () VALUES ()";
+		$CURR_SQL = join "", "INSERT INTO ", $self->word($tab), " () VALUES ()";
 	}
 	$self->{last_count} = $self->{dbh}->do($CURR_SQL) + 0;
 	$self->{last_id} = $CURR_SQL = undef;
@@ -425,7 +482,7 @@ sub append {
 sub insert {
 	my ($self, $tab, $fields, $matrix) = @_;
 	my $SET = $self->INS_SET($matrix);
-	$CURR_SQL = join "", "INSERT INTO ", $self->SQL_WORD($tab), " (", $self->FIELDS($fields), ") VALUES ", $SET;
+	$CURR_SQL = join "", "INSERT INTO ", $self->word($tab), " (", $self->FIELDS($fields), ") VALUES ", $SET;
 	$self->{last_count} = $self->{dbh}->do($CURR_SQL)+0;
 	$CURR_SQL = undef;
 	$self
@@ -436,7 +493,7 @@ sub update {
 	my ($self, $tab, $param, $where) = @_;
 	my $SET = $self->DO_SET($param);
 	my $COND = $self->DO_WHERE($where);
-	$CURR_SQL = join "", "UPDATE ", $self->SQL_WORD($tab), " SET ", $SET, " WHERE ", $COND;
+	$CURR_SQL = join "", "UPDATE ", $self->word($tab), " SET ", $SET, " WHERE ", $COND;
 	$self->{last_count} = $self->{dbh}->do($CURR_SQL)+0;
 	$CURR_SQL = undef;
 	$self

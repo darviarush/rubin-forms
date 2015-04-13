@@ -28,11 +28,26 @@ sub new {
 # возвращает/устанавливает идентификатор
 sub id { if(@_>1) { die "Изменять id через модель нельзя" } else { $_[0]->{id} } }
 
+# устанавливает view для find
+sub view {
+	my ($self, $view) = @_;
+	$self->{_view} = [split /\s*,\s*/, $view];
+	$self
+}
+
 
 # выбирает записи. Возвращает tie-массив
-sub filter {
+sub find {
 	my ($self, @filters) = @_;
-	$app->auth->query();
+	my $cls = ref $self;
+	my $fieldset = $::app->{modelMetafieldset}{cls}{$cls};
+	
+	my $view = $self->{_view} // ["id"];
+	delete $self->{_view};
+	
+	my $ref = $app->auth->query_all($fieldset->{tab}, $view, @filters);
+	
+	return map {bless $_, $cls} @$ref;
 }
 
 # 
@@ -50,7 +65,8 @@ sub update {
 # удаляет строку
 sub erase {
 	my ($self) = @_;
-	$self->{app}->auth->erase($self->{tab}, {id => $self->{id}});
+	my $fieldset = $::app->{modelMetafieldset}{cls}{ref $self};
+	$::app->auth->erase($fieldset->{tab}, {id => $self->{id}});
 }
 
 1;

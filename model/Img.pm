@@ -3,7 +3,7 @@ package R::Rows::Img;
 
 use base R::Model::Row;
 
-use Image::Magick;
+#use Image::Magick;
 # http://www.graphicsmagick.org/perl.html
 
 
@@ -78,28 +78,28 @@ sub update {
 
 
 # изменяет размер картинки и записывает её в файл name
-sub resize {
-	my ($self, $w, $h, $name) = @_;
-	my $orig = $self->orig;
-	my $magick = Image::Magick->new;
-	$magick->Read($orig);
-	$magick->preview();
-	$magick->Resize(geometry=>geometry, width=>$w, height=>$h);	# turn в радианах
-	$self->erase_files;
-	$magick->Write($orig);
-	$self
-}
+# sub resize {
+	# my ($self, $w, $h, $name) = @_;
+	# my $orig = $self->orig;
+	# my $magick = Image::Magick->new;
+	# $magick->Read($orig);
+	# $magick->preview();
+	# $magick->Resize(geometry=>geometry, width=>$w, height=>$h);	# turn в радианах
+	# $self->erase_files;
+	# $magick->Write($orig);
+	# $self
+# }
 
 # поворачивает картинку
-sub turn {
-	my ($self, $turn) = @_;
-	my $orig = $self->orig;
-	my $magick = Image::Magick->new;
-	$magick->Read($orig);
-	$magick->Rotate(degrees => $turn);	# turn в радианах
-	$self->erase_files;
-	$magick->Write($orig);
-	$self
-}
+# sub turn {
+	# my ($self, $turn) = @_;
+	# my $orig = $self->orig;
+	# my $magick = Image::Magick->new;
+	# $magick->Read($orig);
+	# $magick->Rotate(degrees => $turn);	# turn в радианах
+	# $self->erase_files;
+	# $magick->Write($orig);
+	# $self
+# }
 
 1;

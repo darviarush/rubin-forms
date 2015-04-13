@@ -10,8 +10,8 @@ sub setup {
 
 	$fields->
 	
-	ref(user)->index->
-	col(code => 'varchar(255)')->
+	ref("user")->index->
+	col(code => 'varchar(255)')
 	
 }
 

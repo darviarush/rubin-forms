@@ -7,7 +7,7 @@ use warnings;
 use IO::String;
 
 # назначаем свойства
-Utils::has("R::Request", "app", "method", "url", "location", "action", "ext", "search", "version");
+Utils::has("app", "method", "url", "location", "action", "ext", "search", "version");
 
 
 sub new {

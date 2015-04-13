@@ -86,7 +86,7 @@ sub mtime {
 }
 
 sub file ($) { my ($path) = @_; -e $path? $path: ($_FRAMEWORK && -e ($path="$_FRAMEWORK/$path"))? $path: undef }
-sub dirs (@) { map { (glob($_), ($_FRAMEWORK? glob("$_FRAMEWORK/$_") : ())) } @_ }
+sub dirs (@) { map { (($_FRAMEWORK? glob("$_FRAMEWORK/$_") : ()), glob($_)) } @_ }
 sub files (@) { map { -e $_? $_: () } dirs(@_) }
 
 sub run_bin ($$) {

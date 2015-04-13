@@ -24,7 +24,7 @@ sub closure {
 
 # создаёт функции-свойства в указанном классе
 sub has {
-	my $cls = shift;
+	my ($cls) = caller(0);
 	for my $name (@_) {
 		eval "sub ${cls}::$name { if(\@_>1) { \$_[0]->{'$name'} = \$_[1]; \$_[0] } else { \$_[0]->{'$name'} } }"
 	}
@@ -1002,8 +1002,8 @@ sub TemplateBare {
 	my @begin;
 	
 	#my $code_quote = "my \$dbh = \$app->connect->{dbh}; ";
-	my $code_stash = "my \$_STASH = \$app->{stash}; ";
-	my $code_user_id = "\$app->session->user_id; ";
+	my $code_stash = "my \$_STASH = \$app->request->{stash}; ";
+	my $code_user_id = "\$app->request->user->{id}; ";
 	
 	#push @begin, $code_quote if $form->{is_quote};
 	push @begin, $code_stash if $form->{is_stash};

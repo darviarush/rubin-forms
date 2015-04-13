@@ -11,7 +11,7 @@ use R::Request;
 use Time::HiRes qw//;
 use POSIX qw//;
 
-Utils::has("R::Server", "app");
+Utils::has("app");
 
 sub new {
 	my ($cls, $app) = @_;
@@ -121,8 +121,6 @@ sub ritter {
 			$app->connect->reconnect;
 		}
 	}
-
-	$app->{stash} = {};
 	
 }
 

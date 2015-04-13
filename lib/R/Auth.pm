@@ -96,7 +96,7 @@ sub check_role {
 	my ($self, $action, $tab, $param) = @_;
 	#$action = $param->{"id"}? "edit": "add" unless $action;
 	my $error;
-	my $user_id = $self->app->session->user_id;
+	my $user_id = $::app->request->user->id;
 	my $role = $user_id? 'user': 'noauth';
 	my $check = sub {
 		if($self->{tab_rules}{$tab}{$role}{$action}) {

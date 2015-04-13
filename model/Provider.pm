@@ -16,7 +16,7 @@ sub setup {
 	# http://habrahabr.ru/post/145988/
 	# http://oauth.vk.com/authorize?client_id={client_id}&redirect_uri=mysite.com/vklogin&response_type=code
 	
-	insert(
+	data(
 		[1, 'vk', 'https://oauth.vk.com/authorize?client_id=CLIENT_ID&scope=offline,messages,status,notify&redirect_uri=REDIRECT_URI&response_type=code&v=API_VERSION'],
 		[2, 'odnoklassniki', ''],
 		[3, 'mail.ru', '']

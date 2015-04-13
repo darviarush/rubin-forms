@@ -1,6 +1,8 @@
 package R::Model::Field;
 # поле таблицы
 
+Utils::has(qw/tab col model name type fieldset/);
+
 # конструктор
 sub new {
 	my ($cls, $fieldset, $name, $type) = @_;
@@ -32,18 +34,9 @@ sub add_method {
 		"sub $SUB {
 			my (\$self, \$val) = \@_;
 			if(\@_>1) {
-				if(ref \$val eq 'HASH') {
-					my \$x = \$::app->model->$name;
-					my \$field = \$::app->modelMetafieldset->fieldset('$model')->{field};
-					while(my(\$k, \$v) = each %\$val) {
-						if(exists \$field->{\$k}) {
-							\$x->${\\\$k}(\$v);
-						}
-					}
-					\$self
-				}
-				elsif(ref \$val) {
-					\$self->${name}_id(\$val->id);
+				if(ref \$val) {
+					my \$bean = \$::app->model->$name(\$val);
+					\$self->${name}_id(\$bean->{id});
 				} else {
 					\$self->${name}_id(\$val);
 				}
@@ -70,7 +63,7 @@ sub add_method {
 # возвращает представление филда в sql
 sub sql {
 	my ($self) = @_;
-	my $sql = $::app->connect->SQL_WORD($self->col) . " $self->{type}";
+	my $sql = $::app->connect->word($self->col) . " $self->{type}";
 	$sql .= " NOT NULL" if !$self->{null} && !$self->{pk};
 	$sql .= " PRIMARY KEY" if $self->{pk};
 	$sql .= " AUTO_INCREMENT" if $self->{autoincrement};
@@ -84,9 +77,12 @@ sub sql {
 sub alter {
 	my ($self, $after, $rename) = @_;
 	my $c = $::app->connect;
-	join "", "ALTER TABLE ", $c->SQL_WORD($self->{tab}), " ",
-	($rename == 1? "MODIFY": $rename? "CHANGE": "ADD"), " COLUMN ", $c->SQL_WORD($self->{col}), ($rename && $rename!=1? " " . $c->SQL_WORD($rename): ()),
-	" ", $self->sql, ($after == 1? " FIRST": $after? " AFTER " . $c->SQL_WORD($after): "");
+	
+	$after //= 0;
+	$rename //= 0;
+	
+	join "", "ALTER TABLE ", $c->word($self->{tab}), " ",
+	($rename == 1? "MODIFY": $rename? "CHANGE": "ADD"), " COLUMN ", ($rename==1 || $rename==0? (): $c->word($rename) . " "), $self->sql, ($after == 1? " FIRST": $after? " AFTER " . $c->word($after): "");
 }
 
 # синхронизирует филд с базой
@@ -101,6 +97,8 @@ sub sync {
 		main::msg $sql;
 		$c->dbh->do($sql);
 	} else {
+		#main::msg $self->alter_info;
+		#main::msg $self->sql;
 		if($self->alter_info ne $self->sql) {
 			$sql = $self->alter(undef, 1);
 			main::msg $sql;
@@ -113,12 +111,12 @@ sub sync {
 # возвращает колумн из info
 sub alter_info {
 	my ($self) = @_;
-	my $sql = $::app->info->{$self->{tab}}{$self->{col}};
+	my $sql = $::app->connect->info->{$self->{tab}}{$self->{col}};
 	($sql? (($column_type{$sql->{column_type}} || $sql->{column_type} || "").
 	($sql->{is_nullable} eq "YES" || $sql->{column_key} =~ /PRI/? "": " NOT NULL").
 	(defined($sql->{column_default})? " DEFAULT $sql->{column_default}": "").
 	($sql->{column_key} =~ /PRI/? " PRIMARY KEY": "").
-	($sql->{extra} ne ""? " $sql->{extra}": "")): "")
+	($sql->{extra} ne ""? uc " $sql->{extra}": "")): "")
 }
 
 # это филд базы
@@ -127,6 +125,8 @@ sub compute { 0 }
 
 
 package R::Model::FieldCompute;
+
+Utils::has(qw/fieldset name model/);
 
 # конструктор
 sub new {

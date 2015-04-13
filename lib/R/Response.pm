@@ -6,7 +6,7 @@ use warnings;
 
 use HTTP::Date qw//;
 
-Utils::has("R::Response", "app");
+Utils::has("app", "stash");
 
 # конструктор
 sub new {
@@ -18,7 +18,7 @@ sub new {
 sub reset {
 	my ($self) = @_;
 	my $app = $self->{app};
-	%$self = (app => $app, status => 200, head=>{'Content-Type' => 'text/html; charset=utf-8'}, body=>undef, layout => [] );
+	%$self = (app => $app, stash => {}, status => 200, head=>{'Content-Type' => 'text/html; charset=utf-8'}, body=>undef, layout => [] );
 	$self
 }
 
@@ -301,7 +301,7 @@ sub submit {
 	
 	#$result->{$layouts->[0]}{layout_id} = $layout_id if @$layouts;
 	return {
-		stash => $app->{stash},
+		stash => $self->{stash},
 		url => $request->{original} // $request->{url},
 		(@$layouts? (layout => $layouts): ()),
 		($layout_id? (layout_id => $layout_id): ()),
