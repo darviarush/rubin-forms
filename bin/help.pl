@@ -1,11 +1,11 @@
 #= [name]
 #> возвращает список команд
 
-use Msg;
+#use Msg;
 #use Term::ANSIColor qw(:constants);
 use File::Find;
 use utf8;
-use Cwd qw/cwd/;
+#use Cwd qw/cwd/;
 
 binmode STDOUT, ":utf8";
 binmode STDERR, ":utf8";
@@ -36,7 +36,7 @@ find({ no_chdir=>1, wanted=> sub {
 
 for my $cat (sort keys %CAT) {
 
-	main::msg ":empty", ":bold", "\n+ ", ":bold black", $cat if $cat ne "";
+	main::msg ":empty", ":bold", "\n", ":bold black", $cat, ":" if $cat ne "";
 
 	my $category = $CAT{$cat};
 	
@@ -45,7 +45,7 @@ for my $cat (sort keys %CAT) {
 		my $help = $category->{$name}{help};
 		$name .= " $args" if defined $args;
 		my $len = length $name;
-		main::msg ":empty", ":bold black", $name, ":reset", (" " x  (20 - $len)) . ($help? " ".$help: "");
+		main::msg ":empty", ":bold black", "\t", $name, ":reset", (" " x  (20 - $len)) . ($help? " ".$help: "");
 	}
 }
 

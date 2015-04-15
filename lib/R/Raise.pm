@@ -147,9 +147,7 @@ sub _winpath {
 	
 	local ($`, $');
 	
-	my $file = eval { Cwd::abs_path($_[0]) };
-	$@ = $! = undef;
-	$file //= $_[0];
+	my $file = -e $_[0]? Cwd::abs_path($_[0]): $_[0];
 	$file =~ s!^/cygdrive/(\w)!$1:!;
 	$file =~ s!^/(usr/)?!c:/cygwin/!;
 	$file =~ s!/!\\!g;

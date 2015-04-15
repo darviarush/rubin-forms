@@ -1,5 +1,5 @@
 package R::Connect;
-# ïîäêëþ÷åíèå ê áàçå è ïðîñòåíüêèå ôóíêöèè äëÿ çàïðîñîâ
+# Ð¿Ð¾Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸Ðµ Ðº Ð±Ð°Ð·Ðµ Ð¸ Ð¿Ñ€Ð¾ÑÑ‚ÐµÐ½ÑŒÐºÐ¸Ðµ Ñ„ÑƒÐ½ÐºÑ†Ð¸Ð¸ Ð´Ð»Ñ Ð·Ð°Ð¿Ñ€Ð¾ÑÐ¾Ð²
 
 use strict;
 use warnings;
@@ -10,7 +10,7 @@ use POSIX qw/strftime/;
 
 our $CURR_SQL;
 
-# çàðåçåðâèðîâàííûå ñëîâà sql
+# Ð·Ð°Ñ€ÐµÐ·ÐµÑ€Ð²Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð½Ñ‹Ðµ ÑÐ»Ð¾Ð²Ð° sql
 our %SQL_WORD = (
 mysql => {Utils::set(qw/ACCESSIBLE ADD ALL ALTER ANALYZE AND AS ASC ASENSITIVE BEFORE BETWEEN BIGINT BINARY BLOB BOTH BY CALL CASCADE CASE CHANGE CHAR CHARACTER CHECK COLLATE COLUMN CONDITION CONSTRAINT CONTINUE CONVERT CREATE CROSS CURRENT_DATE CURRENT_TIME CURRENT_TIMESTAMP CURRENT_USER CURSOR DATABASE DATABASES DAY_HOUR DAY_MICROSECOND DAY_MINUTE DAY_SECOND DEC DECIMAL DECLARE DEFAULT DELAYED DELETE DESC DESCRIBE DETERMINISTIC DISTINCT DISTINCTROW DIV DOUBLE DROP DUAL EACH ELSE ELSEIF ENCLOSED ESCAPED EXISTS EXIT EXPLAIN FALSE FETCH FLOAT FLOAT4 FLOAT8 FOR FORCE FOREIGN FROM FULLTEXT GET GRANT GROUP HAVING HIGH_PRIORITY HOUR_MICROSECOND HOUR_MINUTE HOUR_SECOND IF IGNORE IN INDEX INFILE INNER INOUT INSENSITIVE INSERT INT INT1 INT2 INT3 INT4 INT8 INTEGER INTERVAL INTO IO_AFTER_GTIDS IO_BEFORE_GTIDS IS ITERATE JOIN KEY KEYS KILL LEADING LEAVE LEFT LIKE LIMIT LINEAR LINES LOAD LOCALTIME LOCALTIMESTAMP LOCK LONG LONGBLOB LONGTEXT LOOP LOW_PRIORITY MASTER_BIND MASTER_SSL_VERIFY_SERVER_CERT MATCH MAXVALUE MEDIUMBLOB MEDIUMINT MEDIUMTEXT MIDDLEINT MINUTE_MICROSECOND MINUTE_SECOND MOD MODIFIES NATURAL NONBLOCKING NOT NO_WRITE_TO_BINLOG NULL NUMERIC ON OPTIMIZE OPTION OPTIONALLY OR ORDER OUT OUTER OUTFILE PARTITION PRECISION PRIMARY PROCEDURE PURGE RANGE READ READS READ_WRITE REAL REFERENCES REGEXP RELEASE RENAME REPEAT REPLACE REQUIRE RESIGNAL RESTRICT RETURN REVOKE RIGHT RLIKE SCHEMA SCHEMAS SECOND_MICROSECOND SELECT SENSITIVE SEPARATOR SET SHOW SIGNAL SMALLINT SPATIAL SPECIFIC SQL SQLEXCEPTION SQLSTATE SQLWARNING SQL_BIG_RESULT SQL_CALC_FOUND_ROWS SQL_SMALL_RESULT SSL STARTING STRAIGHT_JOIN TABLE TERMINATED THEN TINYBLOB TINYINT TINYTEXT TO TRAILING TRIGGER TRUE UNDO UNION UNIQUE UNLOCK UNSIGNED UPDATE USAGE USE USING UTC_DATE UTC_TIME UTC_TIMESTAMP VALUES VARBINARY VARCHAR VARCHARACTER VARYING WHEN WHERE WHILE WITH WRITE XOR YEAR_MONTH ZEROFILL/)}
 );
@@ -24,7 +24,7 @@ sub new {
 }
 
 
-# êîííåêò
+# ÐºÐ¾Ð½Ð½ÐµÐºÑ‚
 sub connect {
 	my ($self) = @_;
 	$self->close if $self->{dbh};
@@ -35,7 +35,7 @@ sub connect {
 	$self
 }
 
-# çàêðûâàåò ñîåäèíåíèå
+# Ð·Ð°ÐºÑ€Ñ‹Ð²Ð°ÐµÑ‚ ÑÐ¾ÐµÐ´Ð¸Ð½ÐµÐ½Ð¸Ðµ
 sub close {
 	my ($self) = @_;
 	$self->{dbh}->disconnect;
@@ -43,7 +43,7 @@ sub close {
 	$self
 }
 
-# ïåðåêîííåê÷èâàåòñÿ, åñëè ñâÿçü óòðà÷åíà
+# Ð¿ÐµÑ€ÐµÐºÐ¾Ð½Ð½ÐµÐºÑ‡Ð¸Ð²Ð°ÐµÑ‚ÑÑ, ÐµÑÐ»Ð¸ ÑÐ²ÑÐ·ÑŒ ÑƒÑ‚Ñ€Ð°Ñ‡ÐµÐ½Ð°
 sub reconnect {
 	my ($self) = @_;
 	if($self->{dbh}) {
@@ -53,25 +53,25 @@ sub reconnect {
 	$self->connect
 }
 
-# âîçâðàùàåò èìÿ áàçû äàííûõ
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ Ð¸Ð¼Ñ Ð±Ð°Ð·Ñ‹ Ð´Ð°Ð½Ð½Ñ‹Ñ…
 sub basename {
 	my ($self) = @_;
-	$self->{basename} //= $self->{app}->ini->{connect}{DNS} =~ /database=(\w+)/ and $1
+	$self->{basename} //= ($self->{app}->ini->{connect}{DNS} =~ /database=(\w+)/ and $1)
 }
 
-# âîçâðàùàåò dbh
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ dbh
 sub dbh { $_[0]->{dbh} }
 
-# âîçâðàùàåò app
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ app
 sub app { $_[0]->{app} }
 
-# êåøèðóåò èíô. î òàáëèöàõ
+# ÐºÐµÑˆÐ¸Ñ€ÑƒÐµÑ‚ Ð¸Ð½Ñ„. Ð¾ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð°Ñ…
 sub info {
 	my ($self) = @_;
 	$self->{info} //= $self->get_info;
 }
 
-# âîçâðàùàåò èíôîðìàöèþ î òàáëèöàõ
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ Ð¸Ð½Ñ„Ð¾Ñ€Ð¼Ð°Ñ†Ð¸ÑŽ Ð¾ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð°Ñ…
 sub get_info {
 	my ($self) = @_;
 	my $dbh = $self->{dbh};
@@ -81,19 +81,19 @@ sub get_info {
 	my $rows = $dbh->selectall_arrayref($sql, {Slice=>{}});
 	my $info = {};
 	
-	for my $row (@$rows) {	# ñîçäà¸ì info
+	for my $row (@$rows) {	# ÑÐ¾Ð·Ð´Ð°Ñ‘Ð¼ info
 		$info->{$row->{table_name}}{$row->{column_name}} = $row;
 	}
 	return $info;
 }
 
-# êåøèðóåò èíôîðìàöèþ î êëþ÷àõ òàáëèö
+# ÐºÐµÑˆÐ¸Ñ€ÑƒÐµÑ‚ Ð¸Ð½Ñ„Ð¾Ñ€Ð¼Ð°Ñ†Ð¸ÑŽ Ð¾ ÐºÐ»ÑŽÑ‡Ð°Ñ… Ñ‚Ð°Ð±Ð»Ð¸Ñ†
 sub index_info {
 	my ($self) = @_;
 	$self->{index_info} //= $self->get_index_info
 }
 
-# âîçâðàùàåò èíôîðìàöèþ î êëþ÷àõ òàáëèö
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ Ð¸Ð½Ñ„Ð¾Ñ€Ð¼Ð°Ñ†Ð¸ÑŽ Ð¾ ÐºÐ»ÑŽÑ‡Ð°Ñ… Ñ‚Ð°Ð±Ð»Ð¸Ñ†
 sub get_index_info {
 	my ($self) = @_;
 	my $info = $self->info;
@@ -122,55 +122,66 @@ sub get_index_info {
 }
 
 
-# êåøèðóåò èíôîðìàöèþ î âíåøíèõ êëþ÷àõ òàáëèö
-sub info_fk {
+# ÐºÐµÑˆÐ¸Ñ€ÑƒÐµÑ‚ Ð¸Ð½Ñ„Ð¾Ñ€Ð¼Ð°Ñ†Ð¸ÑŽ Ð¾ Ð²Ð½ÐµÑˆÐ½Ð¸Ñ… ÐºÐ»ÑŽÑ‡Ð°Ñ… Ñ‚Ð°Ð±Ð»Ð¸Ñ†
+sub fk_info {
 	my ($self) = @_;
-	$self->{info_fk} //= $self->get_info_fk
+	return $self->{fk_info} if $self->{fk_info};
+	($self->{fk_info}, $self->{fk_info_backward}) = $self->get_fk_info;
+	$self->{fk_info}
 }
 
-# âîçâðàùàåò èíôîðìàöèþ î âíåøíèõ êëþ÷àõ òàáëèö
-sub get_info_fk {
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ Ð¾Ñ‚ ÐºÐ°ÐºÐ¸Ñ… ÐºÐ»ÑŽÑ‡ÐµÐ¹ Ð·Ð°Ð²Ð¸ÑÐ¸Ñ‚ ÐºÐ°ÐºÐ°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð°
+sub fk_info_backward {
 	my ($self) = @_;
-	my $sql = "SELECT TABLE_NAME,COLUMN_NAME,CONSTRAINT_NAME,
-REFERENCED_TABLE_NAME,REFERENCED_COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE
-WHERE TABLE_SCHEMA=?
+	$self->fk_info;
+	$self->{fk_info_backward}
+}
+
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ Ð¸Ð½Ñ„Ð¾Ñ€Ð¼Ð°Ñ†Ð¸ÑŽ Ð¾ Ð²Ð½ÐµÑˆÐ½Ð¸Ñ… ÐºÐ»ÑŽÑ‡Ð°Ñ… Ñ‚Ð°Ð±Ð»Ð¸Ñ†
+sub get_fk_info {
+	my ($self) = @_;
+	my $sql = "SELECT table_name,column_name,constraint_name,
+referenced_table_name,referenced_column_name FROM information_schema.KEY_COLUMN_USAGE
+WHERE TABLE_SCHEMA=" . $self->quote($self->basename) . "
 AND referenced_column_name IS not null";
-	my $rows = $self->dbh->selectall_arrayref($sql, {Slice=>{}}, $self->basename);
+	my $rows = $self->dbh->selectall_arrayref($sql, {Slice=>{}});
 	my $info = {};
+	my $bk = {};
 	for my $row (@$rows) {
-		$info->{$row->{TABLE_NAME}}{$row->{CONSTRAINT_NAME}} = $row;
+		$info->{$row->{table_name}}{$row->{constraint_name}} = $row;
+		$bk->{$row->{referenced_table_name}}{$row->{constraint_name}} = $row;
 	}
-	$info
+	return ($info, $bk);
 }
 
 
-# âîçâðàùàåò òåêóùåå âðåìÿ â ôîðìàòå áàçû
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ Ñ‚ÐµÐºÑƒÑ‰ÐµÐµ Ð²Ñ€ÐµÐ¼Ñ Ð² Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ðµ Ð±Ð°Ð·Ñ‹
 sub now { main::msg 'nnn?', @_[1..$#_]; strftime("%F %T", @_>1? localtime @_[1..$#_]: localtime) }
 
 
-# îáîðà÷èâàåò â `` åñëè íóæíî
+# Ð¾Ð±Ð¾Ñ€Ð°Ñ‡Ð¸Ð²Ð°ÐµÑ‚ Ð² `` ÐµÑÐ»Ð¸ Ð½ÑƒÐ¶Ð½Ð¾
 sub word {
 	my ($self, $col) = @_;
 	exists $self->{sql_word}{uc $col}? "`$col`": $col;
 }
 
-# ôîðìèðóåò êîëóìí
+# Ñ„Ð¾Ñ€Ð¼Ð¸Ñ€ÑƒÐµÑ‚ ÐºÐ¾Ð»ÑƒÐ¼Ð½
 sub SQL_COL {
 	my ($self, $col, $as) = @_;
 	join "", ($as? ($self->word($as), "."): ()), $self->word($col);
 }
 
-# âîçâðàùàåò àëèàñ òàáëèöû. Òî åñòü áûâàåò, ÷òî òàáëèöà ñîäåðæèò íåñêîëüêî ññûëîê íà äðóãóþ òàáëèöó, òîãäà îíè íå ìîãóò íàçûâàòüñÿ âñå êàê òàáëèöà íà êîòîðóþ ññûëàþòñÿ. È òàê: author_id, soauthor_id - alias_tab = {soauthor_id => author_id}
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ Ð°Ð»Ð¸Ð°Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹. Ð¢Ð¾ ÐµÑÑ‚ÑŒ Ð±Ñ‹Ð²Ð°ÐµÑ‚, Ñ‡Ñ‚Ð¾ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° ÑÐ¾Ð´ÐµÑ€Ð¶Ð¸Ñ‚ Ð½ÐµÑÐºÐ¾Ð»ÑŒÐºÐ¾ ÑÑÑ‹Ð»Ð¾Ðº Ð½Ð° Ð´Ñ€ÑƒÐ³ÑƒÑŽ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ, Ñ‚Ð¾Ð³Ð´Ð° Ð¾Ð½Ð¸ Ð½Ðµ Ð¼Ð¾Ð³ÑƒÑ‚ Ð½Ð°Ð·Ñ‹Ð²Ð°Ñ‚ÑŒÑÑ Ð²ÑÐµ ÐºÐ°Ðº Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° Ð½Ð° ÐºÐ¾Ñ‚Ð¾Ñ€ÑƒÑŽ ÑÑÑ‹Ð»Ð°ÑŽÑ‚ÑÑ. Ð˜ Ñ‚Ð°Ðº: author_id, soauthor_id - alias_tab = {soauthor_id => author_id}
 sub TAB_ref {
 	my ($self, $col) = @_;
 	$col =~ s/_id$//;
 	$self->{alias_tab}{$col} // $col;
 }
 
-# êâîòèðîâàíèå
-sub quote { my ($self, $s) = @_; $self->{dbh}->quote($s) }
+# ÐºÐ²Ð¾Ñ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ðµ
+sub quote { my ($self, $s) = @_; !defined($s)? "null": $s =~ /^-?(?:\d+|(?:\d+)?\.\d+)$/? $s: $self->{dbh}->quote($s) }
 
-# ôîðìèðóåò êëþ÷=çíà÷åíèå ÷åðåç çàïÿòóþ, äëÿ UPDATE SET èëè REPLACE SET
+# Ñ„Ð¾Ñ€Ð¼Ð¸Ñ€ÑƒÐµÑ‚ ÐºÐ»ÑŽÑ‡=Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ðµ Ñ‡ÐµÑ€ÐµÐ· Ð·Ð°Ð¿ÑÑ‚ÑƒÑŽ, Ð´Ð»Ñ UPDATE SET Ð¸Ð»Ð¸ REPLACE SET
 sub DO_SET {
 	my ($self, $p, $as) = @_;
 	my @set = ();
@@ -186,7 +197,7 @@ sub DO_SET {
 	return wantarray? @set: join(",", @set);
 }
 
-# ôîðìèðóåò where
+# Ñ„Ð¾Ñ€Ð¼Ð¸Ñ€ÑƒÐµÑ‚ where
 sub DO_WHERE {
 	my ($self, $where, $as) = @_;
 	
@@ -199,7 +210,12 @@ sub DO_WHERE {
 			push @SET, join("", 
 				$self->SQL_COL($a, $as), $op, (
 					!defined($b)? "null":
-					ref $b eq "ARRAY"? ($op eq " BETWEEN "? $self->quote($b->[0])." AND ".$self->quote($b->[1]): do { $op = " IN " if $op eq '='; join "", "(", join(", ", map { $self->quote($_) } @$b), ")" } ):
+					ref $b eq "ARRAY"? (
+						$op eq " BETWEEN "? $self->quote($b->[0])." AND ".$self->quote($b->[1]): do {
+							$op = " IN " if $op eq '=';
+							join "", "(", join(", ", map { $self->quote($_) } @$b), ")" 
+						}
+					):
 					ref $b eq 'HASH'? scalar($self->replace($self->TAB_ref($a), $b)):
 					ref $b eq "SCALAR"? (ref $$b eq "SCALAR"? $$$b: $self->SQL_COL($$b, $as)):
 					$self->quote($b)
@@ -212,14 +228,14 @@ sub DO_WHERE {
 	return $where =~ /^\d+$/? join("", $self->SQL_COL('id', $as), '=', $where): $where;
 }
 
-# ôîðìèðóåò ìàòðèöó çíà÷åíèé äëÿ INSERT
+# Ñ„Ð¾Ñ€Ð¼Ð¸Ñ€ÑƒÐµÑ‚ Ð¼Ð°Ñ‚Ñ€Ð¸Ñ†Ñƒ Ð·Ð½Ð°Ñ‡ÐµÐ½Ð¸Ð¹ Ð´Ð»Ñ INSERT
 sub INS_SET {
 	my ($self, $m) = @_;
 	my $set = join ",", map {join "", "(", join(",", map {$self->quote($_)} @$_), ")"} @$m;
 	return $set;
 }
 
-# ôîðìèðóåò ñòîëáöû
+# Ñ„Ð¾Ñ€Ð¼Ð¸Ñ€ÑƒÐµÑ‚ ÑÑ‚Ð¾Ð»Ð±Ñ†Ñ‹
 sub FIELDS {
 	my ($self, $fields) = @_;
 	return map { $self->word($_) } @$fields if ref $fields eq "ARRAY";
@@ -227,7 +243,7 @@ sub FIELDS {
 	return $fields;
 }
 
-# âîçâðàùàåò ìàññèâ íàçâàíèé ñòîëáöîâ
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ Ð¼Ð°ÑÑÐ¸Ð² Ð½Ð°Ð·Ð²Ð°Ð½Ð¸Ð¹ ÑÑ‚Ð¾Ð»Ð±Ñ†Ð¾Ð²
 sub FIELDS_NAMES {
 	my ($self, $fields) = @_;
 	return @$fields if ref $fields eq "ARRAY";
@@ -235,7 +251,7 @@ sub FIELDS_NAMES {
 	return split /,\s*/, $fields;
 }
 
-# ôîðìèðóåò ñòîëáöû ñ òàáëèöåé
+# Ñ„Ð¾Ñ€Ð¼Ð¸Ñ€ÑƒÐµÑ‚ ÑÑ‚Ð¾Ð»Ð±Ñ†Ñ‹ Ñ Ñ‚Ð°Ð±Ð»Ð¸Ñ†ÐµÐ¹
 sub FOR_TAB_FIELDS {
 	my ($self, $fields, $as) = @_;
 	$as = $self->word($as);
@@ -244,13 +260,13 @@ sub FOR_TAB_FIELDS {
 	return map { $as.".".$self->word($_) } split /,\s*/, $fields;
 }
 
-# âîçâðàùàåò òàáëèöó è å¸ àëèàñ, åñëè îí óêàçàí
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¸ ÐµÑ‘ Ð°Ð»Ð¸Ð°Ñ, ÐµÑÐ»Ð¸ Ð¾Ð½ ÑƒÐºÐ°Ð·Ð°Ð½
 sub TAB {
 	return ($2, $1) if $_[1] =~ /^\s*(\w+)\s+(?:as\s+)?(\w+)\s*$/i;
 	($_[1], $_[1]);
 }
 
-# âûáîðêè
+# Ð²Ñ‹Ð±Ð¾Ñ€ÐºÐ¸
 sub sel {
 	my ($self, $tab, $view, @args) = @_;
 	my @view = $self->FIELDS($view);
@@ -260,7 +276,7 @@ sub sel {
 	$sql
 }
 
-# äîáàâëÿåò â push arg
+# Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð² push arg
 sub query_compile {
 	my ($self, $arg, $push, $as) = @_;
 	my ($op, @val) = @$arg;
@@ -271,14 +287,14 @@ sub query_compile {
 	} elsif($op eq "ORDER") { # ORDER
 		push @{$push->{order}}, $self->FOR_TAB_FIELDS($val[0], $as);
 	} elsif($op eq "LIMIT") { # LIMIT
-		die "Îäèí LIMIT óæå åñòü â SQL-çàïðîñå" if $push->{limit};
-		$push->{limit} = $val[0].', '.$val[1];
+		die "ÐžÐ´Ð¸Ð½ LIMIT ÑƒÐ¶Ðµ ÐµÑÑ‚ÑŒ Ð² SQL-Ð·Ð°Ð¿Ñ€Ð¾ÑÐµ" if $push->{limit};
+		$push->{limit} = join ", ", @val;
 	} else {
-		die "×òî-òî íåÿñíîå ïîïàëî â âûðàæåíèå äëÿ select";
+		die "Ð§Ñ‚Ð¾-Ñ‚Ð¾ Ð½ÐµÑÑÐ½Ð¾Ðµ Ð¿Ð¾Ð¿Ð°Ð»Ð¾ Ð² Ð²Ñ‹Ñ€Ð°Ð¶ÐµÐ½Ð¸Ðµ Ð´Ð»Ñ select";
 	}
 }
 
-# äîáàâëÿåò ê çàïðîñó óêàçàííîå â ìàññèâå
+# Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ðº Ð·Ð°Ð¿Ñ€Ð¾ÑÑƒ ÑƒÐºÐ°Ð·Ð°Ð½Ð½Ð¾Ðµ Ð² Ð¼Ð°ÑÑÐ¸Ð²Ðµ
 sub query_add {
 	my ($self, $sep, $args) = @_;
 	my $push;
@@ -289,19 +305,20 @@ sub query_add {
 	$self->query_join($push, $sep);
 }
 
-# îáúåäèíÿåò âñå âûðàæåíèÿ â sql-çàïðîñ
+# Ð¾Ð±ÑŠÐµÐ´Ð¸Ð½ÑÐµÑ‚ Ð²ÑÐµ Ð²Ñ‹Ñ€Ð°Ð¶ÐµÐ½Ð¸Ñ Ð² sql-Ð·Ð°Ð¿Ñ€Ð¾Ñ
 sub query_join {
 	my ($self, $arg, $sep) = @_;
-	($arg->{where} && @{$arg->{where}}? ("${sep}WHERE ", join " AND ", map { join "", "(", $_, ")" } @{$arg->{where}}): ()), 
-	($arg->{group} && @{$arg->{group}}? ("${sep}GROUP BY ", join ", ", @{$arg->{group}}): ()), 
-	($arg->{having} && @{$arg->{having}}? ("${sep}HAVING ", join " AND ", map { join "", "(", $_, ")" } @{$arg->{having}}): ()),
-	($arg->{order} && @{$arg->{order}}? ("${sep}ORDER BY ", join ", ", @{$arg->{order}}): ()), 
+	my @w;
+	($arg->{where} && (@w=@{$arg->{where}})? ("${sep}WHERE ", @w==1? @w: join " AND ", map { join "", "(", $_, ")" } @w): ()), 
+	($arg->{group} && (@w=@{$arg->{group}})? ("${sep}GROUP BY ", join ", ", @w): ()), 
+	($arg->{having} && (@w=@{$arg->{having}})? ("${sep}HAVING ", @w==1? @w: join " AND ", map { join "", "(", $_, ")" } @w): ()),
+	($arg->{order} && (@w=@{$arg->{order}})? ("${sep}ORDER BY ", join ", ", @w): ()), 
 	($arg->{limit}? ("${sep}LIMIT ", $arg->{limit}): ())
 }
 
 sub flat2volume { my ($self, $join, @args) = @_; my ($tab) = @args; my ($as); ($as, $tab) = $self->TAB($tab); return {tab => $self->word($tab), as => $self->word($as), args=>[@args], join=>$join}; }
 
-# âûáîðêè
+# Ð²Ñ‹Ð±Ð¾Ñ€ÐºÐ¸
 sub sel_join {
 	my ($self, @any) = @_;
 	my (@st, @where, @view, @join, $push);
@@ -342,7 +359,7 @@ sub sel_join {
 	wantarray? ($sql, $fields, $real_fields): $sql;
 }
 
-# ïàêóåò ñòðîêè äëÿ ïåðåäà÷è êëèåíòó
+# Ð¿Ð°ÐºÑƒÐµÑ‚ ÑÑ‚Ñ€Ð¾ÐºÐ¸ Ð´Ð»Ñ Ð¿ÐµÑ€ÐµÐ´Ð°Ñ‡Ð¸ ÐºÐ»Ð¸ÐµÐ½Ñ‚Ñƒ
 sub pack_rows {
 	my ($self, $fld, $rows_start, $add_row) = @_;
 	
@@ -360,7 +377,7 @@ sub pack_rows {
 		
 		if(not defined $add_row->[$i]) { $i += @$cols; pop @$rows if @$row == 0; }
 		elsif(@$row == 0) { push @$row, $add_row->[$i++] for @$cols; }
-		elsif($add_row->[$i] == $row->[0]) {	# ñðàâíèâàåì id
+		elsif($add_row->[$i] == $row->[0]) {	# ÑÑ€Ð°Ð²Ð½Ð¸Ð²Ð°ÐµÐ¼ id
 			$i += @$cols;
 		} else {
 			push @$rows, $row = [];
@@ -373,7 +390,7 @@ sub pack_rows {
 }
 
 
-# çàïðàøèâàåò ñòðîêè è ïàêóåò èõ â ôîðìàò äëÿ ïåðåäà÷è
+# Ð·Ð°Ð¿Ñ€Ð°ÑˆÐ¸Ð²Ð°ÐµÑ‚ ÑÑ‚Ñ€Ð¾ÐºÐ¸ Ð¸ Ð¿Ð°ÐºÑƒÐµÑ‚ Ð¸Ñ… Ð² Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ Ð´Ð»Ñ Ð¿ÐµÑ€ÐµÐ´Ð°Ñ‡Ð¸
 sub query_rows {
 	my ($self, $tab, $view, @args) = @_;
 	my ($sql, $fields, $real_fields) = $self->sel_join(@_);
@@ -391,9 +408,9 @@ sub query_rows {
 	};
 }
 
-# àíàëîã query_rows: çàïðàøèâàåò ñòðîêè îòäåëüíûìè çàïðîñàìè
-# îòëè÷èå â òîì, ÷òî LIMIT ìîæåò áûòü ïðîñòàâëåí äëÿ îòäåëüíûõ ïîäñòðîê
-# INNER_JOIN òóò ðàáîòàåò òàê æå êàê è LEFT_JOIN
+# Ð°Ð½Ð°Ð»Ð¾Ð³ query_rows: Ð·Ð°Ð¿Ñ€Ð°ÑˆÐ¸Ð²Ð°ÐµÑ‚ ÑÑ‚Ñ€Ð¾ÐºÐ¸ Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ñ‹Ð¼Ð¸ Ð·Ð°Ð¿Ñ€Ð¾ÑÐ°Ð¼Ð¸
+# Ð¾Ñ‚Ð»Ð¸Ñ‡Ð¸Ðµ Ð² Ñ‚Ð¾Ð¼, Ñ‡Ñ‚Ð¾ LIMIT Ð¼Ð¾Ð¶ÐµÑ‚ Ð±Ñ‹Ñ‚ÑŒ Ð¿Ñ€Ð¾ÑÑ‚Ð°Ð²Ð»ÐµÐ½ Ð´Ð»Ñ Ð¾Ñ‚Ð´ÐµÐ»ÑŒÐ½Ñ‹Ñ… Ð¿Ð¾Ð´ÑÑ‚Ñ€Ð¾Ðº
+# INNER_JOIN Ñ‚ÑƒÑ‚ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ‚Ð°Ðº Ð¶Ðµ ÐºÐ°Ðº Ð¸ LEFT_JOIN
 sub quick_rows {
 	my ($self, $tab, $view, @args) = @_;
 	
@@ -414,7 +431,7 @@ sub quick_rows {
 	return $rows;
 }
 
-# çàïðàøèâàåò ñòðîêó
+# Ð·Ð°Ð¿Ñ€Ð°ÑˆÐ¸Ð²Ð°ÐµÑ‚ ÑÑ‚Ñ€Ð¾ÐºÑƒ
 sub query {
 	my ($self) = @_;
 	$CURR_SQL = sel(@_);
@@ -423,7 +440,7 @@ sub query {
 	return wantarray? @row: $row[0];
 }
 
-# çàïðàøèâàåò ñòðîêè
+# Ð·Ð°Ð¿Ñ€Ð°ÑˆÐ¸Ð²Ð°ÐµÑ‚ ÑÑ‚Ñ€Ð¾ÐºÐ¸
 sub query_all {
 	my ($self) = @_;
 	$CURR_SQL = sel @_;
@@ -432,74 +449,78 @@ sub query_all {
 	$row
 }
 
-# ñòðîêà â âèäå õåøà
+# ÑÑ‚Ñ€Ð¾ÐºÐ° Ð² Ð²Ð¸Ð´Ðµ Ñ…ÐµÑˆÐ°
 sub query_ref {
 	my $x = query_all(@_);
 	$x->[0];
 }
 
-# id ïîñëåäíåé äîáàâëåííîé çàïèñè
+# id Ð¿Ð¾ÑÐ»ÐµÐ´Ð½ÐµÐ¹ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð½Ð¾Ð¹ Ð·Ð°Ð¿Ð¸ÑÐ¸
 sub last_id {
 	my ($self) = @_;
 	return $self->{last_id} // $self->{dbh}->selectrow_array("SELECT LAST_INSERT_ID()");
 }
 
-# êîëè÷åñòâî èçìåí¸ííûõ ñòðîê ïîñëåäíåé îïåðàöèåé ðåäàêòèðîâàíèÿ
+# ÐºÐ¾Ð»Ð¸Ñ‡ÐµÑÑ‚Ð²Ð¾ Ð¸Ð·Ð¼ÐµÐ½Ñ‘Ð½Ð½Ñ‹Ñ… ÑÑ‚Ñ€Ð¾Ðº Ð¿Ð¾ÑÐ»ÐµÐ´Ð½ÐµÐ¹ Ð¾Ð¿ÐµÑ€Ð°Ñ†Ð¸ÐµÐ¹ Ñ€ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ñ
 sub last_count { $_[0]->{last_count} }
 
-# óäàëÿåò çàïèñè èç òàáëèöû
+# ÑƒÐ´Ð°Ð»ÑÐµÑ‚ Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð¸Ð· Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹
 sub erase {
 	my ($self, $tab, $where) = @_;
 	my $cond = $self->DO_WHERE($where);
 	$CURR_SQL = join "", "DELETE FROM ", $self->word($tab), " WHERE ", $cond;
+	main::msg $CURR_SQL if $self->{app}->ini->{site}{'log-level'} >= 1;
 	$self->{last_count} = $self->{dbh}->do($CURR_SQL) + 0;
 	$CURR_SQL = undef;
 	$self
 }
 
-# äîáàâëÿåò îäíó çàïèñü â òàáëèöó
+# Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð¾Ð´Ð½Ñƒ Ð·Ð°Ð¿Ð¸ÑÑŒ Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ
 sub add {
 	my ($self, $tab, $param) = @_;
-	if(%$param) {	
+	if(defined($param) and 0!=keys %$param) {	
 		my $SET = $self->DO_SET($param);
 		$CURR_SQL = join "", "INSERT INTO ", $self->word($tab), " SET ", $SET;
 	} else {
 		$CURR_SQL = join "", "INSERT INTO ", $self->word($tab), " () VALUES ()";
 	}
+	main::msg $CURR_SQL if $self->{app}->ini->{site}{'log-level'} >= 1;
 	$self->{last_count} = $self->{dbh}->do($CURR_SQL) + 0;
 	$self->{last_id} = $CURR_SQL = undef;
 	$self
 }
 
-# äîáàâëÿåò îäíó çàïèñü â òàáëèöó è âîçâðàùàåò å¸ id
+# Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð¾Ð´Ð½Ñƒ Ð·Ð°Ð¿Ð¸ÑÑŒ Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ Ð¸ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ ÐµÑ‘ id
 sub append {
 	my ($self, $tab, $param) = @_;
 	$self->add($tab, $param)->last_id;
 }
 
 
-# äîáàâëÿåò ìíîãî çàïèñåé â òàáëèöó
+# Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð¼Ð½Ð¾Ð³Ð¾ Ð·Ð°Ð¿Ð¸ÑÐµÐ¹ Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ
 sub insert {
 	my ($self, $tab, $fields, $matrix) = @_;
 	my $SET = $self->INS_SET($matrix);
 	$CURR_SQL = join "", "INSERT INTO ", $self->word($tab), " (", $self->FIELDS($fields), ") VALUES ", $SET;
+	main::msg $CURR_SQL if $self->{app}->ini->{site}{'log-level'} >= 1;
 	$self->{last_count} = $self->{dbh}->do($CURR_SQL)+0;
 	$CURR_SQL = undef;
 	$self
 }
 
-# èçìåíÿåò çàïèñü
+# Ð¸Ð·Ð¼ÐµÐ½ÑÐµÑ‚ Ð·Ð°Ð¿Ð¸ÑÑŒ
 sub update {
 	my ($self, $tab, $param, $where) = @_;
 	my $SET = $self->DO_SET($param);
 	my $COND = $self->DO_WHERE($where);
 	$CURR_SQL = join "", "UPDATE ", $self->word($tab), " SET ", $SET, " WHERE ", $COND;
+	main::msg $CURR_SQL if $self->{app}->ini->{site}{'log-level'} >= 1;
 	$self->{last_count} = $self->{dbh}->do($CURR_SQL)+0;
 	$CURR_SQL = undef;
 	$self
 }
 
-# äîáàâëÿåò èëè èçìåíÿåò çàïèñü îñíîâûâàÿñü íà íàëè÷èè id â ïàðàìåòðàõ
+# Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð¸Ð»Ð¸ Ð¸Ð·Ð¼ÐµÐ½ÑÐµÑ‚ Ð·Ð°Ð¿Ð¸ÑÑŒ Ð¾ÑÐ½Ð¾Ð²Ñ‹Ð²Ð°ÑÑÑŒ Ð½Ð° Ð½Ð°Ð»Ð¸Ñ‡Ð¸Ð¸ id Ð² Ð¿Ð°Ñ€Ð°Ð¼ÐµÑ‚Ñ€Ð°Ñ…
 sub save {
 	my ($self, $tab, $param) = @_;
 	if(my $id = $param->{id}) {
@@ -512,7 +533,7 @@ sub save {
 	return $self;
 }
 
-# äîáàâëÿåò èëè èçìåíÿåò ïåðâóþ ïîïàâùóþñÿ çàïèñü
+# Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð¸Ð»Ð¸ Ð¸Ð·Ð¼ÐµÐ½ÑÐµÑ‚ Ð¿ÐµÑ€Ð²ÑƒÑŽ Ð¿Ð¾Ð¿Ð°Ð²Ñ‰ÑƒÑŽÑÑ Ð·Ð°Ð¿Ð¸ÑÑŒ
 sub replace {
 	my ($self, $tab, $param) = @_;
 	my $id = $self->query($tab, "id", $param, "LIMIT 1");
@@ -526,12 +547,26 @@ sub replace {
 	return $self;
 }
 
+# Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ Ð¸Ð»Ð¸ Ð¸Ð·Ð¼ÐµÐ½ÑÐµÑ‚ Ð¿ÐµÑ€Ð²ÑƒÑŽ Ð¿Ð¾Ð¿Ð°Ð²Ñ‰ÑƒÑŽÑÑ Ð·Ð°Ð¿Ð¸ÑÑŒ
+sub store {
+	my ($self, $tab, $param) = @_;
+	my $id;
+	if(ref($param) and ($id = $param->{id}) and $self->query($tab, "1", $id)) {
+		delete $param->{id};
+		$self->update($tab, $param, $id);
+		$self->{last_id} = $id;
+	} else {
+		$self->add($tab, $param);
+	}
+	return $self;
+}
 
-# ïîèñê
-our $ABC = {qw(à À á Á â Â ã Ã ä Ä å Å ¸ Å ¨ Å æ Æ ç Ç è È é É ê Ê ë Ë ì Ì í Í î Î ï Ï ð Ð ñ Ñ ò Ò ó Ó ô Ô õ Õ ö Ö ÷ × ø Ø ù Ù ú Ú û Û ü Ü ý Ý þ Þ ÿ ß)};
+
+# Ð¿Ð¾Ð¸ÑÐº
+our $ABC = {qw(Ð° Ð Ð± Ð‘ Ð² Ð’ Ð³ Ð“ Ð´ Ð” Ðµ Ð• Ñ‘ Ð• Ð Ð• Ð¶ Ð– Ð· Ð— Ð¸ Ð˜ Ð¹ Ð™ Ðº Ðš Ð» Ð› Ð¼ Ðœ Ð½ Ð Ð¾ Ðž Ð¿ ÐŸ Ñ€ Ð  Ñ Ð¡ Ñ‚ Ð¢ Ñƒ Ð£ Ñ„ Ð¤ Ñ… Ð¥ Ñ† Ð¦ Ñ‡ Ð§ Ñˆ Ð¨ Ñ‰ Ð© ÑŠ Ðª Ñ‹ Ð« ÑŒ Ð¬ Ñ Ð­ ÑŽ Ð® Ñ Ð¯)};
 our $ABCx = join "|", %$ABC;
 
-# ôðàçó ðàçáèâàåò íà ñëîâà äëÿ ïîèñêà
+# Ñ„Ñ€Ð°Ð·Ñƒ Ñ€Ð°Ð·Ð±Ð¸Ð²Ð°ÐµÑ‚ Ð½Ð° ÑÐ»Ð¾Ð²Ð° Ð´Ð»Ñ Ð¿Ð¾Ð¸ÑÐºÐ°
 sub build_words {
 	my ($u) = @_;
 	local ($`, $', $&);
@@ -540,17 +575,17 @@ sub build_words {
 	while($u =~ /(\d+|($ABCx)+|[A-Za-z]+)/go) {
 		my $z = $1;
 		$z =~ tr/a-z/A-Z/;
-		$z =~ s/à|á|â|ã|ä|å|¸|¨|æ|ç|è|é|ê|ë|ì|í|î|ï|ð|ñ|ò|ó|ô|õ|ö|÷|ø|ù|ú|û|ü|ý|þ|ÿ/$ABC->{$&}/g;
-		if($z =~ s/^([\x80-\xFF]{4,})(ÀÌÈ|ßÌÈ|ÓÌß|ÅÃÎ|ÎÃÎ|ÎÌÓ|ÅÌÓ|ÛÌÈ|ÈÌÈ|ÅØÜ|ÈØÜ|ÅÒÅ|ÈÒÅ|ÅÒÜ|ÈÒÜ|ÀÒÜ|ßÒÜ|ÎÑÜ|ÎÑß|ÅÒÅ|ÈÒÅ)$/$1/){}
-		elsif($z =~ s/^([\x80-\xFF]{4,})(ÅÌ|ÎÌ|ÎÞ|ÎÂ|ÅÞ|ÎÉ|ÅÉ|ÜÞ|ÜÈ|ÈÉ|ÛÉ|ÈÈ|Èß|Ûß|ÀÌ|ßÌ|ÀÕ|ßÕ|ßß|Àß|ÎÅ|ÅÅ|ÎÌ|ÅÌ|ÞÞ|ÞÓ|ÛÌ|ÈÌ|ÅÉ|ÛÅ|ÈÅ|ÛÕ|ÈÕ|Ñß|ÑÜ|ÒÅ|ÀÞ|ÓÞ|ÅÒ|ÈÒ|ÅÌ|ÈÌ|ÓÒ|ÞÒ|ÀÒ|ßÒ|ÈÒ|ØÜ|ÑÒ)$/$1/){}
-		elsif($z =~ s/^([\x80-\xFF]{4,})(À|ß|Î|Ó|Þ|Å|È|Û|Ü)$/$1/){}
+		$z =~ s/Ð°|Ð±|Ð²|Ð³|Ð´|Ðµ|Ñ‘|Ð|Ð¶|Ð·|Ð¸|Ð¹|Ðº|Ð»|Ð¼|Ð½|Ð¾|Ð¿|Ñ€|Ñ|Ñ‚|Ñƒ|Ñ„|Ñ…|Ñ†|Ñ‡|Ñˆ|Ñ‰|ÑŠ|Ñ‹|ÑŒ|Ñ|ÑŽ|Ñ/$ABC->{$&}/g;
+		if($z =~ s/^([\x80-\xFF]{4,})(ÐÐœÐ˜|Ð¯ÐœÐ˜|Ð£ÐœÐ¯|Ð•Ð“Ðž|ÐžÐ“Ðž|ÐžÐœÐ£|Ð•ÐœÐ£|Ð«ÐœÐ˜|Ð˜ÐœÐ˜|Ð•Ð¨Ð¬|Ð˜Ð¨Ð¬|Ð•Ð¢Ð•|Ð˜Ð¢Ð•|Ð•Ð¢Ð¬|Ð˜Ð¢Ð¬|ÐÐ¢Ð¬|Ð¯Ð¢Ð¬|ÐžÐ¡Ð¬|ÐžÐ¡Ð¯|Ð•Ð¢Ð•|Ð˜Ð¢Ð•)$/$1/){}
+		elsif($z =~ s/^([\x80-\xFF]{4,})(Ð•Ðœ|ÐžÐœ|ÐžÐ®|ÐžÐ’|Ð•Ð®|ÐžÐ™|Ð•Ð™|Ð¬Ð®|Ð¬Ð˜|Ð˜Ð™|Ð«Ð™|Ð˜Ð˜|Ð˜Ð¯|Ð«Ð¯|ÐÐœ|Ð¯Ðœ|ÐÐ¥|Ð¯Ð¥|Ð¯Ð¯|ÐÐ¯|ÐžÐ•|Ð•Ð•|ÐžÐœ|Ð•Ðœ|Ð®Ð®|Ð®Ð£|Ð«Ðœ|Ð˜Ðœ|Ð•Ð™|Ð«Ð•|Ð˜Ð•|Ð«Ð¥|Ð˜Ð¥|Ð¡Ð¯|Ð¡Ð¬|Ð¢Ð•|ÐÐ®|Ð£Ð®|Ð•Ð¢|Ð˜Ð¢|Ð•Ðœ|Ð˜Ðœ|Ð£Ð¢|Ð®Ð¢|ÐÐ¢|Ð¯Ð¢|Ð˜Ð¢|Ð¨Ð¬|Ð¡Ð¢)$/$1/){}
+		elsif($z =~ s/^([\x80-\xFF]{4,})(Ð|Ð¯|Ðž|Ð£|Ð®|Ð•|Ð˜|Ð«|Ð¬)$/$1/){}
 		elsif($z =~ s/^([A-Z]{2,})(ES|S|E|ED|ING|ER)$/$1/){}
 		push @z, $z;
 	}
 	return @z;
 }
 
-# äîáàâëÿåò ñëîâà â òàáëèöó words, åñëè èõ òàì íåò è âîçâðàùàåò èõ èäåíòèôèêàòîðû
+# Ð´Ð¾Ð±Ð°Ð²Ð»ÑÐµÑ‚ ÑÐ»Ð¾Ð²Ð° Ð² Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñƒ words, ÐµÑÐ»Ð¸ Ð¸Ñ… Ñ‚Ð°Ð¼ Ð½ÐµÑ‚ Ð¸ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ Ð¸Ñ… Ð¸Ð´ÐµÐ½Ñ‚Ð¸Ñ„Ð¸ÐºÐ°Ñ‚Ð¾Ñ€Ñ‹
 sub set_words {
 	my $self = shift;
 	my $dbh = $self->{dbh};
@@ -567,7 +602,7 @@ sub set_words {
 	return keys %word_id;
 }
 
-# âîçâðàùàåò word_id äëÿ òåõ ñëîâ â ôðàçå, êîòîðûå åñòü â words
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ word_id Ð´Ð»Ñ Ñ‚ÐµÑ… ÑÐ»Ð¾Ð² Ð² Ñ„Ñ€Ð°Ð·Ðµ, ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ðµ ÐµÑÑ‚ÑŒ Ð² words
 sub get_words {
 	my ($self, $phrase) = @_;
 	my $dbh = $self->{dbh};

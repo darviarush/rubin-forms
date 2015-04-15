@@ -12,6 +12,7 @@ sub new {
 # перечисление столбцов
 sub index {
 	my ($self) = @_;
+	my $c = $::app->connect;
 	"(" . join(", ", map {$c->word($_)} @{$self->{idx}}) . ")"
 }
 
@@ -67,10 +68,9 @@ sub sync {
 package R::Model::IndexRef;
 # внешний ключ
 
-Utils::has(qw/fk keys/);
-
 use base R::Model::Index;
 
+Utils::has(qw/fk keys/);
 
 our $on_delete = " ON DELETE RESTRICT";
 our $on_update = " ON UPDATE RESTRICT";
@@ -90,10 +90,29 @@ sub sql {
 
 # удаление из базы
 sub drop {
-	my ($self) = @_;
+	my ($self, $tab, $name) = @_;
 	my $c = $::app->connect;
-	"ALTER TABLE " . $c->word($self->tab) . " DROP FOREIGN KEY " . $c->word($self->name);
+	"ALTER TABLE " . $c->word($tab // $self->tab) . " DROP FOREIGN KEY " . $c->word($name // $self->name);
 }
 
-
+# синхронизация с базой
+sub sync {
+	my ($self) = @_;
+	my $c = $::app->connect;
+	my $dbh = $c->dbh;
+	my $info = $c->fk_info;
+	$info = $info->{$self->tab}{$self->name};
+	if(!$info) {
+		$dbh->do(main::msg $self->alter);
+	} elsif(
+		$info->{table_name} ne $self->{tab} ||
+		$info->{column_name} ne $self->{idx}[0] ||
+		$info->{referenced_table_name} ne $self->{fk}{tab} ||
+		$info->{referenced_column_name} ne $self->{keys}[0]
+	) {
+		$dbh->do(main::msg $self->drop);
+		$dbh->do(main::msg $self->alter);
+	}
+	$self
+}
 1;

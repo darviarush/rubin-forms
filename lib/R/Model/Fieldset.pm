@@ -4,8 +4,9 @@ package R::Model::Fieldset;
 use strict;
 use warnings;
 
-use R::Model::Field qw//;
-use R::Model::Index qw//;
+require R::Model::Rowset;
+require R::Model::Field;
+require R::Model::Index;
 
 #our $pk_type = 'int primary key AUTO_INCREMENT';
 our $pk_type = "int unsigned";
@@ -15,10 +16,12 @@ our $engine = "INNODB";
 sub new {
 	my ($cls, $name) = @_;
 	
-	my $tab = $name;
-	$tab =~ s![A-Z]!"_" . lcfirst $&!ge;
+	my $meta = $::app->modelMetafieldset;
+	
+	my $tab = $meta->word($name);
+	
 	my $self = bless {
-		cls=>$cls,
+		cls=>{},
 		name => $name,	# имя филдсета
 		tab => $tab,	# имя таблицы в базе
 		field=>{},		# филды имя=>филд
@@ -31,25 +34,42 @@ sub new {
 		testdata => []
 	}, $cls;
 	
+	my $modelClass = "R::Rows::" . ucfirst $name;
+	$meta->{cls}{$modelClass} = $self;
+	
+	my $Prop = ucfirst $name;
+	
+	# создаём роусет
+	no strict "refs";
+	unshift @{"R::Rowset::${Prop}::ISA"}, "R::Model::Rowset";
+	use strict "refs";
+	
+	eval "sub R::Rowset::${Prop}::model {'$name'}
+	sub R::Rowset::${Prop}::modelClass {'$modelClass'}";
+	die $@ if $@;
+	
 	$self->pk($pk_type)->autoincrement;
-	
-	my $row = $::app->model->$name;
-	
+
+	# создаём метод модели и подгружаем класс модели
+	my $row = $::app->model->$name(undef);
+
 	$row->can("setup")->($self);
 	
-	$::app->{metaFieldset}{cls}{ref $row} = $self;
-
 	$self
 }
-
-
 
 # добавляет вычислимый столбец
 sub compute {
 	my ($self, $name) = @_;
-	my $field = R::Model::FieldCompute->new($self, $name);
-	push @{$self->{fieldset}}, $field;
-	$self->{field}{$name} = $field;
+	# оборачиваем в _pp_compute
+	my $model = $self->{name};
+	my $row = $::app->model->$model(undef);
+	my $code = $row->can($name);
+	die "Нет метода $model.$name" unless $code;
+	my $field = $self->field($self, $name);
+	$field->{compute} = 1;
+	$R::Model::Row::compute{ref $row}{$name} = $code;
+	$field->add_method("_compute");
 	$self
 }
 
@@ -59,7 +79,6 @@ sub field {
 	my $field = R::Model::Field->new($self, $name, $type);
 	push @{$self->{fieldset}}, $field;
 	$self->{field}{$name} = $field;
-	$field->add_method;
 	$field
 }
 
@@ -73,19 +92,21 @@ sub last {
 # добавляет поле
 sub col {
 	my ($self, $name, $type) = @_;
-	$self->field($name, $type);
+	$self->field($name, $type)->add_method;
 	$self
 }
 
 # добавляет поле-ссылку
 sub ref {
 	my ($self, $name, $to_model, $fk_name) = @_;
-	my $field = $self->field($name . "_id", '');
+	$to_model ||= $name;
+	my $field = $self->field($name, '');
+	$field->{col} .= '_id';
 	$field->{null} = 1;
 	
-	$field->add_method($name . "_id");
+	$field->add_method("_ref");
 	
-	$to_model ||= $name;
+	#$field->add_method($name . "_id");
 	$field->{ref} = $to_model;
 	
 	my $fk = $::app->modelMetafieldset->fieldset($to_model)->back_ref($field);
@@ -93,8 +114,6 @@ sub ref {
 	$fk_name ||= "fk_" . $field->tab . "__" . $field->col . "__to__" . $fk->tab . "__" . $fk->col;
 	
 	$self->{indexref}{$field->name} = R::Model::IndexRef->new($fk_name, $field, $fk);
-	
-	$field->add_method;
 	
 	$self
 }
@@ -106,17 +125,12 @@ sub back_ref {
 	
 	$field->{type} = $id->{type};
 	
-	my $name = $field->model . "s";
+	my $ref_name = $field->name eq $self->{name}? $field->model . "s": $field->name . ucfirst($field->model) . "s";
 	
-	my $ref = R::Model::Field->new($self, $name);
-	$ref->add_method($name, "
-if(\@_>1) {
-	
-	\$self
-} else {
-	\$self->find(" . $field->model . "_id => \$self->{id})
-}
-");
+	my $back = $self->field($ref_name);
+	$back->{compute} = 1;
+	$back->{ref} = $field;
+	$back->add_method("_back_ref");
 	
 	$id
 }
@@ -125,49 +139,45 @@ if(\@_>1) {
 sub m2m {
 	my ($self, $name, $to_model) = @_;
 	
-	my $to_fieldset = $::app->metaFieldset->fieldset($to_model);
+	my $to_fieldset = $::app->modelMetafieldset->fieldset($to_model);
 	
-	my $m2m = "m2m_${name}_" . $self->name . "_" . $to_fieldset->name;
+	my $m2m = "m2m_${name}_" . $self->name . "__" . $to_fieldset->name;
 	
-	my $fieldset = $::app->metaFieldset->fieldset($m2m)->
+	my $fieldset = $::app->modelMetafieldset->fieldset($m2m)->
 	pk(undef)->
 	ref($self->{name})->
 	ref($to_model);
 	
-	my $ref = R::Model::Field->new($self, $name);
-	$ref->add_method(undef, "
-if(\@_>1) {
+	my $ref = $self->field($name);
+	$ref->{compute} = 1;
+	$ref->add_method("_m2m");
 	
-	\$self
-} else {
-	\$self->${m2m}s->$to_model
-}
-");
-	
-	my $ref2 = R::Model::Field->new($to_fieldset, $name);
-	$ref2->add_method(undef, "
-if(\@_>1) {
-	
-	\$self
-} else {
-	\$self->${m2m}s->$self->{name}
-}
-");
+	my $ref2 = $to_fieldset->field($name);
+	$ref2->{compute} = 1;
+	$ref2->add_method("_m2m");
 	
 	$self
 }
 
+# добавляет валидатор
+sub check {
+	my ($self, $valid) = @_;
+	
+}
+
+
 # добавляет или удаляет pk
 sub pk {
 	my ($self, $type) = @_;
+	
+	delete $self->{field}{'id'};
+	shift @{$self->{fieldset}};
+	
 	if(defined $type) {
 		my $pk = $self->field('id', $type);
 		$pk->{type} = $type;
 		$pk->{autoincrement} = 0;
 		$pk->{pk} = 1;
-	} elsif(exists $self->{field}{'id'}) {
-		delete $self->{field}{'id'};
-		shift @{$self->{fieldset}};
 	}
 	$self
 }
@@ -271,7 +281,7 @@ sub sync {
 		}
 		
 		while(my ($k, $v) = each %$info) {
-			$c->dbh->do(main::msg "ALTER TABLE " . $c->word($tab) . " DROP COLUMN " . $c->word($k)) if !$is{$k};
+			$c->dbh->do(main::msg R::Model::Field::drop(undef, $tab, $k)) if !$is{$k};
 		}
 		
 		while(my ($name, $index) = each %{$self->{index}}) {
@@ -298,7 +308,11 @@ sub create_table {
 		push @col, $field->sql unless $field->compute;
 	}
 	
-	while(my ($key, $idx) = %{$self->{index}}) {
+	while(my ($key, $idx) = each %{$self->{index}}) {
+		push @col, $idx->sql;
+	}
+	
+	while(my ($key, $idx) = each %{$self->{indexref}}) {
 		push @col, $idx->sql;
 	}
 	
