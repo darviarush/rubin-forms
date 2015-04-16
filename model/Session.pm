@@ -1,4 +1,4 @@
-package R::Rows::Session;
+package R::Row::Session;
 # сессия
 
 use base R::Model::Row;

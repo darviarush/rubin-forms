@@ -1,4 +1,4 @@
-package R::Rows::Provider;
+package R::Row::Provider;
 # сессия
 
 use base R::Model::Row;

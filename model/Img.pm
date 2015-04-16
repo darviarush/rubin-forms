@@ -1,4 +1,4 @@
-package R::Rows::Img;
+package R::Row::Img;
 # добавляет картинку в базу (табл. img) и на диск (каталог html/images, по-умолчанию)
 
 use base R::Model::Row;

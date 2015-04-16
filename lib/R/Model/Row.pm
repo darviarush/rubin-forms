@@ -21,6 +21,7 @@ sub new {
 	if(ref $id) {
 		
 		if(ref $id eq $cls) {
+			$id->save if !$id->{id};
 			$id = $id->{id};
 		}
 		else {
@@ -31,6 +32,7 @@ sub new {
 			while(my($k, $v) = each %$id) {
 				$bean->$k($v) if exists $field->{$k};
 			}
+			$bean->{save} //= {};
 			return $bean;
 		}
 	}
@@ -43,7 +45,7 @@ sub setup {}
 # возвращает/устанавливает идентификатор
 sub id {
 	my ($self, $val) = @_;
-	if(@_>1) { $::app->model->{ref $self}{id} = $val; $self }
+	if(@_>1) { $self->{save}{id} = $val; $self }
 	else { $self->save->{id} }
 }
 
@@ -53,12 +55,12 @@ sub id {
 sub _pp {
 	my ($name, $self, $val) = @_;
 	if(@_>2) {
-		main::msg 'set', ref($self), $name, $val;
-		$::app->model->{ref $self}{$name} = $val;
+		#main::msg 'set', ref($self), $name, $val;
+		$self->{save}{$name} = $val;
 		$self
 	}
 	else {
-		main::msg 'get', ref($self), $name;
+		#main::msg 'get', ref($self), $name;
 		$self->save;
 		my $c = $::app->connect;
 		my $field = $::app->{modelMetafieldset}{cls}{ref $self}{field}{$name};
@@ -70,7 +72,7 @@ sub _pp {
 sub _pp_ref {
 	my ($name, $self, $val) = @_;
 	if(@_>2) {
-		main::msg 'ref-set', ref($self), $name, $val;
+		#main::msg 'ref-set', ref($self), $name, $val;
 		$val = {@_[2..$#_]} if @_>3;
 		if(ref $val) {
 			my $field = $::app->{modelMetafieldset}{cls}{ref $self}{field}{$name};
@@ -80,11 +82,11 @@ sub _pp_ref {
 			$val = $bean->{id};
 		}
 		
-		$::app->model->{ref $self}{$name} = $val;
+		$self->{save}{$name} = $val;
 		$self
 	}
 	else {
-		main::msg 'ref-get', ref($self), $name, $val;
+		#main::msg 'ref-get', ref($self), $name, $val;
 		my $id = _pp($name, $self);
 		$::app->model->$name($id)
 	}
@@ -96,13 +98,14 @@ sub _pp_back_ref {
 	my $bk = $::app->{modelMetafieldset}{cls}{ref $self}{field}{$name};
 	my $ref = $bk->{ref};
 	my $model = $ref->{model};
-	$self->save if !$self->{id};
-	$::app->model->$model->find($ref->{name} => $self->{id});
+	#$self->save if !$self->{id};
+	$::app->model->$model->find($ref->{name} => $self);
 }
 
 # свойство m2m
 sub _pp_m2m {
 	my ($name, $self, $val) = @_;
+	#my $fk = $::app->{modelMetafieldset}{cls}{ref $self}{field}{$name};
 	
 }
 
@@ -117,10 +120,9 @@ sub _pp_compute {
 # проверяет - надо ли сохранять и вызывает store
 sub save {
 	my ($self) = @_;
-	my $model = $::app->model;
-	my $save = $model->{ref $self};
+	my $save = $self->{save};
 	if($save) {
-		$model->{ref $self} = undef;
+		$self->{save} = undef;
 		$self->store($save);
 	} elsif(!defined $self->{id}) {
 		$self->store;
@@ -131,10 +133,8 @@ sub save {
 # деструктор
 sub DESTROY {
 	my ($self) = @_;
-	my $model = $::app->model;
-	my $save = $model->{ref $self};
+	my $save = $self->{save};
 	if($save) {
-		$model->{ref $self} = undef;
 		$self->store($save);
 	}
 }
@@ -168,7 +168,11 @@ sub erase {
 	my ($self) = @_;
 	my $fieldset = $::app->{modelMetafieldset}{cls}{ref $self};
 	$::app->auth->erase($fieldset->{tab}, {id => $self->{id}});
+	$self->{id} = undef;
+	$self
 }
+
+
 
 
 1;

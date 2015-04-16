@@ -1,6 +1,9 @@
 package R::Model::Index;
 # описывает индекс базы данных
 
+use strict;
+use warnings;
+
 Utils::has(qw/idx name type tab/);
 
 # конструктор
@@ -68,7 +71,7 @@ sub sync {
 package R::Model::IndexRef;
 # внешний ключ
 
-use base R::Model::Index;
+our @ISA = qw/R::Model::Index/;
 
 Utils::has(qw/fk keys/);
 

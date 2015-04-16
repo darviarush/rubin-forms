@@ -61,7 +61,7 @@ sub sync {
 	my $fk_info = $c->fk_info_backward;
 	my $dbh = $c->dbh;
 	
-	$dbh->do(main::msg $self->create_database), $dbh->do("USE " . $c->word($c->databasename)) unless $dbh->{Name};
+	$dbh->do(main::msg $self->create_database), $dbh->do(main::msg "USE " . $c->word($c->databasename)) unless $dbh->{Name};
 	
 	
 	my $fieldsets = $self->{fieldset};
@@ -93,7 +93,7 @@ sub sync {
 	$self
 }
 
-
+# sql для создания БД
 sub create_database {
 	my ($self) = @_;
 	my $c = $::app->connect;

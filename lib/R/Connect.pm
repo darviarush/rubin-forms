@@ -96,7 +96,7 @@ sub index_info {
 # возвращает информацию о ключах таблиц
 sub get_index_info {
 	my ($self) = @_;
-	my $info = $self->info;
+	my $info = $self->get_info;
 	my $dbh = $self->{dbh};
 	my $ref = {};
 	while(my($tab, $v) = each %$info) {
@@ -126,14 +126,20 @@ sub get_index_info {
 sub fk_info {
 	my ($self) = @_;
 	return $self->{fk_info} if $self->{fk_info};
-	($self->{fk_info}, $self->{fk_info_backward}) = $self->get_fk_info;
-	$self->{fk_info}
+	$self->get_fk_info;
 }
 
 # возвращает от каких ключей зависит какая таблица
 sub fk_info_backward {
 	my ($self) = @_;
 	$self->fk_info;
+	$self->{fk_info_backward}
+}
+
+# возвращает от каких ключей зависит какая таблица
+sub get_fk_info_backward {
+	my ($self) = @_;
+	$self->get_fk_info;
 	$self->{fk_info_backward}
 }
 
@@ -146,12 +152,12 @@ WHERE TABLE_SCHEMA=" . $self->quote($self->basename) . "
 AND referenced_column_name IS not null";
 	my $rows = $self->dbh->selectall_arrayref($sql, {Slice=>{}});
 	my $info = {};
-	my $bk = {};
+	my $bk = $self->{fk_info_backward} = {};
 	for my $row (@$rows) {
 		$info->{$row->{table_name}}{$row->{constraint_name}} = $row;
 		$bk->{$row->{referenced_table_name}}{$row->{constraint_name}} = $row;
 	}
-	return ($info, $bk);
+	return $info;
 }
 
 

@@ -1,4 +1,4 @@
-package R::Rows::User;
+package R::Row::User;
 # модель пользователя
 
 use base R::Model::Row;

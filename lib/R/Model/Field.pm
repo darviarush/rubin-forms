@@ -27,7 +27,8 @@ sub new {
 		model=>$fieldset->{name},
 		name=>$name,
 		type=>$type,
-		fieldset=>$fieldset
+		fieldset=>$fieldset,
+		check=>[]
 	}, $cls;
 }
 
@@ -37,7 +38,7 @@ sub add_method {
 	my $name = $self->{name};
 	my $model = $self->{model};
 	my $Prop = ucfirst $model;
-	my $SUB = "R::Rows::${Prop}::$name";
+	my $SUB = "R::Row::${Prop}::$name";
 	
 	$prop //= "";
 	

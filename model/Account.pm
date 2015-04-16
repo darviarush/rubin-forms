@@ -1,4 +1,4 @@
-package R::Rows::Account;
+package R::Row::Account;
 # аккаунт пользователя - main.ru, vk и т.д.
 
 use base R::Model::Row;

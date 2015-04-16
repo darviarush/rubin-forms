@@ -19,13 +19,6 @@ sub AUTOLOAD {
 	$AUTOLOAD =~ /([^:]+)$/;
 	my $prop = $1;
 	my $Prop = ucfirst $prop;
-	
-	my $eval = "sub $AUTOLOAD { \@_>1? R::Rows::$Prop->new(\@_[1..\$#_]): R::Rowset::$Prop->new }";
-	eval $eval;
-	die "$AUTOLOAD: ".($@ // $!) if $@ // $!;
-	no strict "refs";
-	my $sub = *{$AUTOLOAD}{CODE};
-	use strict "refs";
 		
 	my ($self) = @_;
 	my $base = $self->{base};
@@ -40,7 +33,7 @@ sub AUTOLOAD {
 	if(!@load) {
 		require R::Model::Row;
 		no strict "refs";
-		@{"R::Rows::${Prop}::ISA"} = "R::Model::Row";
+		@{"R::Row::${Prop}::ISA"} = "R::Model::Row";
 		use strict "refs";
 	} else {
 		my $fieldset;
@@ -48,12 +41,12 @@ sub AUTOLOAD {
 		for $load (@load) {
 			if($i>0) {
 				no strict "refs";
-				%{"R::Rows::${Prop}::_${i}::"} = %{"R::Rows::${Prop}::"};
-				delete ${"R::Rows::"}{"${Prop}::"};
+				%{"R::Row::${Prop}::_${i}::"} = %{"R::Row::${Prop}::"};
+				delete ${"R::Row::"}{"${Prop}::"};
 				use strict "refs";
 				require $load;
 				no strict "refs";
-				push @{"R::Rows::${Prop}::ISA"}, "R::Rows::${Prop}::_${i}";
+				push @{"R::Row::${Prop}::ISA"}, "R::Row::${Prop}::_${i}";
 				use strict "refs";
 			} else {
 				require $load;
@@ -63,7 +56,12 @@ sub AUTOLOAD {
 		}
 	}
 
-	#$fieldset->sync if $app->ini->{site}{test} && $app->ini->{site}{autosync};
+	my $eval = "sub $AUTOLOAD { \@_>1? R::Row::$Prop->new(\@_[1..\$#_]): R::Rowset::$Prop->new }";
+	eval $eval;
+	die "$AUTOLOAD: ".($@ // $!) if $@ // $!;
+	no strict "refs";
+	my $sub = *{$AUTOLOAD}{CODE};
+	use strict "refs";
 
 	goto &$sub;
 }

@@ -34,7 +34,7 @@ sub new {
 		testdata => []
 	}, $cls;
 	
-	my $modelClass = "R::Rows::" . ucfirst $name;
+	my $modelClass = "R::Row::" . ucfirst $name;
 	$meta->{cls}{$modelClass} = $self;
 	
 	my $Prop = ucfirst $name;
@@ -141,18 +141,18 @@ sub m2m {
 	
 	my $to_fieldset = $::app->modelMetafieldset->fieldset($to_model);
 	
-	my $m2m = "m2m_${name}_" . $self->name . "__" . $to_fieldset->name;
+	my $m2m_model = $name . join "", sort ucfirst($self->{name}), ucfirst($to_fieldset->{name});
 	
-	my $fieldset = $::app->modelMetafieldset->fieldset($m2m)->
+	my $fieldset = $::app->modelMetafieldset->fieldset($m2m_model)->
 	pk(undef)->
 	ref($self->{name})->
 	ref($to_model);
 	
-	my $ref = $self->field($name);
+	my $ref = $self->field($name . ucfirst($to_fieldset->{name}) . "s");
 	$ref->{compute} = 1;
 	$ref->add_method("_m2m");
 	
-	my $ref2 = $to_fieldset->field($name);
+	my $ref2 = $to_fieldset->field($name . ucfirst($self->{name}) . "s");
 	$ref2->{compute} = 1;
 	$ref2->add_method("_m2m");
 	
@@ -161,8 +161,9 @@ sub m2m {
 
 # добавляет валидатор
 sub check {
-	my ($self, $valid) = @_;
-	
+	my ($self, $name, @args) = @_;
+	push @{$self->last->{check}}, {name=>$name, args=>[@args]};
+	$self
 }
 
 

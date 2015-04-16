@@ -85,7 +85,6 @@ sub ritter {
 	my ($self) = @_;
 	my $app = $self->{app};
 	my $response = $app->response;
-	#$app->session->reset;
 	
 	eval {
 		$response->render;
