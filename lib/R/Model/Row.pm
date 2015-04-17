@@ -4,8 +4,6 @@ package R::Model::Row;
 use warnings;
 use strict;
 
-our %compute;
-
 # конструктор
 # app->model->compute
 sub new {
@@ -63,7 +61,7 @@ sub _pp {
 		#main::msg 'get', ref($self), $name;
 		$self->save;
 		my $c = $::app->connect;
-		my $field = $::app->{modelMetafieldset}{cls}{ref $self}{field}{$name};
+		my $field = $self->Field->{$name};
 		$c->query($field->{tab}, [$field->{col}], {id=>$self->{id}})
 	}
 }
@@ -72,13 +70,12 @@ sub _pp {
 sub _pp_ref {
 	my ($name, $self, $val) = @_;
 	if(@_>2) {
-		#main::msg 'ref-set', ref($self), $name, $val;
 		$val = {@_[2..$#_]} if @_>3;
 		if(ref $val) {
-			my $field = $::app->{modelMetafieldset}{cls}{ref $self}{field}{$name};
-			my $model = $field->{ref};
+			my $field = $self->Field->{$name};
+			my $model = $field->{ref}{model};
 			my $bean = $::app->model->$model($val);
-			$self->save if !$bean->{id};
+			$self->save unless $bean->{id};
 			$val = $bean->{id};
 		}
 		
@@ -86,7 +83,6 @@ sub _pp_ref {
 		$self
 	}
 	else {
-		#main::msg 'ref-get', ref($self), $name, $val;
 		my $id = _pp($name, $self);
 		$::app->model->$name($id)
 	}
@@ -95,25 +91,25 @@ sub _pp_ref {
 # свойство обратной ссылки
 sub _pp_back_ref {
 	my ($name, $self) = @_;
-	my $bk = $::app->{modelMetafieldset}{cls}{ref $self}{field}{$name};
-	my $ref = $bk->{ref};
+	my $bk = $self->Field->{$name};
+	my $ref = $bk->{back};
 	my $model = $ref->{model};
-	#$self->save if !$self->{id};
 	$::app->model->$model->find($ref->{name} => $self);
 }
 
 # свойство m2m
 sub _pp_m2m {
-	my ($name, $self, $val) = @_;
-	#my $fk = $::app->{modelMetafieldset}{cls}{ref $self}{field}{$name};
-	
+	my ($name, $self) = @_;
+	#my $fk = $self->Field->{$name};
+	#$::app->model->$model->find($ref->{name} => $self);
 }
 
 # вычислимое свойство
 sub _pp_compute {
 	my ($name, @args) = @_;
 	my $self = $args[0];
-	$compute{ref $self}{$name}->(@args);
+	
+	$self->Field->{$name}{code}->(@args);
 }
 
 
@@ -143,7 +139,7 @@ sub DESTROY {
 sub store {
 	my ($self, $save) = @_;
 
-	my $fieldset = $::app->{modelMetafieldset}{cls}{ref $self};
+	my $fieldset = $self->Fieldset;
 	my $tab = $fieldset->{tab};
 	my $field = $fieldset->{field};
 
@@ -166,8 +162,7 @@ sub store {
 # удаляет строку
 sub erase {
 	my ($self) = @_;
-	my $fieldset = $::app->{modelMetafieldset}{cls}{ref $self};
-	$::app->auth->erase($fieldset->{tab}, {id => $self->{id}});
+	$::app->auth->erase($self->Fieldset->{tab}, {id => $self->{id}});
 	$self->{id} = undef;
 	$self
 }

@@ -5,10 +5,13 @@ use strict;
 use warnings;
 
 require R::Model::Rowset;
-require R::Model::Field;
-require R::Model::Index;
+require R::Model::Field::Col;
+require R::Model::Field::Ref;
+require R::Model::Field::Back;
+require R::Model::Field::M2m;
+require R::Model::Field::Compute;
 
-#our $pk_type = 'int primary key AUTO_INCREMENT';
+
 our $pk_type = "int unsigned";
 our $engine = "INNODB";
 
@@ -21,11 +24,11 @@ sub new {
 	my $tab = $meta->word($name);
 	
 	my $self = bless {
-		cls=>{},
 		name => $name,	# имя филдсета
 		tab => $tab,	# имя таблицы в базе
 		field=>{},		# филды имя=>филд
 		fieldset=>[],	# порядок филдов
+		pk=>undef,		# primary key
 		index=>{},		# индексы
 		indexref=>{},	# индексы-ссылки
 		engine => undef,
@@ -34,19 +37,22 @@ sub new {
 		testdata => []
 	}, $cls;
 	
-	my $modelClass = "R::Row::" . ucfirst $name;
-	$meta->{cls}{$modelClass} = $self;
-	
 	my $Prop = ucfirst $name;
 	
 	# создаём роусет
 	no strict "refs";
 	unshift @{"R::Rowset::${Prop}::ISA"}, "R::Model::Rowset";
+	my $getter = sub {$_[0]};
+	my $fs = Utils::closure($self, $getter);
+	my $ff = Utils::closure($self->{field}, $getter);
+	my $mm = Utils::closure($::app->model, $name, sub { my($model, $name, $self, @args)=@_; $model->$name(@args) });
+	*{"R::Row::${Prop}::Fieldset"} = $fs;
+	*{"R::Rowset::${Prop}::Fieldset"} = $fs;
+	*{"R::Row::${Prop}::Field"} = $ff;
+	*{"R::Rowset::${Prop}::Field"} = $ff;
+	*{"R::Row::${Prop}::Model"} = $mm;
+	*{"R::Rowset::${Prop}::Model"} = $mm;
 	use strict "refs";
-	
-	eval "sub R::Rowset::${Prop}::model {'$name'}
-	sub R::Rowset::${Prop}::modelClass {'$modelClass'}";
-	die $@ if $@;
 	
 	$self->pk($pk_type)->autoincrement;
 
@@ -58,30 +64,6 @@ sub new {
 	$self
 }
 
-# добавляет вычислимый столбец
-sub compute {
-	my ($self, $name) = @_;
-	# оборачиваем в _pp_compute
-	my $model = $self->{name};
-	my $row = $::app->model->$model(undef);
-	my $code = $row->can($name);
-	die "Нет метода $model.$name" unless $code;
-	my $field = $self->field($self, $name);
-	$field->{compute} = 1;
-	$R::Model::Row::compute{ref $row}{$name} = $code;
-	$field->add_method("_compute");
-	$self
-}
-
-# добавляет и возвращает филд
-sub field {
-	my ($self, $name, $type) = @_;
-	my $field = R::Model::Field->new($self, $name, $type);
-	push @{$self->{fieldset}}, $field;
-	$self->{field}{$name} = $field;
-	$field
-}
-
 # возвращает последний филд
 sub last {
 	my ($self) = @_;
@@ -89,72 +71,42 @@ sub last {
 	$x->[$#$x];
 }
 
+# добавляет вычислимый столбец
+sub compute {
+	my ($self, $name) = @_;
+	R::Model::Field::Compute->new($name);
+	$self
+}
+
 # добавляет поле
 sub col {
 	my ($self, $name, $type) = @_;
-	$self->field($name, $type)->add_method;
+	R::Model::Field::Col->new($self, $name, $type);
 	$self
 }
 
 # добавляет поле-ссылку
 sub ref {
-	my ($self, $name, $to_model, $fk_name) = @_;
-	$to_model ||= $name;
-	my $field = $self->field($name, '');
-	$field->{col} .= '_id';
-	$field->{null} = 1;
-	
-	$field->add_method("_ref");
-	
-	#$field->add_method($name . "_id");
-	$field->{ref} = $to_model;
-	
-	my $fk = $::app->modelMetafieldset->fieldset($to_model)->back_ref($field);
-	
-	$fk_name ||= "fk_" . $field->tab . "__" . $field->col . "__to__" . $fk->tab . "__" . $fk->col;
-	
-	$self->{indexref}{$field->name} = R::Model::IndexRef->new($fk_name, $field, $fk);
-	
+	my ($self, $name, $to_model, $fk_name) = @_;	
+	R::Model::Field::Ref->new($self, $name, $to_model, $fk_name);
 	$self
-}
-
-# объявляет обратную ссылку
-sub back_ref {
-	my ($self, $field) = @_;
-	my $id = $self->{field}{id};
-	
-	$field->{type} = $id->{type};
-	
-	my $ref_name = $field->name eq $self->{name}? $field->model . "s": $field->name . ucfirst($field->model) . "s";
-	
-	my $back = $self->field($ref_name);
-	$back->{compute} = 1;
-	$back->{ref} = $field;
-	$back->add_method("_back_ref");
-	
-	$id
 }
 
 # ссылка многие-ко-многим
 sub m2m {
-	my ($self, $name, $to_model) = @_;
+	my ($self, $name, $to_model, $m2m_model) = @_;
 	
 	my $to_fieldset = $::app->modelMetafieldset->fieldset($to_model);
 	
-	my $m2m_model = $name . join "", sort ucfirst($self->{name}), ucfirst($to_fieldset->{name});
+	$m2m_model //= $name . join "", sort ucfirst($self->{name}), ucfirst($to_fieldset->{name});
 	
-	my $fieldset = $::app->modelMetafieldset->fieldset($m2m_model)->
+	my $m2m_fieldset = $::app->modelMetafieldset->fieldset($m2m_model)->
 	pk(undef)->
 	ref($self->{name})->
 	ref($to_model);
 	
-	my $ref = $self->field($name . ucfirst($to_fieldset->{name}) . "s");
-	$ref->{compute} = 1;
-	$ref->add_method("_m2m");
-	
-	my $ref2 = $to_fieldset->field($name . ucfirst($self->{name}) . "s");
-	$ref2->{compute} = 1;
-	$ref2->add_method("_m2m");
+	R::Model::Field::M2m->new($self, $name, $to_fieldset, $m2m_fieldset);
+	R::Model::Field::M2m->new($to_fieldset, $name, $self, $m2m_fieldset);
 	
 	$self
 }
@@ -162,21 +114,22 @@ sub m2m {
 # добавляет валидатор
 sub check {
 	my ($self, $name, @args) = @_;
-	push @{$self->last->{check}}, {name=>$name, args=>[@args]};
+	$self->last->check({name=>$name, args=>[@args]});
 	$self
 }
 
 
 # добавляет или удаляет pk
 sub pk {
-	my ($self, $type) = @_;
+	my ($self, $type, $name) = @_;
 	
-	delete $self->{field}{'id'};
-	shift @{$self->{fieldset}};
+	$name //= "id";
+	
+	my $pk = $self->{pk};
+	$pk->delete if $pk;
 	
 	if(defined $type) {
-		my $pk = $self->field('id', $type);
-		$pk->{type} = $type;
+		$pk = $self->{pk} = R::Model::Field::Col->new($self, $name, $type);
 		$pk->{autoincrement} = 0;
 		$pk->{pk} = 1;
 	}
@@ -263,7 +216,7 @@ sub sync {
 	my $c = $::app->connect;
 	my $tab = $self->{tab};
 	my $info = $c->info->{$tab};
-
+	
 	while(my ($name, $indexref) = each %{$self->{indexref}}) {
 		$indexref->fk->fieldset->sync;
 	}
@@ -274,15 +227,17 @@ sub sync {
 		$c->dbh->do($sql);
 	} else {
 		my %is;
+		my $num = 1;
+		my $after = 1;
 		for my $field (@{$self->{fieldset}}) {
 			if(!$field->compute) {
-				$field->sync;
-				$is{$field->{col}} = 1;
+				$field->sync($after, $num++);
+				$is{$after = $field->{col}} = 1;
 			}
 		}
 		
 		while(my ($k, $v) = each %$info) {
-			$c->dbh->do(main::msg R::Model::Field::drop(undef, $tab, $k)) if !$is{$k};
+			$c->dbh->do(main::msg R::Model::Field::Col::drop(undef, $tab, $k)) if !$is{$k};
 		}
 		
 		while(my ($name, $index) = each %{$self->{index}}) {

@@ -48,8 +48,8 @@ $book1->soauthor($author1);
 $book1->readAuthors($author1, $app->model->author->new);
 
 ok $book1->author->id, "book1.author имеет id";
-is 1, $author1->books->count;
-is 1, $author1->soauthorBooks->count, ;
+is 1, $author1->books->count, "количество книг";
+is 1, $author1->soauthorBooks->count, "книги в которых автор выступал соавтором";
 is 2, $book1->readAuthors->count, "book1 прочло 2 автора";
 is 1, $author1->readBooks->count, "author1 прочёл 1 книгу";
 my ($book2) = $author1->readBooks;

@@ -30,6 +30,30 @@ sub has {
 	}
 }
 
+# свойства только для чтения
+sub has_const {
+	my ($cls) = caller(0);
+	for my $name (@_) {
+		eval "sub ${cls}::$name { \$_[0]->{'$name'} }"
+	}
+}
+
+# свойства ссылки на массив - забрасывают все свои аргументы в массив и возвращают или ссылку на массив (скалярный контекст) или все свои значения
+sub has_array {
+	my ($cls) = caller(0);
+	for my $name (@_) {
+		eval "sub ${cls}::$name { if(\@_>1) { my \$s=shift; push \@{\$s->{'$name'}}, \@_; \$s } else { wantarray? \@{\$_[0]->{'$name'}}: \$_[0]->{'$name'} }"
+	}
+}
+
+# проверяет на соответствие isa
+use Scalar::Util qw/blessed/;
+sub isa {
+	my ($val, $cls) = @_;
+	return unless blessed $val;
+	$val->isa($cls);
+}
+
 
 # сортирует по свойству
 sub order_by {
