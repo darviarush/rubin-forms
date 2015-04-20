@@ -26,10 +26,18 @@ sub new {
 	$self
 }
 
-# добавляем параметр
-sub add_method {
-	$_[0]->SUPER::add_method("_compute")
+# вычислимое свойство
+sub row {
+	my ($self, @args) = @_;
+	$self->{code}->(@args);
 }
 
+sub rowset {
+	my ($self, $rowset, @args) = @_;
+	my $code = $self->{code};
+	for my $bean ($rowset->find) {
+		$code->($bean, @args);
+	}
+}
 
 1;

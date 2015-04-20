@@ -123,11 +123,26 @@ sub alter_info {
 }
 
 
-# формирует from и where для sql-запроса
-sub form {
-	my ($self, $q) = @_;
-	$q->where($self->col . $q->exp);
-	$self
+# свойство филда - устанавливается в класс row
+sub row {
+	my ($self, $bean, $val) = @_;
+	if(@_>2) {
+		#main::msg 'set', ref($bean), $name, $val;
+		$bean->{save}{$self->{name}} = $val;
+		$bean
+	}
+	else {
+		#main::msg 'get', ref($bean), $name;
+		$bean->save;
+		my $c = $::app->connect;
+		$c->query($self->{tab}, [$self->{col}], {id=>$bean->{id}})
+	}
+}
+
+# устанавливается в класс rowset-а
+sub rowset {
+	my ($self, $bean, $val) = @_;
+	$bean->view($self->{name});
 }
 
 

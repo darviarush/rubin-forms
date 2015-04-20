@@ -25,32 +25,25 @@ sub new {
 	$self->add_method
 }
 
-# создаёт метод в модели, если его ещё нет
+# создаёт метод в модели
 sub add_method {
 	my ($self, $prop, $alter) = @_;
 	my $name = $self->{name};
-	my $model = $self->{model};
-	my $Prop = ucfirst $model;
+	my $Prop = ucfirst $self->{model};
 	my $SUB = "R::Row::${Prop}::$name";
 	my $SUBSET = "R::Rowset::${Prop}::$name";
 	
-	$prop //= "";
+	main::msg $SUB;
 	
-	main::msg $SUB, $prop;
+	no strict "refs";
 	
-	my $ref = $alter // $name;
+	die "$SUB занят" if *{$SUB}{CODE};
+	die "$SUBSET занят" if *{$SUBSET}{CODE};
 	
-	eval("
-	sub $SUB {
-		unshift \@_, '$ref';
-		goto &R::Model::Row::_pp$prop;
-	}
-	sub $SUBSET {
-		unshift \@_, '$ref';
-		goto &R::Model::Row::_pp$prop;
-	}
-	");
-	die "$SUB: ".($@ // $!) if $@ // $!;
+	*{$SUB} = Utils::closure($self, $self->can("row"));
+	*{$SUBSET} = Utils::closure($self, $self->can("rowset"));
+	
+	use strict "refs";
 	
 	$self
 }
@@ -66,6 +59,13 @@ sub delete {
 		$i++;
 	}
 	splice @{$fieldset->{fieldset}}, $i, 1;
+}
+
+# возвращает row
+sub bean {
+	my ($self, @args) = @_;
+	my $model = $self->{model};
+	$::app->model->$model(@args);
 }
 
 1;

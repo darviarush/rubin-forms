@@ -103,10 +103,14 @@ sub m2m {
 	my $m2m_fieldset = $::app->modelMetafieldset->fieldset($m2m_model)->
 	pk(undef)->
 	ref($self->{name})->
-	ref($to_model);
+	ref($to_model)->
+	index($self->{name}, $to_model);
 	
-	R::Model::Field::M2m->new($self, $name, $to_fieldset, $m2m_fieldset);
-	R::Model::Field::M2m->new($to_fieldset, $name, $self, $m2m_fieldset);
+	my $ref_from = $m2m_fieldset->{field}{$self->{name}};
+	my $ref_to = $m2m_fieldset->{field}{$to_model};
+	
+	R::Model::Field::M2m->new($name, $ref_from, $ref_to);
+	R::Model::Field::M2m->new($name, $ref_to, $ref_from);
 	
 	$self
 }
@@ -161,6 +165,11 @@ sub default {
 	my ($self, $default, $raw) = @_;
 	$self->last->{default} = $raw? $default: $::app->connect->quote($default);
 	$self
+}
+
+sub raw_default {
+	my ($self, $default) = @_;
+	$self->default($default, 1);
 }
 
 # добавляет комментарий к последнему филду

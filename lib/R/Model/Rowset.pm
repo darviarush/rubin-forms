@@ -20,10 +20,11 @@ sub new {
 sub add {
 	my ($self, @row) = @_;
 	
-	my $rel = $self->{rel};
+	my ($id) = $self->_all;
 	for my $val (@row) {
-		
+		$self->bean($val)->{save}{} = $id;
 	}
+	$self
 }
 
 
@@ -31,7 +32,7 @@ sub add {
 sub find {
 	my ($self, @filters) = @_;
 	my $bean = bless {find=>[@{$self->{find}}, @filters]}, ref $self;
-	wantarray? $bean->Rows: $bean;
+	wantarray? $bean->_rows: $bean;
 }
 
 # выбирает много столбцов
@@ -39,7 +40,7 @@ sub view {
 	my ($self, $view) = @_;
 	$view = [split /\s*,\s*/, $view] unless ref $view;
 	unshift @$view, "id" unless grep {$_ eq "id" } @$view;
-	$self->Rows($view);
+	$self->_rows($view);
 	$self
 }
 
@@ -47,7 +48,11 @@ sub view {
 sub count {
 	my ($self, $view) = @_;
 	$view //= "*";
-	$::app->connect->query($self->Fieldset->{tab}, "count($view)", $self->_where);
+	
+	my $from = [];
+	my $where = join "", $self->_where($from);
+	
+	$::app->connect->query($from, "count($view)", $where);
 }
 
 # offset
@@ -74,27 +79,72 @@ sub page {
 
 ######################################################### Выборки #########################################################
 
+# возвращает id
+sub _all {
+	my ($self) = @_;
+	my $from = [];
+	my $where = join "", $self->_where($from);
+	
+	@{$::app->connect->query_all($from, "A1.id", $where)};
+}
+
+# возвращает bean
+sub _rows {
+	my ($self) = @_;
+		#my $view = $self->{view} // "id";
+	my $cls = ref $self;
+	$cls =~ s/::Rowset::/::Row::/;
+	map {bless $_, $cls} $self->_all;
+}
+
 # возвращает find c переименованными столбцами
 sub _where {
-	my ($self, $find) = @_;
-	$find //= $self->{find};
-	my $field = $self->Field;
-	my $q = {};
+	my ($self, $from, $N, $Ncol, $like) = @_;
+	my $find = $self->{find};
+	my $fieldset = $self->Fieldset;
+	my $field = $fieldset->{field};
+	
+	#::msg $N, $fieldset->{name} . "->" . join ", ", @$find;
+
+	$like //= {};
+	my $c = $::app->connect;
+	
+	my $tab = $c->word($fieldset->{tab});	
+	
+	my $A = "A" . (1+@$from);
+	push @$from, defined($N)? "INNER JOIN $tab As $A ON $N=$A.$Ncol": "$fieldset->{tab} As $A";
+	
+	my @where;
+	
 	for(my $i = 0; $i<@$find; $i+=2) {
 		my ($key, $val) = @$find[$i, $i+1];
+		
+		$key = $`, $val = $self->find($' => $val) if $key =~ /__/;
+		
+		my $fld = $field->{$key};
+		die "нет поля $key в $fieldset->{name}" unless $fld;
+
+		my $col = $fld->{col};
+		my ($NA);
+		if(defined $col) { $NA = "$A.id"; $col = $c->word($col); }
+		else { $NA = "$A.id"; $col = $c->word($fld->{ref}{col}); }
 		
 		if(ref $val) {
 			if(Utils::isa($val, "R::Model::Row")) {
 				$val->store if !$val->{id};
 				$val = $val->{id};
 			} elsif(Utils::isa($val, "R::Model::Rowset")) {
-				
+				push @where, $val->_where($from, $NA, $col);
+				next;
 			}
 		}
 		
-		$q->{$field->{$key}{col}} = $val;
+		push @where, (@where? " AND ": ()), $A, ".", $col, "=", $c->quote($val);
 	}
-	return $q;
+	
+	#$from->[0] = $fieldset->{tab} if @$from == 1;
+	
+	return @where;
 }
 
 
@@ -145,24 +195,5 @@ sub _where {
 	# }
 	# return ($from, $where);
 # }
-
-
-
-######################################################### Свойства #########################################################
-
-# свойство
-sub _pp {
-	my ($name, $self) = @_;
-	my $rows = $self->view($name);
-	wantarray? $rows->Rows: $rows
-}
-
-# ссылка
-sub _pp_ref {
-	# my ($name, $self) = @_;
-	# my $rows = $self->view($name);
-	# wantarray? $rows->Rows: $rows
-}
-
 
 1;

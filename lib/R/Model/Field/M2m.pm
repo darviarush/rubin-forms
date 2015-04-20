@@ -6,12 +6,15 @@ use base R::Model::Field;
 use strict;
 use warnings;
 
-Utils::has_const(qw/m2m to ref/);
+Utils::has_const(qw/back ref/);
 
 
 # конструктор
 sub new {
-	my ($cls, $fieldset, $name, $to_fieldset, $m2m_fieldset) = @_;
+	my ($cls, $name, $ref1, $ref2) = @_;
+	
+	my $fieldset = $::app->modelMetafieldset->fieldset($ref1->ref->model);
+	my $to_fieldset = $::app->modelMetafieldset->fieldset($ref2->ref->model);
 	
 	$name .= ucfirst($to_fieldset->{name}) . "s";
 	
@@ -19,17 +22,23 @@ sub new {
 
 	%$self = (
 		%$self,
-		m2m => $m2m_fieldset,
-		to => $to_fieldset,
-		ref => $m2m_fieldset->{field}{$fieldset->{name}}
+		back => $ref1,
+		ref => $ref2,
 	);
 
 }
 
-# добавляем параметр
-sub add_method {
-	$_[0]->SUPER::add_method("_m2m")
+# свойство m2m
+sub row {
+	my ($self, $bean, @args) = @_;
+	my $model1 = $self->{back}{back}{name};
+	my $model2 = $self->{ref}{name};
+	
+	#::msg ref($bean)."->$model1->$model2";
+	
+	$bean->$model1->$model2(@args);
 }
 
+sub rowset { goto &row }
 
 1;

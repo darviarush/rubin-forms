@@ -6,7 +6,7 @@ use base R::Model::Field;
 use strict;
 use warnings;
 
-Utils::has_const(qw/back/);
+Utils::has_const(qw/ref/);
 
 
 # конструктор
@@ -19,16 +19,21 @@ sub new {
 	
 	%$self = (
 		%$self,
-		back=>$field
+		ref=>$field
 	);
 	
 	$self
 }
 
-# добавляем параметр
-sub add_method {
-	$_[0]->SUPER::add_method("_back_ref")
+
+# свойство обратной ссылки
+sub row {
+	my ($self, $bean) = @_;
+	my $bk = $self->{ref};
+	$bk->bean->find($bk->{name} => $bean);
 }
 
+
+sub rowset { goto &row }
 
 1;

@@ -277,7 +277,14 @@ sub sel {
 	my ($self, $tab, $view, @args) = @_;
 	my @view = $self->FIELDS($view);
 	die "not fields in sql query for `$tab`" unless @view;
-	my $sql = join "", "SELECT ", join(", ", @view), " FROM ", $self->word($tab), $self->query_add(" ", \@args);
+	my $sep = " ";
+	if(ref $tab) {
+		$sep = "\n" if @$tab > 1;
+		$tab = join "\n", @$tab;
+	} else {
+		$tab = $self->word($tab);
+	}
+	my $sql = join "", "SELECT ", join(", ", @view), "${sep}FROM ", $tab, $self->query_add($sep, \@args);
 	main::msg $sql if $self->{app}->ini->{site}{'log-level'} >= 1;
 	$sql
 }

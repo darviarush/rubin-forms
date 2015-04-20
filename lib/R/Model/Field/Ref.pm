@@ -9,7 +9,7 @@ use warnings;
 require R::Model::Index;
 require R::Model::Field::Back;
 
-Utils::has_const(qw/ref/);
+Utils::has_const(qw/ref back/);
 
 
 # конструктор
@@ -27,9 +27,8 @@ sub new {
 		type=>$fk->{type},
 		null=>1,
 		ref=>$fk,
+		back=>R::Model::Field::Back->new($to_fieldset, $self),
 	);
-
-	R::Model::Field::Back->new($to_fieldset, $self);
 
 	$fk_name ||= "fk_" . $self->tab . "__" . $self->col . "__to__" . $fk->tab . "__" . $fk->col;
 	
@@ -38,9 +37,29 @@ sub new {
 	$self
 }
 
-# добавляем параметр
-sub add_method {
-	$_[0]->SUPER::add_method("_ref")
+# свойство row
+sub row {
+	my ($self, $bean, $val) = @_;
+	if(@_>2) {
+		$val = {@_[2..$#_]} if @_>3;
+		if(ref $val) {
+			my $ref = $self->{ref}->bean($val);
+			$ref->save unless $ref->{id};
+			$val = $ref->{id};
+		}
+		
+		$bean->{save}{$self->{name}} = $val;
+		$bean
+	}
+	else {
+		my $id = $self->SUPER::row($bean);
+		$self->{ref}->bean($id)
+	}
+}
+
+sub rowset {
+	my ($self, $bean) = @_;
+	$self->{ref}->bean->find($self->{back}{name} => $bean)
 }
 
 1;

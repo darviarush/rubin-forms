@@ -45,7 +45,7 @@ ok !$author1->{id}, "author1 не имеет id";
 $book1->author($author1);
 $book1->soauthor($author1);
 
-$book1->readAuthors($author1, $app->model->author->new);
+$book1->readAuthors->add($author1, $app->model->author->new);
 
 ok $book1->author->id, "book1.author имеет id";
 is 1, $author1->books->count, "количество книг";
