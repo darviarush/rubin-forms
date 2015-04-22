@@ -100,17 +100,21 @@ sub _all {
 	
 	my $c = $::app->connect;
 	
+	#my $find = $self->{find};
+	#if(@$find == 2 && )
+	
 	my $fld = $self->Field->{id}->copy(As=>"A1");
 	my $from = [$c->word($fld->{tab}) . " As $fld->{As}"];
 	
 	my $where = join " AND ", map {
 		my $col = $_->{col};
-		my $As = $_->{As} // $_->{upFld}{As};
 		my $val = $_->{val};
-		join "", $As, ".", $c->word($col), "=", $c->quote($val);
+		join "", (@$from==1? (): ($_->{As} // $_->{upFld}{As}, ".")), $c->word($col), "=", $c->quote($val);
 	} $self->_where($from, $fld);
 	
-	$view //= "$fld->{As}.id";
+	$view //= (@$from!=1? "$fld->{As}.": "") . $c->word($fld->{col});
+	
+	$from = $c->word($fld->{tab}) if @$from == 1;
 	
 	@{$::app->connect->query_all($from, $view, $where)};
 }
