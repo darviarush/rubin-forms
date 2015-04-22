@@ -6,7 +6,7 @@ use base R::Model::Field;
 use strict;
 use warnings;
 
-Utils::has_const(qw/back ref/);
+Utils::has_const(qw/back toSelf toRef/);
 
 
 # конструктор
@@ -22,23 +22,22 @@ sub new {
 
 	%$self = (
 		%$self,
-		back => $ref1,
-		ref => $ref2,
+		toSelf => $ref1,	# на себя
+		toRef => $ref2,		# на таблицу ref
+		back => undef,		# обратный field из таблицы ref, устанавливается в fieldset->m2m
 	);
 
+	$self
 }
 
 # свойство m2m
 sub row {
-	my ($self, $bean, @args) = @_;
-	my $model1 = $self->{back}{back}{name};
-	my $model2 = $self->{ref}{name};
-	
-	#::msg ref($bean)."->$model1->$model2";
-	
-	$bean->$model1->$model2(@args);
+	my ($self, $bean, @args) = @_;	
+	$self->{back}->bean->find($self->{back}{name} => $bean);
 }
 
 sub rowset { goto &row }
+
+
 
 1;

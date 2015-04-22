@@ -21,6 +21,13 @@ sub new {
 	my $to_fieldset = $::app->modelMetafieldset->fieldset($to_model ||= $name);
 	my $fk = $to_fieldset->{pk};
 	
+	# например:
+	#	book.author_id -> author.id
+	# тогда:
+	#	book.author_id =>
+	#		ref => author.id
+	#		back => author.books { ref => book.author_id }
+	
 	%$self = (
 		%$self,
 		col=>$self->{col} . '_id',
@@ -57,9 +64,12 @@ sub row {
 	}
 }
 
+# свойство
+#	book -> author (books => books)
 sub rowset {
 	my ($self, $bean) = @_;
 	$self->{ref}->bean->find($self->{back}{name} => $bean)
 }
+
 
 1;

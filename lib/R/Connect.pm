@@ -94,31 +94,46 @@ sub index_info {
 }
 
 # возвращает информацию о ключах таблиц
+# sub get_index_info {
+	# my ($self) = @_;
+	# my $info = $self->get_info;
+	# my $dbh = $self->{dbh};
+	# my $ref = {};
+	# while(my($tab, $v) = each %$info) {
+		# my $sql = "SHOW INDEX FROM " . $self->word($tab);
+		# my $rows = $dbh->selectall_arrayref($sql, {Slice=>{}});
+		# my $prev = "";
+		# my $cur;
+		# for my $row (@$rows) {
+			# my $name = $row->{Key_name};
+			# my $idx = $row->{Column_name};
+			# my $i = $row->{Seq_in_index} - 1;
+			
+			# if($prev ne $name) {
+				# my $ne = $row->{Non_unique};
+				# $cur = $ref->{$tab}{$name} = {idx=>[], name=>$name, type=>$ne? 'INDEX': 'UNIQUE'};
+				# $prev = $name;
+			# }
+			# $cur->{idx}[$i] = $idx;
+		# }
+		
+	# }
+	# $ref
+# }
+
 sub get_index_info {
 	my ($self) = @_;
-	my $info = $self->get_info;
-	my $dbh = $self->{dbh};
-	my $ref = {};
-	while(my($tab, $v) = each %$info) {
-		my $sql = "SHOW INDEX FROM " . $self->word($tab);
-		my $rows = $dbh->selectall_arrayref($sql, {Slice=>{}});
-		my $prev = "";
-		my $cur;
-		for my $row (@$rows) {
-			my $name = $row->{Key_name};
-			my $idx = $row->{Column_name};
-			my $i = $row->{Seq_in_index} - 1;
-			
-			if($prev ne $name) {
-				my $ne = $row->{Non_unique};
-				$cur = $ref->{$tab}{$name} = {idx=>[], name=>$name, type=>$ne? 'INDEX': 'UNIQUE'};
-				$prev = $name;
-			}
-			$cur->{idx}[$i] = $idx;
-		}
-		
+	my $sql = "SELECT table_name as tab,column_name as col,constraint_name as name,ordinal_position as pos
+FROM information_schema.KEY_COLUMN_USAGE
+WHERE TABLE_SCHEMA=" . $self->quote($self->basename) . "
+AND referenced_column_name IS null";
+	my $rows = $self->dbh->selectall_arrayref($sql, {Slice=>{}});
+	my $info = {};
+	for my $row (@$rows) {
+		my $idx = $info->{$row->{tab}}{$row->{name}} //= [];
+		push @$idx, $row;
 	}
-	$ref
+	return $info;
 }
 
 
@@ -146,16 +161,18 @@ sub get_fk_info_backward {
 # возвращает информацию о внешних ключах таблиц
 sub get_fk_info {
 	my ($self) = @_;
-	my $sql = "SELECT table_name,column_name,constraint_name,
-referenced_table_name,referenced_column_name FROM information_schema.KEY_COLUMN_USAGE
+	my $sql = "SELECT table_name as tab,column_name as col,constraint_name as name,
+referenced_table_name as ref_tab,referenced_column_name as ref_col,
+ordinal_position as pos, position_in_unique_constraint as ref_pos
+FROM information_schema.KEY_COLUMN_USAGE
 WHERE TABLE_SCHEMA=" . $self->quote($self->basename) . "
 AND referenced_column_name IS not null";
 	my $rows = $self->dbh->selectall_arrayref($sql, {Slice=>{}});
 	my $info = {};
 	my $bk = $self->{fk_info_backward} = {};
 	for my $row (@$rows) {
-		$info->{$row->{table_name}}{$row->{constraint_name}} = $row;
-		$bk->{$row->{referenced_table_name}}{$row->{constraint_name}} = $row;
+		$info->{$row->{tab}}{$row->{name}} = $row;
+		$bk->{$row->{ref_tab}}{$row->{name}} = $row;
 	}
 	return $info;
 }
@@ -514,7 +531,7 @@ sub append {
 sub insert {
 	my ($self, $tab, $fields, $matrix) = @_;
 	my $SET = $self->INS_SET($matrix);
-	$CURR_SQL = join "", "INSERT INTO ", $self->word($tab), " (", $self->FIELDS($fields), ") VALUES ", $SET;
+	$CURR_SQL = join "", "INSERT INTO ", $self->word($tab), " (", join(", ", $self->FIELDS($fields)), ") VALUES ", $SET;
 	main::msg $CURR_SQL if $self->{app}->ini->{site}{'log-level'} >= 1;
 	$self->{last_count} = $self->{dbh}->do($CURR_SQL)+0;
 	$CURR_SQL = undef;

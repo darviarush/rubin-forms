@@ -15,16 +15,34 @@ sub new {
 	}
 }
 
-# добавляет записи
-# 1. создать модели
+# добавляет записи в m2m
 sub add {
 	my ($self, @row) = @_;
 	
-	my ($id) = $self->_all;
+	my $m2m = $self->Field->{$self->{find}[0]};
+	my $ref_val = $self->{find}[1];
+	
+	$ref_val = $m2m->toRef->ref->bean($ref_val)->id if ref $ref_val;
+
+	my $ref = $m2m->{toRef}{col};
+	my $back = $m2m->{toSelf}{col};
+	my $mod = $m2m->{toSelf}{ref};
+	my @matrix;
 	for my $val (@row) {
-		$self->bean($val)->{save}{} = $id;
+		my $bean = $mod->bean($val);
+		$bean->store if !$bean->{id};
+		push @matrix, [$ref_val, $bean->{id}];
 	}
+	
+	my $c = $::app->connect;
+	$c->insert($m2m->{toRef}{tab}, [$ref, $back], \@matrix);
+	
 	$self
+}
+
+# удаляет записи из m2m
+sub erase {
+	
 }
 
 
@@ -42,17 +60,6 @@ sub view {
 	unshift @$view, "id" unless grep {$_ eq "id" } @$view;
 	$self->_rows($view);
 	$self
-}
-
-# количество записей
-sub count {
-	my ($self, $view) = @_;
-	$view //= "*";
-	
-	my $from = [];
-	my $where = join "", $self->_where($from);
-	
-	$::app->connect->query($from, "count($view)", $where);
 }
 
 # offset
@@ -77,15 +84,35 @@ sub page {
 	$self
 }
 
+# количество записей
+sub count {
+	my ($self, $view) = @_;
+	$view //= "*";
+	my ($count) = $self->_all("count($view) as count");
+	$count->{count}
+}
+
 ######################################################### Выборки #########################################################
 
 # возвращает id
 sub _all {
-	my ($self) = @_;
-	my $from = [];
-	my $where = join "", $self->_where($from);
+	my ($self, $view) = @_;
 	
-	@{$::app->connect->query_all($from, "A1.id", $where)};
+	my $c = $::app->connect;
+	
+	my $fld = $self->Field->{id}->copy(As=>"A1");
+	my $from = [$c->word($fld->{tab}) . " As $fld->{As}"];
+	
+	my $where = join " AND ", map {
+		my $col = $_->{col};
+		my $As = $_->{As} // $_->{upFld}{As};
+		my $val = $_->{val};
+		join "", $As, ".", $c->word($col), "=", $c->quote($val);
+	} $self->_where($from, $fld);
+	
+	$view //= "$fld->{As}.id";
+	
+	@{$::app->connect->query_all($from, $view, $where)};
 }
 
 # возвращает bean
@@ -99,47 +126,52 @@ sub _rows {
 
 # возвращает find c переименованными столбцами
 sub _where {
-	my ($self, $from, $N, $Ncol, $like) = @_;
+	my ($self, $from, $fromFld) = @_;
 	my $find = $self->{find};
-	my $fieldset = $self->Fieldset;
-	my $field = $fieldset->{field};
-	
-	#::msg $N, $fieldset->{name} . "->" . join ", ", @$find;
-
-	$like //= {};
-	my $c = $::app->connect;
-	
-	my $tab = $c->word($fieldset->{tab});	
-	
-	my $A = "A" . (1+@$from);
-	push @$from, defined($N)? "INNER JOIN $tab As $A ON $N=$A.$Ncol": "$fieldset->{tab} As $A";
 	
 	my @where;
 	
 	for(my $i = 0; $i<@$find; $i+=2) {
 		my ($key, $val) = @$find[$i, $i+1];
 		
-		$key = $`, $val = $self->find($' => $val) if $key =~ /__/;
+		my $fld;
+		if($key =~ /__/) {
+			$key = $`;
+			my $next_key = $';
+			$fld = $fromFld->like($key);
+			$val = $fld->bean->find($next_key => $val);
+		} else {
+			$fld = $fromFld->like($key);
+		}
 		
-		my $fld = $field->{$key};
-		die "нет поля $key в $fieldset->{name}" unless $fld;
-
-		my $col = $fld->{col};
-		my ($NA);
-		if(defined $col) { $NA = "$A.id"; $col = $c->word($col); }
-		else { $NA = "$A.id"; $col = $c->word($fld->{ref}{col}); }
+		if(Utils::isa($fld, "R::Model::Field::M2m")) {
+			$val = $fld->toSelf->bean->find($fld->{toRef}{name} => $val);
+			$fld = $fromFld->like($fld->{toSelf}{back}{name});
+		}
+		
+		if(Utils::isa($fld, "R::Model::Field::Back") && !$fld->{As}) {
+			my $ref = $fld->ref->copy(upFld=>$fromFld);
+			$fromFld->join($ref, $from);
+			$fld = $fromFld->{like}{$fld->{name}} = $ref;
+		}
 		
 		if(ref $val) {
 			if(Utils::isa($val, "R::Model::Row")) {
 				$val->store if !$val->{id};
 				$val = $val->{id};
 			} elsif(Utils::isa($val, "R::Model::Rowset")) {
-				push @where, $val->_where($from, $NA, $col);
+				$fromFld->join($fld, $from) unless $fld->{As};
+				push @where, $val->_where($from, $fld);
 				next;
 			}
 		}
 		
-		push @where, (@where? " AND ": ()), $A, ".", $col, "=", $c->quote($val);
+		die "val уже есть: $fld->{model}.$fld->{name}=$fld->{val}" if exists $fld->{val};
+		$fld->{val} = $val;
+		push @where, $fld;
+		# my $col = $fld->{col};
+		# my $As = $fld->{As} // $fld->{upFld}{As};
+		# push @where, (@where? " AND ": ()), $As, ".", $c->word($col), "=", $c->quote($val);
 	}
 	
 	#$from->[0] = $fieldset->{tab} if @$from == 1;
@@ -147,53 +179,5 @@ sub _where {
 	return @where;
 }
 
-
-
-#require R::Model::Query;
-
-# выбирает объекты
-# sub Rows {
-	# my ($self) = @_;
-	# my $view = 'id';
-	
-	# my $fields = $self->Field;
-	
-	# my $find = $self->{find};
-	# my %like;
-	# my (@from, @where);
-	
-	# for(my $i=0; $i<@$find; $i+=2) {
-		# my ($key, $val) = @_;
-		
-		# my @key = split /__/, $key;
-		
-		# $fields->{$key[0]}->form(\@key, $val, \%like);
-		# push @from, $query->from;
-		# push @where, $query->where;
-	# }
-	
-	# my $ref = $::app->connect->query_all(join("", @from), $view, join "", @where);
-	# my $cls = ref $self;
-	# $cls =~ s/::Rowset::/::Row::/;
-	# return map {bless $_, $cls} @$ref;
-# }
-
-
-# возвращает from и where
-# sub _sql {
-	# my ($self, $branch) = @_;	# branch - ветка
-	# my $i = 0;	# номер ветки
-	# my ($from, $where) = ([], []);
-	# for my $rel (@{$self->{rel}}) {
-		# $i++;
-		# if(ref $rel) {
-			# my ($from1, $where1) = $rel->sql;
-			
-		# } else {
-			
-		# }
-	# }
-	# return ($from, $where);
-# }
 
 1;

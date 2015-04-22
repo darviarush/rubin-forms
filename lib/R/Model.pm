@@ -11,7 +11,7 @@ use File::Find;
 # конструктор
 sub new {
 	my ($cls, $app) = @_;
-	bless {app=>$app, base=>'model', models=>[]}, $cls;
+	bless {app=>$app, base=>'model'}, $cls;
 }
 
 # возвращает модель
@@ -27,27 +27,25 @@ sub AUTOLOAD {
 	
 	my $meta = $app->modelMetafieldset;
 	
-	my @load = main::files($base."/".$load.".pm");
+	my @load = $base? main::files($base."/".$load.".pm"): ();
 	die "not exists model $Prop" if not @load and not exists $meta->{fieldset}{$prop};
 	
 	if(!@load) {
 		require R::Model::Row;
-		no strict "refs";
-		@{"R::Row::${Prop}::ISA"} = "R::Model::Row";
-		use strict "refs";
+		{no strict "refs"; @{"R::Row::${Prop}::ISA"} = "R::Model::Row" };
 	} else {
 		my $fieldset;
 		my $i = 0;
 		for $load (@load) {
 			if($i>0) {
-				no strict "refs";
+				{no strict "refs";
 				%{"R::Row::${Prop}::_${i}::"} = %{"R::Row::${Prop}::"};
 				delete ${"R::Row::"}{"${Prop}::"};
-				use strict "refs";
+				};
 				require $load;
-				no strict "refs";
+				{no strict "refs";
 				push @{"R::Row::${Prop}::ISA"}, "R::Row::${Prop}::_${i}";
-				use strict "refs";
+				};
 			} else {
 				require $load;
 			}
@@ -59,9 +57,8 @@ sub AUTOLOAD {
 	my $eval = "sub $AUTOLOAD { \@_>1? R::Row::$Prop->new(\@_[1..\$#_]): R::Rowset::$Prop->new }";
 	eval $eval;
 	die "$AUTOLOAD: ".($@ // $!) if $@ // $!;
-	no strict "refs";
-	my $sub = *{$AUTOLOAD}{CODE};
-	use strict "refs";
+	my $sub;
+	{no strict "refs"; $sub = *{$AUTOLOAD}{CODE}};
 
 	goto &$sub;
 }

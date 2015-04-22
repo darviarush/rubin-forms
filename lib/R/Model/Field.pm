@@ -1,5 +1,5 @@
 package R::Model::Field;
-# ïîëå òàáëèöû
+# Ð¿Ð¾Ð»Ðµ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ñ‹
 
 use strict;
 use warnings;
@@ -8,7 +8,7 @@ Utils::has_const(qw/fieldset name model compute/);
 Utils::has_array(qw/check/);
 
 
-# êîíñòðóêòîð
+# ÐºÐ¾Ð½ÑÑ‚Ñ€ÑƒÐºÑ‚Ð¾Ñ€
 sub new {
 	my ($cls, $fieldset, $name) = @_;
 	
@@ -25,30 +25,32 @@ sub new {
 	$self->add_method
 }
 
-# ñîçäà¸ò ìåòîä â ìîäåëè
+# ÑÐ¾Ð·Ð´Ð°Ñ‘Ñ‚ Ð¼ÐµÑ‚Ð¾Ð´ Ð² Ð¼Ð¾Ð´ÐµÐ»Ð¸
 sub add_method {
 	my ($self, $prop, $alter) = @_;
 	my $name = $self->{name};
+	
+	return $self if $name eq "id" and $self->isa("R::Model::Field::Col");
+	
 	my $Prop = ucfirst $self->{model};
 	my $SUB = "R::Row::${Prop}::$name";
 	my $SUBSET = "R::Rowset::${Prop}::$name";
 	
 	main::msg $SUB;
 	
-	no strict "refs";
+	{no strict "refs";
 	
-	die "$SUB çàíÿò" if *{$SUB}{CODE};
-	die "$SUBSET çàíÿò" if *{$SUBSET}{CODE};
-	
-	*{$SUB} = Utils::closure($self, $self->can("row"));
-	*{$SUBSET} = Utils::closure($self, $self->can("rowset"));
-	
-	use strict "refs";
+		die "$SUB Ð·Ð°Ð½ÑÑ‚" if *{$SUB}{CODE};
+		die "$SUBSET Ð·Ð°Ð½ÑÑ‚" if *{$SUBSET}{CODE};
+		
+		*{$SUB} = Utils::closure($self, $self->can("row"));
+		*{$SUBSET} = Utils::closure($self, $self->can("rowset"));
+	};
 	
 	$self
 }
 
-# óäàëÿåò èç ôèëäñåòà
+# ÑƒÐ´Ð°Ð»ÑÐµÑ‚ Ð¸Ð· Ñ„Ð¸Ð»Ð´ÑÐµÑ‚Ð°
 sub delete {
 	my ($self) = @_;
 	my $fieldset = $self->{fieldset};
@@ -61,11 +63,38 @@ sub delete {
 	splice @{$fieldset->{fieldset}}, $i, 1;
 }
 
-# âîçâðàùàåò row
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ row
 sub bean {
 	my ($self, @args) = @_;
 	my $model = $self->{model};
 	$::app->model->$model(@args);
 }
+
+# ÐºÐ¾Ð¿Ð¸Ñ€ÑƒÐµÑ‚ ÑÐµÐ±Ñ Ð¸ Ð´Ð¾Ð¿Ð¾Ð»Ð½ÑÐµÑ‚
+sub copy {
+	my ($self, @args) = @_;
+	bless {like=>{}, %$self, @args}, ref $self;
+}
+
+# Ð¿Ñ€Ð¾Ð¸Ð·Ð²Ð¾Ð´Ð¸Ñ‚ Ð¿Ð¾Ð´Ð¾Ð±Ð½Ñ‹Ð¹
+sub like {
+	my ($self, $key) = @_;
+	my $fld = $self->{like}{$key};
+	unless($fld) {
+		die "Ð½ÐµÑ‚ ÑÑ‚Ð¾Ð»Ð±Ñ†Ð° $key Ñƒ $self->{model}".($self->{As}? " as $self->{As}": "")." Ð¿Ñ€Ð¸ Ð·Ð°Ð¿Ñ€Ð¾ÑÐµ Ñƒ $self->{name}" unless $fld = $self->{fieldset}{field}{$key};
+		$fld = $fld->copy(upFld=>$self);
+	}
+	$fld
+}
+
+# ÑÑ‚Ñ€Ð¾Ð¸Ñ‚ join
+sub join {
+	my ($self, $to, $from) = @_;
+	my $c = $::app->connect;
+	$to->{As} = "A" . (1+@$from);
+	push @$from, "INNER JOIN " . $c->word($to->{tab}) . " As $to->{As} ON $to->{As}." . $c->word($to->{col}) . "=$self->{As}." . $c->word($self->{col});
+	$self
+}
+
 
 1;

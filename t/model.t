@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 11;
+use Test::More tests => 12;
 use Msg;
 
 our $app;
@@ -31,7 +31,7 @@ my $fk = $c->get_fk_info;
 is undef, $fk->{author};
 is 1, scalar keys %{$idx->{author}};
 is 2, scalar keys %{$fk->{book}};
-is 3, scalar keys %{$idx->{book}}, "ключи book";
+is 1, scalar keys %{$idx->{book}}, "ключи book";
 
 
 my $author1 = $app->model->author->new;
@@ -50,7 +50,9 @@ $book1->readAuthors->add($author1, $app->model->author->new);
 ok $book1->author->id, "book1.author имеет id";
 is 1, $author1->books->count, "количество книг";
 is 1, $author1->soauthorBooks->count, "книги в которых автор выступал соавтором";
+msg "===============================";
 is 2, $book1->readAuthors->count, "book1 прочло 2 автора";
+msg "===============================";
 is 1, $author1->readBooks->count, "author1 прочёл 1 книгу";
 my ($book2) = $author1->readBooks;
 is $book1->id, $book2->id;

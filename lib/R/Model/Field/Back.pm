@@ -27,6 +27,7 @@ sub new {
 
 
 # свойство обратной ссылки
+#	author.books
 sub row {
 	my ($self, $bean) = @_;
 	my $bk = $self->{ref};
@@ -35,5 +36,6 @@ sub row {
 
 
 sub rowset { goto &row }
+
 
 1;

@@ -52,7 +52,7 @@ sub alter {
 	$rename //= 0;
 	
 	join "", "ALTER TABLE ", $c->word($self->{tab}), " ",
-	($rename == 1? "MODIFY": $rename? "CHANGE": "ADD"), " COLUMN ", ($rename==1 || $rename==0? (): $c->word($rename) . " "), $self->sql(1), ($after == 1? " FIRST": $after? " AFTER " . $c->word($after): "");
+	($rename == 1? "MODIFY": $rename? "CHANGE": "ADD"), " COLUMN ", ($rename==1 || $rename==0? (): $c->word($rename) . " "), $self->sql(1), ($after eq 1? " FIRST": $after? " AFTER " . $c->word($after): "");
 }
 
 # код для удаления столбца
@@ -78,7 +78,7 @@ sub sync {
 			main::msg ':empty', '1) ', $self->alter_info;
 			main::msg ':empty', '2) ', $self->sql;
 			main::msg($what);
-			$sql = $self->alter(undef, 1);
+			$sql = $self->alter($after, 1);
 			main::msg $sql;
 			$c->dbh->do($sql);
 		}
@@ -145,5 +145,16 @@ sub rowset {
 	$bean->view($self->{name});
 }
 
+# формирует часть для from sql-запроса
+sub from {
+	my ($self, $as) = @_;
+	return ();
+}
+
+# формирует части для where sql-запроса
+sub where {
+	my ($self, $as) = @_;
+	return $self->copy(as => $as);
+}
 
 1;

@@ -18,9 +18,8 @@ sub AUTOLOAD {
 	
 	eval "sub $AUTOLOAD { my (\$self, \$val) = \@_; if(\@_ == 1) { \$self->{'$prop'} } else { \$self->{'$prop'} = \$val; \$self }}";
 	die "$AUTOLOAD: ".($@ // $!) if $@ // $!;
-	no strict "refs";
-	my $sub = *{$AUTOLOAD}{CODE};
-	use strict "refs";
+	my $sub;
+	{no strict "refs"; $sub = *{$AUTOLOAD}{CODE} };
 	
 	if(@_ == 1) {
 		my ($self) = @_;

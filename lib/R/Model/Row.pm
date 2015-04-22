@@ -17,12 +17,11 @@ sub new {
 	}
 	
 	if(ref $id) {
-		
 		if(ref $id eq $cls) {
 			$id->save if !$id->{id};
 			$id = $id->{id};
 		}
-		else {
+		elsif(ref $id eq "HASH") {
 			# если нет id, то создаёт перед compute или геттере, а сеттер - забрасывает в set и сохраняет перед compute или при геттере
 			my $bean = bless {id => $id->{id}}, $cls;
 			
@@ -32,6 +31,9 @@ sub new {
 			}
 			$bean->{save} //= {};
 			return $bean;
+		}
+		else {
+			die "Нельзя ". ref($id) ." обратить в модель $cls";
 		}
 	}
 	bless {id=>$id}, $cls;
@@ -51,13 +53,7 @@ sub id {
 # проверяет - надо ли сохранять и вызывает store
 sub save {
 	my ($self) = @_;
-	my $save = $self->{save};
-	if($save) {
-		$self->{save} = undef;
-		$self->store($save);
-	} elsif(!defined $self->{id}) {
-		$self->store;
-	}
+	$self->store if $self->{save} || !defined $self->{id};
 	$self
 }
 
@@ -66,7 +62,8 @@ sub DESTROY {
 	my ($self) = @_;
 	my $save = $self->{save};
 	if($save) {
-		$self->store($save);
+		::msg "save-destroy:", ref($self), $self->{id}, $save;
+		$self->store;
 	}
 }
 
@@ -79,10 +76,11 @@ sub store {
 	my $field = $fieldset->{field};
 
 	my $s = {};
-	if($save) {
+	if($save //= $self->{save}) {
 		while(my ($k, $v) = each %$save) {
 			$s->{$field->{$k}{col}} = $v;
 		}
+		$self->{save} = undef;
 	}
 	
 	my $c = $::app->connect;

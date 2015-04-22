@@ -5,6 +5,7 @@ use strict;
 use warnings;
 
 require R::Model::Rowset;
+require R::Model::Index;
 require R::Model::Field::Col;
 require R::Model::Field::Ref;
 require R::Model::Field::Back;
@@ -29,7 +30,7 @@ sub new {
 		field=>{},		# филды имя=>филд
 		fieldset=>[],	# порядок филдов
 		pk=>undef,		# primary key
-		index=>{},		# индексы
+		indexes=>{},		# индексы
 		indexref=>{},	# индексы-ссылки
 		engine => undef,
 		options => [],	# дополнительные опции таблицы
@@ -40,7 +41,7 @@ sub new {
 	my $Prop = ucfirst $name;
 	
 	# создаём роусет
-	no strict "refs";
+	{no strict "refs";
 	unshift @{"R::Rowset::${Prop}::ISA"}, "R::Model::Rowset";
 	my $getter = sub {$_[0]};
 	my $fs = Utils::closure($self, $getter);
@@ -52,13 +53,12 @@ sub new {
 	*{"R::Rowset::${Prop}::Field"} = $ff;
 	*{"R::Row::${Prop}::Model"} = $mm;
 	*{"R::Rowset::${Prop}::Model"} = $mm;
-	use strict "refs";
-	
-	$self->pk($pk_type)->autoincrement;
+	};
 
 	# создаём метод модели и подгружаем класс модели
 	my $row = $::app->model->$name(undef);
 
+	$self->pk($pk_type)->autoincrement;
 	$row->can("setup")->($self);
 	
 	$self
@@ -104,13 +104,15 @@ sub m2m {
 	pk(undef)->
 	ref($self->{name})->
 	ref($to_model)->
-	index($self->{name}, $to_model);
+	unique("$self->{name}, $to_model");
 	
 	my $ref_from = $m2m_fieldset->{field}{$self->{name}};
 	my $ref_to = $m2m_fieldset->{field}{$to_model};
 	
-	R::Model::Field::M2m->new($name, $ref_from, $ref_to);
-	R::Model::Field::M2m->new($name, $ref_to, $ref_from);
+	my $ref1 = R::Model::Field::M2m->new($name, $ref_from, $ref_to);
+	my $ref2 = R::Model::Field::M2m->new($name, $ref_to, $ref_from);
+	$ref1->{back} = $ref2;
+	$ref2->{back} = $ref1;
 	
 	$self
 }
@@ -186,9 +188,9 @@ sub rem { goto &comment }
 # добавляет индекс
 sub _add_index {
 	my ($keyword, $self, $idx, $name) = @_;
-	my @idx = split /\s*,\s*/, $idx // $self->last;
+	my @idx = split /\s*,\s*/, $idx // $self->last->{name};
 	$name ||= "idx_" . join "__", @idx;
-	$self->{indexes}{$name} = R::Model::Index->new($keyword, [@idx], $name, $self->{tab});
+	$self->{indexes}{$name} = R::Model::Index->new($keyword, [@idx], $name, $self);
 	$self
 }
 
@@ -249,13 +251,28 @@ sub sync {
 			$c->dbh->do(main::msg R::Model::Field::Col::drop(undef, $tab, $k)) if !$is{$k};
 		}
 		
-		while(my ($name, $index) = each %{$self->{index}}) {
+		%is = (PRIMARY=>1);
+		while(my ($name, $index) = each %{$self->{indexes}}) {
 			$index->sync;
+			$is{$index->{name}} = 1;
 		}
 		
+		my $idx_info = $c->index_info->{$tab} // {};
+		while(my ($k, $v) = each %$idx_info) {
+			$c->dbh->do(main::msg R::Model::Index::drop(undef, $tab, $k)) if !$is{$k};
+		}
+		
+		%is = ();
 		while(my ($name, $indexref) = each %{$self->{indexref}}) {
 			$indexref->sync;
+			$is{$indexref->{name}} = 1;
 		}
+		
+		my $fk_info = $c->fk_info->{$tab} // {};
+		while(my ($k, $v) = each %$fk_info) {
+			$c->dbh->do(main::msg R::Model::IndexRef::drop(undef, $tab, $k)) if !$is{$k};
+		}
+		
 	}
 	
 	$self;
@@ -273,7 +290,7 @@ sub create_table {
 		push @col, $field->sql unless $field->compute;
 	}
 	
-	while(my ($key, $idx) = each %{$self->{index}}) {
+	while(my ($key, $idx) = each %{$self->{indexes}}) {
 		push @col, $idx->sql;
 	}
 	
