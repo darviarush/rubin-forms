@@ -1,11 +1,8 @@
 #= [name]
 #> возвращает список команд
 
-#use Msg;
-#use Term::ANSIColor qw(:constants);
 use File::Find;
 use utf8;
-#use Cwd qw/cwd/;
 
 binmode STDOUT, ":utf8";
 binmode STDERR, ":utf8";

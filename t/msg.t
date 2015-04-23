@@ -6,7 +6,7 @@ use Test::More tests => 7;
 use Msg;
 
 our $_FRAMEWORK;
-chdir $_FRAMEWORK;
+chdir $_FRAMEWORK if $_FRAMEWORK;
 
 $_FRAMEWORK = "t";
 
@@ -20,4 +20,4 @@ is_deeply [files("t/ms*.t")], ["t/msg.t"];
 is_deeply [files("*.ttt")], [];
 
 
-is_deeply [dirs("msg.t")], ["msg.t", "t/msg.t"];
+is_deeply [dirs("msg.t")], ["t/msg.t", "msg.t"];

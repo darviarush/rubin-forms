@@ -7,7 +7,7 @@ use Msg;
 use Test::More tests => 65;
 
 use Msg;
-use Action;
+#use Action;
 require_ok 'Utils';
 require_ok 'Helper';
 
@@ -84,18 +84,53 @@ print $io $example;
 seek $io, 0, 0;
 
 my $param = Utils::param_from_post($io, "multipart/form-data; boundary=----WebKitFormBoundaryWdoiUAIAnqflZYdF", length $example);
-#msg $param;
 is_deeply $param, {
-  'file1' => ["x1\n"],
-  'test1' => 'value1',
-  'file4' => [],
-  'file3' => [],
-  'submit' => 'Upload',
-  'file5' => [],
-  'file6' => [],
-  'test2' => 'value2',
-  'file2' => ["x2\n"]
-};
+	'file1' => {
+		'body' => 'x1',
+		'head' => {
+			'Content-Type' => 'text/plain',
+			'Content-Disposition' => 'form-data; name="file1"; filename="eula.1028.txt"'
+		}
+	},
+	'test1' => 'value1',
+	'file4' => {
+		'body' => '',
+		'head' => {
+			'Content-Type' => 'application/octet-stream',
+			'Content-Disposition' => 'form-data; name="file4"; filename=""'
+		}
+	},
+	'file3' => {
+		'body' => '',
+		'head' => {
+			'Content-Type' => 'application/octet-stream',
+			'Content-Disposition' => 'form-data; name="file3"; filename=""'
+		}
+	},
+	'submit' => 'Upload',
+	'file5' => {
+		'body' => '',
+		'head' => {
+			'Content-Type' => 'application/octet-stream',
+			'Content-Disposition' => 'form-data; name="file5"; filename=""'
+		}
+	},
+	'file6' => {
+		'body' => '',
+		'head' => {
+			'Content-Type' => 'application/octet-stream',
+			'Content-Disposition' => 'form-data; name="file6"; filename=""'
+		}
+	},
+	'test2' => 'value2',
+	'file2' => {
+		'body' => 'x2',
+		'head' => {
+			'Content-Type' => 'text/plain',
+			'Content-Disposition' => 'form-data; name="file2"; filename="eula.1031.txt"'
+		}
+	}
+}, "из multipart/form-data";
 
 
 ################################################# inject_ini #################################################

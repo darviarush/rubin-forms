@@ -145,16 +145,4 @@ sub rowset {
 	$bean->view($self->{name});
 }
 
-# формирует часть для from sql-запроса
-sub from {
-	my ($self, $as) = @_;
-	return ();
-}
-
-# формирует части для where sql-запроса
-sub where {
-	my ($self, $as) = @_;
-	return $self->copy(as => $as);
-}
-
 1;

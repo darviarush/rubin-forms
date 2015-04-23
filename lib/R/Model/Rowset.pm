@@ -55,11 +55,11 @@ sub find {
 
 # выбирает много столбцов
 sub view {
-	my ($self, $view) = @_;
-	$view = [split /\s*,\s*/, $view] unless ref $view;
-	unshift @$view, "id" unless grep {$_ eq "id" } @$view;
-	$self->_rows($view);
-	$self
+	my ($self, @view) = @_;
+	$self->{view} = [@view];
+	
+	#unshift @$view, "id" unless grep {$_ eq "id" } @$view;
+	wantarray? $self->_rows: $self;
 }
 
 # offset
@@ -105,6 +105,13 @@ sub _all {
 	
 	my $fld = $self->Field->{id}->copy(As=>"A1");
 	my $from = [$c->word($fld->{tab}) . " As $fld->{As}"];
+	
+	# if(!$view && $self->{view}) {
+		# my $find = $self->{find};
+		# $self->{find} = [map {} $self->{view}]
+		# my @view = $self->_where($from, $fld);
+		# $self->{find} = $find;
+	# }
 	
 	my $where = join " AND ", map {
 		my $col = $_->{col};

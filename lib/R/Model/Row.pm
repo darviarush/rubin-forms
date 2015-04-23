@@ -62,7 +62,7 @@ sub DESTROY {
 	my ($self) = @_;
 	my $save = $self->{save};
 	if($save) {
-		::msg "save-destroy:", ref($self), $self->{id}, $save;
+		#::msg "save-destroy:", ref($self), $self->{id}, $save;
 		$self->store;
 	}
 }
