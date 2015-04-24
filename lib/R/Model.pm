@@ -30,6 +30,12 @@ sub AUTOLOAD {
 	my @load = $base? main::files($base."/".$load.".pm"): ();
 	die "not exists model $Prop" if not @load and not exists $meta->{fieldset}{$prop};
 	
+	my $eval = "sub $AUTOLOAD { \@_>1? R::Row::$Prop->new(\@_[1..\$#_]): R::Rowset::$Prop->new }";
+	eval $eval;
+	die "$AUTOLOAD: ".($@ // $!) if $@ // $!;
+	my $sub;
+	{no strict "refs"; $sub = *{$AUTOLOAD}{CODE}};
+	
 	if(!@load) {
 		require R::Model::Row;
 		{no strict "refs"; @{"R::Row::${Prop}::ISA"} = "R::Model::Row" };
@@ -39,12 +45,12 @@ sub AUTOLOAD {
 		for $load (@load) {
 			if($i>0) {
 				{no strict "refs";
-				%{"R::Row::${Prop}::_${i}::"} = %{"R::Row::${Prop}::"};
-				delete ${"R::Row::"}{"${Prop}::"};
+					%{"R::Row::${Prop}::_${i}::"} = %{"R::Row::${Prop}::"};
+					%{"R::Row::${Prop}::"} = ();
 				};
 				require $load;
 				{no strict "refs";
-				push @{"R::Row::${Prop}::ISA"}, "R::Row::${Prop}::_${i}";
+					push @{"R::Row::${Prop}::ISA"}, "R::Row::${Prop}::_${i}";
 				};
 			} else {
 				require $load;
@@ -53,12 +59,6 @@ sub AUTOLOAD {
 			$self->$prop->can("setup")->($fieldset) if $i++ > 0;	# должен отработать обязательно конструктор филдсета - создать поля в классе модели
 		}
 	}
-
-	my $eval = "sub $AUTOLOAD { \@_>1? R::Row::$Prop->new(\@_[1..\$#_]): R::Rowset::$Prop->new }";
-	eval $eval;
-	die "$AUTOLOAD: ".($@ // $!) if $@ // $!;
-	my $sub;
-	{no strict "refs"; $sub = *{$AUTOLOAD}{CODE}};
 
 	goto &$sub;
 }
