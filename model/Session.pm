@@ -11,10 +11,10 @@ sub setup {
 	$fields->
 	
 	pk('binary(20)')->
-	ref('user')->index->
-	col(now => 'datetime')->index->
+	ref('user')->required->
+	col(now => 'datetime')->
 	col(new_pass => 'tinyint')->null->comment("0/1 - сессия создана для регистрации")->
-	engine('memory')
+	engine('memory');
 
 }
 

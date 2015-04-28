@@ -24,7 +24,7 @@ sub new {
 	
 	my $tab = $meta->word($name);
 	
-	my $self = bless {
+	$meta->{fieldset}{$name} = my $self = bless {
 		name => $name,	# имя филдсета
 		tab => $tab,	# имя таблицы в базе
 		field=>{},		# филды имя=>филд
@@ -33,7 +33,9 @@ sub new {
 		indexes=>{},		# индексы
 		indexref=>{},	# индексы-ссылки
 		engine => undef,
-		options => [],	# дополнительные опции таблицы
+		options => undef,	# дополнительные опции таблицы
+		charset => undef,	# collate таблицы
+		comment => undef,	# комментарий таблицы
 		data => [],
 		testdata => []
 	}, $cls;
@@ -74,7 +76,7 @@ sub last {
 # добавляет вычислимый столбец
 sub compute {
 	my ($self, $name) = @_;
-	R::Model::Field::Compute->new($name);
+	R::Model::Field::Compute->new($self, $name);
 	$self
 }
 
@@ -93,21 +95,28 @@ sub ref {
 }
 
 # ссылка многие-ко-многим
+#	$name - имя филдов m2m
+#	$to_model - имя модели
+#	$m2m_model - имя модели-связи
+#	$alias1 - название ref на себя
+#	$alias2 - название ref на модель
 sub m2m {
-	my ($self, $name, $to_model, $m2m_model) = @_;
+	my ($self, $name, $to_model, $m2m_model, $alias1, $alias2) = @_;
 	
 	my $to_fieldset = $::app->modelMetafieldset->fieldset($to_model);
 	
 	$m2m_model //= $name . join "", sort ucfirst($self->{name}), ucfirst($to_fieldset->{name});
+	$alias1 //= $self->{name};
+	$alias2 //= $to_model;
 	
 	my $m2m_fieldset = $::app->modelMetafieldset->fieldset($m2m_model)->
 	pk(undef)->
-	ref($self->{name})->
-	ref($to_model)->
-	unique("$self->{name}, $to_model");
+	ref($alias1 => $self->{name})->
+	ref($alias2 => $to_model)->
+	unique("$alias1, $alias2");
 	
-	my $ref_from = $m2m_fieldset->{field}{$self->{name}};
-	my $ref_to = $m2m_fieldset->{field}{$to_model};
+	my $ref_from = $m2m_fieldset->{field}{$alias1};
+	my $ref_to = $m2m_fieldset->{field}{$alias2};
 	
 	my $ref1 = R::Model::Field::M2m->new($name, $ref_from, $ref_to);
 	my $ref2 = R::Model::Field::M2m->new($name, $ref_to, $ref_from);
@@ -156,7 +165,7 @@ sub null {
 }
 
 # делает филд обязательным
-sub require {
+sub required {
 	$_[0]->last->{null} = 0;
 	$_[0]
 }
@@ -177,7 +186,7 @@ sub raw_default {
 # добавляет комментарий к последнему филду
 sub comment {
 	my ($self, $comment) = @_;
-	$self->last->{comment} = $comment;
+	my $fld = $self->last->remark($comment);
 	$self
 }
 
@@ -199,7 +208,12 @@ sub unique { unshift @_, 'UNIQUE'; goto &_add_index; }
 
 # добавляют опции таблицы
 sub engine { $_[0]->{engine} = $_[1]; $_[0] }
-sub options { push @{$_[0]->{options}}, $_[1]; $_[0] }
+sub options { $_[0]->{options} = $_[1]; $_[0] }
+sub tab_comment { $_[0]->{comment} = $_[1]; $_[0] }
+sub tab_charset { $_[0]->{charset} = $_[1]; $_[0] }
+
+# просто для окончания, чтобы можно было столбец закомментировать
+sub end {}
 
 # в новую таблицу добавляются обязательные данные
 sub data {
@@ -216,6 +230,11 @@ sub testdata {
 	$self
 }
 
+# возвращает имена столбцов таблицы
+sub col_keys {
+	my ($self) = @_;
+	map { $_->{col} } grep { !$_->{compute} } @{$self->{fieldset}};
+}
 
 # синхронизация таблицы
 sub sync {
@@ -234,9 +253,29 @@ sub sync {
 	
 	if(!$info) {
 		my $sql = $self->create_table;
-		main::msg $sql;
-		$c->dbh->do($sql);
+		$c->do($sql);
+		
+		my $cols = [$self->col_keys];
+		
+		if($::app->ini->{site}{test} && @{$self->{testdata}}) {
+			$c->insert($self->{tab}, $cols, $self->{testdata});
+		}
+		
+		if(@{$self->{data}}) {
+			$c->insert($self->{tab}, $cols, $self->{data});
+		}
+		
 	} else {
+	
+		my $tab_info = $c->tab_info->{$self->{tab}};
+		$tab_info->{charset} = undef if !$self->{charset} and ($tab_info->{charset} // "") eq 'utf8_unicode_ci';
+		
+		if($self->sql ne $self->sql($tab_info)) {
+			main::msg "1) " . $self->sql;
+			main::msg "2) " . $self->sql($tab_info);
+			$c->do($self->alter);
+		}
+	
 		my %is;
 		my $num = 1;
 		my $after = 1;
@@ -247,35 +286,52 @@ sub sync {
 			}
 		}
 		
-		while(my ($k, $v) = each %$info) {
-			$c->dbh->do(main::msg R::Model::Field::Col::drop(undef, $tab, $k)) if !$is{$k};
-		}
-		
-		%is = (PRIMARY=>1);
+		my %idx_is = (PRIMARY=>1);
 		while(my ($name, $index) = each %{$self->{indexes}}) {
 			$index->sync;
-			$is{$index->{name}} = 1;
+			$idx_is{$index->{name}} = 1;
 		}
 		
 		my $idx_info = $c->index_info->{$tab} // {};
 		while(my ($k, $v) = each %$idx_info) {
-			$c->dbh->do(main::msg R::Model::Index::drop(undef, $tab, $k)) if !$is{$k};
+			$c->do(R::Model::Index::drop(undef, $tab, $k)) if !$idx_is{$k};
 		}
 		
-		%is = ();
+		my %ref_is = ();
 		while(my ($name, $indexref) = each %{$self->{indexref}}) {
 			$indexref->sync;
-			$is{$indexref->{name}} = 1;
+			$ref_is{$indexref->{name}} = 1;
 		}
 		
 		my $fk_info = $c->fk_info->{$tab} // {};
 		while(my ($k, $v) = each %$fk_info) {
-			$c->dbh->do(main::msg R::Model::IndexRef::drop(undef, $tab, $k)) if !$is{$k};
+			$c->do(R::Model::IndexRef::drop(undef, $tab, $k)) if !$ref_is{$k};
 		}
 		
+		while(my ($k, $v) = each %$info) {
+			$c->do(R::Model::Field::Col::drop(undef, $tab, $k)) if !$is{$k};
+		}
 	}
 	
 	$self;
+}
+
+# возвращает дополнительные опции таблицы, которые можно использовать в alter table
+sub sql {
+	my ($self, $opt) = @_;
+	$opt //= $self;
+	my $c = $::app->connect;
+	" ENGINE=" . uc($opt->{engine} || $engine) . 
+	($opt->{charset}? " DEFAUT CHARACTER SET '" . do{ $opt->{charset} =~ /_/; $` } . "' DEFAULT COLLATION '$opt->{charset}'": "") .
+	($opt->{comment}? " COMMENT " . $c->quote($opt->{comment}): "") .
+	($opt->{options}? " $opt->{options}": "")
+}
+
+# возвращает alter table для таблицы (не для столбцов)
+sub alter {
+	my ($self) = @_;
+	my $c = $::app->connect;
+	"ALTER TABLE " . $c->word($self->{tab}) . $self->sql;
 }
 
 # возвращает create table
@@ -300,7 +356,7 @@ sub create_table {
 	
 	push @sql, join ",\n", @col;
 	
-	push @sql, "\n) ENGINE=", ($self->{engine} || $engine), (@{$self->{options}}? " " . join(" ", @{$self->{options}}): ());
+	push @sql, "\n)", $self->sql;
 	join "", @sql;
 }
 

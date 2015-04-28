@@ -40,23 +40,27 @@ sub AUTOLOAD {
 		require R::Model::Row;
 		{no strict "refs"; @{"R::Row::${Prop}::ISA"} = "R::Model::Row" };
 	} else {
-		my $fieldset;
 		my $i = 0;
 		for $load (@load) {
 			if($i>0) {
 				{no strict "refs";
-					%{"R::Row::${Prop}::_${i}::"} = %{"R::Row::${Prop}::"};
-					%{"R::Row::${Prop}::"} = ();
+					*{"R::Row::$Prop\__$i\::"} = *{"R::Row::$Prop\::"};
+					undef ${"R::Row::"}{"$Prop\::"};
+					push @{"R::Row::$Prop\::ISA"}, "R::Row::$Prop\__$i";
 				};
 				require $load;
+			
+				# должен отработать обязательно конструктор филдсета - создать поля в классе модели
+				my $fieldset = $meta->fieldset($prop);
+				my $setup;
 				{no strict "refs";
-					push @{"R::Row::${Prop}::ISA"}, "R::Row::${Prop}::_${i}";
+				$setup = *{"R::Row::$Prop\::setup"}{CODE};
 				};
+				$setup->($fieldset);
 			} else {
 				require $load;
+				$meta->fieldset($prop);
 			}
-			$fieldset = $meta->fieldset($prop);
-			$self->$prop->can("setup")->($fieldset) if $i++ > 0;	# должен отработать обязательно конструктор филдсета - создать поля в классе модели
 		}
 	}
 

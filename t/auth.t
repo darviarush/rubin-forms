@@ -13,6 +13,8 @@ my $ini = Utils::parse_ini(undef, <<'END');
 
 [do]
 
+session.noauth = rm
+
 main.user = view
 main.user.view = v2,v3
 
@@ -28,11 +30,21 @@ main.float = v3
 END
 our $app;
 
-$app->ini($ini);
+$app->ini({%{$app->ini}, %$ini});
+
+$app->modelMetafieldset->sync;
+
 $app->auth;
 eval { $app->auth->check_role("view", "main", {'v1'=>1, 'v2'=>1}) };
-ok $@;
-$app->session->user_id(1);
+#::msg "$@";
+ok ("$@" =~ /\bview\b.+\bnoauth\b.+\bmain\b/? 1: 0);
+
+$app->request->{cookie} = {"sess" => ("0" x 19) . "1"};
+
+$app->model->session($app->request->cookie("sess"))->erase;
+
+$app->model->session->new($app->request->cookie("sess"))->user(1);
+
 is "R::Auth", ref $app->auth->check_role("view", "main", {'v2'=>1, 'v3'=>1});
 $app->auth->valid_param("", "view", "main", {'v1'=>1, 'v2'=>1});
 

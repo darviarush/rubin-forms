@@ -22,12 +22,13 @@ sub new {
 	
 	push @{$fieldset->{fieldset}}, $fieldset->{field}{$name} = $self;
 	
-	$self->add_method
+	$self->add_method;
+	$self
 }
 
 # создаёт метод в модели
 sub add_method {
-	my ($self, $prop, $alter) = @_;
+	my ($self) = @_;
 	my $name = $self->{name};
 	
 	return $self if $name eq "id" and $self->isa("R::Model::Field::Col");
@@ -36,7 +37,10 @@ sub add_method {
 	my $SUB = "R::Row::${Prop}::$name";
 	my $SUBSET = "R::Rowset::${Prop}::$name";
 	
-	main::msg $SUB;
+	my $cls = ref $self;
+	$cls=~/([^:]+)$/;
+	
+	main::msg "$1\t$self->{model}.$name";
 	
 	{no strict "refs";
 	

@@ -12,7 +12,8 @@ our $CURR_SQL;
 
 # зарезервированные слова sql
 our %SQL_WORD = (
-mysql => {Utils::set(qw/ACCESSIBLE ADD ALL ALTER ANALYZE AND AS ASC ASENSITIVE BEFORE BETWEEN BIGINT BINARY BLOB BOTH BY CALL CASCADE CASE CHANGE CHAR CHARACTER CHECK COLLATE COLUMN CONDITION CONSTRAINT CONTINUE CONVERT CREATE CROSS CURRENT_DATE CURRENT_TIME CURRENT_TIMESTAMP CURRENT_USER CURSOR DATABASE DATABASES DAY_HOUR DAY_MICROSECOND DAY_MINUTE DAY_SECOND DEC DECIMAL DECLARE DEFAULT DELAYED DELETE DESC DESCRIBE DETERMINISTIC DISTINCT DISTINCTROW DIV DOUBLE DROP DUAL EACH ELSE ELSEIF ENCLOSED ESCAPED EXISTS EXIT EXPLAIN FALSE FETCH FLOAT FLOAT4 FLOAT8 FOR FORCE FOREIGN FROM FULLTEXT GET GRANT GROUP HAVING HIGH_PRIORITY HOUR_MICROSECOND HOUR_MINUTE HOUR_SECOND IF IGNORE IN INDEX INFILE INNER INOUT INSENSITIVE INSERT INT INT1 INT2 INT3 INT4 INT8 INTEGER INTERVAL INTO IO_AFTER_GTIDS IO_BEFORE_GTIDS IS ITERATE JOIN KEY KEYS KILL LEADING LEAVE LEFT LIKE LIMIT LINEAR LINES LOAD LOCALTIME LOCALTIMESTAMP LOCK LONG LONGBLOB LONGTEXT LOOP LOW_PRIORITY MASTER_BIND MASTER_SSL_VERIFY_SERVER_CERT MATCH MAXVALUE MEDIUMBLOB MEDIUMINT MEDIUMTEXT MIDDLEINT MINUTE_MICROSECOND MINUTE_SECOND MOD MODIFIES NATURAL NONBLOCKING NOT NO_WRITE_TO_BINLOG NULL NUMERIC ON OPTIMIZE OPTION OPTIONALLY OR ORDER OUT OUTER OUTFILE PARTITION PRECISION PRIMARY PROCEDURE PURGE RANGE READ READS READ_WRITE REAL REFERENCES REGEXP RELEASE RENAME REPEAT REPLACE REQUIRE RESIGNAL RESTRICT RETURN REVOKE RIGHT RLIKE SCHEMA SCHEMAS SECOND_MICROSECOND SELECT SENSITIVE SEPARATOR SET SHOW SIGNAL SMALLINT SPATIAL SPECIFIC SQL SQLEXCEPTION SQLSTATE SQLWARNING SQL_BIG_RESULT SQL_CALC_FOUND_ROWS SQL_SMALL_RESULT SSL STARTING STRAIGHT_JOIN TABLE TERMINATED THEN TINYBLOB TINYINT TINYTEXT TO TRAILING TRIGGER TRUE UNDO UNION UNIQUE UNLOCK UNSIGNED UPDATE USAGE USE USING UTC_DATE UTC_TIME UTC_TIMESTAMP VALUES VARBINARY VARCHAR VARCHARACTER VARYING WHEN WHERE WHILE WITH WRITE XOR YEAR_MONTH ZEROFILL/)}
+mysql => {Utils::set(qw/ACCESSIBLE	 ADD	 ALL	 ALTER	 ANALYZE	 AND	 AS	 ASC	 ASENSITIVE	 BEFORE	 BETWEEN	 BIGINT	 BINARY	 BLOB	 BOTH	 BY	 CALL	 CASCADE	 CASE	 CHANGE	 CHAR	 CHARACTER	 CHECK	 COLLATE	 COLUMN	 CONDITION	 CONSTRAINT	 CONTINUE	 CONVERT	 CREATE	 CROSS	 CURRENT_DATE	 CURRENT_TIME	 CURRENT_TIMESTAMP	 CURRENT_USER	 CURSOR	 DATABASE	 DATABASES	 DAY_HOUR	 DAY_MICROSECOND	 DAY_MINUTE	 DAY_SECOND	 DEC	 DECIMAL	 DECLARE	 DEFAULT	 DELAYED	 DELETE	 DESC	 DESCRIBE	 DETERMINISTIC	 DISTINCT	 DISTINCTROW	 DIV	 DOUBLE	 DROP	 DUAL	 EACH	 ELSE	 ELSEIF	 ENCLOSED ESCAPED	 EXISTS	 EXIT	 EXPLAIN	 FALSE	 FETCH	 FLOAT	 FLOAT4	 FLOAT8	 FOR	 FORCE	 FOREIGN	 FROM FULLTEXT	 GENERAL GRANT	 GROUP	 HAVING	 HIGH_PRIORITY	 HOUR_MICROSECOND	 HOUR_MINUTE	 HOUR_SECOND	 IF	 IGNORE	 IGNORE_SERVER_IDS IN	 INDEX	 INFILE	 INNER	 INOUT	 INSENSITIVE	 INSERT	 INT	 INT1	 INT2	 INT3	 INT4	 INT8	 INTEGER	 INTERVAL	 INTO	 IS	 ITERATE	 JOIN	 KEY	 KEYS	 KILL	 LEADING	 LEAVE	 LEFT	 LIKE	 LIMIT	 LINEAR	 LINES	 LOAD	 LOCALTIME	 LOCALTIMESTAMP	 LOCK	 LONG	 LONGBLOB	 LONGTEXT	 LOOP	 LOW_PRIORITY	 MASTER_HEARTBEAT_PERIOD MASTER_SSL_VERIFY_SERVER_CERT	 MATCH	 MAXVALUE MEDIUMBLOB	 MEDIUMINT	 MEDIUMTEXT	 MIDDLEINT	 MINUTE_MICROSECOND	 MINUTE_SECOND	 MOD	 MODIFIES	 NATURAL	 NOT	 NO_WRITE_TO_BINLOG	 NULL	 NUMERIC	 ON	 OPTIMIZE	 OPTION	 OPTIONALLY	 OR	 ORDER	 OUT	 OUTER	 OUTFILE	 PARTITION PRECISION	 PRIMARY	 PROCEDURE	 PURGE	 RANGE	 READ	 READS	 READ_WRITE	 REAL REFERENCES	 REGEXP	 RELEASE	 RENAME	 REPEAT	 REPLACE	 REQUIRE	 RESIGNAL RESTRICT	 RETURN	 REVOKE	 RIGHT	 RLIKE	 SCHEMA	 SCHEMAS	 SECOND_MICROSECOND	 SELECT	 SENSITIVE	 SEPARATOR	 SET	 SHOW	 SIGNAL SLOW SMALLINT	 SPATIAL	 SPECIFIC	 SQL	 SQLEXCEPTION	 SQLSTATE	 SQLWARNING	 SQL_BIG_RESULT	 SQL_CALC_FOUND_ROWS	 SQL_SMALL_RESULT	 SSL	 STARTING	 STRAIGHT_JOIN	 TABLE	 TERMINATED	 THEN	 TINYBLOB	 TINYINT	 TINYTEXT	 TO	 TRAILING	 TRIGGER	 TRUE	 UNDO	 UNION	 UNIQUE	 UNLOCK	 UNSIGNED	 UPDATE	 USAGE	 USE	 USING	 UTC_DATE	 UTC_TIME	 UTC_TIMESTAMP	 VALUES	 VARBINARY	 VARCHAR	 VARCHARACTER	 VARYING	 WHEN	 WHERE	 WHILE	 WITH	 WRITE	 XOR	 YEAR_MONTH	 ZEROFILL
+GENERATED	GET	IO_AFTER_GTIDS	IO_BEFORE_GTIDS MASTER_BIND OPTIMIZER_COSTS PARSE_GCOL_EXPR STORED VIRTUAL/)}
 );
 
 
@@ -66,12 +67,35 @@ sub dbh { $_[0]->{dbh} }
 sub app { $_[0]->{app} }
 
 # кеширует инф. о таблицах
+sub tab_info {
+	my ($self) = @_;
+	$self->{tab_info} //= $self->get_tab_info;
+}
+
+# возвращает информацию о таблицах
+sub get_tab_info {
+	my ($self) = @_;
+	my $dbh = $self->{dbh};
+	my $sql = "select table_name as name, engine, table_collation as charset, table_comment as comment, create_options as options
+		from information_schema.tables
+		where table_schema=".$self->quote($self->basename);
+	my $rows = $dbh->selectall_arrayref($sql, {Slice=>{}});
+	my $info = {};
+	
+	for my $row (@$rows) {	# создаём info
+		$info->{$row->{name}} = $row;
+	}
+	return $info;
+}
+
+
+# кеширует инф. о столбцах таблиц
 sub info {
 	my ($self) = @_;
 	$self->{info} //= $self->get_info;
 }
 
-# возвращает информацию о таблицах
+# возвращает информацию о столбцах таблиц
 sub get_info {
 	my ($self) = @_;
 	my $dbh = $self->{dbh};
@@ -93,48 +117,44 @@ sub index_info {
 	$self->{index_info} //= $self->get_index_info
 }
 
-# возвращает информацию о ключах таблиц
-# sub get_index_info {
-	# my ($self) = @_;
-	# my $info = $self->get_info;
-	# my $dbh = $self->{dbh};
-	# my $ref = {};
-	# while(my($tab, $v) = each %$info) {
-		# my $sql = "SHOW INDEX FROM " . $self->word($tab);
-		# my $rows = $dbh->selectall_arrayref($sql, {Slice=>{}});
-		# my $prev = "";
-		# my $cur;
-		# for my $row (@$rows) {
-			# my $name = $row->{Key_name};
-			# my $idx = $row->{Column_name};
-			# my $i = $row->{Seq_in_index} - 1;
-			
-			# if($prev ne $name) {
-				# my $ne = $row->{Non_unique};
-				# $cur = $ref->{$tab}{$name} = {idx=>[], name=>$name, type=>$ne? 'INDEX': 'UNIQUE'};
-				# $prev = $name;
-			# }
-			# $cur->{idx}[$i] = $idx;
-		# }
-		
-	# }
-	# $ref
-# }
-
+# без кеширования
 sub get_index_info {
 	my ($self) = @_;
-	my $sql = "SELECT table_name as tab,column_name as col,constraint_name as name,ordinal_position as pos
-FROM information_schema.KEY_COLUMN_USAGE
-WHERE TABLE_SCHEMA=" . $self->quote($self->basename) . "
-AND referenced_column_name IS null";
-	my $rows = $self->dbh->selectall_arrayref($sql, {Slice=>{}});
+	my %rename = qw(Table tab Non_unique non_uniq Key_name name Seq_in_index pos Column_name col Comment comment Index_comment index_comment Null null Index_type type Packed packed Cardinality cardinality Sub_part part Collation charset);
+	my $tab_info = $self->get_tab_info;
+	my $fk_info = $self->get_fk_info;
 	my $info = {};
-	for my $row (@$rows) {
-		my $idx = $info->{$row->{tab}}{$row->{name}} //= [];
-		push @$idx, $row;
+	while(my ($tab, $in) = each %$tab_info) {
+		my $sql = "SHOW KEYS FROM " . $self->word($tab);
+		my $rows = $self->{dbh}->selectall_arrayref($sql, {Slice=>{}});
+
+		for my $row (@$rows) {
+			next if exists $fk_info->{$tab}{$row->{Key_name}};
+
+			%$row = map {(($rename{$_} // $_) => $row->{$_})} keys %$row;
+			
+			my $idx = $info->{$row->{tab}}{$row->{name}} //= [];
+			push @$idx, $row;
+		}
 	}
 	return $info;
 }
+
+# без кеширования
+# sub get_index_info {
+	# my ($self) = @_;
+	# my $sql = "SELECT table_name as tab,column_name as col,constraint_name as name,ordinal_position as pos
+# FROM information_schema.KEY_COLUMN_USAGE
+# WHERE TABLE_SCHEMA=" . $self->quote($self->basename) . "
+# AND referenced_column_name IS null";
+	# my $rows = $self->dbh->selectall_arrayref($sql, {Slice=>{}});
+	# my $info = {};
+	# for my $row (@$rows) {
+		# my $idx = $info->{$row->{tab}}{$row->{name}} //= [];
+		# push @$idx, $row;
+	# }
+	# return $info;
+# }
 
 
 # кеширует информацию о внешних ключах таблиц
@@ -202,7 +222,7 @@ sub TAB_ref {
 }
 
 # квотирование
-sub quote { my ($self, $s) = @_; !defined($s)? "null": $s =~ /^-?(?:\d+|(?:\d+)?\.\d+)$/? $s: $self->{dbh}->quote($s) }
+sub quote { my ($self, $s) = @_; !defined($s)? "null": $s =~ /^-?(?:[1-9]\d*|0)(?:\.\d+)?$/? $s: $self->{dbh}->quote($s) }
 
 # формирует ключ=значение через запятую, для UPDATE SET или REPLACE SET
 sub DO_SET {
@@ -494,14 +514,22 @@ sub last_id {
 # количество изменённых строк последней операцией редактирования
 sub last_count { $_[0]->{last_count} }
 
+# выполняет sql-запрос
+sub do {
+	my ($self, $sql) = @_;
+	$CURR_SQL = $sql;
+	main::msg $CURR_SQL if $self->{app}->ini->{site}{'log-level'} >= 1;
+	my $ret = $self->{dbh}->do($CURR_SQL);
+	$CURR_SQL = undef;
+	$ret
+}
+
 # удаляет записи из таблицы
 sub erase {
 	my ($self, $tab, $where) = @_;
 	my $cond = $self->DO_WHERE($where);
 	$CURR_SQL = join "", "DELETE FROM ", $self->word($tab), " WHERE ", $cond;
-	main::msg $CURR_SQL if $self->{app}->ini->{site}{'log-level'} >= 1;
-	$self->{last_count} = $self->{dbh}->do($CURR_SQL) + 0;
-	$CURR_SQL = undef;
+	$self->{last_count} = $self->do($CURR_SQL) + 0;
 	$self
 }
 
@@ -514,9 +542,8 @@ sub add {
 	} else {
 		$CURR_SQL = join "", "INSERT INTO ", $self->word($tab), " () VALUES ()";
 	}
-	main::msg $CURR_SQL if $self->{app}->ini->{site}{'log-level'} >= 1;
-	$self->{last_count} = $self->{dbh}->do($CURR_SQL) + 0;
-	$self->{last_id} = $CURR_SQL = undef;
+	$self->{last_count} = $self->do($CURR_SQL) + 0;
+	$self->{last_id} = undef;
 	$self
 }
 
@@ -532,9 +559,7 @@ sub insert {
 	my ($self, $tab, $fields, $matrix) = @_;
 	my $SET = $self->INS_SET($matrix);
 	$CURR_SQL = join "", "INSERT INTO ", $self->word($tab), " (", join(", ", $self->FIELDS($fields)), ") VALUES ", $SET;
-	main::msg $CURR_SQL if $self->{app}->ini->{site}{'log-level'} >= 1;
-	$self->{last_count} = $self->{dbh}->do($CURR_SQL)+0;
-	$CURR_SQL = undef;
+	$self->{last_count} = $self->do($CURR_SQL)+0;
 	$self
 }
 
@@ -544,9 +569,7 @@ sub update {
 	my $SET = $self->DO_SET($param);
 	my $COND = $self->DO_WHERE($where);
 	$CURR_SQL = join "", "UPDATE ", $self->word($tab), " SET ", $SET, " WHERE ", $COND;
-	main::msg $CURR_SQL if $self->{app}->ini->{site}{'log-level'} >= 1;
-	$self->{last_count} = $self->{dbh}->do($CURR_SQL)+0;
-	$CURR_SQL = undef;
+	$self->{last_count} = $self->do($CURR_SQL)+0;
 	$self
 }
 

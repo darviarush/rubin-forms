@@ -7,5 +7,6 @@ requires 'MIME::Lite';
 requires 'MIME::Base64';
 requires 'JSON::XS';
 
+#requires 'Package::Rename';
 #requires 'Env::Path';
 #requires 'Sphinx::Search';

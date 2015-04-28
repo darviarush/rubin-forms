@@ -45,12 +45,10 @@ sub drop {
 sub sync {
 	my ($self) = @_;
 	my $c = $::app->connect;
-	my $dbh = $c->dbh;
 	my $info = $c->get_index_info;
-	#::msg $self->tab, $self->name, $info;
 	$info = $info->{$self->tab}{$self->name};
 	if(!$info) {
-		$dbh->do(main::msg $self->alter);
+		$c->do($self->alter);
 	} else {
 		my $replace = 0;
 		if(@$info != @{$self->{idx}}) { ::msg "1111"; $replace = 1; }
@@ -63,8 +61,8 @@ sub sync {
 		}
 		
 		if($replace) {
-			$dbh->do(main::msg $self->drop);
-			$dbh->do(main::msg $self->alter);
+			$c->do($self->drop);
+			$c->do($self->alter);
 		}
 	}
 	$self
@@ -105,19 +103,18 @@ sub drop {
 sub sync {
 	my ($self) = @_;
 	my $c = $::app->connect;
-	my $dbh = $c->dbh;
 	my $info = $c->fk_info;
 	$info = $info->{$self->tab}{$self->name};
 	if(!$info) {
-		$dbh->do(main::msg $self->alter);
+		$c->do($self->alter);
 	} elsif(
 		$info->{tab} ne $self->{tab} ||
 		$info->{col} ne $self->{idx}[0] ||
 		$info->{ref_tab} ne $self->{fk}{tab} ||
 		$info->{ref_col} ne $self->{keys}[0]
 	) {
-		$dbh->do(main::msg $self->drop);
-		$dbh->do(main::msg $self->alter);
+		$c->do($self->drop);
+		$c->do($self->alter);
 	}
 	$self
 }

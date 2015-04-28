@@ -24,19 +24,24 @@ sub new {
 		elsif(ref $id eq "HASH") {
 			# если нет id, то создаёт перед compute или геттере, а сеттер - забрасывает в set и сохраняет перед compute или при геттере
 			my $bean = bless {id => $id->{id}}, $cls;
-			
-			my $field = $::app->{modelMetafieldset}{cls}{$cls}{field};
-			while(my($k, $v) = each %$id) {
-				$bean->$k($v) if exists $field->{$k};
-			}
-			$bean->{save} //= {};
-			return $bean;
+			return $bean->FromHash($id);
 		}
 		else {
 			die "Нельзя ". ref($id) ." обратить в модель $cls";
 		}
 	}
 	bless {id=>$id}, $cls;
+}
+
+# помощник
+sub FromHash {
+	my ($self, $hash) = @_;
+	my $field = $self->Field;
+	$self->{save} //= {};
+	while(my($k, $v) = each %$hash) {
+		$self->$k($v) if exists $field->{$k};
+	}
+	$self
 }
 
 # Наследуется в остальных
@@ -50,38 +55,28 @@ sub id {
 }
 
 
-# проверяет - надо ли сохранять и вызывает store
-sub save {
-	my ($self) = @_;
-	$self->store if $self->{save} || !defined $self->{id};
-	$self
-}
-
 # деструктор
 sub DESTROY {
 	my ($self) = @_;
-	my $save = $self->{save};
-	if($save) {
-		#::msg "save-destroy:", ref($self), $self->{id}, $save;
-		$self->store;
-	}
+	$self->save;
 }
 
-# сохраняет
-sub store {
-	my ($self, $save) = @_;
+# сохраняет, если надо
+sub save {
+	my ($self) = @_;
 
+	return $self unless $self->{save};
+	
 	my $fieldset = $self->Fieldset;
 	my $tab = $fieldset->{tab};
 	my $field = $fieldset->{field};
 
 	my $s = {};
-	if($save //= $self->{save}) {
-		while(my ($k, $v) = each %$save) {
-			$s->{$field->{$k}{col}} = $v;
-		}
-		$self->{save} = undef;
+	my $save = $self->{save};
+	while(my ($k, $v) = each %$save) {
+		$s->{$field->{$k}{col}} = $v;
 	}
+	$self->{save} = undef;
 	
 	my $c = $::app->connect;
 	if($self->{id}) {
@@ -95,7 +90,8 @@ sub store {
 # удаляет строку
 sub erase {
 	my ($self) = @_;
-	$::app->auth->erase($self->Fieldset->{tab}, {id => $self->{id}});
+	$self->save;
+	$::app->connect->erase($self->Fieldset->{tab}, {id => $self->{id}});
 	$self->{id} = undef;
 	$self
 }

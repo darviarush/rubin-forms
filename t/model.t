@@ -6,13 +6,11 @@ use Msg;
 
 our $app;
 
-$app->ini->{connect}{DNS} =~ s/database=.*/database=test/;
+#$app->ini->{connect}{DNS} =~ s/database=.*/database=test/;	# меняем базу
 
 $app->model->{base} = "";	# отключаем базис модели, чтобы не подгружались классы
 
-my $c = $app->connect;		# подключаемся к базе
-
-my $meta = $app->modelMetafieldset;
+my $meta = $app->modelMetafieldset->database("test1");	# меняем базу
 my $author = $meta->fieldset("author");
 my $book = $meta->fieldset("book");
 
@@ -24,6 +22,7 @@ col("name" => "varchar(255)");
 
 $meta->sync;
 
+my $c = $app->connect;		# подключение к базе
 my $idx = $c->get_index_info;
 my $fk = $c->get_fk_info;
 

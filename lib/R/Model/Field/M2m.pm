@@ -13,10 +13,10 @@ Utils::has_const(qw/back toSelf toRef/);
 sub new {
 	my ($cls, $name, $ref1, $ref2) = @_;
 	
-	my $fieldset = $::app->modelMetafieldset->fieldset($ref1->ref->model);
-	my $to_fieldset = $::app->modelMetafieldset->fieldset($ref2->ref->model);
+	my $fieldset = $ref1->ref->fieldset;
+	#my $to_fieldset = $ref2->ref->fieldset;
 	
-	$name .= ucfirst($to_fieldset->{name}) . "s";
+	$name .= ucfirst($ref2->{name}) . "s";
 	
 	my $self = $cls->SUPER::new($fieldset, $name);
 
@@ -29,6 +29,16 @@ sub new {
 
 	$self
 }
+
+# комментарий
+sub remark {
+	my ($self, $comment) = @_;
+	$self->toSelf->remark($comment);
+	$self->toRef->remark($comment);
+	$self->fieldset->tab_comment($comment);
+	$self
+}
+
 
 # свойство m2m
 sub row {

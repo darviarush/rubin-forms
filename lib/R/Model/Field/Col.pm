@@ -30,6 +30,13 @@ sub new {
 	$self
 }
 
+# добавляет комментарий
+sub remark {
+	my ($self, $comment) = @_;
+	$self->{comment} = $comment;
+	$self
+}
+
 # возвращает представление филда в sql
 sub sql {
 	my ($self, $alter) = @_;
@@ -37,7 +44,7 @@ sub sql {
 	$sql .= " NOT NULL" if $alter && !$self->{null} || !$alter && !$self->{null} && !$self->{pk};
 	$sql .= " PRIMARY KEY" if !$alter && $self->{pk};
 	$sql .= " AUTO_INCREMENT" if $self->{autoincrement};
-	$sql .= " DEFAULT $self->{default}" if $self->{default};
+	$sql .= " DEFAULT $self->{default}" if defined $self->{default};
 	$sql
 }
 
@@ -71,16 +78,14 @@ sub sync {
 	
 	if(!$info) {
 		my $sql = $self->alter($after);
-		main::msg $sql;
-		$c->dbh->do($sql);
+		$c->do($sql);
 	} else {
 		if(my $what = $self->not_eq_info($num)) {
 			main::msg ':empty', '1) ', $self->alter_info;
 			main::msg ':empty', '2) ', $self->sql;
 			main::msg($what);
 			$sql = $self->alter($after, 1);
-			main::msg $sql;
-			$c->dbh->do($sql);
+			$c->do($sql);
 		}
 	}
 	$self
@@ -98,8 +103,9 @@ sub not_eq_info {
 	my ($self, $num) = @_;
 	my $sql = $::app->connect->info->{$self->{tab}}{$self->{col}};
 	return "(not in tab)" unless $sql;
-	my $type = $column_type{$sql->{column_type}} // "";
-	return "$self->{type} ne $sql->{column_type} || $type" if $self->{type} ne $sql->{column_type} && $self->{type} ne $type;
+	my $col_type = lc( $column_type{$sql->{column_type}} // $sql->{column_type} // "");
+	my $type = lc $self->{type};
+	return "$type ne $col_type" if $type ne $col_type;
 	my $null = $sql->{is_nullable} eq "YES";
 	return "null and ne null" if $self->{null} && !$null;
 	return "ne null and null" if !$self->{null} && $null;

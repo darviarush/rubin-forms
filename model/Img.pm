@@ -14,7 +14,11 @@ sub setup {
 	# äîáàâëÿåì ñòîëáöû â òàáëèöó
 	$fields->
 	
-	compute('body')
+	compute('body')->
+	
+	testdata(
+		[1]
+	)
 	
 }
 

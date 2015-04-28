@@ -137,8 +137,11 @@
 # 102. $ и wrap сделать одинаковыми, т.к. before(1) и $(1) - разные. И разный язык запросов
 # 103. в nika-css ввести параметр для сжатия, который удаляет пробелы после { } ; и %...
 # 104. несколько раз повторяется тест модели. Запомнить при изменении и выполнить по timeout(0) события модели
+# 105. подтянуть ie6+ до уровня браузера html5 (по крайней мере с поддержкой defineProperty)): http://habrahabr.ru/post/133328/, : 
  
 # Ссылки:
+# behavior ie6-ie7 - https://msdn.microsoft.com/en-us/library/ms531079(v=vs.85).aspx . Запрещает быстро обновлять: lightweight=true
+# библиотеки для исправления старых версий js: https://github.com/Raynos/DOM-shim, https://github.com/es-shims/es5-shim
 # http://caniuse.com/ - в каком браузере что работает
 # https://sites.google.com/site/moispargalkicss/home/spisok-standartnyh-media-queries - стандартные медиа-запросы css
 # http://habrahabr.ru/post/237671/ - слепой набор
@@ -147,7 +150,7 @@
 # http://jsfiddle.net/C3WeM/5/ - анимация основанная на css3 - http://habrahabr.ru/post/209140/
 # http://todomvc.com/ - блог на разных фреймворках
 # http://topobzor.com/13-servisov-dlya-testirovaniya-sajta-v-raznyx-brauzerax/.html - сайты-тестеры
-# http://www.javascripting.com/ - библиотеки js
+# *** http://www.javascripting.com/ - библиотеки js
 # http://habrahabr.ru/post/174987/ - редактор http://ace.c9.io
 # http://rubaxa.github.io/Sortable/ - библиотечка для сортировки, внизу другие ссылки: http://rubaxa.github.io/Pilot/, http://mailru.github.io/FileAPI/ и т.д.
 # http://experiment.net.ru/dirs.php.html - подробная документация по DOM, js, css2, html4

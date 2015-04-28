@@ -8,8 +8,8 @@ use warnings;
 sub new {
 	my ($cls, @args) = @_;
 	if(ref $cls) {
-		my $bean = $cls->Model(@args or {});
-		$bean
+		my $bean = $cls->Model(undef);
+		$bean->FromHash(@args==1? {id=>$args[0]}: (@args or {}));
 	} else {
 		bless {find=>[]}, $cls;
 	}
@@ -30,7 +30,7 @@ sub add {
 	my @matrix;
 	for my $val (@row) {
 		my $bean = $mod->bean($val);
-		$bean->store if !$bean->{id};
+		$bean->save if !$bean->{id};
 		push @matrix, [$ref_val, $bean->{id}];
 	}
 	
@@ -168,7 +168,7 @@ sub _where {
 		
 		if(ref $val) {
 			if(Utils::isa($val, "R::Model::Row")) {
-				$val->store if !$val->{id};
+				$val->save if !$val->{id};
 				$val = $val->{id};
 			} elsif(Utils::isa($val, "R::Model::Rowset")) {
 				$fromFld->join($fld, $from) unless $fld->{As};
