@@ -5,8 +5,14 @@ use R::Watch;
 
 # конструктор
 sub new {
-	my($cls, $app) = @_;
-	bless {app => $app, dir => 'action', dir_c => 'watch/action_c'}, $cls;
+	my($cls, $app, $dir, $dir_c, $ext_act, $ext_htm) = @_;
+	bless {
+		app => $app,
+		dir => $dir // 'action',
+		dir_c => $dir_c // 'watch/action_c',
+		ext_act => $ext_act // qr/\.act$/,
+		ext_htm => $ext_htm // qr/\.htm$/,
+	}, $cls;
 }
 
 # удаляет директорию co скомпиленными темплейтами
@@ -25,11 +31,11 @@ sub watch {
 		$self->{app}->process->reset;
 	};
 	
-	($watch // $self->{app}->watch)->on(qr/\.act$/, $dir, Utils::closure($self, $prt, sub {
+	($watch // $self->{app}->watch)->on($self->{ext_act}, $dir, Utils::closure($self, $prt, sub {
 		my ($self, $print, $path) = @_;
 		$self->compile_action($path);
 		$print->($self, 'action', $path);
-	}))->on(qr/\.htm$/, $dir, Utils::closure($self, $prt, sub {
+	}))->on($self->{ext_htm}, $dir, Utils::closure($self, $prt, sub {
 		my ($self, $print, $path) = @_;
 		$self->compile_htm($path);
 		$print->($self, 'htm', $path);
@@ -57,7 +63,7 @@ sub write {
 	my $dir = [main::dirs($self->{dir_c})];
 	open my $f, ">", $file or die "Нет файла `$file` для записи: $!";
 	print $f "use Helper;\n\n";
-	R::Watch->new->on(qr/\.(act|htm)\.pl$/, $dir, sub {
+	R::Watch->new->on(qr/\.\w+\.pl$/, $dir, sub {
 		my ($path) = @_;
 		print $f "require '$path';\n";
 		#$::_action{$index} = sub { die raise(501) }
@@ -71,9 +77,9 @@ sub compile_htm {
 	my ($self, $path) = @_;
 	local ($_, $`, $');
 	
-	$path =~ /\b$self->{dir}\/(.*)\.htm$/;
+	$path =~ /\b$self->{dir}\/(.*)\.(\w+)$/;
 	my $index = $1;
-	
+	my $ext = $2;
 		
 	my $tmpl = Utils::read($path);
 	my $eval = Utils::TemplateBare($tmpl, my $forms, my $page);
@@ -86,7 +92,7 @@ sub compile_htm {
 	if(exists $page->{options}) {
 		for my $option (@{$page->{options}}) {
 			if($option->[0] eq 'layout') { push @write, "\$app->action->{layout}{'$index'} = '$option->[1]';\n\n"; }
-			else { die "Неизвестная опция `$option->[0]` на странице `$index.htm`" }
+			else { die "Неизвестная опция `$option->[0]` на странице `$index.$ext`" }
 		}
 	}
 	
@@ -119,7 +125,7 @@ sub compile_htm {
 sub compile_action {
 	my ($self, $path) = @_;
 	
-	$path =~ /\b$self->{dir}\/(.*)\.act$/;
+	$path =~ /\b$self->{dir}\/(.*)\.\w+$/;
 	my $index = $1;
 
 	my $action = Utils::read($path);

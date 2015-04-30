@@ -140,6 +140,8 @@
 # 105. подтянуть ie6+ до уровня браузера html5 (по крайней мере с поддержкой defineProperty)): http://habrahabr.ru/post/133328/, : 
  
 # Ссылки:
+# библиотеки для добавления функциональности html5 - https://github.com/Modernizr/Modernizr/wiki/HTML5-Cross-Browser-Polyfills
+# индикатор загрузки на css3: http://evgeniy.pakalo.name/post/67
 # behavior ie6-ie7 - https://msdn.microsoft.com/en-us/library/ms531079(v=vs.85).aspx . Запрещает быстро обновлять: lightweight=true
 # библиотеки для исправления старых версий js: https://github.com/Raynos/DOM-shim, https://github.com/es-shims/es5-shim
 # http://caniuse.com/ - в каком браузере что работает

@@ -954,7 +954,7 @@ sub TemplateBare {
 			my $var = $3 // $8;
 			my $const = $4;
 			my $content = $&;
-			if($open_span && ($open_tag || $TAG =~ /^(?:script|style)$/i)) { $content }
+			if($open_span && ($open_tag || $TAG && $TAG =~ /^(?:script|style)$/i)) { $content }
 			else {
 				$pos += length $content;
 
@@ -1048,7 +1048,9 @@ sub TemplateBare {
 
 # возвращает функцию
 sub Template {
-	my $fn = eval TemplateBare(@_);
+	my $str = TemplateBare(@_);
+	::msg($str);
+	my $fn = eval $str;
 	die $@ if $@;
 	$fn;
 }

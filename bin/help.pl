@@ -28,7 +28,7 @@ find({ no_chdir=>1, wanted=> sub {
 	my ($help) = /^#> ([^\r\n]+)/m;
 	
 	$CAT{$cat || ""}{$name} = {args=>$args, help=>$help};
-}}, dirs "bin");
+}}, files "bin");
 
 
 for my $cat (sort keys %CAT) {

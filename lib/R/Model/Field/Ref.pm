@@ -16,9 +16,12 @@ Utils::has_const(qw/ref back/);
 sub new {
 	my ($cls, $fieldset, $name, $to_model, $fk_name) = @_;
 		
+	$to_model ||= $name;
+	#die "Нет модели $to_model" unless $::app->modelMetafieldset->{fieldset}{$to_model};
+
 	my $self = $cls->SUPER::new($fieldset, $name, '');
 	
-	my $to_fieldset = $::app->modelMetafieldset->fieldset($to_model ||= $name);
+	my $to_fieldset = $::app->modelMetafieldset->fieldset($to_model);
 	my $fk = $to_fieldset->{pk};
 	
 	# например:

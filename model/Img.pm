@@ -16,10 +16,7 @@ sub setup {
 	
 	compute('body')->
 	
-	testdata(
-		[1]
-	)
-	
+	end
 }
 
 # возвращает path

@@ -217,16 +217,46 @@ sub end {}
 
 # в новую таблицу добавляются обязательные данные
 sub data {
-	my ($self, @data) = @_;
-	push @{$self->{data}}, @data;
+	my ($self, @args) = @_;
+	push @{$self->{data}}, scalar(@{$self->{fieldset}}), @args;
+	$self
+}
+
+# в новую таблицу добавляются тестовые данные
+sub testdata {
+	my ($self, @args) = @_;
+	push @{$self->{testdata}}, scalar(@{$self->{fieldset}}), @args;
 	$self
 }
 
 
-# в новую таблицу добавляются тестовые данные
-sub testdata {
-	my ($self, @data) = @_;
-	push @{$self->{testdata}}, @data;
+# запускает данные
+sub run_data {
+	my ($self, $rows) = @_;
+	my $max_field;
+	my $model = $self->{name};
+	for my $row (@$rows) {
+		if(!CORE::ref $row) {
+			$max_field = $row;
+		} elsif(CORE::ref $row eq "CODE") {
+			my $bean = $::app->model->$model(undef);
+			$row->($bean);
+			$bean->store;
+		} elsif(CORE::ref $row eq "ARRAY") {
+			my $bean = $::app->model->$model(undef);
+			my $fieldset = $self->{fieldset};
+			my $i = @$fieldset - $max_field;
+			for my $val (@$row) {
+				my $fld = $fieldset->[$i++];
+				my $name = $fld->{name};
+				$bean->$name($val);
+			}
+			$bean->store;
+		} else {
+			die "Что-то неясное попало в инициализирующие данные: $row";
+		}
+		
+	}
 	$self
 }
 
@@ -255,14 +285,16 @@ sub sync {
 		my $sql = $self->create_table;
 		$c->do($sql);
 		
-		my $cols = [$self->col_keys];
+		#my $cols = [$self->col_keys];
 		
 		if($::app->ini->{site}{test} && @{$self->{testdata}}) {
-			$c->insert($self->{tab}, $cols, $self->{testdata});
+			#$c->insert($self->{tab}, $cols, $self->{testdata});
+			$self->run_data($self->{testdata});
 		}
 		
 		if(@{$self->{data}}) {
-			$c->insert($self->{tab}, $cols, $self->{data});
+			#$c->insert($self->{tab}, $cols, $self->{data});
+			$self->run_data($self->{data});
 		}
 		
 	} else {

@@ -5,13 +5,18 @@ use warnings;
 our $app;
 
 # грузим экшены
-msg(":bold black", "load action..."), $app->action->compile->write("watch/action.pl") unless $app->ini->{restart};
+unless($app->ini->{restart}) {
+	msg(":bold black", "load action...");
+	$app->action->compile->write("watch/action.pl");
+	$app->mailer->action->compile->write("watch/action_mailer.pl");
+}
 
 # запускаем главный процесс, за которым будет следить и перезапускать этот. Там так же идёт демонизация
 $app->process->spy unless $app->ini->{restart};
 # тут уже порождённый процесс
 
 require "watch/action.pl";
+require "watch/action_mailer.pl";
 
 # добавляем роутеры для kitty-cgi
 $app->kitty->route($app->action->{act}) if $app->ini->{site}{kitty};
@@ -45,7 +50,7 @@ sub lord {
 
 require POSIX;
 my $ppid = POSIX::getppid();
-sub graph {	# будет вызываться раз в секунду
+sub graph {	# будет вызываться раз в секунду на главном процессе
 	$app->process->close, exit unless kill 0, $ppid;
 	#$app->model->session->delete if time % 3600 == 0;	# раз в час - не доделано
 }

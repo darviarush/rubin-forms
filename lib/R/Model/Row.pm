@@ -61,12 +61,40 @@ sub DESTROY {
 	$self->save;
 }
 
-# сохраняет, если надо
+# сохраняет, если есть что
 sub save {
 	my ($self) = @_;
 
 	return $self unless $self->{save};
 	
+	my ($tab, $s) = $self->ToCol;
+	
+	my $c = $::app->connect;
+	if($self->{id}) {
+		$c->update($tab, $s, {id => $self->{id}});
+	} else {
+		$self->{id} = $c->append($tab, $s);
+	}
+	$self
+}
+
+# сохраняет - смотрит, есть ли с таким id запись 
+sub store {
+	my ($self) = @_;
+	$::app->connect->store($self->ToCol);
+	$self
+}
+
+# сохраняет первую попавшуюся
+sub replace {
+	my ($self) = @_;
+	$::app->connect->replace($self->ToCol);
+	$self
+}
+
+# помощник 
+sub ToCol {
+	my ($self) = @_;
 	my $fieldset = $self->Fieldset;
 	my $tab = $fieldset->{tab};
 	my $field = $fieldset->{field};
@@ -77,14 +105,7 @@ sub save {
 		$s->{$field->{$k}{col}} = $v;
 	}
 	$self->{save} = undef;
-	
-	my $c = $::app->connect;
-	if($self->{id}) {
-		$c->update($tab, $s, {id => $self->{id}});
-	} else {
-		$self->{id} = $c->append($tab, $s);
-	}
-	$self
+	return ($tab, $s);
 }
 
 # удаляет строку
