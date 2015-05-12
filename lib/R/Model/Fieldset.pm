@@ -95,19 +95,28 @@ sub ref {
 }
 
 # ссылка многие-ко-многим
-#	$name - имя филдов m2m
+#	$name - имя филда m2m
 #	$to_model - имя модели
+#	$name_from_model - имя обратной связи в $to_model
 #	$m2m_model - имя модели-связи
 #	$alias1 - название ref на себя
 #	$alias2 - название ref на модель
 sub m2m {
-	my ($self, $name, $to_model, $m2m_model, $alias1, $alias2) = @_;
+	my ($self, $name, $to_model, $name_from_model, $m2m_model, $alias1, $alias2) = @_;
 	
 	my $to_fieldset = $::app->modelMetafieldset->fieldset($to_model);
 	
-	$m2m_model //= $name . join "", sort ucfirst($self->{name}), ucfirst($to_fieldset->{name});
+	$to_model = $name, $name .= "s" unless defined $to_model;
+	
+	$name_from_model //= $self->{name} . "s";
+	unless($m2m_model) {
+		$name =~ /s$/; my $x = $` // $name;
+		$name_from_model =~ /s$/; my $y = $` // $name_from_model;
+		$m2m_model = $x . ucfirst $y;
+	}
+	
 	$alias1 //= $self->{name};
-	$alias2 //= $to_model;
+	$alias2 //= ($alias1 eq $to_model? 'any' . $to_model: $to_model);
 	
 	my $m2m_fieldset = $::app->modelMetafieldset->fieldset($m2m_model)->
 	pk(undef)->
@@ -119,7 +128,7 @@ sub m2m {
 	my $ref_to = $m2m_fieldset->{field}{$alias2};
 	
 	my $ref1 = R::Model::Field::M2m->new($name, $ref_from, $ref_to);
-	my $ref2 = R::Model::Field::M2m->new($name, $ref_to, $ref_from);
+	my $ref2 = R::Model::Field::M2m->new($name_from_model, $ref_to, $ref_from);
 	$ref1->{back} = $ref2;
 	$ref2->{back} = $ref1;
 	
@@ -141,7 +150,7 @@ sub pk {
 	$name //= "id";
 	
 	my $pk = $self->{pk};
-	$pk->delete if $pk;
+	$self->{pk} = undef, $pk->delete if $pk;
 	
 	if(defined $type) {
 		$pk = $self->{pk} = R::Model::Field::Col->new($self, $name, $type);

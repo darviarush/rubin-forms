@@ -16,7 +16,7 @@ sub new {
 	my $fieldset = $ref1->ref->fieldset;
 	#my $to_fieldset = $ref2->ref->fieldset;
 	
-	$name .= ucfirst($ref2->{name}) . "s";
+	#$name .= ucfirst($ref2->{name}) . "s";
 	
 	my $self = $cls->SUPER::new($fieldset, $name);
 
@@ -42,11 +42,19 @@ sub remark {
 
 # свойство m2m
 sub row {
-	my ($self, $bean, @args) = @_;	
-	$self->{back}->bean->find($self->{back}{name} => $bean);
+	my ($self, $bean, @args) = @_;
+	if(@args) {
+		#$self->{back}->bean()
+		#->add(@args);
+	} else {
+		$self->{back}->bean->find($self->{back}{name} => $bean);
+	}
 }
 
-sub rowset { goto &row }
+sub rowset {
+	my ($self, $bean, @args) = @_;
+	$self->{back}->bean->find($self->{back}{name} => $bean);
+}
 
 
 

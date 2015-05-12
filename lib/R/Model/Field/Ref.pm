@@ -21,8 +21,12 @@ sub new {
 
 	my $self = $cls->SUPER::new($fieldset, $name, '');
 	
+	
+	
 	my $to_fieldset = $::app->modelMetafieldset->fieldset($to_model);
 	my $fk = $to_fieldset->{pk};
+	
+	::msg 'from', $fieldset->{name}, $name, 'to', $to_model, $to_fieldset->{field}{id};
 	
 	# например:
 	#	book.author_id -> author.id

@@ -40,6 +40,7 @@ sub AUTOLOAD {
 		require R::Model::Row;
 		{no strict "refs"; @{"R::Row::${Prop}::ISA"} = "R::Model::Row" };
 	} else {
+	
 		my $i = 0;
 		for $load (@load) {
 			if($i>0) {
@@ -61,6 +62,7 @@ sub AUTOLOAD {
 				require $load;
 				$meta->fieldset($prop);
 			}
+			$i++;
 		}
 	}
 

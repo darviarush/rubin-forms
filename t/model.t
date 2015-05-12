@@ -6,7 +6,7 @@ use Msg;
 
 our $app;
 
-#$app->ini->{connect}{DNS} =~ s/database=.*/database=test/;	# меняем базу
+$app->ini->{connect} = $app->ini->{connect}{test};	# меняем базу
 
 $app->model->{base} = "";	# отключаем базис модели, чтобы не подгружались классы
 
@@ -17,7 +17,7 @@ my $book = $meta->fieldset("book");
 $book->
 ref("author")->
 ref("soauthor" => "author")->
-m2m("read" => "author")->
+m2m("readAuthors" => "author" => "readBooks")-> 
 col("name" => "varchar(255)");
 
 $meta->sync;

@@ -12,6 +12,8 @@ sub new {
 		dir_c => $dir_c // 'watch/action_c',
 		ext_act => $ext_act // qr/\.act$/,
 		ext_htm => $ext_htm // qr/\.htm$/,
+		htm => {},
+		act => {},
 	}, $cls;
 }
 
@@ -66,7 +68,6 @@ sub write {
 	R::Watch->new->on(qr/\.\w+\.pl$/, $dir, sub {
 		my ($path) = @_;
 		print $f "require '$path';\n";
-		#$::_action{$index} = sub { die raise(501) }
 	})->fire;
 	close $f;
 	$self

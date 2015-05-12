@@ -1027,7 +1027,7 @@ sub TemplateBare {
 	
 	#my $code_quote = "my \$dbh = \$app->connect->{dbh}; ";
 	my $code_stash = "my \$_STASH = \$app->request->{stash}; ";
-	my $code_user_id = "\$app->request->user->{id}; ";
+	my $code_user_id = "\$_STASH->{user_id} = \$app->request->user->id; ";
 	
 	#push @begin, $code_quote if $form->{is_quote};
 	push @begin, $code_stash if $form->{is_stash};
