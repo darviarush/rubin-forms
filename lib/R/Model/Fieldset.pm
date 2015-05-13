@@ -4,6 +4,7 @@ package R::Model::Fieldset;
 use strict;
 use warnings;
 
+require R::Model::Row;
 require R::Model::Rowset;
 require R::Model::Index;
 require R::Model::Field::Col;
@@ -14,6 +15,7 @@ require R::Model::Field::Compute;
 
 
 our $pk_type = "int unsigned";
+our $default_charset = "utf8_general_ci";
 our $engine = "INNODB";
 
 # конструктор
@@ -44,7 +46,8 @@ sub new {
 	
 	# создаём роусет
 	{no strict "refs";
-	unshift @{"R::Rowset::${Prop}::ISA"}, "R::Model::Rowset";
+	@{"R::Row::${Prop}::ISA"} = "R::Model::Row" unless @{"R::Row::${Prop}::ISA"};
+	@{"R::Rowset::${Prop}::ISA"} = "R::Model::Rowset" unless @{"R::Rowset::${Prop}::ISA"};
 	my $getter = sub {$_[0]};
 	my $fs = Utils::closure($self, $getter);
 	my $ff = Utils::closure($self->{field}, $getter);
@@ -57,11 +60,11 @@ sub new {
 	*{"R::Rowset::${Prop}::Model"} = $mm;
 	};
 
-	# создаём метод модели и подгружаем класс модели
-	my $row = $::app->model->$name(undef);
-
 	$self->pk($pk_type)->autoincrement;
-	$row->can("setup")->($self);
+	
+	# создаём свойство в модели
+	# если конструктор филдсета был вызван не из app->model, то тут будут подгружены и пакеты модели
+	$::app->model->$name(undef);
 	
 	$self
 }
@@ -89,8 +92,8 @@ sub col {
 
 # добавляет поле-ссылку
 sub ref {
-	my ($self, $name, $to_model, $fk_name) = @_;	
-	R::Model::Field::Ref->new($self, $name, $to_model, $fk_name);
+	my ($self, $name, $to_model, $bk_name, $fk_name) = @_;	
+	R::Model::Field::Ref->new($self, $name, $to_model, $bk_name, $fk_name);
 	$self
 }
 
@@ -193,15 +196,11 @@ sub raw_default {
 }
 
 # добавляет комментарий к последнему филду
-sub comment {
+sub remark {
 	my ($self, $comment) = @_;
 	my $fld = $self->last->remark($comment);
 	$self
 }
-
-# синонимы
-sub remark { goto &comment }
-sub rem { goto &comment }
 
 # добавляет индекс
 sub _add_index {
@@ -218,7 +217,7 @@ sub unique { unshift @_, 'UNIQUE'; goto &_add_index; }
 # добавляют опции таблицы
 sub engine { $_[0]->{engine} = $_[1]; $_[0] }
 sub options { $_[0]->{options} = $_[1]; $_[0] }
-sub tab_comment { $_[0]->{comment} = $_[1]; $_[0] }
+sub comment { $_[0]->{comment} = $_[1]; $_[0] }
 sub tab_charset { $_[0]->{charset} = $_[1]; $_[0] }
 
 # просто для окончания, чтобы можно было столбец закомментировать
@@ -294,10 +293,7 @@ sub sync {
 		my $sql = $self->create_table;
 		$c->do($sql);
 		
-		#my $cols = [$self->col_keys];
-		
 		if($::app->ini->{site}{test} && @{$self->{testdata}}) {
-			#$c->insert($self->{tab}, $cols, $self->{testdata});
 			$self->run_data($self->{testdata});
 		}
 		
@@ -311,11 +307,18 @@ sub sync {
 		my $tab_info = $c->tab_info->{$self->{tab}};
 		$tab_info->{charset} = undef if !$self->{charset} and ($tab_info->{charset} // "") eq 'utf8_unicode_ci';
 		
-		if($self->sql ne $self->sql($tab_info)) {
-			main::msg "1) " . $self->sql;
-			main::msg "2) " . $self->sql($tab_info);
-			$c->do($self->alter);
+		my @a = $self->sql;
+		my @b = $self->sql($tab_info);
+		my $i = 0;
+		for my $a (@a) {
+			my $b = $b[$i++];
+			if($a ne $b) {
+				main::msg "1) $a";
+				main::msg "2) $b";
+				$c->do($self->alter($a));
+			}
 		}
+		
 	
 		my %is;
 		my $num = 1;
@@ -359,20 +362,27 @@ sub sync {
 
 # возвращает дополнительные опции таблицы, которые можно использовать в alter table
 sub sql {
-	my ($self, $opt) = @_;
+	my ($self, $opt, $op) = @_;
 	$opt //= $self;
+	$op = $op? ",": "";
 	my $c = $::app->connect;
-	" ENGINE=" . uc($opt->{engine} || $engine) . 
-	($opt->{charset}? " DEFAUT CHARACTER SET '" . do{ $opt->{charset} =~ /_/; $` } . "' DEFAULT COLLATION '$opt->{charset}'": "") .
-	($opt->{comment}? " COMMENT " . $c->quote($opt->{comment}): "") .
-	($opt->{options}? " $opt->{options}": "")
+	
+	my $collation = $opt->{charset} // $default_charset;
+	$collation =~ /_/; 
+	my $charset = $`;
+	return (
+	"CONVERT TO CHARACTER SET '$charset' COLLATE '$collation'$op",
+	"ENGINE=" . uc($opt->{engine} || $engine),
+	"COMMENT=" . $c->quote($opt->{comment} // ""),
+	($opt->{options}? $opt->{options}: ()),
+	)
 }
 
 # возвращает alter table для таблицы (не для столбцов)
 sub alter {
-	my ($self) = @_;
+	my ($self, $sql) = @_;
 	my $c = $::app->connect;
-	"ALTER TABLE " . $c->word($self->{tab}) . $self->sql;
+	"ALTER TABLE " . $c->word($self->{tab}) . " " . ($sql // join " ", $self->sql(undef, 1));
 }
 
 # возвращает create table

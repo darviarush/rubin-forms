@@ -7,7 +7,7 @@ use base "R::Model::Row";
 # вызывается для создания структуры базы
 sub setup {
 	my ($fields) = @_;
-
+	
 	$fields->
 	
 	col(email => "varchar(255)")->
@@ -16,11 +16,11 @@ sub setup {
 	
 	index('email, pass')->
 	
-	
 	testdata(
 		[1, '@', '123', 1, 'тестовый admin'],
 		[2, 'u@', '123', 0, 'тестовый пользователь'],
-	)
+	);
+
 }
 
 1;

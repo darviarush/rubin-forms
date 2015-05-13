@@ -14,7 +14,7 @@ sub setup {
 	# äîáàâëÿåì ñòîëáöû â òàáëèöó
 	$fields->
 	
-	compute('body')->
+	compute('file')->
 	
 	end
 }
@@ -34,7 +34,7 @@ sub orig {
 }
 
 # âû÷èñëÿåìûé ñòîëáåö
-sub body {
+sub file {
 	my ($self, $body) = @_;
 	if(@_>1) {
 		$self->{id} = $::app->auth->add($self->{tab})->last_id unless defined $self->{id};

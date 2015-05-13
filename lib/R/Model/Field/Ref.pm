@@ -14,19 +14,15 @@ Utils::has_const(qw/ref back/);
 
 # конструктор
 sub new {
-	my ($cls, $fieldset, $name, $to_model, $fk_name) = @_;
+	my ($cls, $fieldset, $name, $to_model, $bk_name, $fk_name) = @_;
 		
 	$to_model ||= $name;
 	#die "Нет модели $to_model" unless $::app->modelMetafieldset->{fieldset}{$to_model};
 
 	my $self = $cls->SUPER::new($fieldset, $name, '');
 	
-	
-	
 	my $to_fieldset = $::app->modelMetafieldset->fieldset($to_model);
 	my $fk = $to_fieldset->{pk};
-	
-	::msg 'from', $fieldset->{name}, $name, 'to', $to_model, $to_fieldset->{field}{id};
 	
 	# например:
 	#	book.author_id -> author.id
@@ -41,7 +37,7 @@ sub new {
 		type=>$fk->{type},
 		null=>1,
 		ref=>$fk,
-		back=>R::Model::Field::Back->new($to_fieldset, $self),
+		back=>R::Model::Field::Back->new($to_fieldset, $self, $bk_name),
 	);
 
 	$fk_name ||= "fk_" . $self->tab . "__" . $self->col . "__to__" . $fk->tab . "__" . $fk->col;

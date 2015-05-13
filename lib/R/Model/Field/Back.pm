@@ -11,9 +11,9 @@ Utils::has_const(qw/ref/);
 
 # конструктор
 sub new {
-	my ($cls, $fieldset, $field) = @_;
+	my ($cls, $fieldset, $field, $name) = @_;
 	
-	my $name = $field->name eq $fieldset->{name}? $field->model . "s": $field->name . ucfirst($field->model) . "s";
+	$name //= $field->name eq $fieldset->{name}? $field->model . "s": $field->name . ucfirst($field->model) . "s";
 	
 	my $self = $cls->SUPER::new($fieldset, $name);
 	

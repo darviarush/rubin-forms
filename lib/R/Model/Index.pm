@@ -51,7 +51,7 @@ sub sync {
 		$c->do($self->alter);
 	} else {
 		my $replace = 0;
-		if(@$info != @{$self->{idx}}) { ::msg "1111"; $replace = 1; }
+		if(@$info != @{$self->{idx}}) { $replace = 1; }
 		else {
 			my $i=0;
 			my $field = $self->{fieldset}{field};
@@ -99,9 +99,14 @@ sub drop {
 	"ALTER TABLE " . $c->word($tab // $self->tab) . " DROP FOREIGN KEY " . $c->word($name // $self->name);
 }
 
+#our %REF_ENGINE = Utils::set(qw/INNODB XTRADB/);
+
 # синхронизация с базой
 sub sync {
 	my ($self) = @_;
+	
+	#unless exists $REF_ENGINE{};
+	
 	my $c = $::app->connect;
 	my $info = $c->fk_info;
 	$info = $info->{$self->tab}{$self->name};

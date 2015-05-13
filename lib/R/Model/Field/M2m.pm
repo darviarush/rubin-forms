@@ -33,9 +33,7 @@ sub new {
 # комментарий
 sub remark {
 	my ($self, $comment) = @_;
-	$self->toSelf->remark($comment);
-	$self->toRef->remark($comment);
-	$self->fieldset->tab_comment($comment);
+	$self->toSelf->fieldset->comment($comment);
 	$self
 }
 

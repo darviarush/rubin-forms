@@ -21,9 +21,7 @@ sub setup {
 		[2, 'odnoklassniki', ''],
 		[3, 'mail.ru', '']
 	)
-	
-	
-	
+
 }
 
 1;
