@@ -61,8 +61,10 @@ sub sync {
 		}
 		
 		if($replace) {
+			$c->do("SET FOREIGN_KEY_CHECKS = 0");
 			$c->do($self->drop);
 			$c->do($self->alter);
+			$c->do("SET FOREIGN_KEY_CHECKS = 1");
 		}
 	}
 	$self

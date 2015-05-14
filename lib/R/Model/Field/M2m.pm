@@ -30,6 +30,12 @@ sub new {
 	$self
 }
 
+# выдаёт краткую информацию о себе
+sub info {
+	my ($self) = @_;
+	"=> " . $self->toRef->ref->model;
+}
+
 # комментарий
 sub remark {
 	my ($self, $comment) = @_;

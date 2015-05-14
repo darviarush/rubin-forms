@@ -25,6 +25,12 @@ sub new {
 	$self
 }
 
+# выдаёт краткую информацию о себе
+sub info {
+	my ($self) = @_;
+	"<- " . $self->ref->model . "." . $self->ref->name;
+}
+
 
 # свойство обратной ссылки
 #	author.books

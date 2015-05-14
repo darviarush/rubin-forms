@@ -27,7 +27,7 @@ sub AUTOLOAD {
 	
 	my $meta = $app->modelMetafieldset;
 	my @load = $base? main::files($base."/".$load.".pm"): ();
-	die "not exists model $Prop" if not @load and not exists $meta->{fieldset}{$prop};
+	#die "not exists model $Prop" if not @load and not exists $meta->{fieldset}{$prop};
 	
 	my $eval = "sub $AUTOLOAD { \@_>1? R::Row::$Prop->new(\@_[1..\$#_]): R::Rowset::$Prop->new }";
 	eval $eval;

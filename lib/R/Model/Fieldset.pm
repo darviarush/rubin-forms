@@ -66,6 +66,9 @@ sub new {
 	# если конструктор филдсета был вызван не из app->model, то тут будут подгружены и пакеты модели
 	$::app->model->$name(undef);
 	
+	# порядок создания таблиц - в начале те, у которых нет ссылок на следующие
+	unshift @{$meta->{fields}}, $self;
+	
 	$self
 }
 
@@ -206,7 +209,7 @@ sub remark {
 sub _add_index {
 	my ($keyword, $self, $idx, $name) = @_;
 	my @idx = split /\s*,\s*/, $idx // $self->last->{name};
-	$name ||= "idx_" . join "__", @idx;
+	$name ||= ($keyword eq "INDEX"? 'idx': 'unq') . "_" . join "__", @idx;
 	$self->{indexes}{$name} = R::Model::Index->new($keyword, [@idx], $name, $self);
 	$self
 }
@@ -226,14 +229,14 @@ sub end {}
 # в новую таблицу добавляются обязательные данные
 sub data {
 	my ($self, @args) = @_;
-	push @{$self->{data}}, scalar(@{$self->{fieldset}}), @args;
+	push @{$self->{data}}, @args;
 	$self
 }
 
 # в новую таблицу добавляются тестовые данные
 sub testdata {
 	my ($self, @args) = @_;
-	push @{$self->{testdata}}, scalar(@{$self->{fieldset}}), @args;
+	push @{$self->{testdata}}, @args;
 	$self
 }
 
@@ -241,21 +244,16 @@ sub testdata {
 # запускает данные
 sub run_data {
 	my ($self, $rows) = @_;
-	my $max_field;
 	my $model = $self->{name};
 	for my $row (@$rows) {
-		if(!CORE::ref $row) {
-			$max_field = $row;
-		} elsif(CORE::ref $row eq "CODE") {
-			my $bean = $::app->model->$model(undef);
-			$row->($bean);
-			$bean->store;
-		} elsif(CORE::ref $row eq "ARRAY") {
+
+		if(CORE::ref $row eq "ARRAY") {
 			my $bean = $::app->model->$model(undef);
 			my $fieldset = $self->{fieldset};
-			my $i = @$fieldset - $max_field;
+			my $i = 0;
 			for my $val (@$row) {
 				my $fld = $fieldset->[$i++];
+				while(CORE::ref($fld) =~ /^R::Model::Field::(?:Back|M2m)$/) { $fld = $fieldset->[$i++] }
 				my $name = $fld->{name};
 				$bean->$name($val);
 			}
@@ -285,25 +283,18 @@ sub sync {
 	my $tab = $self->{tab};
 	my $info = $c->info->{$tab};
 	
+	# синхронизируем вначале зависимые таблицы
 	while(my ($name, $indexref) = each %{$self->{indexref}}) {
 		$indexref->fk->fieldset->sync;
 	}
 	
+	# создаём или редактируем
 	if(!$info) {
 		my $sql = $self->create_table;
-		$c->do($sql);
-		
-		if($::app->ini->{site}{test} && @{$self->{testdata}}) {
-			$self->run_data($self->{testdata});
-		}
-		
-		if(@{$self->{data}}) {
-			#$c->insert($self->{tab}, $cols, $self->{data});
-			$self->run_data($self->{data});
-		}
-		
+		$c->do($sql);		
 	} else {
 	
+		# опции таблицы
 		my $tab_info = $c->tab_info->{$self->{tab}};
 		$tab_info->{charset} = undef if !$self->{charset} and ($tab_info->{charset} // "") eq 'utf8_unicode_ci';
 		
@@ -319,7 +310,7 @@ sub sync {
 			}
 		}
 		
-	
+		# столбцы
 		my %is;
 		my $num = 1;
 		my $after = 1;
@@ -330,28 +321,30 @@ sub sync {
 			}
 		}
 		
-		my %idx_is = (PRIMARY=>1);
+		# индексы
 		while(my ($name, $index) = each %{$self->{indexes}}) {
 			$index->sync;
-			$idx_is{$index->{name}} = 1;
 		}
 		
+		# удаляем индексы
 		my $idx_info = $c->index_info->{$tab} // {};
 		while(my ($k, $v) = each %$idx_info) {
-			$c->do(R::Model::Index::drop(undef, $tab, $k)) if !$idx_is{$k};
+			$c->do(R::Model::Index::drop(undef, $tab, $k)) if not exists $self->{indexes}{$k} and $k ne "PRIMARY";
 		}
 		
-		my %ref_is = ();
+		# fk
 		while(my ($name, $indexref) = each %{$self->{indexref}}) {
 			$indexref->sync;
-			$ref_is{$indexref->{name}} = 1;
 		}
 		
+		# удаляем fk
 		my $fk_info = $c->fk_info->{$tab} // {};
 		while(my ($k, $v) = each %$fk_info) {
-			$c->do(R::Model::IndexRef::drop(undef, $tab, $k)) if !$ref_is{$k};
+			$c->do(R::Model::IndexRef::drop(undef, $tab, $k)) if !exists $self->{indexref}{$k};
 		}
 		
+		
+		# удаляем столбцы
 		while(my ($k, $v) = each %$info) {
 			$c->do(R::Model::Field::Col::drop(undef, $tab, $k)) if !$is{$k};
 		}
@@ -362,19 +355,20 @@ sub sync {
 
 # возвращает дополнительные опции таблицы, которые можно использовать в alter table
 sub sql {
-	my ($self, $opt, $op) = @_;
+	my ($self, $opt, $create) = @_;
 	$opt //= $self;
-	$op = $op? ",": "";
 	my $c = $::app->connect;
 	
 	my $collation = $opt->{charset} // $default_charset;
 	$collation =~ /_/; 
 	my $charset = $`;
+
 	return (
-	"CONVERT TO CHARACTER SET '$charset' COLLATE '$collation'$op",
-	"ENGINE=" . uc($opt->{engine} || $engine),
-	"COMMENT=" . $c->quote($opt->{comment} // ""),
-	($opt->{options}? $opt->{options}: ()),
+		($create? "DEFAULT CHARACTER SET '$charset' COLLATE '$collation',":
+		"CONVERT TO CHARACTER SET '$charset' COLLATE '$collation'"),
+		"ENGINE=" . uc($opt->{engine} || $engine),
+		"COMMENT=" . $c->quote($opt->{comment} // ""),
+		($opt->{options}? $opt->{options}: ()),
 	)
 }
 

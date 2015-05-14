@@ -1,3 +1,4 @@
+#== СЕРВЕР
 #> сервер - http, fcgi или psgi
 
 use strict;

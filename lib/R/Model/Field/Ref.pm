@@ -42,9 +42,15 @@ sub new {
 
 	$fk_name ||= "fk_" . $self->tab . "__" . $self->col . "__to__" . $fk->tab . "__" . $fk->col;
 	
-	$fieldset->{indexref}{$self->name} = R::Model::IndexRef->new($fk_name, $self, $fk);
+	$fieldset->{indexref}{$fk_name} = R::Model::IndexRef->new($fk_name, $self, $fk);
 	
 	$self
+}
+
+# выдаёт краткую информацию о себе
+sub info {
+	my ($self) = @_;
+	"-> " . $self->ref->model . ($self->ref->name ne "id"? "." . $self->ref->name: "");
 }
 
 # свойство row

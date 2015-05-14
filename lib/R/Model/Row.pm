@@ -5,7 +5,7 @@ use warnings;
 use strict;
 
 # конструктор
-# app->model->compute
+# app->model->модель
 sub new {
 	my ($cls, $id);
 	if(@_>2) {
@@ -78,7 +78,7 @@ sub save {
 # сохраняет - смотрит, есть ли с таким id запись 
 sub store {
 	my ($self) = @_;
-	$::app->connect->store($self->ToCol);
+	$self->{id} = $::app->connect->store($self->ToCol)->last_id;
 	$self
 }
 
@@ -113,8 +113,5 @@ sub erase {
 	$self->{id} = undef;
 	$self
 }
-
-
-
 
 1;

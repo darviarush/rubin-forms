@@ -14,6 +14,7 @@ sub new {
 	bless {
 		name => undef,		# имя базы данных
 		fieldset => {},		# имя => таблица
+		fields => [],		# [таблица, таблица...] - порядок таблиц
 		cls => {},			# class => таблица
 		charset => "utf8_unicode_ci",
 	}, $cls;
@@ -93,6 +94,27 @@ sub sync {
 		$c->do($sql);
 	}
 
+	# выполняем функции синхронизации в установленном порядке
+	
+	my $_test = $::app->ini->{site}{test};
+	for my $fieldset (@{$self->{fields}}) {
+
+		my $name = $fieldset->{name};
+		my $bean = $::app->model->$name(undef);
+
+		if($_test && @{$fieldset->{testdata}}) {
+			$fieldset->run_data($fieldset->{testdata});
+			$bean->can("testdata")->($fieldset) if $bean->can("testdata");
+		}
+			
+		if(@{$fieldset->{data}}) {
+			$fieldset->run_data($fieldset->{data});
+			$bean->can("data")->($fieldset) if $bean->can("data");
+		}
+		
+		delete $fieldset->{sync};
+	}
+	
 	$self
 }
 

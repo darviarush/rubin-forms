@@ -9,6 +9,7 @@ use Data::Dumper;
 
 # создаёт множество
 sub set { map { $_=>1 } @_ }
+sub starset { my $i=shift; map { $_=>$i++ } @_ }
 
 # удаляет дубликаты
 sub unique { my %x; map { if(exists $x{$_}) { () } else { $x{$_} = 1; $_ } } @_ }
@@ -419,14 +420,40 @@ sub replace {
 
 # копирует файл
 sub cp {
-	my ($from, $to) = @_;
-	Utils::write($to, Utils::read($from));
+	my ($from, $to, $bufsize) = @_;
+	my ($open_from, $open_to);
+	unless(ref $from) {
+		$open_from = $from; undef $from;
+		open $from, "<", $open_from or die "не могу открыть `$open_from`. $!";
+	}
+	unless(ref $to) {
+		$open_to = $to; undef $to;
+		open $to, ">", $open_to or die "не могу записать `$open_to`. $!";
+	}
+	
+	$bufsize //= 1024*1024*8;
+	my $buf;
+	
+	for(;;) {
+		last unless CORE::read $from, $buf, $bufsize;
+		print $to $buf;
+	}
+	close $from if $open_from;
+	close $to if $open_to;
+	#Utils::write($to, Utils::read($from));
 }
 
 # переносит файл
 sub mv {
 	my ($from, $to) = @_;
-	Utils::cp($from, $to) unless rename $from, $to;
+	Utils::cp($from, $to), unlink $from unless rename $from, $to;
+}
+
+# возвращает расширение файла
+sub ext {
+	my ($file) = @_;
+	$file =~ /\.([^\.]+)/;
+	return $1;
 }
 
 # stderr и stdout записывает так же и в файл
@@ -640,7 +667,7 @@ sub rmpath {
 }
 
 # возвращает путь к каталогу картинки без /image/. Параметр - id
-sub img_path { $_[1] = 62; $_[2] = '/'; goto &to_radix; }
+#sub img_path { $_[1] = 62; $_[2] = '/'; to_radix(); }
 
 # переводит натуральное число в заданную систему счисления
 sub to_radix {

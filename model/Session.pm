@@ -14,7 +14,10 @@ sub setup {
 	ref('user')->required->
 	col(now => 'datetime')->
 	col(new_pass => 'tinyint')->null->remark("0/1 - сессия создана для регистрации")->
-	engine('memory');
+	
+	#engine('memory')->
+	
+	end;
 
 }
 

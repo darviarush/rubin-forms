@@ -40,7 +40,7 @@ sub add_method {
 	my $cls = ref $self;
 	$cls=~/([^:]+)$/;
 	
-	main::msg "$1\t$self->{model}.$name";
+	#main::msg "$1\t$self->{model}.$name";
 	
 	{no strict "refs";
 	
@@ -72,6 +72,16 @@ sub bean {
 	my ($self, @args) = @_;
 	my $model = $self->{model};
 	$::app->model->$model(@args);
+}
+
+# выдаёт краткую информацию о себе
+sub info {"i"}
+
+# добавляет комментарий
+sub remark {
+	my ($self, $comment) = @_;
+	$self->{comment} = $comment;
+	$self
 }
 
 # копирует себя и дополняет

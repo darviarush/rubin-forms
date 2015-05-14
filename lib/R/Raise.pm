@@ -39,7 +39,7 @@ package R::Raise::Trace;
 # преобразует и печатает исключение
 
 use Term::ANSIColor qw//;
-use Cwd qw//;
+#use Cwd qw/abs_path getcwd/;
 use Data::Dumper;
 use overload
 	'""' => \&stringify,
@@ -141,13 +141,20 @@ sub color {
 
 # изменяет путь cygwin на виндовый
 sub _winpath {
-	return "--undef path in winpath--" if !defined $_[0];
+	my ($path) = @_;
+	return "--undef path in winpath--" unless defined $path;
 	
-	return $_[0] if $main::_UNIX;
+	return $path if $main::_UNIX;
 	
 	local ($`, $');
 	
-	my $file = -e $_[0]? Cwd::abs_path($_[0]): $_[0];
+	my $file = $path;
+
+	if(-e $path) {
+		$path = eval { require Cwd; Cwd::fast_abs_path($path) };
+		$file = $path unless $@ // $!;
+	}
+	
 	$file =~ s!^/cygdrive/(\w)!$1:!;
 	$file =~ s!^/(usr/)?!c:/cygwin/!;
 	$file =~ s!/!\\!g;

@@ -1,5 +1,5 @@
 package R::Row::Img;
-# добавляет картинку в базу (табл. img) и на диск (каталог html/images, по-умолчанию)
+# РґРѕР±Р°РІР»СЏРµС‚ РєР°СЂС‚РёРЅРєСѓ РІ Р±Р°Р·Сѓ (С‚Р°Р±Р». img) Рё РЅР° РґРёСЃРє (РєР°С‚Р°Р»РѕРі html/images, РїРѕ-СѓРјРѕР»С‡Р°РЅРёСЋ)
 
 use base R::Model::Row;
 
@@ -7,52 +7,88 @@ use base R::Model::Row;
 # http://www.graphicsmagick.org/perl.html
 
 
-# вызывается при создании объекта
+# РІС‹Р·С‹РІР°РµС‚СЃСЏ РїСЂРё СЃРѕР·РґР°РЅРёРё РѕР±СЉРµРєС‚Р°
 sub setup {
 	my ($fields) = @_;
 	
-	# добавляем столбцы в таблицу
+	# РґРѕР±Р°РІР»СЏРµРј СЃС‚РѕР»Р±С†С‹ РІ С‚Р°Р±Р»РёС†Сѓ
 	$fields->
 	
-	compute('file')->
+	col("bitext" => "tinyint")->default(0)->remark("С‡РёСЃР»Рѕ РѕР±РѕР·РЅР°С‡Р°РµС‚ СЂР°СЃС€РёСЂРµРЅРёРµ С„Р°Р№Р»Р°-РєР°СЂС‚РёРЅРєРё")->
+	compute("ext")->
+	compute("body")->
 	
 	end
 }
 
-# возвращает path
+our @EXT = qw/noname png jpg gif/;
+our %EXT = Utils::starset(0, @EXT);
+$EXT{"jpeg"} = $EXT{"jpg"};
+
+sub ext {
+	my ($self, $ext) = @_;
+	
+	if(@_>1) {
+		$self->bitext($EXT{lc $ext})
+	} else {
+		$EXT[$self->bitext]
+	}
+}
+
+# РІРѕР·РІСЂР°С‰Р°РµС‚ РґРёСЂРµРєС‚РѕСЂРёСЋ
 sub path {
 	my ($self) = @_;
 	my $path = Utils::to_radix($self->{id}, 62);
 	$path =~ s!.!$&/!;
-	$self->{dir} . "/" . $path;
+	$self->root . "/" . $path;
 }
 
-# возвращает путь неизменной картинки
+# РІРѕР·РІСЂР°С‰Р°РµС‚ РїСѓС‚СЊ РЅРµРёР·РјРµРЅРЅРѕР№ РєР°СЂС‚РёРЅРєРё
 sub orig {
 	my ($self) = @_;
-	$self->path . $self->{name}
+	$self->path . "orig." . $self->ext
 }
 
-# вычисляемый столбец
-sub file {
+# РїСѓС‚СЊ Рє СЂРµРїРѕР·РёС‚РѕСЂРёСЋ
+sub root {
+	"html/images"
+}
+
+# РІС‹С‡РёСЃР»СЏРµРјС‹Р№ СЃС‚РѕР»Р±РµС†
+sub body {
 	my ($self, $body) = @_;
 	if(@_>1) {
-		$self->{id} = $::app->auth->add($self->{tab})->last_id unless defined $self->{id};
+		$self->store unless $self->{id};
 		my $path = $self->path;
 		Utils::mkpath($path);
-		Utils::write($self->orig, $body);
+		$self->erase_files;
+		if(ref $body) {
+			Utils::cp($body, $self->orig);
+		} else {
+			Utils::write($self->orig, $body);
+		}
 	} else {
 		Utils::read($self->orig);
 	}
 	return $self;
 }
 
-# удаляет файлы картинки
+# РєР°СЂС‚РёРЅРєСѓ РІР·СЏС‚СЊ РёР· С„Р°Р№Р»Р°
+sub file {
+	my ($self, $file) = @_;
+	open my $f, "<", "$file" or die "РќРµ РјРѕРіСѓ РѕС‚РєСЂС‹С‚СЊ `$file`: $!";
+	$self->ext(Utils::ext($file));
+	$self->body($f);
+	close $f;
+	$self
+}
+
+# СѓРґР°Р»СЏРµС‚ С„Р°Р№Р»С‹ РєР°СЂС‚РёРЅРєРё
 sub erase_files {
 	my ($self) = @_;
 	my $path = $self->path;
 	opendir my $dir, $path or die $!;
-	while($file = readdir $dir) {
+	while(my $file = readdir $dir) {
 		$file = "$path$file";
 		if(-f $path) { unlink $file }
 		else { $count++ }
@@ -61,7 +97,7 @@ sub erase_files {
 	return $count;
 }
 
-# удаляет картинку
+# СѓРґР°Р»СЏРµС‚ РєР°СЂС‚РёРЅРєСѓ
 sub erase {
 	my ($self) = @_;
 	$self->SUPER::erase;
@@ -69,35 +105,27 @@ sub erase {
 	$self
 }
 
-# заменяет картинку
-sub update {
-	my ($self, $body) = @_;
-	$self->erase_files;
-	Utils::write($self->orig, $body);
-	$self
-}
 
-
-# изменяет размер картинки и записывает её в файл name
+# РёР·РјРµРЅСЏРµС‚ СЂР°Р·РјРµСЂ РєР°СЂС‚РёРЅРєРё Рё Р·Р°РїРёСЃС‹РІР°РµС‚ РµС‘ РІ С„Р°Р№Р» name
 # sub resize {
 	# my ($self, $w, $h, $name) = @_;
 	# my $orig = $self->orig;
 	# my $magick = Image::Magick->new;
 	# $magick->Read($orig);
 	# $magick->preview();
-	# $magick->Resize(geometry=>geometry, width=>$w, height=>$h);	# turn в радианах
+	# $magick->Resize(geometry=>geometry, width=>$w, height=>$h);	# turn РІ СЂР°РґРёР°РЅР°С…
 	# $self->erase_files;
 	# $magick->Write($orig);
 	# $self
 # }
 
-# поворачивает картинку
+# РїРѕРІРѕСЂР°С‡РёРІР°РµС‚ РєР°СЂС‚РёРЅРєСѓ
 # sub turn {
 	# my ($self, $turn) = @_;
 	# my $orig = $self->orig;
 	# my $magick = Image::Magick->new;
 	# $magick->Read($orig);
-	# $magick->Rotate(degrees => $turn);	# turn в радианах
+	# $magick->Rotate(degrees => $turn);	# turn РІ СЂР°РґРёР°РЅР°С…
 	# $self->erase_files;
 	# $magick->Write($orig);
 	# $self

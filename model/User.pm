@@ -14,13 +14,26 @@ sub setup {
 	col(pass => "varchar(255)")->
 	col(is_admin => "tinyint")->default(0)->
 	
-	index('email, pass')->
+	unique('email')->
 	
 	testdata(
-		[1, '@', '123', 1, 'тестовый admin'],
-		[2, 'u@', '123', 0, 'тестовый пользователь'],
+		[1, '@', '123', 1],
+		[2, 'u@', '123', 0],
 	);
 
 }
+
+sub login {
+	my ($self, $email, $pass) = @_;
+	
+	die "Вы уже залогинены - разлогиньтесь!" if $self->{id};
+	
+	my ($user) = $self->Model->find(email=>$email, pass=>$pass);
+	
+	die "Неверный email или пароль" unless $user;
+	
+	$user
+}
+
 
 1;

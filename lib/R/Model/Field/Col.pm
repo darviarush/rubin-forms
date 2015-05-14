@@ -30,11 +30,9 @@ sub new {
 	$self
 }
 
-# добавляет комментарий
-sub remark {
-	my ($self, $comment) = @_;
-	$self->{comment} = $comment;
-	$self
+# выдаёт краткую информацию о себе
+sub info {
+	""
 }
 
 # возвращает представление филда в sql
