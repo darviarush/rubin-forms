@@ -33,10 +33,10 @@ sub add_method {$_[0]}
 sub info {"*"}
 
 # вычислимое свойство
-sub row {
-	my ($self, @args) = @_;
-	$self->{code}->(@args);
-}
+# sub row {
+	# my ($self, @args) = @_;
+	# $self->{code}->(@args);
+# }
 
 sub rowset {
 	my ($self, $rowset, @args) = @_;

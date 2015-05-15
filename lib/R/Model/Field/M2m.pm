@@ -46,12 +46,18 @@ sub remark {
 
 # свойство m2m
 sub row {
-	my ($self, $bean, @args) = @_;
-	if(@args) {
-		#$self->{back}->bean()
-		#->add(@args);
+	my ($self, $bean, $idx) = @_;
+	
+	my $rows = $self->{back}->bean->find($self->{back}{name} => $bean);
+	
+	if(@_>2) {
+		my ($ass_bean) = $rows->limit($idx, 1);
+		unless($ass_bean) {
+			$ass_bean = 
+		}
+		$ass_bean
 	} else {
-		$self->{back}->bean->find($self->{back}{name} => $bean);
+		$rows
 	}
 }
 

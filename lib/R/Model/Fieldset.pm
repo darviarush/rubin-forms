@@ -401,15 +401,23 @@ sub create_table {
 	
 	push @sql, join ",\n", @col;
 	
-	push @sql, "\n)", $self->sql;
+	push @sql, "\n) ", join " ", $self->sql(undef, 1);
 	join "", @sql;
 }
 
 # переименовывает таблицу
-sub rename {
+sub rename_tab {
 	my ($self, $tab) = @_;
 	my $c = $::app->connect;
 	join "", "ALTER TABLE ", $c->word($self->{tab}), " RENAME ", $c->word($tab);
 }
+
+# переименовывает столбец
+sub rename {
+	my ($self, $new_name) = @_;
+	my $c = $::app->connect;
+	$c->do($self->rename_tab($new_name));
+}
+
 
 1;

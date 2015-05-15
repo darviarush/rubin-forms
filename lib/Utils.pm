@@ -666,8 +666,25 @@ sub rmpath {
 	$! = undef;
 }
 
-# возвращает путь к каталогу картинки без /image/. Параметр - id
-#sub img_path { $_[1] = 62; $_[2] = '/'; to_radix(); }
+# обходит рекурсивно директории и применяет к файлам и каталогам указанную функцию
+sub by_files {
+	my $fn = pop;
+	require File::Find;
+	File::Find::find({
+		no_chdir => 1,
+		wanted => sub {
+			$fn->($File::Find::name);
+		}
+	}, @_);
+}
+
+# удаляет файлы и директории с файлами
+sub rm {
+	by_files(@_, sub {
+		my ($path) = @_;
+		if(-d $path) {rmdir $path} else {unlink $path}
+	});
+}
 
 # переводит натуральное число в заданную систему счисления
 sub to_radix {

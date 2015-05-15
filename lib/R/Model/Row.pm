@@ -39,7 +39,7 @@ sub FromHash {
 	my $field = $self->Field;
 	$self->{save} //= {};
 	while(my($k, $v) = each %$hash) {
-		$self->$k($v) if exists $field->{$k};
+		$self->$k($v);	# if exists $field->{$k};
 	}
 	$self
 }
@@ -47,8 +47,17 @@ sub FromHash {
 # возвращает/устанавливает идентификатор
 sub id {
 	my ($self, $val) = @_;
-	if(@_>1) { $self->{save}{id} = $val; $self }
-	else { $self->save->{id} }
+	if(@_>1) {
+		if(defined $self->{id} and $val ne $self->{id}) {
+			die "попытка изменить id";
+			$self->{save}{id} = $val;
+			$self->save;
+		} else {
+			$self->{id} = $val;
+		}
+		$self
+	}
+	else { $self->save if !$self->{id}; $self->{id} }
 }
 
 
@@ -67,27 +76,42 @@ sub save {
 	my ($tab, $s) = $self->ToCol;
 	
 	my $c = $::app->connect;
-	if($self->{id}) {
-		$c->update($tab, $s, {id => $self->{id}});
+	my ($id, $rel);
+	if($id = $self->{id}) {
+		$c->update($tab, $s, {id => $id});
+		if($id = $s->{id}) {
+			$rel->{save}{$self->{ref}} = $id if $rel = $self->{rel};
+			$self->{id} = $id;
+		}
 	} else {
-		$self->{id} = $c->append($tab, $s);
+		$id = $self->{id} = $c->append($tab, $s);
+		$rel->{save}{$self->{ref}} = $id if $rel = $self->{rel};
 	}
 	$self
 }
 
-# сохраняет - смотрит, есть ли с таким id запись 
+# сохраняет - смотрит, есть ли с таким id запись и обязательно сохраняет, даже если нет $self->{save}
 sub store {
 	my ($self) = @_;
-	$self->{id} = $::app->connect->store($self->ToCol)->last_id;
-	$self
+	
+	if(my $id = $self->{id} // $self->{save}{id}) {
+		unless($::app->connect->query($self->Fieldset->{tab}, "1", $id)) {
+			$self->{save}{id} = $id;
+			$self->{id} = undef;
+		} else {
+			$self->{id} //= $self->{save}{id};
+			delete $self->{save}{id};
+		}
+	}
+	$self->save;
 }
 
 # сохраняет первую попавшуюся
-sub replace {
-	my ($self) = @_;
-	$::app->connect->replace($self->ToCol);
-	$self
-}
+# sub replace {
+	# my ($self) = @_;
+	# $::app->connect->replace($self->ToCol);
+	# $self
+# }
 
 # помощник 
 sub ToCol {
@@ -99,6 +123,7 @@ sub ToCol {
 	my $s = {};
 	my $save = $self->{save};
 	while(my ($k, $v) = each %$save) {
+		#$v = $v->id if ref $v;
 		$s->{$field->{$k}{col}} = $v;
 	}
 	$self->{save} = undef;

@@ -72,8 +72,14 @@ sub offset {
 # limit
 sub limit {
 	my ($self, $limit) = @_;
-	$self->{limit} = $limit;
-	$self
+	if(@_==3) {
+		$self->{offset} = $limit;
+		$self->{limit} = $_[2];
+	}
+	else {
+		$self->{limit} = $limit;
+	}
+	wantarray? $self->_rows: $self;
 }
 
 # выборка страницы начиная с 1

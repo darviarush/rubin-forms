@@ -237,7 +237,7 @@ sub DO_SET {
 			)
 		);
 	}
-	return wantarray? @set: join(",", @set);
+	return wantarray? @set: join(", ", @set);
 }
 
 # формирует where
@@ -322,7 +322,6 @@ sub sel {
 		$tab = $self->word($tab);
 	}
 	my $sql = join "", "SELECT ", join(", ", @view), "${sep}FROM ", $tab, $self->query_add($sep, \@args);
-	main::msg $sql if $self->{app}->ini->{site}{'log-level'} >= 1;
 	$sql
 }
 
@@ -486,6 +485,7 @@ sub query {
 	my ($self) = @_;
 	$CURR_SQL = sel(@_);
 	my @row = $self->{dbh}->selectrow_array($CURR_SQL);
+	$self->log(wantarray? \@row: $row[0]);
 	$CURR_SQL = undef;
 	return wantarray? @row: $row[0];
 }
@@ -495,6 +495,7 @@ sub query_all {
 	my ($self) = @_;
 	$CURR_SQL = sel @_;
 	my $row = $self->{dbh}->selectall_arrayref($CURR_SQL, {Slice=>{}});
+	$self->log($row);
 	$CURR_SQL = undef;
 	$row
 }
@@ -503,6 +504,24 @@ sub query_all {
 sub query_ref {
 	my $x = query_all(@_);
 	$x->[0];
+}
+
+# логирует, если нужно
+sub log {
+	my ($self, @args) = @_;
+	main::msg ":inline", ":empty", $self->syntax($CURR_SQL), (@args? (":red", " -> ", ":reset", ":sep", @args): ()) if $self->{app}->ini->{site}{'log-level'} >= 1;
+}
+
+our $COLOR_NUM = ":cyan";
+our $COLOR_WORD = ":magenta";
+our $COLOR_STR = ":green";
+our $COLOR_DO = ":yellow";
+
+# подсветка синтаксиса
+sub syntax {
+	my ($self, $sql) = @_;
+	#my $words = $self->{sql_word}; $words->{uc $_}
+	map { ((/^\d+$/? $COLOR_NUM: /^['"]/? $COLOR_STR: /^[A-Z\d_]+$/? $COLOR_WORD: ":reset"), $_) } split /(\w+|'(?:\\'|[^'])*'|"(?:\\"|[^"])*")/, $sql;
 }
 
 # id последней добавленной записи
@@ -518,8 +537,11 @@ sub last_count { $_[0]->{last_count} }
 sub do {
 	my ($self, $sql) = @_;
 	$CURR_SQL = $sql;
-	main::msg $CURR_SQL if $self->{app}->ini->{site}{'log-level'} >= 1;
 	my $ret = $self->{dbh}->do($CURR_SQL);
+	my $cw = $COLOR_WORD;
+	$COLOR_WORD = $COLOR_DO;
+	$self->log($COLOR_NUM, ($ret == 1? (): $ret), ($CURR_SQL =~ /^\s*INSERT\b/i? $self->last_id: ()));
+	$COLOR_WORD = $cw;
 	$CURR_SQL = undef;
 	$ret
 }
@@ -542,8 +564,8 @@ sub add {
 	} else {
 		$CURR_SQL = join "", "INSERT INTO ", $self->word($tab), " () VALUES ()";
 	}
-	$self->{last_count} = $self->do($CURR_SQL) + 0;
 	$self->{last_id} = undef;
+	$self->{last_count} = $self->do($CURR_SQL) + 0;
 	$self
 }
 
@@ -559,6 +581,7 @@ sub insert {
 	my ($self, $tab, $fields, $matrix) = @_;
 	my $SET = $self->INS_SET($matrix);
 	$CURR_SQL = join "", "INSERT INTO ", $self->word($tab), " (", join(", ", $self->FIELDS($fields)), ") VALUES ", $SET;
+	$self->{last_id} = undef;
 	$self->{last_count} = $self->do($CURR_SQL)+0;
 	$self
 }
@@ -587,17 +610,27 @@ sub save {
 }
 
 # добавляет или изменяет первую попавщуюся запись
+# sub replace {
+	# my ($self, $tab, $param) = @_;
+	# my $id = $self->query($tab, "id", $param, "LIMIT 1");
+	# if($id) {
+		# delete $param->{id};
+		# $self->update($tab, $param, $id);
+		# $self->{last_id} = $id;
+	# } else {
+		# $self->add($tab, $param);
+	# }
+	# return $self;
+# }
+
+# добавляет или изменяет первую попавщуюся запись
 sub replace {
 	my ($self, $tab, $param) = @_;
-	my $id = $self->query($tab, "id", $param, "LIMIT 1");
-	if($id) {
-		delete $param->{id};
-		$self->update($tab, $param, $id);
-		$self->{last_id} = $id;
-	} else {
-		$self->add($tab, $param);
-	}
-	return $self;
+	my $SET = $self->DO_SET($param);
+	$CURR_SQL = join "", "REPLACE ", $self->word($tab), " SET ", $SET;
+	$self->{last_id} = $param->{id};
+	$self->{last_count} = $self->do($CURR_SQL)+0;
+	$self
 }
 
 # добавляет или изменяет первую попавщуюся запись

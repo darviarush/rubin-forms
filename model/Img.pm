@@ -15,11 +15,19 @@ sub setup {
 	$fields->
 	
 	col("bitext" => "tinyint")->default(0)->remark("число обозначает расширение файла-картинки")->
-	compute("ext")->
-	compute("body")->
+	compute("ext")->remark("расширение")->
+	compute("body")->remark("бинарный код файла")->
+	compute("file")->remark("путь к файлу")->
 	
 	end
 }
+
+# удаление таблицы
+sub DROP {
+	my ($fieldset) = @_;
+	Utils::rmdir(root());
+}
+
 
 our @EXT = qw/noname png jpg gif/;
 our %EXT = Utils::starset(0, @EXT);
@@ -43,12 +51,6 @@ sub path {
 	$self->root . "/" . $path;
 }
 
-# возвращает путь неизменной картинки
-sub orig {
-	my ($self) = @_;
-	$self->path . "orig." . $self->ext
-}
-
 # путь к репозиторию
 sub root {
 	"html/images"
@@ -63,24 +65,29 @@ sub body {
 		Utils::mkpath($path);
 		$self->erase_files;
 		if(ref $body) {
-			Utils::cp($body, $self->orig);
+			Utils::cp($body, $self->file);
 		} else {
-			Utils::write($self->orig, $body);
+			Utils::write($self->file, $body);
 		}
 	} else {
-		Utils::read($self->orig);
+		Utils::read($self->file);
 	}
 	return $self;
 }
 
-# картинку взять из файла
+# картинку взять из файла, либо вернуть путь к файлу
 sub file {
 	my ($self, $file) = @_;
-	open my $f, "<", "$file" or die "Не могу открыть `$file`: $!";
-	$self->ext(Utils::ext($file));
-	$self->body($f);
-	close $f;
-	$self
+	if(@_>1) {
+		open my $f, "<", "$file" or die "Не могу открыть `$file`: $!";
+		$self->ext(Utils::ext($file));
+		$self->body($f);
+		close $f;
+		$self
+	} else {
+		# возвращает путь неизменной картинки
+		$self->path . "file." . $self->ext
+	}
 }
 
 # удаляет файлы картинки
@@ -109,25 +116,25 @@ sub erase {
 # изменяет размер картинки и записывает её в файл name
 # sub resize {
 	# my ($self, $w, $h, $name) = @_;
-	# my $orig = $self->orig;
+	# my $file = $self->file;
 	# my $magick = Image::Magick->new;
-	# $magick->Read($orig);
+	# $magick->Read($file);
 	# $magick->preview();
 	# $magick->Resize(geometry=>geometry, width=>$w, height=>$h);	# turn в радианах
 	# $self->erase_files;
-	# $magick->Write($orig);
+	# $magick->Write($file);
 	# $self
 # }
 
 # поворачивает картинку
 # sub turn {
 	# my ($self, $turn) = @_;
-	# my $orig = $self->orig;
+	# my $file = $self->file;
 	# my $magick = Image::Magick->new;
-	# $magick->Read($orig);
+	# $magick->Read($file);
 	# $magick->Rotate(degrees => $turn);	# turn в радианах
 	# $self->erase_files;
-	# $magick->Write($orig);
+	# $magick->Write($file);
 	# $self
 # }
 

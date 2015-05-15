@@ -56,20 +56,26 @@ sub info {
 # свойство row
 sub row {
 	my ($self, $bean, $val) = @_;
+		
 	if(@_>2) {
 		$val = {@_[2..$#_]} if @_>3;
-		if(ref $val) {
-			my $ref = $self->{ref}->bean($val);
-			$ref->save unless $ref->{id};
-			$val = $ref->{id};
-		}
 		
-		$bean->{save}{$self->{name}} = $val;
-		$bean
+		if(!ref $val) {
+			$self->SUPER::row($bean, $val);
+		} else {
+			my $id;
+			%$val = (%$val, id => $id) if !$val->{id} && $bean->id && defined($id = $self->SUPER::row($bean));
+			my $new = $self->{ref}->bean($val);
+			$bean->{save}{$self->{name}} = $new->id;
+			$bean
+		}
 	}
 	else {
 		my $id = $self->SUPER::row($bean);
-		$self->{ref}->bean($id)
+		my $new = $self->{ref}->bean($id);
+		$new->{rel} = $bean;
+		$new->{ref} = $self->{name};
+		$new
 	}
 }
 
