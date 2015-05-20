@@ -229,14 +229,14 @@ my @abc = ('A'..'Z', 'a'..'z', '0'..'9', '/', '$', '.');
 
 sub unic_id {
 	my $size = shift || 16;
-	my $unic_id = "";
+	my @unic_id;
 
 	for(my $i=0; $i<$size; $i++) {
 		my $j = int rand scalar @abc;
-		$unic_id .= $abc[$j];
+		push @unic_id, $abc[$j];
 	}
 
-	return $unic_id;
+	return join "", @unic_id;
 }
 
 # sub unic_id {
@@ -248,11 +248,11 @@ sub unic_id {
 # создаёт соль заданной длины
 sub gen_salt {
 	my $size = shift || 16;
-	my $salt = "";
+	my @salt;
 
-	for(my $i=0; $i<$size; $i++) { $salt .= chr(rand 256); }
+	for(my $i=0; $i<$size; $i++) { push @salt, chr(rand 256); }
 
-	return $salt;
+	return join "", @salt;
 }
 
 # распаковывает данные переданные в виде параметров url
@@ -368,6 +368,7 @@ $Data::Dumper::Useqq = 1;
 { no warnings 'redefine';
 	sub Data::Dumper::qquote {
 		my $s = shift;
+		print STDERR "\n!!!\n";
 		$s =~ s/\'/\\\'/g;
 		return "'$s'";
 	}
@@ -680,10 +681,20 @@ sub by_files {
 
 # удаляет файлы и директории с файлами
 sub rm {
+	my @dir;
 	by_files(@_, sub {
 		my ($path) = @_;
-		if(-d $path) {rmdir $path} else {unlink $path}
+		if(-d $path) {push @dir, $path} else {unlink $path}
 	});
+	rmdir $_ for @dir;
+}
+
+# удаляет всё в указанной директории
+sub rmdown {
+	for my $dir (@_) {
+		my @dir = <$dir/*>;
+		rm(@dir) if @dir;
+	}
 }
 
 # переводит натуральное число в заданную систему счисления
@@ -942,7 +953,7 @@ sub TemplateBare {
 					if($form->{load}) {
 						my $data = ($name? "\$data->{'$name'}": "\$_[0] = \$data");
 						my $where = exists $form->{where}? ", join '', $form->{where}": '';
-						$load = "$data = \$app->auth->form_load(\$id.'-$name'$where) unless ref($data);";
+						$load = "$data = \$app->action->form_load(\$id.'-$name'$where) unless ref($data);";
 						push @code, ["load", $load . "\n"];
 						$load = "do { $load () }, ";
 					}

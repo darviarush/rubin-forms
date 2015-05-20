@@ -32,7 +32,9 @@ sub connect {
 	my $ini = $self->{app}->ini->{connect};
 	$self->{dbh} = my $dbh = DBI->connect($ini->{DNS}, $ini->{user}, $ini->{password},
 		{RaiseError => 1, PrintError => 0, PrintWarn => 0});
-	$dbh->do("SET NAMES utf8");
+	my $collate = $ini->{charset} // "utf8_unicode_ci";
+	my ($charset) = $collate =~ /^([^_]+)/;
+	$self->do("SET NAMES " . $dbh->quote($charset) . ($collate =~ /_/? " COLLATE " . $dbh->quote($collate): ""));
 	$self
 }
 
@@ -41,6 +43,10 @@ sub close {
 	my ($self) = @_;
 	$self->{dbh}->disconnect;
 	delete $self->{info};
+	delete $self->{tab_info};
+	delete $self->{index_info};
+	delete $self->{fk_info};
+	delete $self->{fk_info_backward};
 	$self
 }
 
@@ -76,7 +82,7 @@ sub tab_info {
 sub get_tab_info {
 	my ($self) = @_;
 	my $dbh = $self->{dbh};
-	my $sql = "select table_name as name, engine, table_collation as charset, table_comment as comment, create_options as options
+	my $sql = "select table_name as name, engine, table_collation as charset, table_comment as remark, create_options as options
 		from information_schema.tables
 		where table_schema=".$self->quote($self->basename);
 	my $rows = $dbh->selectall_arrayref($sql, {Slice=>{}});
@@ -222,7 +228,20 @@ sub TAB_ref {
 }
 
 # квотирование
-sub quote { my ($self, $s) = @_; !defined($s)? "null": $s =~ /^-?(?:[1-9]\d*|0)(?:\.\d+)?$/? $s: $self->{dbh}->quote($s) }
+sub quote {
+	my ($self, $s) = @_;
+	!defined($s)? "NULL":
+	ref($s)? do {
+		ref $s eq "ARRAY"? do {
+			my %x = map { ($_=>$_) } @$s;
+			"(".join(",", map{$self->quote($x{$_})} keys %x).")"
+		}:
+		Utils::isa($s, "R::Model::Row")? $s->id:
+		die("не могу приобразовать ссылку в quote: `$s`");
+	}:
+	$s =~ /^-?(?:[1-9]\d*|0)(?:\.\d+)?$/? $s:
+	$self->{dbh}->quote($s)
+}
 
 # формирует ключ=значение через запятую, для UPDATE SET или REPLACE SET
 sub DO_SET {
@@ -500,6 +519,16 @@ sub query_all {
 	$row
 }
 
+# массив значений
+sub query_col {
+	my ($self) = @_;
+	$CURR_SQL = sel @_;
+	my $row = $self->{dbh}->selectcol_arrayref($CURR_SQL);
+	$self->log($row);
+	$CURR_SQL = undef;
+	$row
+}
+
 # строка в виде хеша
 sub query_ref {
 	my $x = query_all(@_);
@@ -591,7 +620,15 @@ sub update {
 	my ($self, $tab, $param, $where) = @_;
 	my $SET = $self->DO_SET($param);
 	my $COND = $self->DO_WHERE($where);
-	$CURR_SQL = join "", "UPDATE ", $self->word($tab), " SET ", $SET, " WHERE ", $COND;
+	my $from;
+	if(ref $tab) {
+		if(@$tab == 1) { $tab = $tab->[0]; }
+		else {
+			$from = $tab;
+			($tab) = $from->[0] =~ /As\s+(.+?)$/;
+		}
+	}
+	$CURR_SQL = join "", "UPDATE ", $self->word($tab), " SET ", $SET, ($from? join("\n", @$from) . "\n": " "), "WHERE ", $COND;
 	$self->{last_count} = $self->do($CURR_SQL)+0;
 	$self
 }

@@ -31,6 +31,35 @@ sub info {
 	"<- " . $self->ref->model . "." . $self->ref->name;
 }
 
+# выполняется при извлечении столбца back из upFld
+sub deep_copy {
+	my ($self, $upFld) = @_;
+	#::msg ":bold black", "dc back!", ":reset", $upFld->model .".". $upFld->name .".". $self->name;
+	$self = $self->SUPER::deep_copy($upFld);
+	$self->{As} = $upFld->join($self->{ref}) unless $self->{As};
+	$self
+}
+
+# # проверяет, что такой есть и возвращает столбец
+sub getlike {
+	my ($self, $key) = @_;
+	my $fld;
+	#::msg ":magenta", "back!", ":reset", $self->model . "." . $self->name . ".$key", $self->{toSelf}{back}{name}, $self->{toRef}{name};
+	die "нет поля по обратной ссылке $self->{model}.$self->{name}.$key" unless $fld = $self->{ref}{fieldset}{field}{$key};
+	$fld->deep_copy($self);
+}
+
+# возвращает As и col
+sub column {
+	my ($self) = @_;
+	return $self->{As}, $self->{ref}{ref}{col};
+}
+
+
+# sub deadlock {
+	# my ($self) = @_;
+	# $self->like($self->{ref}{name});
+# }
 
 # свойство обратной ссылки
 #	author.books

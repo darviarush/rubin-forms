@@ -11,12 +11,15 @@ require R::Model::Fieldset;
 sub new {
 	my ($cls) = @_;
 	
+	my $ini = $::app->ini->{DNS};
+	
 	bless {
 		name => undef,		# имя базы данных
 		fieldset => {},		# имя => таблица
 		fields => [],		# [таблица, таблица...] - порядок таблиц
 		cls => {},			# class => таблица
-		charset => "utf8_unicode_ci",
+		charset => $ini->{charset} // "utf8_unicode_ci",
+		paging => $ini->{paging} // 6,		# размер страницы
 	}, $cls;
 }
 
@@ -24,6 +27,18 @@ sub new {
 sub fieldset {
 	my ($self, $name) = @_;
 	$self->{fieldset}{$name} //= R::Model::Fieldset->new($name);
+}
+
+our %META = Utils::set(qw/charset paging/);
+
+# устанавливает метаинформацию для базы
+sub meta {
+	my ($self, %args) = @_;
+	while(my($k, $v) = each %args) {
+		die "нет опции `$k` в meta" unless exists $META{$k};
+		$self->{$k} = $v;
+	}
+	$self
 }
 
 # Преобразовывает имя модели в стандартное имя столбца или таблицы
@@ -146,5 +161,15 @@ sub database {
 	$self
 }
 
+# удаляет базу
+sub drop {
+	my ($self) = @_;
+	$self->load_all_models;
+	my $info = $::app->connect->info;
+	for my $fieldset (@{$self->{fields}}) {
+		$fieldset->drop if $info->{$fieldset->{tab}};
+	}
+	$self
+}
 
 1;

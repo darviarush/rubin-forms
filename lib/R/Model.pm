@@ -14,6 +14,8 @@ sub new {
 	bless {app=>$app, base=>'model'}, $cls;
 }
 
+our %inspect = qw/onCreate create onDrop drop onAdd add onUpdate update onSave save onTruncate truncate onErase erase/;
+
 # возвращает модель
 sub AUTOLOAD {
 	$AUTOLOAD =~ /([^:]+)$/;
@@ -37,6 +39,7 @@ sub AUTOLOAD {
 	
 	if(@load) {
 		my @setup;
+		my $listener = $app->listener;
 		my $i = 0;
 		for $load (@load) {
 			if($i>0) {
@@ -50,7 +53,11 @@ sub AUTOLOAD {
 			require $load;
 			# должен отработать обязательно конструктор филдсета - создать поля в классе модели
 			{no strict "refs";
-			push @setup, *{"R::Row::$Prop\::setup"}{CODE};
+				push @setup, *{"R::Row::$Prop\::setup"}{CODE};
+				while(my ($method, $on) = each %inspect) {
+					my $code = *{"R::Row::$Prop\::$method"}{CODE};
+					$listener->listen("$prop.$on", $code) if $code;
+				}
 			};
 			
 			$i++;

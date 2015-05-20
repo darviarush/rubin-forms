@@ -145,7 +145,8 @@ sub row {
 # устанавливается в класс rowset-а
 sub rowset {
 	my ($self, $bean, $val) = @_;
-	$bean->view($self->{name});
+	my $ref = $bean->view($self->name)->_col_ref;
+	wantarray? @$ref: $ref;
 }
 
 1;

@@ -76,14 +76,24 @@ sub save {
 	my ($tab, $s) = $self->ToCol;
 	
 	my $c = $::app->connect;
+	my $listener = $::app->listener;
+	my $name = $self->Fieldset->{name};
 	my ($id, $rel);
 	if($id = $self->{id}) {
+	
+		$listener->fire("$name.update,$name.save", $self);
+		$self->{noAction} = undef, return $self if $self->{noAction};
+	
 		$c->update($tab, $s, {id => $id});
 		if($id = $s->{id}) {
 			$rel->{save}{$self->{ref}} = $id if $rel = $self->{rel};
 			$self->{id} = $id;
 		}
 	} else {
+	
+		$listener->fire("$name.add,$name.save", $self, 1);
+		$self->{noAction} = undef, return $self if $self->{noAction};
+	
 		$id = $self->{id} = $c->append($tab, $s);
 		$rel->{save}{$self->{ref}} = $id if $rel = $self->{rel};
 	}
@@ -133,10 +143,30 @@ sub ToCol {
 # удаляет строку
 sub erase {
 	my ($self) = @_;
-	$self->save;
-	$::app->connect->erase($self->Fieldset->{tab}, {id => $self->{id}});
+	die "нельзя удалить не созданную запись без id" unless $self->{id};
+	my $fieldset = $self->Fieldset;
+	my $name = $fieldset->{name};
+	$::app->listener->fire("$name.erase", $self);
+	$self->{noAction} = undef, return $self if $self->{noAction};
+	$::app->connect->erase($fieldset->{tab}, {id => $self->{id}});
 	$self->{id} = undef;
 	$self
 }
+
+# ===== события =====
+# все события выполняются перед sql-запросом
+# отменить можно установив $self->{noAction} в 1
+# создание таблицы
+#sub onCreate {}
+# удаление таблицы
+#sub onDrop {}
+# создание записи
+#sub onAdd {}
+# измение записи
+#sub onUpdate {}
+# сохранение записи - 2-й параметр: 1-add или 0-update
+#sub onSave {}
+# удаление записи
+#sub onErase {}
 
 1;

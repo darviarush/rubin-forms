@@ -61,7 +61,7 @@ sub msg (@) {
 		my $i = 0;
 		my $msg = join("", map {
 			my @ret = !defined($_)? ($_UNIX? Term::ANSIColor::colored("undef", "red"): "undef"):
-			ref $_? do { my($x)=Utils::Dump($_); $x=~s/\s+//g if $inline; $x}:
+			ref $_? do { my($x)=Utils::Dump($_); $x=~s/\s+/ /g if $inline; $x}:
 			$_ eq ":space"? do { $sep = " "; () }:
 			$_ eq ":empty"? do { $sep = ""; () }:
 			$_ eq ":sep"? do { $sep = ", "; () }:
@@ -71,9 +71,11 @@ sub msg (@) {
 			$_ eq ":time"? do { POSIX::strftime("%T", localtime) }:
 			/^:([\w ]+)$/? do { if($_UNIX) { $reset = 1; $next = Term::ANSIColor::color($1); } () }:
 			$_;
-			if(defined $next and @ret) { $ret[0] = "$next$ret[0]"; $next = undef }
-			$i++;
-			push @ret, $sep if @ret and $i != @_;
+			if(@ret) {
+				unshift @ret, $sep if $i++ != 0;
+				unshift(@ret, $next), $next = undef if defined $next;
+			}
+			
 			@ret
 		} @_);
 		$msg .= Term::ANSIColor::color('reset') if $reset;

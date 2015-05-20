@@ -53,6 +53,17 @@ sub info {
 	"-> " . $self->ref->model . ($self->ref->name ne "id"? "." . $self->ref->name: "");
 }
 
+# проверяет, что такой есть и возвращает столбец. Добавляет join
+sub getlike {
+	my ($self, $key) = @_;
+	my $fld;
+	#::msg ":yellow", "ref!", ":reset", $self->model . "." . $self->name . ".$key";
+	die "нет поля по ссылке $self->{model}.$self->{name}.$key" unless $fld = $self->{ref}{fieldset}{field}{$key};
+	$fld = $self->{like}{$key} = $fld->deep_copy($self);
+	$self->{As} = $self->join($self->{ref}) unless $self->{As};
+	$fld;
+}
+
 # свойство row
 sub row {
 	my ($self, $bean, $val) = @_;

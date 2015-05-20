@@ -37,7 +37,9 @@ sub new {
 		engine => undef,
 		options => undef,	# дополнительные опции таблицы
 		charset => undef,	# collate таблицы
-		comment => undef,	# комментарий таблицы
+		remark => undef,	# комментарий таблицы
+		paging => undef,	# размер страницы
+		ordering => undef,	# сортирвка по умолчанию
 		data => [],
 		testdata => []
 	}, $cls;
@@ -69,6 +71,18 @@ sub new {
 	# порядок создания таблиц - в начале те, у которых нет ссылок на следующие
 	unshift @{$meta->{fields}}, $self;
 	
+	$self
+}
+
+our %META = Utils::set(qw/charset paging ordering engine options remark/);
+
+# устанавливает метаинформацию для базы
+sub meta {
+	my ($self, %args) = @_;
+	while(my($k, $v) = each %args) {
+		die "нет опции `$k` в meta" unless exists $META{$k};
+		$self->{$k} = $v;
+	}
 	$self
 }
 
@@ -217,12 +231,6 @@ sub _add_index {
 sub index { unshift @_, 'INDEX'; goto &_add_index; }
 sub unique { unshift @_, 'UNIQUE'; goto &_add_index; }
 
-# добавляют опции таблицы
-sub engine { $_[0]->{engine} = $_[1]; $_[0] }
-sub options { $_[0]->{options} = $_[1]; $_[0] }
-sub comment { $_[0]->{comment} = $_[1]; $_[0] }
-sub tab_charset { $_[0]->{charset} = $_[1]; $_[0] }
-
 # просто для окончания, чтобы можно было столбец закомментировать
 sub end {}
 
@@ -290,6 +298,9 @@ sub sync {
 	
 	# создаём или редактируем
 	if(!$info) {
+		my $listener = $::app->listener;
+		$listener->fire("$self->{name}.create", $self);
+
 		my $sql = $self->create_table;
 		$c->do($sql);		
 	} else {
@@ -367,7 +378,7 @@ sub sql {
 		($create? "DEFAULT CHARACTER SET '$charset' COLLATE '$collation',":
 		"CONVERT TO CHARACTER SET '$charset' COLLATE '$collation'"),
 		"ENGINE=" . uc($opt->{engine} || $engine),
-		"COMMENT=" . $c->quote($opt->{comment} // ""),
+		"COMMENT=" . $c->quote($opt->{remark} // ""),
 		($opt->{options}? $opt->{options}: ()),
 	)
 }
@@ -419,5 +430,25 @@ sub rename {
 	$c->do($self->rename_tab($new_name));
 }
 
+# удаляет таблицу
+sub drop {
+	my ($self) = @_;
+	
+	my $listener = $::app->listener;
+	$listener->fire("$self->{name}.drop", $self);
+	return $self if $self->{noAction};
+	
+	my $c = $::app->connect;
+	
+	my $fk_info = $c->fk_info_backward->{$self->{tab}};
+	while(my($name, $fk) = each %$fk_info) {
+		$c->do(R::Model::IndexRef::drop(undef, $fk->{tab}, $name));
+	}
+	
+	my $sql = "DROP TABLE " . $c->word($self->{tab});
+	$c->do($sql);
+	
+	$self
+}
 
 1;

@@ -90,25 +90,55 @@ sub copy {
 	bless {like=>{}, %$self, @args}, ref $self;
 }
 
+# выполняется при извлечении столбца из upFld
+sub deep_copy {
+	my ($self, $upFld) = @_;
+	$upFld->{like}{$self->{name}} = $self->copy(upFld=>$upFld, From=>$upFld->{From});
+}
+
+# проверяет, что такой есть и возвращает столбец
+sub getlike {
+	my ($self, $key) = @_;
+	die "Попытка извлечь столбец из обычного столбца $self->{model}.$self->{name}.$key" unless $self->{Main};
+	my $fld;
+	die "нет столбца $self->{model}.$self->{name}.$key" unless $fld = $self->{fieldset}{field}{$key};
+	#::msg ":cyan", "col!", ":reset", $self->model . "." . $self->name . ".$key";
+	$fld->deep_copy($self)
+}
+
 # производит подобный
 sub like {
 	my ($self, $key) = @_;
-	my $fld = $self->{like}{$key};
-	unless($fld) {
-		die "нет столбца $key у $self->{model}".($self->{As}? " as $self->{As}": "")." при запросе у $self->{name}" unless $fld = $self->{fieldset}{field}{$key};
-		$fld = $fld->copy(upFld=>$self);
-	}
-	$fld
+	$self->{like}{$key} //= $self->getlike($key);
 }
 
 # строит join
 sub join {
-	my ($self, $to, $from) = @_;
+	my ($self, $to) = @_;
 	my $c = $::app->connect;
-	$to->{As} = "A" . (1+@$from);
-	push @$from, "INNER JOIN " . $c->word($to->{tab}) . " As $to->{As} ON $to->{As}." . $c->word($to->{col}) . "=$self->{As}." . $c->word($self->{col});
-	$self
+	my $from = $self->{From};
+	my $As = "A" . (1+@$from);
+	my ($As0, $col) = $self->column;
+	push @$from, "INNER JOIN " . $c->word($to->{tab}) . " As $As ON $As." . $c->word($to->{col}) . "=$As0." . $c->word($col);
+	
+	#::msg ":inline", ":red", "join!", ":reset", $self->name . " -> ", ":cyan", $sql;
+	
+	$As
 }
 
+# возвращает As и col
+sub column {
+	my ($self) = @_;
+	return (($self->{upFld}? $self->{upFld}{As}: $self->{As}), $self->{col});
+}
+
+# возвращает строку, для column
+sub prepare_column {
+	my ($self) = @_;
+	my $c = $::app->connect;
+	my ($As, $col) = $self->column;
+	my $from = $self->{From};
+	(@$from!=1? "$As.": "") . $c->word($col)
+}
 
 1;

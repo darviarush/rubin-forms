@@ -167,4 +167,33 @@ sub layout {
 	$self->{layout_cache}{$action} = $layouts;
 }
 
+# загружает load
+sub form_load {
+	my ($self, $action, $where) = @_;
+	
+	$action =~ s!-\d+!!g;
+	
+	my $response;
+	my $forms = $self->{app}->action->{form};
+	my $form = $forms->{$action};
+	my $tab = $form->{tab} // $form->{name};
+	my $view = [keys %{$form->{fields}}];
+	
+	main::msg '----------------------------', $action, $view, $where;
+	
+	if($form->{is_list}) {
+		$response = $self->query_all($tab, $view, $where);
+		if(@$valid) {
+			$_->{_valid} = $valid for @$response;
+		}
+	}
+	else {
+		$response = $self->query_ref($tab, $view, $where);
+		$response->{_valid} = $valid if @$valid;
+	}
+	
+	$response
+}
+
+
 1;

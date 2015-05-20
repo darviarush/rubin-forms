@@ -22,12 +22,6 @@ sub setup {
 	end
 }
 
-# удаление таблицы
-sub DROP {
-	my ($fieldset) = @_;
-	Utils::rmdir(root());
-}
-
 
 our @EXT = qw/noname png jpg gif/;
 our %EXT = Utils::starset(0, @EXT);
@@ -105,13 +99,15 @@ sub erase_files {
 }
 
 # удаляет картинку
-sub erase {
+sub onErase {
 	my ($self) = @_;
-	$self->SUPER::erase;
 	Utils::rmpath($self->path) if $self->erase_files == 0;
-	$self
 }
 
+# удаляются все данные из таблицы
+sub onDrop {
+	Utils::rmdown(root());
+}
 
 # изменяет размер картинки и записывает её в файл name
 # sub resize {
