@@ -40,7 +40,7 @@ sub deep_copy {
 	$self
 }
 
-# # проверяет, что такой есть и возвращает столбец
+# проверяет, что такой есть и возвращает столбец
 sub getlike {
 	my ($self, $key) = @_;
 	my $fld;
@@ -56,17 +56,13 @@ sub column {
 }
 
 
-# sub deadlock {
-	# my ($self) = @_;
-	# $self->like($self->{ref}{name});
-# }
-
 # свойство обратной ссылки
 #	author.books
 sub row {
-	my ($self, $bean) = @_;
-	my $bk = $self->{ref};
-	$bk->bean->find($bk->{name} => $bean);
+	my ($self, $bean, $idx) = @_;
+	my $ref = $self->{ref};
+	my $ref_name = $ref->{name};
+	$ref->bean->find($ref_name => $bean);
 }
 
 

@@ -167,31 +167,44 @@ sub layout {
 	$self->{layout_cache}{$action} = $layouts;
 }
 
-# загружает load
+# загружает данные в шаблоне
 sub form_load {
-	my ($self, $action, $where) = @_;
+	my ($self, $action, @where) = @_;
 	
-	$action =~ s!-\d+!!g;
+	#$action =~ s!-\d+!!g;
 	
 	my $response;
-	my $forms = $self->{app}->action->{form};
+	my $forms = $self->{form};
 	my $form = $forms->{$action};
-	my $tab = $form->{tab} // $form->{name};
-	my $view = [keys %{$form->{fields}}];
+	my $name = $form->{name};
+	my $model = $form->{model} // $name;
+	my @view = keys %{$form->{fields}};
+	my $load = $form->{load};
 	
-	main::msg '----------------------------', $action, $view, $where;
-	
-	if($form->{is_list}) {
-		$response = $self->query_all($tab, $view, $where);
-		if(@$valid) {
-			$_->{_valid} = $valid for @$response;
+	my $get_bean = $load == 2? sub {
+		my $bean = $self->{app}{response}{bean}{$name};
+		if(ref $model) {
+			$bean = $bean->$_ for @$model;
+			$bean
+		} else {
+			$bean->$model
 		}
+	}: undef;
+	
+	main::msg ":inline", ":bold black", '----------------------------', ":red", $action, ":green", \@view, ":cyan", \@where;
+	
+	my $bean;
+	if($form->{is_list}) {
+		$bean = $load == 2? $get_bean->(): $::app->model->$model;
+		$bean = $bean->find(@where) if @where;
 	}
 	else {
-		$response = $self->query_ref($tab, $view, $where);
-		$response->{_valid} = $valid if @$valid;
+		$bean = $load == 2? $get_bean->(): $::app->model->$model(@where);
 	}
 	
+	$self->{app}{response}{bean}{$name} = $bean if $load == 1;
+	
+	$response = $bean->annotate(@view);
 	$response
 }
 

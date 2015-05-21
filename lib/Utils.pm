@@ -952,7 +952,8 @@ sub TemplateBare {
 					my $load = "";
 					if($form->{load}) {
 						my $data = ($name? "\$data->{'$name'}": "\$_[0] = \$data");
-						my $where = exists $form->{where}? ", join '', $form->{where}": '';
+						my $where = exists $form->{where}? ", $form->{where}": '';
+						#$name =~ s!-\d+!!g;
 						$load = "$data = \$app->action->form_load(\$id.'-$name'$where) unless ref($data);";
 						push @code, ["load", $load . "\n"];
 						$load = "do { $load () }, ";
@@ -1025,7 +1026,7 @@ sub TemplateBare {
 			}
 		}:
 		
-		# :load([tab|model,] "where"|id|%id|5)
+		# :load([model,] "where"|id|%id|5)
 		# шаблон для ajax - добавляет данные в load учитывая циклы и ифы
 		# load присваивает данным, но только если там их нет
 		$open_tag && m!\G\$([+*])(\w+)(?::(?:(noload)|(load|model)\((?:(\w+),\s*)?(?:(%?\w+)|($RE_TYPE))\)))?!? do {
@@ -1035,22 +1036,22 @@ sub TemplateBare {
 				is_list => $type eq "*",
 			};
 
-			$T->{model} = $model if $model;
 			$T->{noload} = 1 if $noload;
+			# load=1, model=2, noload=0, nothing=0, from=2
 			$load = $noload? 0: defined($load) && $load eq "load"? 1: $form->{load}? 2: 0;
 			$model = $var, $var = undef if $load == 2 and not defined $model;
+			$T->{model} = $model =~ /\./? [split /\./, $model]: $model if $model;
+			
 			$T->{load}  = $load if $load;
 			$T->{where} = unstring($where) if $where;
-			$T->{where} = "id=\$$var" if $var;
+			$T->{where} = "\$$var" if $var;
 			
-			$T->{tab} = $model // $name;
-			$T->{where} = ($type eq "*"? "$form->{name}_id=\$id": "id=\$$T->{tab}_id") . (exists $T->{where}? " AND ($T->{where})": "") if $load == 2;
 			if(exists $T->{where}) {
 				$T->{where} =~ s!['\\]!\\$&!g;
-				$T->{where} =~ s/\$(%)?(\w+)/ $form->{fields}{$2}=1 unless $1; "', \$app->connect->quote(" . $vario->($1, $2) . "), '"/ge;
-				$T->{where} = "'$T->{where}'";
+				$T->{where} =~ s!^[^\$]!'$&!;
+				$T->{where} .= "'" if $T->{where} !~ /\$%?\w+$/;
+				$T->{where} =~ s/\$(%)?(\w+)/ $form->{fields}{$2}=1 unless $1; ($` ne ""? "', ": "") . $vario->($1, $2) . ($' ne ""? ", '": "")/ge;
 			}
-			#$T->{where} =~ s!\$(%)?(\w+)!"'".$vario->($1, $2)."'"!ge if exists $T->{where};
 			"', \$id, '-$name";
 		}:
 		$open_tag && m!\G\$([+*])!? "', \$id, '":

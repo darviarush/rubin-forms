@@ -135,18 +135,44 @@ sub row {
 		$bean
 	}
 	else {
-		$bean->save if $bean->{save} and exists $bean->{save}{$self->{name}};
+		# есть отображение, возможно что свойство уже подгружено
+		if(my $val = $bean->{val}) {
+			my $name = $self->{name};
+			return $val->{$name} if exists $val->{$name};
+		}
+		# сохраняем, если бин ещё не сохранён
+		$bean->save if $bean->{save} and (not defined($bean->{id}) or exists $bean->{save}{$self->{name}});
+		# возвращаем пусто, если нет идентификатора
 		return unless defined $bean->{id};
+		
+		# запрашиваем
 		my $c = $::app->connect;
-		$c->query($self->{tab}, [$self->{col}], {id=>$bean->{id}})
+		if(my $view = $bean->{view}) {
+			my $main = $self->{name};
+			my %col = ($self->{col} => $main);
+			my $fields = $self->{fieldset}{field};
+			for my $name (@$view) {
+				my $field = $fields->{$name};
+				$col{$field->{col}} = $name;
+			}
+			delete $bean->{view};
+			my $val = $bean->{val} = $c->query_ref($self->{tab}, \%col, {id=>$bean->{id}});
+			$val->{$main}
+		} else {
+			$c->query($self->{tab}, [$self->{col}], {id=>$bean->{id}})
+		}
 	}
 }
 
 # устанавливается в класс rowset-а
 sub rowset {
 	my ($self, $bean, $val) = @_;
-	my $ref = $bean->view($self->name)->_col_ref;
-	wantarray? @$ref: $ref;
+	if(@_>2) {
+		$bean->update($self->{name}=>$val);
+	} else {
+		my $ref = $bean->view($self->{name});
+		wantarray? @{$ref->_col_ref}: @{$ref->limit(1)->_col_ref};
+	}
 }
 
 1;

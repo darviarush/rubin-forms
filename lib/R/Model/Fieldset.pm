@@ -364,6 +364,17 @@ sub sync {
 	$self;
 }
 
+# инкрементирует автоинкремент на указанное количество и возвращает последний id
+sub auto_increment_inc {
+	my ($self, $inc) = @_;
+	my $c = $::app->connect;
+	my $id = $c->query("INFORMATION_SCHEMA.TABLES", "AUTO_INCREMENT", ["WHERE", "TABLE_SCHEMA" => $c->basename, "TABLE_NAME" => $self->{tab}]);
+	$id += $inc;
+	$c->do("ALTER TABLE " . $c->word($self->{name}) . " AUTO_INCREMENT = " . $id);
+	$id-1;
+}
+
+
 # возвращает дополнительные опции таблицы, которые можно использовать в alter table
 sub sql {
 	my ($self, $opt, $create) = @_;

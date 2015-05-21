@@ -75,7 +75,7 @@ sub column {
 
 # свойство m2m
 sub row {
-	my ($self, $bean, $idx) = @_;
+	my ($self, $bean, $idx, $size) = @_;
 	
 	# переворачиваем
 	my $back = $self->{back};
@@ -88,18 +88,19 @@ sub row {
 		# если нет с таким индексом, то - добавляем нужное количество
 		unless($ass_bean) {
 			my $n = $idx - $rows->count;
-			my $toRef = $self->{toRef};
 			my $id = $bean->id;
 			die "$bean не имеет id" unless $id;
 			
-			$c->insert($self->{tab}, [$self->{toSelf}{name}], [map { [$id] } 2..$n]) if $n >= 2;
-			 
-			my @add = map { # устанавливаем связь
-				$toRef->bean({$self->{toSelf}{name} => $bean});
-			} 1..$n;
-			::msg "kast $n = $idx - $count :", 1..$n;
-			my $model = $toRef->{name};
-			$ass_bean = $add[$#add]->$model;	# извлекаем из последнего по 
+			my $c = $::app->connect;
+			my $to_self_col = $self->{toSelf}{col};
+			my $to_ref = $self->{toRef}{ref};
+			
+			$c->insert($self->{toRef}{fieldset}{tab}, [$to_self_col], [map { [$id] } 1..$n]);
+			
+			$ass_bean = $to_ref->bean({});
+			$ass_bean->{rel_m2m} = $id;
+			$ass_bean->{ref_m2m} = $self;
+			$ass_bean->{save}{id} = $to_ref->{fieldset}->auto_increment_inc($n);
 		}
 		$ass_bean
 	} else {

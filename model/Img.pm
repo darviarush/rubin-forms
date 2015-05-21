@@ -80,7 +80,7 @@ sub file {
 		$self
 	} else {
 		# возвращает путь неизменной картинки
-		$self->path . "file." . $self->ext
+		$self->path . "orig." . $self->ext
 	}
 }
 

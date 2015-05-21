@@ -17,6 +17,17 @@ sub new {
 	}
 }
 
+# возвращает id
+sub id {
+	my ($self) = @_;
+	if(@_>1) {
+		die "попытка проапдейтить столбец id";
+	} else {
+		my $ref = $self->view("id");
+		wantarray? @{$ref->_col_ref}: @{$ref->limit(1)->_col_ref};
+	}
+}
+
 # добавляет записи в m2m
 sub add {
 	my ($self, @row) = @_;
@@ -44,7 +55,16 @@ sub add {
 
 # удаляет записи из m2m
 sub del {
+	my ($self, @row) = @_;
 	
+	die "доделать!";
+	
+	my ($m2m, $ref_val) = @{$self->{find}};
+	my $m2m = $self->Field->{$m2m};
+	
+	my $c = $::app->connect;
+	$c->erase($m2m->{toRef}{tab}, {});
+	$self
 }
 
 # создаёт копию себя заменяя ключи
@@ -71,7 +91,6 @@ sub order {
 	my ($self, @order) = @_;
 	$self->_clone(order => [($self->{order}? @{$self->{order}}: ()), @order]);
 }
-
 
 # offset
 sub offset {
@@ -120,22 +139,22 @@ sub min { unshift @_, "min"; goto &__FN__; }
 # добавляет having
 sub having {
 	my ($self, @having) = @_;
-	$self->clone(having => [($self->{having}? @{$self->{having}}: ()), @having]);	
+	$self->clone(having => [($self->{having}? @{$self->{having}}: ()), @having]);
 }
 
-# как annotate, только выдаёт сразу, не глядя на wantarray
+# добавляет группировку записей
 sub aggregate {
-	# my ($self, @args) = @_;
-	# $self->{annotate} = [@args];
-	# wantarray? $self->_all: do { my ($first) = $self->_all; $first };
+	my ($self, @aggregate) = @_;
+	$self = $self->clone(aggregate => [($self->{aggregate}? @{$self->{aggregate}}: ()), @aggregate]);
+	wantarray? $self->_all: do { my ($first) = $self->limit(1)->_all; $first };
 }
 
 
-# group by
+# выдаёт аннотацию - хэш с данными и произвольными полями
 sub annotate {
-	# my ($self, @args) = @_;
-	# $self->{annotate} = [@args];
-	# wantarray? $self->_all: $self;
+	my ($self, @annotate) = @_;
+	$self = $self->view(@annotate);
+	wantarray? $self->_all: do { my ($first) = $self->limit(1)->_all; $first };
 }
 
 # вставить выбранные записи в указанную таблицу
@@ -199,10 +218,10 @@ sub _query {
 		@view = $self->_where($fld);
 	}
 
-	my @annotate;
-	if($self->{annotate}) {
-		$self->{find} = $self->{annotate};
-		@annotate = $self->_where($fld);
+	my @aggregate;
+	if($self->{aggregate}) {
+		$self->{find} = $self->{aggregate};
+		@aggregate = $self->_where($fld);
 	}
 	
 	my @having;
@@ -256,8 +275,8 @@ sub _query {
 	
 	my $where = join " AND ", map { $FILTER->() } @where;
 	
-	if(@annotate) {
-		$where .= "${sep}GROUP BY " . join ", ", map { $_->prepare_column } @annotate;
+	if(@aggregate) {
+		$where .= "${sep}GROUP BY " . join ", ", map { $_->prepare_column } @aggregate;
 	}
 	
 	if(@having) {

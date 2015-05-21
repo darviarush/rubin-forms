@@ -2,22 +2,24 @@
 
 $email = $request->param("email");
 $pass = $request->param("pass");
-$conn = $app->connect;
 
-$user_id = $conn->query("user", "id", {email=>$email, pass=>$pass});
+$user_id = $app->model->user->find(email => $email, pass => $pass)->id;
 if($user_id) {
-	$uid = $app->session->user_id;
+	$uid = $request->user->id;
 	if($user_id == $uid) {
 		$sess = $request->cookie("sess");
 	} else {
 		$sess = Utils::unic_id(20);
 		$response->cookie("sess", $sess, path => "/");
-		$conn->erase("sess", {user_id=>$user_id});
-		$conn->add("sess", {id=>$sess, user_id=>$user_id});
+		$request->cookie->{sess} = $sess;
+		#$conn->erase("sess", {user_id=>$user_id});
+		#$conn->add("sess", {id=>$sess, user_id=>$user_id});
 	}
 
-	$app->session->user_id($user_id);
-	$response->cookie(sess => $sess);
+	$request->session->user($user_id)->store;
+	
+	#$app->session->user_id($user_id);
+	#$response->cookie(sess => $sess);
 	
 	$head = $request->head;
 	$referer = !exists $head->{Referer}? "/profit": $head->{Referer};

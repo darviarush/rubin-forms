@@ -301,7 +301,7 @@ sub INS_SET {
 sub FIELDS {
 	my ($self, $fields) = @_;
 	return map { $self->word($_) } @$fields if ref $fields eq "ARRAY";
-	return map { ($fields->{$_}, ' as ', $self->word($_)) } keys %$fields if ref $fields eq "HASH";
+	return map { ($self->word($fields->{$_}), ' as ', $self->word($_)) } keys %$fields if ref $fields eq "HASH";
 	return $fields;
 }
 
@@ -348,12 +348,15 @@ sub sel {
 sub query_compile {
 	my ($self, $arg, $push, $as) = @_;
 	my ($op, @val) = @$arg;
-	if($op eq "GROUP") {	# GROUP
-		push @{$push->{group}}, $self->FOR_TAB_FIELDS($val[0], $as);
+	my $val = (@val==1? $val[0]: \@val);
+	if($op eq "WHERE") { # WHERE
+		push @{$push->{where}}, $self->DO_WHERE($val, $as);
+	} elsif($op eq "GROUP") {	# GROUP
+		push @{$push->{group}}, $self->FOR_TAB_FIELDS($val, $as);
 	} elsif($op eq "HAVING") { # HAVING
-		push @{$push->{having}}, $self->DO_WHERE($val[0], $as);
+		push @{$push->{having}}, $self->DO_WHERE($val, $as);
 	} elsif($op eq "ORDER") { # ORDER
-		push @{$push->{order}}, $self->FOR_TAB_FIELDS($val[0], $as);
+		push @{$push->{order}}, $self->FOR_TAB_FIELDS($val, $as);
 	} elsif($op eq "LIMIT") { # LIMIT
 		die "Один LIMIT уже есть в SQL-запросе" if $push->{limit};
 		$push->{limit} = join ", ", @val;
@@ -365,7 +368,7 @@ sub query_compile {
 # добавляет к запросу указанное в массиве
 sub query_add {
 	my ($self, $sep, $args) = @_;
-	my $push;
+	my $push = {};
 	for my $arg (@$args) {
 		if(ref $arg eq 'ARRAY') { $self->query_compile($arg, $push) }
 		else { push @{$push->{where}}, $self->DO_WHERE($arg) }
@@ -381,7 +384,7 @@ sub query_join {
 	($arg->{group} && (@w=@{$arg->{group}})? ("${sep}GROUP BY ", join ", ", @w): ()), 
 	($arg->{having} && (@w=@{$arg->{having}})? ("${sep}HAVING ", @w==1? @w: join " AND ", map { join "", "(", $_, ")" } @w): ()),
 	($arg->{order} && (@w=@{$arg->{order}})? ("${sep}ORDER BY ", join ", ", @w): ()), 
-	($arg->{limit}? ("${sep}LIMIT ", $arg->{limit}): ())
+	($arg->{limit}? ("${sep}LIMIT ", $arg->{limit}): ());
 }
 
 sub flat2volume { my ($self, $join, @args) = @_; my ($tab) = @args; my ($as); ($as, $tab) = $self->TAB($tab); return {tab => $self->word($tab), as => $self->word($as), args=>[@args], join=>$join}; }
@@ -617,7 +620,7 @@ sub insert {
 
 # изменяет запись
 sub update {
-	my ($self, $tab, $param, $where) = @_;
+	my ($self, $tab, $param, $where, $opt) = @_;
 	my $SET = $self->DO_SET($param);
 	my $COND = $self->DO_WHERE($where);
 	my $from;
@@ -628,7 +631,7 @@ sub update {
 			($tab) = $from->[0] =~ /As\s+(.+?)$/;
 		}
 	}
-	$CURR_SQL = join "", "UPDATE ", $self->word($tab), " SET ", $SET, ($from? join("\n", @$from) . "\n": " "), "WHERE ", $COND;
+	$CURR_SQL = join "", "UPDATE ", $self->word($tab), " SET ", $SET, ($from? join("\n", @$from) . "\n": " "), "WHERE ", $COND, (defined($opt)? " $opt": ());
 	$self->{last_count} = $self->do($CURR_SQL)+0;
 	$self
 }

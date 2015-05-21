@@ -26,7 +26,7 @@ sub setup {
 sub login {
 	my ($self, $email, $pass) = @_;
 	
-	die "Вы уже залогинены - разлогиньтесь!" if $self->{id};
+	#die "Вы уже залогинены - разлогиньтесь!" if $self->{id};
 	
 	my ($user) = $self->Model->find(email=>$email, pass=>$pass);
 	

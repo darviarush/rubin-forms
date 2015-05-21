@@ -49,9 +49,9 @@ sub id {
 	my ($self, $val) = @_;
 	if(@_>1) {
 		if(defined $self->{id} and $val ne $self->{id}) {
-			die "попытка изменить id";
+			die "попытка изменить id"; # нужно при изменении id изменить id во всех ссылающихся на него
 			$self->{save}{id} = $val;
-			$self->save;
+			#$self->save;
 		} else {
 			$self->{id} = $val;
 		}
@@ -60,6 +60,25 @@ sub id {
 	else { $self->save if !$self->{id}; $self->{id} }
 }
 
+# добавляет поля, которые должны запроситься при первом запросе
+# compute-поля отбрасываются
+# если compute-поле зависит от другого поля - устанавливается и другое поле
+sub view {
+	my ($self, @view) = @_;
+	my $field = $self->Field;
+	$self->{view} = [grep { !$field->{$_}->compute } @view];
+	$self
+}
+
+# возвращает хэш с указанными полями. Поля могут быть любыми - так же и вычисляемыми
+sub annotate {
+	my ($self, @fields) = @_;
+	local $_;
+	$self->view(@fields);
+	my $s = {};
+	$s->{$_} = $self->$_ for @fields;
+	$s
+}
 
 # деструктор
 sub DESTROY {
@@ -71,32 +90,45 @@ sub DESTROY {
 sub save {
 	my ($self) = @_;
 
-	return $self unless $self->{save};
+	my $save = $self->{save};
+	return $self unless $save;
 	
 	my ($tab, $s) = $self->ToCol;
 	
 	my $c = $::app->connect;
 	my $listener = $::app->listener;
 	my $name = $self->Fieldset->{name};
-	my ($id, $rel);
-	if($id = $self->{id}) {
+	my $id = $self->{id};
+	
+	if(defined $id) {
 	
 		$listener->fire("$name.update,$name.save", $self);
 		$self->{noAction} = undef, return $self if $self->{noAction};
 	
-		$c->update($tab, $s, {id => $id});
-		if($id = $s->{id}) {
-			$rel->{save}{$self->{ref}} = $id if $rel = $self->{rel};
-			$self->{id} = $id;
-		}
+		$c->update($tab, $s, { "id" => $id });
+		$self->{id} = $id if $id = $s->{id};
 	} else {
 	
 		$listener->fire("$name.add,$name.save", $self, 1);
 		$self->{noAction} = undef, return $self if $self->{noAction};
 	
-		$id = $self->{id} = $c->append($tab, $s);
-		$rel->{save}{$self->{ref}} = $id if $rel = $self->{rel};
+		$c->add($tab, $s);
+		$id = $self->{id} = $save->{id} // $c->last_id;
 	}
+	
+	if(defined $id) {
+		my $rel;
+		$rel->{save}{$self->{ref}} = $id if $rel = $self->{rel};
+		if($rel = $self->{rel_m2m}) {
+			my $ref=$self->{ref_m2m};
+			my $to_ref_col = $ref->{toRef}{col};
+			my $to_self = $ref->{toSelf};
+			$c->update($to_self->{fieldset}{tab}, {$to_ref_col=>$id}, {$to_self->{col}=>$rel, $to_ref_col=>undef}, "LIMIT 1");
+			delete $self->{rel_m2m};
+			delete $self->{ref_m2m};
+		}
+	}
+	
 	$self
 }
 
@@ -105,7 +137,7 @@ sub store {
 	my ($self) = @_;
 	
 	if(my $id = $self->{id} // $self->{save}{id}) {
-		unless($::app->connect->query($self->Fieldset->{tab}, "1", $id)) {
+		unless($::app->connect->query($self->Fieldset->{tab}, "1", {id=>$id})) {
 			$self->{save}{id} = $id;
 			$self->{id} = undef;
 		} else {
