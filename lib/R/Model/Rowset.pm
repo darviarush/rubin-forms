@@ -60,7 +60,7 @@ sub del {
 	die "доделать!";
 	
 	my ($m2m, $ref_val) = @{$self->{find}};
-	my $m2m = $self->Field->{$m2m};
+	$m2m = $self->Field->{$m2m};
 	
 	my $c = $::app->connect;
 	$c->erase($m2m->{toRef}{tab}, {});
@@ -139,22 +139,20 @@ sub min { unshift @_, "min"; goto &__FN__; }
 # добавляет having
 sub having {
 	my ($self, @having) = @_;
-	$self->clone(having => [($self->{having}? @{$self->{having}}: ()), @having]);
+	$self->_clone(having => [($self->{having}? @{$self->{having}}: ()), @having]);
 }
 
 # добавляет группировку записей
 sub aggregate {
 	my ($self, @aggregate) = @_;
-	$self = $self->clone(aggregate => [($self->{aggregate}? @{$self->{aggregate}}: ()), @aggregate]);
-	wantarray? $self->_all: do { my ($first) = $self->limit(1)->_all; $first };
+	$self->_clone(aggregate => [($self->{aggregate}? @{$self->{aggregate}}: ()), @aggregate]);
 }
 
 
 # выдаёт аннотацию - хэш с данными и произвольными полями
 sub annotate {
 	my ($self, @annotate) = @_;
-	$self = $self->view(@annotate);
-	wantarray? $self->_all: do { my ($first) = $self->limit(1)->_all; $first };
+	$self->view(@annotate)->_all;
 }
 
 # вставить выбранные записи в указанную таблицу
@@ -294,6 +292,8 @@ sub _query {
 	
 	$from = $c->word($fld->{tab}) if @$from == 1;
 	
+	#::msg "fff:", $from, $view, $where;
+	
 	return $from, $view, $where;
 }
 
@@ -301,7 +301,8 @@ sub _query {
 sub _all {
 	my ($self, $_view) = @_;
 	my ($from, $view, $where) = $self->_query($_view);
-	@{$::app->connect->query_all($from, $view, $where)};
+	my $ref = $::app->connect->query_all($from, $view, $where);
+	wantarray? @$ref: $ref;
 }
 
 # возвращает массив значений

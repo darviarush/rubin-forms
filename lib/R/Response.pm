@@ -55,7 +55,7 @@ sub type {
 sub cookie {
 	my ($self, $name, $value, %param) = @_;
 	my $val = join "", $name, "=", $value,
-		(exists $param{expire}? ("; Expires=" , HTTP::Date::time2str($param{expire})): ()),
+		(exists $param{expires}? ("; Expires=" , HTTP::Date::time2str($param{expires})): ()),
 		(exists $param{path}? "; Path=$param{path}": ()),
 		(exists $param{domain}? "; Domain=$param{domain}": ()),
 		(exists $param{secure}? "; Secure": ()),
@@ -300,6 +300,7 @@ sub submit {
 	}
 	
 	#$result->{$layouts->[0]}{layout_id} = $layout_id if @$layouts;
+	$self->{stash}{user_id} = $request->user->id;
 	return {
 		stash => $self->{stash},
 		url => $request->{original} // $request->{url},

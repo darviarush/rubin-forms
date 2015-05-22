@@ -48,7 +48,7 @@ sub ne { if($_[0]=~$_FLOAT and $_[1]=~$_FLOAT) { $_[0] != $_[1] } else { $_[0] n
 # атрибуты, классы, стили
 sub visible { $_[0]? "": "display: none" }
 sub style { $_[0]? "style=\"$_[0]\"": "" }
-sub img { return "/img/" unless $_[0]; "/images/" . Utils::img_path($_[0]) . "/" }
+sub img { return "/img/" unless $_[0]; "/images/" . Utils::img_path($_[0]) }
 
 # запуск функции
 sub run { my $f = shift; $f->(@_) }

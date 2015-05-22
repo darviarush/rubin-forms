@@ -6,7 +6,7 @@ $pass = $request->param("pass");
 $user_id = $app->model->user->find(email => $email, pass => $pass)->id;
 if($user_id) {
 	$uid = $request->user->id;
-	if($user_id == $uid) {
+	if($uid and $user_id == $uid) {
 		$sess = $request->cookie("sess");
 	} else {
 		$sess = Utils::unic_id(20);

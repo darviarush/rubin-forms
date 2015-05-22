@@ -47,6 +47,14 @@ sub has_array {
 	}
 }
 
+# возвращает указанную переменную или все занчения или ссылку (скалярный контент). Устанавливает ссылку, либо свои параметры, как ключ => значение
+sub has_hash {
+	my ($cls) = caller(0);
+	for my $name (@_) {
+		eval "sub ${cls}::$name { if(\@_>1) { my \$s=shift; push \@{\$s->{'$name'}}, \@_; \$s } else { wantarray? \@{\$_[0]->{'$name'}}: \$_[0]->{'$name'} }"
+	}
+}
+
 # проверяет на соответствие isa
 use Scalar::Util qw/blessed/;
 sub isa {
@@ -363,12 +371,12 @@ sub confirm {
 }
 
 # Dumper не должен возвращать \x{...}
-$Data::Dumper::Useqq = 1;
+$Data::Dumper::Useqq     = 1;	# использовать двойные кавычки
 
 { no warnings 'redefine';
 	sub Data::Dumper::qquote {
 		my $s = shift;
-		print STDERR "\n!!!\n";
+		#print STDERR "\n!!!\n";
 		$s =~ s/\'/\\\'/g;
 		return "'$s'";
 	}
@@ -697,6 +705,15 @@ sub rmdown {
 	}
 }
 
+# путь к картинке
+sub img_path {
+	my ($id) = @_;
+	local ($_, $`, $', $&);
+	$_ = to_radix($id, 62);
+	s!.!$&/!g;
+	$_;
+}
+
 # переводит натуральное число в заданную систему счисления
 sub to_radix {
 	my ($n, $radix) = @_;
@@ -843,6 +860,10 @@ sub TemplateBare {
 	
 	require Helper;
 	
+	local ($_, $&, $`, $', $1, $2, $3, $4, $5);
+	$_ = $_[0];
+	#my $index = $_[3];
+	
 	my $RE_TYPE = qr/("(?:\\"|[^"])*"|'(?:\\'|[^'])*'|-?\d+(?:\.\d+)?(?:E[+-]\d+)?)/;
 	
 	my $re_type = sub { my ($x)=@_; return unless defined $x; local($`, $', $1); $x=~s/^'(.*)'$/$1/, $x=~s/"/\\"/g, $x="\"$x\"" if $x =~ /^'/; $x};
@@ -858,8 +879,6 @@ sub TemplateBare {
 
 	my $forms = {};	# fields=> {}, lists=> {}, forms=> {}
 	
-	local ($_, $&, $`, $', $1, $2, $3, $4, $5);
-	($_) = @_;
 	
 	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id, @ifST, @code) = ($_, 0);
 	my $page = my $form = {};
@@ -948,6 +967,7 @@ sub TemplateBare {
 					$T = [$open_tag, $pos+1, $name=$T->{name}, $type=$T->{is_list}, $m=/\bcinit[^<]*\G/i, scalar(@html), $form];
 					my $id = (exists($form->{id})? "$form->{id}-": "") . $name;
 					$frm->{id} = $id;
+					$frm->{parent_form} = $form->{id};
 					$forms->{$id} = $form = $frm;
 					my $load = "";
 					if($form->{load}) {
@@ -1027,6 +1047,7 @@ sub TemplateBare {
 		}:
 		
 		# :load([model,] "where"|id|%id|5)
+		# :model(model [, "where"|id|%id|5])
 		# шаблон для ajax - добавляет данные в load учитывая циклы и ифы
 		# load присваивает данным, но только если там их нет
 		$open_tag && m!\G\$([+*])(\w+)(?::(?:(noload)|(load|model)\((?:(\w+),\s*)?(?:(%?\w+)|($RE_TYPE))\)))?!? do {
@@ -1037,9 +1058,10 @@ sub TemplateBare {
 			};
 
 			$T->{noload} = 1 if $noload;
-			# load=1, model=2, noload=0, nothing=0, from=2
+			# load=1, model=2, noload=0, 'nothing'=0, 'from'=2
 			$load = $noload? 0: defined($load) && $load eq "load"? 1: $form->{load}? 2: 0;
-			$model = $var, $var = undef if $load == 2 and not defined $model;
+			$model = $var // $name . ($T->{is_list}? "s": ""), $var = undef if $load == 2 and not defined $model;
+			$model = $name if $load == 1 and not defined $model;
 			$T->{model} = $model =~ /\./? [split /\./, $model]: $model if $model;
 			
 			$T->{load}  = $load if $load;

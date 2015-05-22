@@ -29,7 +29,11 @@ BEGIN {
 		print STDERR $msg;
 		exit
 	};
-	$SIG{ __WARN__ } = sub { print STDERR $raise->trace($_[0])->color("warning", 'yellow', 'green'); exit if $_[0]=~/^Deep recursion on subroutine/ };
+	$SIG{ __WARN__ } = sub {
+		print STDERR $raise->trace($_[0])->color("warning", 'yellow', 'green');
+		exit;
+		exit if $_[0]=~/^Deep recursion on subroutine/;
+	};
 
 }
 our $_FRAMEWORK;

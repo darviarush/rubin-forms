@@ -95,8 +95,8 @@ sub last {
 
 # добавляет вычислимый столбец
 sub compute {
-	my ($self, $name) = @_;
-	R::Model::Field::Compute->new($self, $name);
+	my ($self, $name, @relation_fields) = @_;
+	R::Model::Field::Compute->new($self, $name, \@relation_fields);
 	$self
 }
 

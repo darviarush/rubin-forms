@@ -104,6 +104,7 @@ sub compile_htm {
 	while(my ($id, $form) = each %$forms) {
 		$form->{name} = $index unless $form->{name};
 		$form->{id} = $id = "$index-$id";
+		$form->{parent_form} = "$index-$form->{parent_form}" if $form->{parent_form};
 		#$form->{query} = form_query $form, $forms;
 		push @write, "\$app->action->{form}{'$id'} = ".Utils::Dump($form).";\n\n";
 		$_ = "$index-$_" for @{$form->{forms}};
@@ -171,18 +172,23 @@ sub layout {
 sub form_load {
 	my ($self, $action, @where) = @_;
 	
-	#$action =~ s!-\d+!!g;
+	my $form_id = $action;
+	my $id;
+	$id = $1 if $form_id =~ s!-(\d+)!!g;
 	
 	my $response;
 	my $forms = $self->{form};
-	my $form = $forms->{$action};
+	my $form = $forms->{$form_id};
 	my $name = $form->{name};
 	my $model = $form->{model} // $name;
 	my @view = keys %{$form->{fields}};
 	my $load = $form->{load};
-	
+		
 	my $get_bean = $load == 2? sub {
-		my $bean = $self->{app}{response}{bean}{$name};
+		my $bean = $self->{app}{response}{bean}{$form->{parent_form}};
+		
+		$bean = $bean->Field->{$model}->bean($id) if defined $id;
+		
 		if(ref $model) {
 			$bean = $bean->$_ for @$model;
 			$bean
@@ -191,20 +197,23 @@ sub form_load {
 		}
 	}: undef;
 	
-	main::msg ":inline", ":bold black", '----------------------------', ":red", $action, ":green", \@view, ":cyan", \@where;
+	main::msg ":inline", ":bold black", '----------------------------', ":red", $action, $form_id, $model, ":green", \@view, ":cyan", \@where;
 	
 	my $bean;
+	
 	if($form->{is_list}) {
 		$bean = $load == 2? $get_bean->(): $::app->model->$model;
 		$bean = $bean->find(@where) if @where;
+		@view = ("id", grep { $_ ne "id" } @view);
 	}
 	else {
 		$bean = $load == 2? $get_bean->(): $::app->model->$model(@where);
 	}
 	
-	$self->{app}{response}{bean}{$name} = $bean if $load == 1;
+	$self->{app}{response}{bean}{$form_id} = $bean;
 	
 	$response = $bean->annotate(@view);
+	
 	$response
 }
 

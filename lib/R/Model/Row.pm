@@ -4,6 +4,13 @@ package R::Model::Row;
 use warnings;
 use strict;
 
+# операторы возвращающие строку
+#use overload '""' => sub { $_[0]->name };
+
+# операторы возвращающие число
+#use overload '0+' => sub { $_[0]->id // 0 };
+
+
 # конструктор
 # app->model->модель
 sub new {
@@ -66,7 +73,7 @@ sub id {
 sub view {
 	my ($self, @view) = @_;
 	my $field = $self->Field;
-	$self->{view} = [grep { !$field->{$_}->compute } @view];
+	$self->{view} = [grep { !$field->{$_}->compute } map { my $fld=$field->{$_}; $fld->{rel}? @{$fld->{rel}}: $_ } @view];
 	$self
 }
 

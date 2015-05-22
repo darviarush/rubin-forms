@@ -301,7 +301,7 @@ sub INS_SET {
 sub FIELDS {
 	my ($self, $fields) = @_;
 	return map { $self->word($_) } @$fields if ref $fields eq "ARRAY";
-	return map { ($self->word($fields->{$_}), ' as ', $self->word($_)) } keys %$fields if ref $fields eq "HASH";
+	return map { my $val = $fields->{$_}; $_ eq $val? $_: $self->word($_) . ' As ' . $self->word($val) } keys %$fields if ref $fields eq "HASH";
 	return $fields;
 }
 

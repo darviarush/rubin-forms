@@ -15,7 +15,7 @@ sub setup {
 	$fields->
 	
 	col("bitext" => "tinyint")->default(0)->remark("число обозначает расширение файла-картинки")->
-	compute("ext")->remark("расширение")->
+	compute("ext" => qw/bitext/)->remark("расширение")->
 	compute("body")->remark("бинарный код файла")->
 	compute("file")->remark("путь к файлу")->
 	
