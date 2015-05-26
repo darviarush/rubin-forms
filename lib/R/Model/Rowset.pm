@@ -152,6 +152,7 @@ sub aggregate {
 # выдаёт аннотацию - хэш с данными и произвольными полями
 sub annotate {
 	my ($self, @annotate) = @_;
+	
 	$self->view(@annotate)->_all;
 }
 
@@ -198,7 +199,7 @@ sub erase {
 sub _query {
 	my ($self, $view) = @_;
 	
-	#::msg ":red", ":inline", $self;
+	::msg ":red", ":inline", $self;
 	
 	my $c = $::app->connect;
 	
@@ -212,7 +213,7 @@ sub _query {
 	
 	my @view;	
 	if(!$view && $self->{view}) {
-		$self->{find} = [map {($_ => 1)} @{$self->{view}}];
+		$self->{find} = [map {($_ => $_)} @{$self->{view}}];
 		@view = $self->_where($fld);
 	}
 
@@ -241,7 +242,7 @@ sub _query {
 	my $sep = @$from==1? " ": "\n";
 	
 	if(@view) {
-		$view = join ", ", map { $_->prepare_column	} @view;
+		$view = join ", ", map { $_->prepare_column . ($_->{val} eq $_->{col}? "": " As $_->{val}") } @view;
 	} else {
 		$view //= $fld->prepare_column;
 	}
@@ -249,6 +250,8 @@ sub _query {
 	my $FILTER = sub {
 		my $op = $_->{op};
 		my $val = $_->{val};
+		
+		$val = $val->{id} if Utils::isa($val, "R::Model::Row");
 		
 		if(!defined $val) {
 			$op = $op eq "="? " IS ": " IS NOT ";

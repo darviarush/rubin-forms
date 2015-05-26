@@ -1,0 +1,14 @@
+
+$path = $request->param("path");
+
+return $response->not_found unless $path =~ m!/images/((?:[^/]/)+)([^\./]+)\.(\w+)!;
+
+$id = $1;
+$name = $2;
+$ext = $3;
+
+$id =~ s!/!!g;
+
+$id = Utils::from_radix($id, 62);
+
+$app->model->img;

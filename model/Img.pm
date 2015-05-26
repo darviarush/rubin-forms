@@ -3,8 +3,9 @@ package R::Row::Img;
 
 use base R::Model::Row;
 
-#use Image::Magick;
-# http://www.graphicsmagick.org/perl.html
+use Graphics::Magick;
+# http://www.graphicsmagick.org/perl.html - документация по Graphics::Magick
+# http://webo.in/articles/habrahabr/69-total-image-optimization/ - оптимизация изображений
 
 
 # вызывается при создании объекта
@@ -17,13 +18,13 @@ sub setup {
 	col("bitext" => "tinyint")->default(0)->remark("число обозначает расширение файла-картинки")->
 	compute("ext" => qw/bitext/)->remark("расширение")->
 	compute("body")->remark("бинарный код файла")->
-	compute("file")->remark("путь к файлу")->
+	compute("file" => qw/bitext/)->remark("путь к файлу")->
 	
 	end
 }
 
 
-our @EXT = qw/noname png jpg gif/;
+our @EXT = qw/jpg png gif/;
 our %EXT = Utils::starset(0, @EXT);
 $EXT{"jpeg"} = $EXT{"jpg"};
 
@@ -52,17 +53,27 @@ sub root {
 
 # вычисляемый столбец
 sub body {
-	my ($self, $body) = @_;
+	my ($self, $body, $name) = @_;
 	if(@_>1) {
 		$self->store unless $self->{id};
 		my $path = $self->path;
 		Utils::mkpath($path);
 		$self->erase_files;
-		if(ref $body) {
-			Utils::cp($body, $self->file);
-		} else {
-			Utils::write($self->file, $body);
+		
+		$body = $body->body if ref $body eq "R::Utils::File";
+		
+		if($name) {
 		}
+		elsif(ref $body) {	# $body - GLOB - file
+			Utils::cp($body, $name = $self->file);
+		} else {
+			Utils::write($name = $self->file, $body);
+		}
+		
+		my $img = _resize($name, 2000, 2000, $self->file);
+		$img = _resize($img, 600, 600, $path . "main.jpg");
+		_preview($img, 200, $path . "small.png");
+		_preview($img, 100, $path . "mini.png");
 	} else {
 		Utils::read($self->file);
 	}
@@ -109,18 +120,77 @@ sub onDrop {
 	Utils::rmdown(root());
 }
 
-# изменяет размер картинки и записывает её в файл name
-# sub resize {
-	# my ($self, $w, $h, $name) = @_;
-	# my $file = $self->file;
-	# my $magick = Image::Magick->new;
-	# $magick->Read($file);
-	# $magick->preview();
-	# $magick->Resize(geometry=>geometry, width=>$w, height=>$h);	# turn в радианах
-	# $self->erase_files;
-	# $magick->Write($file);
-	# $self
-# }
+sub ASSERT($) {
+	die $_[0] if $_[0];
+}
+
+# обычный ресайз - формирует main-картинку
+sub _resize {
+	my ($from, $max_width, $max_height, $path) = @_;
+	my $img;
+	if(ref $from) {
+		$img = $from;
+	} else {
+		$img = Graphics::Magick->new;
+		ASSERT $img->Read($from);
+	}
+	
+	my $width = $img->Get("width");
+	
+	if($max_width < $width) {
+		ASSERT $img->Resize(geometry=>"${max_width}x", filter => Lanczos);	# turn в радианах
+	}
+	
+	my $height = $img->Get("height");
+	
+	if($max_height < $height) {
+		ASSERT $img->Resize(geometry=>"x${max_height}", filter => Lanczos);	# turn в радианах
+	}
+	
+	ASSERT $img->Set(preview => Roll);	# формат в котором показывается картинка при загрузке в браузер
+	ASSERT $img->Write($path);
+	$img
+}
+
+# формирует превью: изменяет размер картинки к width и записывает её в файл
+sub _preview {
+	my ($from, $w, $path) = @_;
+	my $img;
+	if(ref $from) {
+		$img = $from;
+	} else {
+		$img = Graphics::Magick->new;
+		ASSERT $img->Read($from);
+	}
+	
+	my $width = $img->Get("width");
+	my $height = $img->Get("height");
+	
+	if($width < $w || $height < $w) {
+		$width = $width < $w? $w: $width;
+		$height = $height < $w? $w: $height;
+		my $i = Graphics::Magick->new;
+		ASSERT $i->Set(size => "${width}x$height");
+		ASSERT $i->ReadImage('xc:white');
+		ASSERT $i->Composite(image=>$img, gravity=>"center");
+		$img = $i;
+	}
+	
+	if($width > $w || $height > $w) {
+		if($width > $height) {
+			ASSERT $img->Resize(geometry=>"x${w}", filter => Lanczos);	# turn в радианах
+			$width = $img->Get("width");
+			ASSERT $img->Crop(geometry => "${w}x$w+".int(($width-$w)/2)."+0");		# обрезает
+		} else {
+			ASSERT $img->Resize(geometry=>"${w}x", filter => Lanczos);
+			ASSERT $img->Crop(geometry => "${w}x$w+0+0");		# обрезает
+		}
+	}
+	
+	ASSERT $img->Set(preview => Roll);	# формат в котором показывается картинка при загрузке в браузер
+	ASSERT $img->Write($path);
+	$img
+}
 
 # поворачивает картинку
 # sub turn {

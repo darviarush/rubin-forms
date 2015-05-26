@@ -73,8 +73,14 @@ sub redirect {
 	$self->body("Redirect to <a href='$url'>".Utils::escapeHTML($text // $url)."</a>");
 }
 
+# status - 404
+sub not_found {
+	my($self) = @_;
+	$self->error(404);
+}
+
 # устанавливает/возвращает статус
-sub status { 
+sub status {
 	my($self, $status) = @_;
 	if(@_ > 1) { $self->{status} = $status; $self } else { $self->{status} }
 }
@@ -176,13 +182,8 @@ sub render {
 	} elsif(defined(my $act = $action->{act}{$_action})) {
 		$response->type('application/json; charset=utf-8');
 		@ret = $act->($app, $request, $response);
-	} elsif(exists $app->connect->info->{$_action}) {
-		#main::msg "update";
-		#@ret = $app->auth->action_main;
-		
-		my $name = $request->{action};
-		my $bean = $app->model->$name($request->param);
-		
+	} elsif(exists $app->{modelMetafieldset}{$_action}) {	
+		my $bean = $app->model->$_action($request->param);
 		@ret = {id=>$bean->{id}};
 	} else {
 		$response->error(404);

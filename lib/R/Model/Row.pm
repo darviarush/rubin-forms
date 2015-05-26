@@ -80,11 +80,8 @@ sub view {
 # возвращает хэш с указанными полями. Поля могут быть любыми - так же и вычисляемыми
 sub annotate {
 	my ($self, @fields) = @_;
-	local $_;
-	$self->view(@fields);
-	my $s = {};
-	$s->{$_} = $self->$_ for @fields;
-	$s
+	my ($res) = $self->Model->find(id=>$self)->annotate(@fields);
+	$res
 }
 
 # деструктор
@@ -100,8 +97,6 @@ sub save {
 	my $save = $self->{save};
 	return $self unless $save;
 	
-	my ($tab, $s) = $self->ToCol;
-	
 	my $c = $::app->connect;
 	my $listener = $::app->listener;
 	my $name = $self->Fieldset->{name};
@@ -112,6 +107,7 @@ sub save {
 		$listener->fire("$name.update,$name.save", $self);
 		$self->{noAction} = undef, return $self if $self->{noAction};
 	
+		my ($tab, $s) = $self->ToCol;
 		$c->update($tab, $s, { "id" => $id });
 		$self->{id} = $id if $id = $s->{id};
 	} else {
@@ -119,6 +115,7 @@ sub save {
 		$listener->fire("$name.add,$name.save", $self, 1);
 		$self->{noAction} = undef, return $self if $self->{noAction};
 	
+		my ($tab, $s) = $self->ToCol;
 		$c->add($tab, $s);
 		$id = $self->{id} = $save->{id} // $c->last_id;
 	}

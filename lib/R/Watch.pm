@@ -2,7 +2,6 @@
 # следит за изменениями файлов и папок
 
 use File::Find;
-use POSIX qw(strftime);
 
 use Msg;
 

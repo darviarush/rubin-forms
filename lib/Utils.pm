@@ -64,6 +64,12 @@ sub isa {
 }
 
 
+# время для БД
+use POSIX qw(strftime);
+sub now {
+	strftime("%F %T", localtime);
+}
+
 # сортирует по свойству
 sub order_by {
 	my ($sort, $arr, $desc) = @_;
@@ -303,11 +309,13 @@ sub param_from_post {
 	if($type =~ m!^multipart/form-data;\s*boundary=!i) {
 		my $boundary = qr/^--$'(--)?\r?\n/;
 		my $param = {};
+		my $file = {};
 		my $is_val = 0;
 		my @buf;
 		my $val;
 		my ($head, $is_head);
 		my ($name, $encoding) = ("");
+		require R::Utils::File;
 		while(<$stdin>) {
 			#main::msg(":nonewline", $_);
 			if($_ =~ $boundary) {
@@ -315,17 +323,19 @@ sub param_from_post {
 				@buf = "" if @buf == 0;
 				$buf[$#buf] =~ s/\r?\n//;
 				if($name ne "") {
+					my $file_val = $val;
 					if($is_val and @buf == 1) {
 						$val = $buf[0];
 					} else {
-						$val = {body => join('', @buf), head=>$head};
+						$val = R::Utils::File->new({body => join('', @buf), head=>$head});
 					}
-					if(exists $param->{$name}) {
-						my $p = $param->{$name};
-						$param->{$name} = $p = [$p] unless ref $p eq "ARRAY";
+					
+					if(exists $file->{$name}) {
+						my $p = $file->{$name};
+						$file->{$name} = $p = [$p] unless ref $p eq "ARRAY";
 						push @$p, $val;
 					}
-					else {$param->{$name} = $val}
+					else {$file->{$name} = $val}
 				}
 				last if $the_end;
 				$is_head = 1;
@@ -345,7 +355,7 @@ sub param_from_post {
 				push @buf, $_;
 			}
 		}
-		$param;
+		return $param, $file;
 	} elsif($type =~ m!\bapplication/json\b!i) {
 		read $stdin, $_, $len;
 		require JSON::XS;

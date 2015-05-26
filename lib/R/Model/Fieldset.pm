@@ -207,7 +207,7 @@ sub default {
 	$self
 }
 
-sub raw_default {
+sub default_raw {
 	my ($self, $default) = @_;
 	$self->default($default, 1);
 }
