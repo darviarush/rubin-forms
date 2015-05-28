@@ -1,6 +1,8 @@
 /* функции для параметров */
-%exists = function(v) { if(r=CInit.param.css.match(new RegExp("(?:^|\\d)"+v+"(\\d+|(\\d+)?\\.\\d+)"))) return parseInt(r[1]) }
-%get = function(v, def) { return (r=exists(v))!=null? r: def }
+
+%PARAM = window.Nika || {w: 12, in: 2}
+%exists = function(k) { return PARAM[k] }
+%get = function(k, v) { return PARAM[k] || v }
 
 /* параметры */
 %br = get("b", 1)
@@ -11,7 +13,7 @@
 
 
 /* вендорные префиксы */
-%$vendor = CNavigator.vendor
+%$vendor = document.documentMode? '-ms-': window.opera? '-o-': window.chrome? '-webkit-': window.InstallTrigger? '-moz-': navigator.vendor == 'KDE'? '-khtml-': '-vendor-'
 %$style = document.createElement('div').style
 %if(!'animation' in $style) $keyframes_vendor = $vendor
 %$vendorProp = {}
@@ -58,7 +60,7 @@ background-color: #fff;
 overflow: auto;
 }
 
-input, button, select, textarea { font-family: inherit; font-size: inherit; line-height: inherit; overflow: hidden; border:solid %{br}px #E7E7E7!important;  }
+input, button, select, textarea { font-family: inherit; font-size: inherit; line-height: inherit; overflow: hidden; border:solid %{br}px #E7E7E7;  }
 input, button, textarea { padding: %{pa}px }
 select {height: %{20+2*pa+2*br}px}
 input:hover, button:hover, select:hover, textarea:hover { border-color: orange }
@@ -71,7 +73,7 @@ h1, h2, h3, h4, h5, h6 { border-width: 10pt 0 5pt 0; border-color: transparent; 
 html,body{ width:100%; height:100% }
 
 * { padding: 0; margin: 0; box-sizing: border-box; clear: both; vertical-align:middle; }
-div:after {clear:both; content: ""; display: block;}
+div:after, form:after {clear:both; content: ""; display: block;}
 
 %inline-block {display: -moz-inline-stack; display: inline-block; *display: inline; *zoom: 1}
 
@@ -140,15 +142,11 @@ color: white !important;
 	%join(arg) {%if i===1{.%{arg+j}, }.%{arg+t}}	
 	%fix = suffix === 'w'? '': '-'+suffix
 	%lfix = suffix === 'w'? '': suffix
-	%height = CRoot.viewHeight()
 	%for j in 1..rem {
 		%for i in 1..j {
 			%k = i * 100 / j
-			%h = i * height / j
 			%t = i+"_"+j
 			%{join(suffix)} { width: %{k}% }
-			%{join("h"+lfix)} { height: %{h}px }
-			%{join("ph"+lfix)} { height: %{k}% }
 			%{join("offset"+fix)} { margin-left: %{k}% }
 			%{join("push"+fix)} { left: -%{k}% }
 			%{join("pull"+fix)} { left: %{k}% }
@@ -243,8 +241,8 @@ color: white !important;
 
 /* цвета */
 %for name, color of dark {
-	.%{name}s > div { background-color: %{color}; color: %{light[name]} }
-	.%{name}s-light > div { background-color: %{light[name]}; color: #555; }
+	.%{name}s > div, .%{name}s > form { background-color: %{color}; color: %{light[name]} }
+	.%{name}s-light > div, .%{name}s-light > form { background-color: %{light[name]}; color: #555; }
 }
 
 
@@ -359,15 +357,22 @@ th {font-weight: 700}
 }
 
 
-/* кнопки - 2 */
+%div = document.createElement('div')
+%document.documentElement.appendChild(div)
+%rgb = function(color) { div.style.backgroundColor = color; return getComputedStyle(div).getPropertyValue("background-color").match(/(\d+),\s*(\d+),\s*(\d+)/).splice(1,3) }
 
+%rgbToHsl = function(r, g, b) { var d, h, l, max, min, s; r /= 255; g /= 255; b /= 255; max = Math.max(r, g, b); min = Math.min(r, g, b); l = (max + min) / 2; if(max === min) { h = s = 0; } else { d = max - min; s = l > 0.5 ? d / (2 - max - min) : d / (max + min); switch(max) { case r: h = (g - b) / d + (g < b ? 6 : 0); break; case g: h = (b - r) / d + 2; break; case b: h = (r - g) / d + 4; } h /= 6; } return [h, s, l]; }
+
+%hslToRgb = function(h, s, l) { var b, g, hue2rgb, p, q, r; if (s === 0) { r = g = b = l; } else { hue2rgb = function(p, q, t) { if (t < 0) { t += 1; } else if (t > 1) { t -= 1; } if (t < 1 / 6) { return p + (q - p) * 6 * t; } else if (t < 1 / 2) { return q; } else if (t < 2 / 3) { return p + (q - p) * (2 / 3 - t) * 6; } else { return p; } }; q = l < 0.5 ? l * (1 + s) : l + s - l * s; p = 2 * l - q; r = hue2rgb(p, q, h + 1 / 3); g = hue2rgb(p, q, h); b = hue2rgb(p, q, h - 1 / 3); } return [parseInt(r * 255), parseInt(g * 255), parseInt(b * 255)]; }
+
+/* увеличивает или уменьшает светлость */
+%lightness = function(color, x) { var c = rgb(color); c=rgbToHsl(c[0],c[1],c[2]); x+=c[2]; x=x<0? 0: x>1? 1: x; c=hslToRgb(c[0], c[1], x); return "rgb("+c.join(",")+")" }
+
+/* кнопки - 2 */
 %for name, color of dark {
-	%r1 = CRoot.rgba(color)
-	%r2 = CRoot.rgba(color)
-	%r3 = CRoot.rgba(color)
-	%l1 = r1.lightness() + 0.15; r1.lightness(l1 > 1? 1: l1)
-	%l2 = r2.lightness() + 0.05; r2.lightness(l2 > 1? 1: l2)
-	%l3 = r2.lightness() - 0.1; r3.lightness(l3 < 0? 0: l3)
+	%r1 = lightness(color, 0.15)
+	%r2 = lightness(color, 0.05)
+	%r3 = lightness(color, -0.05)
 	%if name === 'blue' { .btn, }.%{name}.btn {
 		background-image: linear-gradient(to bottom, %{r1}, %{color});
 		border-color: %{color};
@@ -377,7 +382,7 @@ th {font-weight: 700}
 	}
 }
 
-
+%div.parentNode.removeChild(div)
 
 
 /* вкладки */
@@ -440,3 +445,5 @@ border-radius: 0 0 1em 1em;
 }
 
 .orange_gradient a {font-weight: normal}
+
+.error { border: solid 1px %{red}; border-left-width: 8px; background-color: %{lred}; padding: %{pa}px }

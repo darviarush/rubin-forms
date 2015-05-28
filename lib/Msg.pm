@@ -6,6 +6,7 @@
 #	а) предусмотреть виджеты
 #	б) хелперы встраивать в шаблон
 #	в) компилировать и в js
+# 4. темплейты только на стороне сервера
 
 
 
@@ -98,11 +99,6 @@ sub msg (@) {
 	return $_[$#_];
 }
 
-sub mtime {
-	my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,$blksize,$blocks) = stat $_[0];
-	$! = undef;
-	$mtime
-}
 
 sub file ($) { my ($path) = @_; -e $path? $path: ($_FRAMEWORK && -e ($path="$_FRAMEWORK/$path"))? $path: undef }
 sub dirs (@) { map { (($_FRAMEWORK? glob("$_FRAMEWORK/$_") : ()), glob($_)) } @_ }

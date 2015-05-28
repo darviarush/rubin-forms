@@ -29,7 +29,7 @@ sub on {
 	}
 
 	for my $file (@files) {
-		$self->{watch}{$file} = main::mtime($file);
+		$self->{watch}{$file} = mtime($file);
 		$self->{file}{$file} = $callback;
 	}
 	
@@ -69,10 +69,10 @@ sub scan {
 		wanted => sub {
 			my $path = $File::Find::name;
 			if(-d $path) {
-				$self->{dirs}{$path} = main::mtime($path);
+				$self->{dirs}{$path} = mtime($path);
 			}
 			elsif($path =~ $ext) {
-				$self->{watch}{$path} = main::mtime($path);
+				$self->{watch}{$path} = mtime($path);
 				$self->{file}{$path} = $callback;
 			}
 		}
@@ -80,15 +80,34 @@ sub scan {
 	$self
 }
 
+sub mtime {
+	my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,$blksize,$blocks) = stat $_[0];
+	$! = undef;
+	$mtime
+}
+
 # проверка
 sub run {
 	my ($self) = @_;
 	while(my($dir, $mtime) = each %{$self->{dirs}}) {
-		main::msg('watch_dir', $dir), $self->erase($dir), $self->scan($dir) if $mtime < main::mtime($dir);
+		my $rmtime = mtime($dir);
+		if(defined $rmtime) {
+			main::msg('watch_dir', $dir), $self->erase($dir), $self->scan($dir) if $mtime < $rmtime;
+		} else {
+			main::msg('watch_dir', $dir, 'remove');
+			$self->erase($dir);
+		}
 	}
 	while(my($file, $mtime) = each %{$self->{watch}}) {
-		#main::msg('watch_file', $file), 
-		$self->{watch}{$file} = main::mtime($file), $self->{file}{$file}->($file, $self->{app}) if $mtime < main::mtime($file);
+		#main::msg('watch_file', $file),
+		my $rmtime = mtime($file);
+		if(defined $rmtime) {
+			$self->{watch}{$file} = $rmtime, $self->{file}{$file}->($file, $self->{app}) if $mtime < $rmtime;
+		} else {
+			::msg "watch_file", $file, "remove";
+			delete $self->{watch}{$path};
+			delete $self->{file}{$path};
+		}
 	}
 	$self
 }

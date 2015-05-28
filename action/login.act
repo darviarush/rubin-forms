@@ -3,31 +3,28 @@
 $email = $request->param("email");
 $pass = $request->param("pass");
 
+$response->addError("login", "email", "Введите email") if defined $email and $email eq "";
+$response->addError("login", "pass", "Введите пароль") if defined $pass and $pass eq "";
+
+return if $response->errors;
+
 $user_id = $app->model->user->find(email => $email, pass => $pass)->id;
 if($user_id) {
 	$uid = $request->user->id;
 	if($uid and $user_id == $uid) {
-		$sess = $request->cookie("sess");
+		#$sess = $request->cookie("sess");
 	} else {
 		$sess = Utils::unic_id(20);
 		$response->cookie("sess", $sess, path => "/");
 		$request->cookie->{sess} = $sess;
-		#$conn->erase("sess", {user_id=>$user_id});
-		#$conn->add("sess", {id=>$sess, user_id=>$user_id});
+		$request->session->user($user_id)->saveAs($sess);
 	}
-
-	$request->session->user($user_id)->store;
 	
-	#$app->session->user_id($user_id);
-	#$response->cookie(sess => $sess);
-	
-	$head = $request->head;
-	$referer = !exists $head->{Referer}? "/profit": $head->{Referer};
-	$referer =~ s!^\w+://[^/]+!!;
+	$referer = $request->referer("/profit");
 	$response->redirect($referer eq "/" ? '/profit': $referer);
 	#{sess => $sess, user_id => $user_id}
 } else {
 	$response->status(403, "Логин или пароль неверен");
-	{error => "Логин или пароль неверен"}
+	$response->addErrors("login", "Логин или пароль неверен");
 }
 

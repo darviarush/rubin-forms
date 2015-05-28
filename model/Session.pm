@@ -21,11 +21,19 @@ sub setup {
 
 }
 
+# сохраняет now
+sub onSave {
+	my ($self) = @_;
+	$self->now( Utils::now() );
+}
+
+# удаляет все просроченные сессии
 sub delete {
 	my ($self) = @_;
-	my $conn = $self->{app}->connect;
-	eval { $conn->erase("sess", {now__lt => $conn->now(time-3600)}); };
-	$conn->reconnect if $@;
+	$self->Model->find(now__lt => Utils::now(time-3600))->erase;
+	#my $conn = $self->{app}->connect;
+	#eval { $conn->erase("sess", {now__lt => $conn->now(time-3600)}); };
+	#$conn->reconnect if $@;
 	$self
 }
 

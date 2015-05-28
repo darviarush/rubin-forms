@@ -20,9 +20,12 @@ our $RE_LOCATION = qr!((/([^\s\?]*?(?:/\d+)?)_?(?:(-?\d+)((?:_-?\d+)*)|\.(\w+))?
 
 # устанавливает новые значения
 sub reset {
-	my ($self) = @_;
+	my ($self, @args) = @_;
+	
+	%$self = (app=>$self->{app});
+	
 	my ($ids, $id);
-	($self, $self->{method}, $self->{url}, $self->{location}, $self->{action}, $id, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body}) = @_;
+	($self->{method}, $self->{url}, $self->{location}, $self->{action}, $id, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body}) = @args;
 
 	#main::msg 'req->reset', $self->{method}, $self->{url}, $self->{location}, $self->{action}, $id, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body};
 	
@@ -42,6 +45,16 @@ sub head {
 	my ($self, $name) = @_;
 	my $head = $self->{head};
 	defined($name)? $head->{$name}: $head;
+}
+
+# возвращает url c которого пришло
+sub referer {
+	my ($self, $default) = @_;
+	my $head = $self->head;
+	my $referer = exists $head->{Referer}? $head->{Referer}: $default;
+	my $host = $self->{app}->ini->{site}{host};
+	$referer =~ s!^https?://$host!!;
+	$referer
 }
 
 # возвращает куки
@@ -119,7 +132,7 @@ sub html {
 # возвращает текущую сессию
 sub session {
 	my ($self) = @_;
-	$::app->model->session($self->cookie("sess"));
+	$self->{session} //= $::app->model->session($self->cookie("sess"));
 }
 
 # возвращает текущего пользователя

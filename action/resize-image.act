@@ -1,7 +1,9 @@
 
 $path = $request->param("path");
 
-return $response->not_found unless $path =~ m!/images/((?:[^/]/)+)([^\./]+)\.(\w+)!;
+$root = $app->model->img(undef)->root;
+
+return $response->not_found unless $path =~ m!^$root/((?:[^/]/)+)([^/]+)$!;
 
 $id = $1;
 $name = $2;
@@ -11,4 +13,6 @@ $id =~ s!/!!g;
 
 $id = Utils::from_radix($id, 62);
 
-$app->model->img;
+$app->model->img($id)->resize($name);
+
+$response->redirect($path);

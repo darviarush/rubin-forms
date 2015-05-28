@@ -90,6 +90,14 @@ sub DESTROY {
 	$self->save;
 }
 
+# сохраняет в указанный идентификатор
+sub saveAs {
+	my ($self, $id) = @_;
+	$self->{id} = undef;
+	$self->{save}{id} = $id;
+	$self->save;
+}
+
 # сохраняет, если есть что
 sub save {
 	my ($self) = @_;
@@ -119,6 +127,7 @@ sub save {
 		$c->add($tab, $s);
 		$id = $self->{id} = $save->{id} // $c->last_id;
 	}
+	delete $self->{val};	# данные изменились. Причём в базе могут они преобразоваться триггерами или ещё как
 	
 	if(defined $id) {
 		my $rel;

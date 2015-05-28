@@ -1044,7 +1044,7 @@ CTemplate =
 			else if NO and (m = s.match ///^</(\w+)\s*>///) and m[1] == TAG then TAG = open_id = open_tag = NO = undefined ; html.push m[0]
 			else if open_tag and m = s.match ///^\$-(\w+)/// then open_id = m[1]; html.push "', id, '-" + m[1]
 			
-			else if m = s.match ///^\$@([/\w]+)/// then #[open_id] = m[1]
+			else if m = s.match ///^\$@([/\w-]+)/// then html.push "', CTemplate.include('#{m[1]}'), '"
 			else if m = s.match ///^\$&/// then 
 			else if m = s.match ///^{%\s*(\w+)\s*=%\}/// then html.push "', (function() { CTemplate._STASH.#{m[1]} = ['"
 			else if m = s.match ///^{%\s*end\s*%\}/// then html.push "'].join(''); return '' })(), '"
@@ -1123,6 +1123,13 @@ CTemplate =
 	#fromArgs: (s) -> x={}; fromArg = ((v) -> [key, val] = v.split("="); x[key]=val); s=String s; (while (pos=s.search(/\s+\w+=/)) != -1 then v=s.slice 0, pos; s=s.slice(pos).replace /^\s+/, ''; fromArg v); fromArg s.replace /\s+$/, ''; x
 	_color: ['Cornsilk', 'lavender', 'Ivory', 'LavenderBlush', 'LemonChiffon', 'MistyRose', 'Seashell', 'Honeydew', 'MintCream', 'Azure', 'AliceBlue']
 	color: (n=parseInt(Math.random()*CTemplate._color.length)) -> CTemplate._color[n]
+	
+	include: (name, data, id)->
+		page = CTemplate._PAGE[name]
+		unless code = page.code
+			template = CTemplate._PAGE[name].template
+			code = CTemplate.compile template
+		code data, name
 
 
 CHelper =
@@ -1822,76 +1829,13 @@ class CWidget
 	content: (content) -> if arguments.length then @down().free(); @append content else new CWidgets @element.childNodes
 	normalize: -> @element.normalize(); this
 	update: (val, request) ->
-		if off != @send 'onBeforeUpdate', val
-			if /^\{/.test val
-				val = fromJSON val
-				CTemplate._STASH = val.stash || {}
-				if layouts = val.layout
-					in_layout = val.layout_id
-					for layout in layouts
-						page = val.body[layout]
-						@byId(in_layout).html CTemplate.compile(page.template)(page.data || {}, layout)
-						in_layout = page.layout_id
-					@byId(val.layout_id).runscript()
-				else
-					@htmlscript CTemplate.compile(val.template)(val.data, @id())
-				
-				$(w = @window()).clean()
-				$(w.document).clean()
-				do CRoot.initWidgets
-				
-				if url=val.url
-					title = CTemplate._STASH.title
-					
-					url = CUrl.from url
-					old = CUrl.from w.location.href
-					extend frames = {}, CParam.from(old.param._f, /,/), CParam.from url.param._f, /,/
-					url.param._f = frames if frames = CParam.to frames, ","
-					
-					args = [CUrl.to(url), title || @document().title]
-					if request.history then args.unshift 0
-					@navigate args...
-					say 'reload_manipulate', args..., w.history$, w.history_pos$
-				this
-				
-			else if request?.request and ///^text/html\b///i.test request.request.getResponseHeader "Content-Type"
+		if off != @send 'onBeforeUpdate', val	
+			if request?.request and ///^text/html\b///i.test request.request.getResponseHeader "Content-Type"
 				@htmlscript val.replace ///[\s\S]*?<body[^<>]*>([\s\S]*?)</body\s*>[\s\S]*///i, "$1"
 			else @val val
 			@send 'onUpdate', val
 		this
-		
-	# reload_manipulate: (data) ->		
-		# data = fromJSON data if typeof data == 'string'
-		# if stash = data['@stash'] then CTemplate._STASH = stash
-		# if layout = data['@layout']
-			# for i in [1...layout.length]
-				# layout_id = data[layout[i-1]].layout_id
-				# page = data[act = layout[i]]
-				# @byId(layout_id).html CTemplate.compile(page.template)(page.data || {}, act)
-			# title = CTemplate._STASH.title
-			
-		# if frames = data["@frames"]
-			# for act, id of frames
-				# page = data[act]
-				# @byId(page.id).html CTemplate.compile(page.template)(page.data || {}, act)
 
-		# CTemplate._STASH = {}		
-				
-		# $(window).clean()
-		# $(document).clean()
-		# do CRoot.initWidgets
-		
-		# url = CUrl.from data['@url']
-		# old = CUrl.from @window().location.href
-		# extend frames = {}, CParam.from(old.param._f, /,/), CParam.from url.param._f, /,/
-		# url.param._f = frames if frames = CParam.to frames, ","
-		
-		# args = [CUrl.to(url), title || @document().title]
-		# if @request.history then args.unshift 0
-		# @navigate args...
-		# say 'reload_manipulate', args..., window.history$, window.history_pos$
-		# this
-	
 	outer: (val) ->
 		if arguments.length
 			focus=@hasFocus()
@@ -2176,19 +2120,6 @@ class CWidget
 		vscroll: (key, val) -> if arguments.length > 1 then @vscroll val else @vscroll()+"px"
 		hscroll: (key, val) -> if arguments.length > 1 then @hscroll val else @hscroll()+"px"
 	addCss: (prop, fn) -> css_fn[prop] = fn; this
-	
-	'''
-	div$.style.color = 'rgba(1,1,1,.5)'
-	is_rgba$ = !!div$.style.color
-	for style$ of div$.style
-		#document.write k+"<br>"
-		to_style$ = if isCase$ then style$.lc() else style$
-		div$.style[style$] = '1px'
-		if div$.style[style$] == '1px' then css_px[to_style$] = 1 else div$.style[style$] = '#AAAAAA'; if div$.style[style$] then css_color[to_style$] = 1 else css_not_px[to_style$] = 1
-		# http://alrra.github.io/little-helpers/vendor-prefixes/
-		if (match=style$.match /^([wW]ebkit|Moz|Khtml|ms|O|Apple|[iI]cab|[Ee]pub|Wap|Xv|Prince|[Rr]o)([A-Z].*)/) and typeof div$.style[(s = match[2]).lcFirst()] != 'string' then with_vendor_prefix[s.lc()] = style$ # css3
-		#document.write k+'<br>'
-	'''
 	
 	toCssCase = (key) -> 
 		unless real = css_good[key]
@@ -2653,24 +2584,6 @@ class CWidget
 			@css cssp
 			
 		this
-	
-	# animate: (param, duration, ease, complete) ->
-		# @_animate = p = if typeof duration == 'object' then duration else duration: duration, ease: ease, complete: complete
-		# p.param = param
-		# duration = p.duration || p.timeout
-		# duration = speeds$[duration] || duration || 400
-		# if typeof duration == 'number' then duration = duration+'ms'
-		# if typeof (delay = p.delay) == 'number' then delay = delay+'ms'
-		# transition = [Object.keys(param).join(",") || 'all', duration]
-		# if ease = p.ease then transition.push ease
-		# if delay
-			# if ease then transition.push delay else @css 'transition-delay', delay
-		# @css 'transition', transition.join " "
-		# @on 'transitionend', ->
-			# @off 'transitionend', arguments.callee
-			# @css transition: null, 'transition-delay': null
-			# @send (p = @_animate).complete, p
-		# @css param
 
 	animate$ = ->
 		anim = @_animqueue[0]
@@ -2811,31 +2724,10 @@ class CWidget
 		if param.queue
 			for q in param.queue then @morph q
 		anim
-
-	
-	analog_anim$ =
-		ease: 'animation-timing-function'
-		timeout: 'animation-duration'
-		count: 'animation-iteration-count'
-		wait: 'animation-delay'
-		play: 'animation-direction'
-		mode: 'animation-fill-mode'
-		state: 'animation-play-state'
-	
-	anim: (a) ->
-		if typeof a == "string" then a = CEffect[a]
-		if 'name' of a then extend_deep_uniq a, CEffect[a.name]
-		
-		for k of analog_anim$
-			if k of a then @css analog_anim$[k], a[k]; delete a[k]
-		
-		
-		
-		this
 			
 		
 	
-	type$.all 'timeout interval clear animate morph anim anime'
+	type$.all 'timeout interval clear animate morph anime'
 
 	
 	# методы шейпов
@@ -3553,7 +3445,6 @@ class CLoaderWidget extends CWidget
 		request.onreadystatechange = @_onReadyStateChange
 		
 		url = param._act || customer.attr("action") || @attr("action") || (if id=customer.id() then (if not param.id and pk=customer.data?.id then param.id = pk); "/"+id else @document().location.pathname)
-		
 		delete param._act
 		
 		method = param._method || customer._method || customer.attr("cmethod") || @attr("cmethod") || @_method
@@ -3566,8 +3457,7 @@ class CLoaderWidget extends CWidget
 		
 		for key of param when key[0] == '$' then headers[key.slice(1).upFirst()] = param[key]; delete param[key]
 			
-		extend @request, timer: timer, request: request, headers: headers, history: param._history, url: url, sender: customer, customer: (if t = customer.attr 'target' then @byId t else if type=='submit' then @byId 'main' else customer)
-		delete param._history
+		extend @request, timer: timer, request: request, headers: headers, url: url, sender: customer, customer: (if t = customer.attr 'target' then @byId t else if type=='submit' then @byId 'main' else customer)
 		
 		params = if method != "POST" then (if params then url = CUrl.from url; extend url.param, param; url = CUrl.to url); null
 		else if CInit.post == 'json' then toJSON param
@@ -3625,18 +3515,9 @@ class CLoaderWidget extends CWidget
 		
 
 	ohSubmit: -> @vid()
-	ohComplete: -> @novid()
-	ohLoad: -> @request.sender.tooltip null
-	ohError: ->
-		text = @request?.request.responseText || ""
-		err = @request.error
-		content = @wrap "<div cview=ajax_error></div>"
-		body = content.first(".c-tip-content")
-		if ///^application/json///.test @request?.request.getResponseHeader 'Content-Type' then body.val fromJSON(text).error
-		else body.update text, @request
-		if err then content.first("h3").text err
-		@request.sender.tooltip ctype: 'tooltip', close: 1, open: 1, html: content, timeout: 5000, class: 'c-error'
-
+	ohComplete: -> 
+	ohLoad: -> @novid()
+	ohError: -> @text @request.error		
 
 
 class CStatusWidget extends CLoaderWidget
@@ -3650,14 +3531,13 @@ class CStatusWidget extends CLoaderWidget
 	ohComplete: -> @preloader.hide()
 	ohLoad: -> @sucess.show()
 	ohError: ->
-		@error.element.title = @request.error
-		@error_msg.text @request.error
+		@error_msg.text @error.element.title = @request.error
 		@error.show()
 
 
 class CRouterWidget extends CWidget
-	config:
-		loader: off	# для якорей - если нет - то используется loader якоря
+	#config:
+	#	loader: off	# для якорей - если нет - то используется loader якоря
 
 	constructor: ->
 		super
@@ -3669,15 +3549,10 @@ class CRouterWidget extends CWidget
 			url = CUrl.from a.attr "href"
 			if not url.host or url.host == a.document().location.host
 				e.cancel()
-				if loader = @config.loader then a._loader = loader
-				#if url.hash then a.attr "target", url.hash; url.hash = ""
-				param = {}
-				#param._noact_ = noact if url.pathname == @document().location.pathname
-				if url.hash then param._a = url.hash; url.hash = ""
-				param._act = CUrl.to url
-				#if not a._loader and not a.attr 'cloader' then a.loader this
-				a.load param
+				@loader a.loader()
+				@load _act: url
 		return
+	
 	
 	prev_url$ = null
 	
@@ -3687,7 +3562,7 @@ class CRouterWidget extends CWidget
 		href = @window().location.href
 		href = href.replace ///\#.*$///, ''
 		say 'popstate', href, e
-		if prev_url$ != href then @load _act: href, _history: 1
+		if prev_url$ != href then @load _act: href
 		prev_url$ = href
 		
 	onhashchange_window: pop$

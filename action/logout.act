@@ -3,7 +3,6 @@
 $response->cookie("sess", "", expires => 150723948, path => "/"),
 $request->session->erase, $request->cookie->{sess} = undef if defined $request->cookie("sess");
 
-main::msg($app->json->encode([ 'logout', $app->{stash} ]));
+::msg($app->json->encode({'logout'=>1, stash=>$app->{stash} }));
 
-
-return $response->redirect("/");
+return $response->redirect;

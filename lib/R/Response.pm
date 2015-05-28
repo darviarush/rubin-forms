@@ -68,6 +68,7 @@ sub cookie {
 # перенаправление на другой url. В ajax перенаправление происходит на сервере, а иначе - на клиенте
 sub redirect {
 	my ($self, $url, $text) = @_;
+	$url = $self->{app}->request->referer("/") unless $url;
 	$self->{status} = 307;
 	$self->head("Location" => $url);
 	$self->body("Redirect to <a href='$url'>".Utils::escapeHTML($text // $url)."</a>");
@@ -146,6 +147,40 @@ sub layout {
 	else { @{$self->{layout}} or @{$self->{app}{action}->layout($self->{app}{request}{action})} }
 }
 
+# возвращает дефолтные параметры страницы: $request->param + $errors + $info
+sub param {
+	my ($self) = @_;
+	my $param = $self->{app}{request}->param;
+	return {%$param, %{$self->{param}}} if $self->{param};
+	return $param;
+}
+
+# возвращает ошибки
+sub errors { $_[0]->{errors} }
+
+# добавляет ошибки на форму
+sub addErrors {
+	my ($self, $form, @errors) = @_;
+	@errors = map { { error => $_ } } @errors;
+	push @{ $self->{param}{$form}{errors} }, @errors;
+	push @{ $self->{errors}{$form}{errors} }, @errors;
+	$self
+}
+
+# добавляет ошибку для элемента формы
+sub addError {
+	my ($self, $form, $element, $error) = @_;
+	$self->{errors}{$form}{"${element}_error"} = $self->{param}{$form}{"${element}_error"} = $error;
+	$self
+}
+
+# добавляет информацию на форму
+sub addInfo {
+	my ($self, $form, @info) = @_;
+	push @{ $self->{param}{$form}{info} }, map { { info => $_ } } @info;
+	$self
+}
+
 # отображает в body страницу
 sub render {
 	my ($self, $_action, $data) = @_;
@@ -155,7 +190,7 @@ sub render {
 	
 	my $action = $app->action;
 	my $_action_htm = $action->{htm};
-	my $_HEAD = $request->{head};
+	#my $_HEAD = $request->{head};
 	
 	if(defined $_action) {
 		$request->{action} = $_action;
@@ -169,15 +204,9 @@ sub render {
 	}
 	
 	my $action_htm = $_action_htm->{$_action};
-	my $ajax = $_HEAD->{"Ajax"};
 	my @ret;
-	
-	#main::msg $_action, $action->{act}{$_action}, $action_htm, $ajax;
-	
-	if(defined $action_htm and defined $ajax and $ajax =~ /^(submit|load)$/) {
-		@ret = $self->submit;
-	}
-	elsif(defined $action_htm and !$ajax) {
+
+	if(defined $action_htm) {
 		@ret = $self->wrap;
 	} elsif(defined(my $act = $action->{act}{$_action})) {
 		$response->type('application/json; charset=utf-8');
@@ -197,19 +226,27 @@ sub render {
 # ajax-редирект
 sub ajax_redirect {
 	my ($self) = @_;
+	
+	$self->{redirect} //= 0;
+	die "Глубина редиректа больше 5. Зацикливание" if $self->{redirect}++ > 5;
+	
 	my $app = $self->{app};
 	my $request = $app->request;
 	my $response = $self;
+	my $location = $response->{head}{"Location"};
 
-	my @location = $response->{head}{"Location"} =~ m!^$R::Request::RE_LOCATION$!o;
+	my @location = $location =~ m!^$R::Request::RE_LOCATION$!o;
 	return unless @location;
 	
+	my $cookie = $request->cookie;
 	$request->reset( 'GET', @location, 'HTTP/1.1', $request->{head} );
+	$request->{cookie} = $cookie;
 	
-	my $cookie = $response->{cookie};
+	$cookie = $response->{cookie};
 	$response->reset->{cookie} = $cookie;
 	
-	$self->render;
+	# рендерим и добавляем переход
+	$self->render->append("<script><!--\nCRoot.navigate('" . Utils::escapejs($location) . "', '" . Utils::escapejs($self->{stash}{title}) . "')\n--></script>");
 }
 
 # выполняет и оборачивает в лайоуты экшн
@@ -221,94 +258,22 @@ sub wrap {
 	my $act = $request->{action};
 	my $action = $app->action;
 	my $_action_act = $action->{act};
-	my $_action_htm = $ajax? $action->{ajax_htm}: $action->{htm};
+	my $_action_htm = $action->{htm};
 	my $action_act = $_action_act->{$act};
 	
 	my @ret;
+	my $form_action = $request->param("action");
+	$_action_act->{$form_action}->($app, $request, $response) if $form_action;
+	
+	::msg $response->errors, 'x', $response->param;
+	
 	for my $layout ($response->layout) {
 		$action_act = $_action_act->{$layout};
-		my $arg = $action_act? $action_act->($app, $request, $response): (ref $ret[0]? $ret[0]: $request->param);
+		my $arg = $action_act? $action_act->($app, $request, $response): (ref $ret[0]? $ret[0]: $response->param);
 		@ret = $_action_htm->{$layout}->($app, $arg, $layout, \@ret);
 	}
 
 	@ret
-}
-
-
-# фреймы - механизм лайоутов и таргетов форм
-sub submit {
-	my ($self, $ajax) = @_;
-	my $app = $self->{app};
-	my $request = $app->{request};
-	my $response = $app->{response};
-	my $action = $app->{action};
-	my $actions = $action->{act};
-	my $templates = $action->{htm};
-	my $pages = $action->{page};
-	my $param = $request->param;
-	my $layout = $app->action->{layout};
-	
-	my $result = {};
-	my $act;
-	my ($id, $url);
-	
-	$response->type("text/json");
-	
-	my $add_res = sub {
-		
-		die "Нет экшена `$act`" if not exists $actions->{$act} and not exists $templates->{$act};
-		
-		my $page = $pages->{$act};
-		
-		my $data = exists $actions->{$act}? $actions->{$act}->($app, $request, $response): $param;
-		$page->{code}->($app, $data, $act) if exists $page->{code};
-		
-		$result->{$act} = {
-			#act => $act,
-			($id ? (id => $id): ()),
-			#(exists $main::_forms{$act} && exists $main::_info->{$act}? (data => action_view($main::_action, $main::param)): ()),
-			(defined($data)? (data => $data): ()),
-			(exists $page->{template}? (template => $page->{template}): ()),
-			(exists $page->{layout_id}? (layout_id => $page->{layout_id}): ()),
-			#(exists $layout->{$act}? (layout => $layout->{$act}): ())
-		};
-		
-	};
-
-	if($ajax) {
-		$act = $request->{action};
-		$add_res->();
-		return $result->{$act};
-	}
-	
-	my $layout_id = $param->{_a} // "main";
-	my @layout = $response->layout;
-	my $layouts = [];
-	for (@layout) {
-		$act = $_;
-		if($layout_id eq ($pages->{$act}{layout_id} // "")) { last; } else { $add_res->($act); }
-		unshift @$layouts, $act;
-	}
-
-	my $frames = $param->{_f};
-	if($frames) {
-		$frames = Utils::param($frames, qr/,/);
-
-		while(($id, $url) = each %$frames) {
-			if($url =~ /\?/) { $act = $`; $request->{param} = Utils::param($'); } else { $act = $url; $request->{param} = {} }
-			$add_res->($act);
-		}
-	}
-	
-	#$result->{$layouts->[0]}{layout_id} = $layout_id if @$layouts;
-	$self->{stash}{user_id} = $request->user->id;
-	return {
-		stash => $self->{stash},
-		url => $request->{original} // $request->{url},
-		(@$layouts? (layout => $layouts): ()),
-		($layout_id? (layout_id => $layout_id): ()),
-		body => $result,
-	};
 }
 
 1;

@@ -1,9 +1,9 @@
 package R::Action;
-# óïðàâëÿåò êîìïèëëÿöèåé ýêøåíîâ
+# ÑƒÐ¿Ñ€Ð°Ð²Ð»ÑÐµÑ‚ ÐºÐ¾Ð¼Ð¿Ð¸Ð»Ð»ÑÑ†Ð¸ÐµÐ¹ ÑÐºÑˆÐµÐ½Ð¾Ð²
 
 use R::Watch;
 
-# êîíñòðóêòîð
+# ÐºÐ¾Ð½ÑÑ‚Ñ€ÑƒÐºÑ‚Ð¾Ñ€
 sub new {
 	my($cls, $app, $dir, $dir_c, $ext_act, $ext_htm) = @_;
 	bless {
@@ -12,18 +12,19 @@ sub new {
 		dir_c => $dir_c // 'watch/action_c',
 		ext_act => $ext_act // qr/\.act$/,
 		ext_htm => $ext_htm // qr/\.htm$/,
+		ajax_htm => {},
 		htm => {},
 		act => {},
 	}, $cls;
 }
 
-# óäàëÿåò äèðåêòîðèþ co ñêîìïèëåííûìè òåìïëåéòàìè
+# ÑƒÐ´Ð°Ð»ÑÐµÑ‚ Ð´Ð¸Ñ€ÐµÐºÑ‚Ð¾Ñ€Ð¸ÑŽ co ÑÐºÐ¾Ð¼Ð¿Ð¸Ð»ÐµÐ½Ð½Ñ‹Ð¼Ð¸ Ñ‚ÐµÐ¼Ð¿Ð»ÐµÐ¹Ñ‚Ð°Ð¼Ð¸
 sub erase {
 	my ($self) = @_;
 	Utils::rm($self->{dir_c});
 }
 
-# ñòàâèò íà watch
+# ÑÑ‚Ð°Ð²Ð¸Ñ‚ Ð½Ð° watch
 sub watch {
 	my ($self, $watch, $compile) = @_;
 	my $dir = [main::dirs($self->{dir})];
@@ -44,7 +45,7 @@ sub watch {
 	}))
 }
 
-# êîìïèëèðóåò óêàçàííûå ýêøåíû
+# ÐºÐ¾Ð¼Ð¿Ð¸Ð»Ð¸Ñ€ÑƒÐµÑ‚ ÑƒÐºÐ°Ð·Ð°Ð½Ð½Ñ‹Ðµ ÑÐºÑˆÐµÐ½Ñ‹
 sub compile {
 	my ($self, $dir, $dir_c) = @_;
 	if(@_>1) {
@@ -63,7 +64,7 @@ sub write {
 	my ($self, $file) = @_;
 	$self->{require} = $file // $self->{require};
 	my $dir = [main::dirs($self->{dir_c})];
-	open my $f, ">", $file or die "Íåò ôàéëà `$file` äëÿ çàïèñè: $!";
+	open my $f, ">", $file or die "ÐÐµÑ‚ Ñ„Ð°Ð¹Ð»Ð° `$file` Ð´Ð»Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸: $!";
 	print $f "use Helper;\n\n";
 	R::Watch->new->on(qr/\.\w+\.pl$/, $dir, sub {
 		my ($path) = @_;
@@ -73,7 +74,7 @@ sub write {
 	$self
 }
 
-# ïîäãðóæàåì ýêøåíû â %_action
+# Ð¿Ð¾Ð´Ð³Ñ€ÑƒÐ¶Ð°ÐµÐ¼ ÑÐºÑˆÐµÐ½Ñ‹ Ð² %_action
 sub compile_htm {
 	my ($self, $path) = @_;
 	local ($_, $`, $');
@@ -93,7 +94,7 @@ sub compile_htm {
 	if(exists $page->{options}) {
 		for my $option (@{$page->{options}}) {
 			if($option->[0] eq 'layout') { push @write, "\$app->action->{layout}{'$index'} = '$option->[1]';\n\n"; }
-			else { die "Íåèçâåñòíàÿ îïöèÿ `$option->[0]` íà ñòðàíèöå `$index.$ext`" }
+			else { die "ÐÐµÐ¸Ð·Ð²ÐµÑÑ‚Ð½Ð°Ñ Ð¾Ð¿Ñ†Ð¸Ñ `$option->[0]` Ð½Ð° ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ðµ `$index.$ext`" }
 		}
 	}
 	
@@ -104,7 +105,12 @@ sub compile_htm {
 	while(my ($id, $form) = each %$forms) {
 		$form->{name} = $index unless $form->{name};
 		$form->{id} = $id = "$index-$id";
-		$form->{parent_form} = "$index-$form->{parent_form}" if $form->{parent_form};
+		if(defined $form->{parent_form}) {
+			$form->{parent_form} = "$index-$form->{parent_form}";
+		} elsif(exists $form->{parent_form}) {
+			$form->{parent_form} = $index;
+		}
+		
 		#$form->{query} = form_query $form, $forms;
 		push @write, "\$app->action->{form}{'$id'} = ".Utils::Dump($form).";\n\n";
 		$_ = "$index-$_" for @{$form->{forms}};
@@ -113,7 +119,7 @@ sub compile_htm {
 	my $code = $page->{code};
 	delete $page->{code};
 	
-	$eval = join "", "\$app->action->{htm}{'$index'} = ", $eval, "\n\n\$app->action->{page}{'$index'} = ", Utils::Dump($page), ";\n\$app->action->{page}{'$index'}{code} = \$app->action->{ajax_htm} = ", $code, ";\n", @write, "\n\n1;";
+	$eval = join "", "\$app->action->{htm}{'$index'} = ", $eval, "\n\n\$app->action->{page}{'$index'} = ", Utils::Dump($page), ";\n\$app->action->{page}{'$index'}{code} = \$app->action->{ajax_htm}{'$index'} = ", $code, ";\n", @write, "\n\n1;";
 	
 	my $p = $path;
 	$p =~ s!\b$self->{dir}/!$self->{dir_c}/!;
@@ -155,7 +161,7 @@ sub compile_action {
 	$self
 }
 
-# âîçâðàùàåò öåïî÷êó ëàéîóòîâ äëÿ ýêøåíà
+# Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ Ñ†ÐµÐ¿Ð¾Ñ‡ÐºÑƒ Ð»Ð°Ð¹Ð¾ÑƒÑ‚Ð¾Ð² Ð´Ð»Ñ ÑÐºÑˆÐµÐ½Ð°
 sub layout {
 	my ($self, $action) = @_;
 	my $lay = $self->{layout_cache}{$action};
@@ -168,7 +174,7 @@ sub layout {
 	$self->{layout_cache}{$action} = $layouts;
 }
 
-# çàãðóæàåò äàííûå â øàáëîíå
+# Ð·Ð°Ð³Ñ€ÑƒÐ¶Ð°ÐµÑ‚ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð² ÑˆÐ°Ð±Ð»Ð¾Ð½Ðµ
 sub form_load {
 	my ($self, $action, @where) = @_;
 	
@@ -183,7 +189,7 @@ sub form_load {
 	my $model = $form->{model} // $name;
 	my @view = keys %{$form->{fields}};
 	my $load = $form->{load};
-		
+	
 	my $get_bean = $load == 2? sub {
 		my $bean = $self->{app}{response}{bean}{$form->{parent_form}};
 		
@@ -217,5 +223,29 @@ sub form_load {
 	$response
 }
 
+# Ð¾Ð±ÑŠÐµÐ´Ð¸Ð½ÑÐµÑ‚ include Ð¸ ajax_include
+sub _include {
+	my ($self, $htm, $name, $data, $id, $LAYOUT) = @_;
+	die "Ð½ÐµÑ‚ ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñ‹ `$name`, Ð´Ð»Ñ Ð²ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸Ñ Ð² Ñ„Ð¾Ñ€Ð¼Ñƒ `$id`" unless $htm;
+	my $app = $self->{app};
+	$id =~ s/\d+-//g;
+	::msg "include", $name, $id, !!$app->response->{bean}{$id};
+	$app->response->{bean}{$name} = $app->response->{bean}{$id};
+	$htm->($app, $data, $name, $LAYOUT);
+}
+
+# Ð²Ñ‹Ð·Ñ‹Ð²Ð°ÐµÑ‚ ajax-Ð¸Ð½ÐºÐ»ÑƒÐ´
+sub include_ajax {
+	my ($self, $name, $data, $id, $LAYOUT) = @_;
+	my $htm = $self->{ajax_htm}{$name};
+	$self->_include($htm, $name, $data, $id, $LAYOUT);
+}
+
+# Ð²ÑÑ‚Ð°Ð²Ð»ÑÐµÑ‚ Ð² ÑÑ‚Ñ€Ð°Ð½Ð¸Ñ†Ñƒ Ð¸Ð½ÐºÐ»ÑƒÐ´
+sub include {
+	my ($self, $name, $data, $id, $LAYOUT) = @_;
+	my $htm = $self->{'htm'}{$name};
+	$self->_include($htm, $name, $data, $id, $LAYOUT);
+}
 
 1;

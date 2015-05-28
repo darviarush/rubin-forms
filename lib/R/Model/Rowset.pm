@@ -199,7 +199,7 @@ sub erase {
 sub _query {
 	my ($self, $view) = @_;
 	
-	::msg ":red", ":inline", $self;
+	#::msg ":red", ":inline", $self;
 	
 	my $c = $::app->connect;
 	

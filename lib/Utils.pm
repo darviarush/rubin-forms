@@ -1002,7 +1002,12 @@ sub TemplateBare {
 		!$NO && m!\G<\!doctype[^>]+>!i? do { $& }:
 		$NO && m!\G</$TAG\s*>!? do { $TAG = $open_id = $open_tag = $NO = undef; $& }:
 		$open_tag && m!\G\$-(\w+)?!? do { $open_id = $1; "', \$id, '".(defined($1)? "-$1": "") }:
-		m!\G\$@([/\w]+)!? do { my $n = $1; my $id = $get_id->(); "', include_action(\$data->{'$id'}, \"\$id-$id\", '$n'), '" }:
+		m!\G\$@([/\w-]+)!? do {
+			my $name = $1;
+			$page->{include}{$1} = 1;
+			push @code, ["include", "\$app->action->include_ajax('$name', \$data, \$id, \$LAYOUT);\n"];
+			"', \$app->action->include('$name', \$data, \$id, \$LAYOUT), '"
+		}:
 		m!\G\$&!? do { $page->{layout_id} = $get_id->(); "', \@\$LAYOUT, '" }:
 		m!\G\{%\s*(\w+)\s*=%\}!? do { $page->{is_stash} = 1; "', do { \$_STASH->{'$1'} = join '', ('" }:
 		m!\G\{%\s*end\s*%\}!? do { "'); () }, '" }:
@@ -1066,11 +1071,11 @@ sub TemplateBare {
 				name => $name, 
 				is_list => $type eq "*",
 			};
-
+			
 			$T->{noload} = 1 if $noload;
 			# load=1, model=2, noload=0, 'nothing'=0, 'from'=2
-			$load = $noload? 0: defined($load) && $load eq "load"? 1: $form->{load}? 2: 0;
-			$model = $var // $name . ($T->{is_list}? "s": ""), $var = undef if $load == 2 and not defined $model;
+			$load = $noload? 0: defined($load)? ($load eq "load"? 1: 2): $form->{load}? 2: 0;
+			$model = $var // $name, $var = undef if $load == 2 and not defined $model;
 			$model = $name if $load == 1 and not defined $model;
 			$T->{model} = $model =~ /\./? [split /\./, $model]: $model if $model;
 			
@@ -1114,7 +1119,7 @@ sub TemplateBare {
 	my @begin;
 	
 	#my $code_quote = "my \$dbh = \$app->connect->{dbh}; ";
-	my $code_stash = "my \$_STASH = \$app->request->{stash}; ";
+	my $code_stash = "my \$_STASH = \$app->response->stash; ";
 	my $code_user_id = "\$_STASH->{user_id} = \$app->request->user->id; ";
 	
 	#push @begin, $code_quote if $form->{is_quote};
