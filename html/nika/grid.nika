@@ -447,3 +447,7 @@ border-radius: 0 0 1em 1em;
 .orange_gradient a {font-weight: normal}
 
 .error { border: solid 1px %{red}; border-left-width: 8px; background-color: %{lred}; padding: %{pa}px }
+
+
+ul.error {list-style: circle inside}
+ol.error {list-style: roman inside}

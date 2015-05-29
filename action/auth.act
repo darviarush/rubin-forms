@@ -1,3 +1,3 @@
 # авторизация для nginx
-return $response->error(401) unless $session->user_id;
+return $response->error(401) unless $request->session->user->id;
 return {}

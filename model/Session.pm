@@ -13,9 +13,9 @@ sub setup {
 	pk('binary(20)')->
 	ref('user')->required->
 	col(now => 'datetime')->
-	col(new_pass => 'tinyint')->null->remark("0/1 - сессия создана для регистрации")->
+	#col(new_pass => 'tinyint')->null->remark("0/1 - сессия создана для регистрации")->
 	
-	#engine('memory')->
+	#meta(engine => 'memory')->
 	
 	end;
 
@@ -28,12 +28,9 @@ sub onSave {
 }
 
 # удаляет все просроченные сессии
-sub delete {
+sub clean {
 	my ($self) = @_;
 	$self->Model->find(now__lt => Utils::now(time-3600))->erase;
-	#my $conn = $self->{app}->connect;
-	#eval { $conn->erase("sess", {now__lt => $conn->now(time-3600)}); };
-	#$conn->reconnect if $@;
 	$self
 }
 

@@ -1001,7 +1001,7 @@ sub TemplateBare {
 		!$NO && m!\G<\!--.*?-->!s? do { $& }:
 		!$NO && m!\G<\!doctype[^>]+>!i? do { $& }:
 		$NO && m!\G</$TAG\s*>!? do { $TAG = $open_id = $open_tag = $NO = undef; $& }:
-		$open_tag && m!\G\$-(\w+)?!? do { $open_id = $1; "', \$id, '".(defined($1)? "-$1": "") }:
+		m!\G\$-(\w+)?!? do { $open_id = $1; "', \$id, '".(defined($1)? "-$1": "") }:
 		m!\G\$@([/\w-]+)!? do {
 			my $name = $1;
 			$page->{include}{$1} = 1;
@@ -1035,7 +1035,7 @@ sub TemplateBare {
 			next
 		}:
 		m!\G\{%\s*else\s*%\}!? do { die "Нельзя использовать else" if @ifST==0 or $ifST[$#ifST]!=1; $ifST[$#ifST] = 2; push @code, ["else", "\n} else {"]; "'): ('" }:
-		m!\G\{%\s*fi\s*%\}!? do { die "Нельзя использовать fi" if @ifST==0; push @code, ["fi", "}\n"]; "')".($ifST[$#ifST] == 1? ": ()": "")."), '" }:
+		m!\G\{%\s*fi\s*%\}!? do { die "Нельзя использовать fi" if @ifST==0; push @code, ["fi", "}\n"]; "')".(pop(@ifST) == 1? ": ()": "")."), '" }:
 		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)]; () }:
 		m!\G&#?\w+;?!? $&:
 		m!\G(?:\$(\{\s*)?(?:(%)?(\w+)|$RE_TYPE)|(#)(\{\s*)?(%)?(\w+))!? do {

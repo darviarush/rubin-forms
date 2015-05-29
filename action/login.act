@@ -3,8 +3,9 @@
 $email = $request->param("email");
 $pass = $request->param("pass");
 
-$response->addError("login", "email", "Введите email") if defined $email and $email eq "";
-$response->addError("login", "pass", "Введите пароль") if defined $pass and $pass eq "";
+#$response->addValue("login", "email", $email);
+$response->addError("email", "Введите email") if defined $email and $email eq "";
+$response->addError("pass", "Введите пароль") if defined $pass and $pass eq "";
 
 return if $response->errors;
 
@@ -25,6 +26,6 @@ if($user_id) {
 	#{sess => $sess, user_id => $user_id}
 } else {
 	$response->status(403, "Логин или пароль неверен");
-	$response->addErrors("login", "Логин или пароль неверен");
+	$response->addErrors("Логин или пароль неверен");
 }
 

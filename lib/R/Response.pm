@@ -69,7 +69,7 @@ sub cookie {
 sub redirect {
 	my ($self, $url, $text) = @_;
 	$url = $self->{app}->request->referer("/") unless $url;
-	$self->{status} = 307;
+	$self->{status} = 303;	# 307 - перенаправляет и POST, а 303 - GET
 	$self->head("Location" => $url);
 	$self->body("Redirect to <a href='$url'>".Utils::escapeHTML($text // $url)."</a>");
 }
@@ -144,40 +144,65 @@ sub layout {
 		$self->{layout} = [@_];
 		$self
 	}
-	else { @{$self->{layout}} or @{$self->{app}{action}->layout($self->{app}{request}{action})} }
+	else { $self->{layout}? @{$self->{layout}}: @{$self->{app}{action}->layout($self->{app}{request}{action})} }
 }
 
 # возвращает дефолтные параметры страницы: $request->param + $errors + $info
-sub param {
+sub default_param {
 	my ($self) = @_;
-	my $param = $self->{app}{request}->param;
+	my $param = $self->{app}{request}->ids;
 	return {%$param, %{$self->{param}}} if $self->{param};
 	return $param;
 }
 
-# возвращает ошибки
+# возвращает параметры для формы
+sub form {
+	my ($self) = @_;
+	$self->{form} //= do {
+		my $form = $self->{app}{request}->param("form");
+		die "не указан параметр form" unless defined $form;
+		$form =~ s/^[^-]+-//;
+		my $param = $self->{param} //= {};
+		$param = $param->{$_} //= {} for split /-/, $form;
+		$param
+	};
+}
+
+# возвращает количество ошибок
 sub errors { $_[0]->{errors} }
 
 # добавляет ошибки на форму
 sub addErrors {
-	my ($self, $form, @errors) = @_;
+	my ($self, @errors) = @_;
+	my $form = $self->form;
 	@errors = map { { error => $_ } } @errors;
-	push @{ $self->{param}{$form}{errors} }, @errors;
-	push @{ $self->{errors}{$form}{errors} }, @errors;
+	push @{ $form->{errors} }, @errors;
+	$self->{errors} //= 0;
+	$self->{errors} += @errors;
 	$self
 }
 
 # добавляет ошибку для элемента формы
 sub addError {
-	my ($self, $form, $element, $error) = @_;
-	$self->{errors}{$form}{"${element}_error"} = $self->{param}{$form}{"${element}_error"} = $error;
+	my ($self, $element, $error) = @_;
+	my $form = $self->form;
+	$form->{"${element}_error"} = $error;
+	$self->{errors} //= 0;
+	$self->{errors} ++;
+	$self
+}
+
+# добавляет значение на форму
+sub addValue {
+	my ($self, $name, $value) = @_;
+	$self->form->{$name} = $value;
 	$self
 }
 
 # добавляет информацию на форму
 sub addInfo {
-	my ($self, $form, @info) = @_;
-	push @{ $self->{param}{$form}{info} }, map { { info => $_ } } @info;
+	my ($self, @info) = @_;
+	push @{ $self->form->{info} }, map { { info => $_ } } @info;
 	$self
 }
 
@@ -202,13 +227,16 @@ sub render {
 		$request->{ids} = {%{$request->{ids}}, %$data};
 		$request->{param} = {%{$request->{param}}, %$data} if defined $request->{param};
 	}
-	
-	my $action_htm = $_action_htm->{$_action};
-	my @ret;
 
+	my $_action_act = $action->{act};
+	my $form_action = $request->param("action");
+	$_action_act->{$form_action}->($app, $request, $response) if $form_action;
+	
+	my @ret;
+	my $action_htm = $action->{htm}{$_action};
 	if(defined $action_htm) {
 		@ret = $self->wrap;
-	} elsif(defined(my $act = $action->{act}{$_action})) {
+	} elsif(defined(my $act = $_action_act->{$_action})) {
 		$response->type('application/json; charset=utf-8');
 		@ret = $act->($app, $request, $response);
 	} elsif(exists $app->{modelMetafieldset}{$_action}) {	
@@ -262,14 +290,9 @@ sub wrap {
 	my $action_act = $_action_act->{$act};
 	
 	my @ret;
-	my $form_action = $request->param("action");
-	$_action_act->{$form_action}->($app, $request, $response) if $form_action;
-	
-	::msg $response->errors, 'x', $response->param;
-	
 	for my $layout ($response->layout) {
 		$action_act = $_action_act->{$layout};
-		my $arg = $action_act? $action_act->($app, $request, $response): (ref $ret[0]? $ret[0]: $response->param);
+		my $arg = $action_act? $action_act->($app, $request, $response): (ref $ret[0]? $ret[0]: $response->default_param);
 		@ret = $_action_htm->{$layout}->($app, $arg, $layout, \@ret);
 	}
 

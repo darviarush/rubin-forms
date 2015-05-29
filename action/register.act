@@ -1,29 +1,26 @@
 # регистрация
+# шаг первый - мы находимся на какой-то форме
 
 $email = $request->param("email");
-if($email) {
 
-	$user_id = $app->connect->replace("user", {email=>$email})->last_id;
-
+if(defined $email) {
+	$response->addError("email", "заполните поле e-mail") if $email eq "";
+	$response->addError("email", "некорректный e-mail") if $email !~ /@/;
+	
+	# показываем ошибки, если они есть
+	return if $response->errors;
+		
 	$sess = Utils::unic_id(20);
-	$app->connect->erase("sess", {user_id=>$user_id, new_pass=>1});
-	$app->connect->add("sess", {id=>$sess, user_id=>$user_id, new_pass=>1});
 
 	# send_email
-	$app->mailer->send("register", {To=>$email}, {id=>$sess});
+	$app->mail->send(action => "register", To => $email, data => {code => $sess});
 
-	return { email => $email };
+	# сохраняем информацию
+	$app->model->register(email => $email)->saveAs($code);
+
+	# переходим на register
+	$response->redirect("/register/code?email=" . Utils::uri_escape($email));
 }
-
-
-$id = $param->{id};
-if($id) {
-	$new_pass = $app->connect->query("sess", "new_pass", {id=>$id});
-
-	if($new_pass) {
-		$response->cookie("sess", $id, path => "/");
-	}
-	return { new_pass => $new_pass };
+else {
+	$response->not_found;
 }
-
-return {}

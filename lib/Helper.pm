@@ -7,7 +7,7 @@ use JSON::XS;
 use Data::Dumper;
 use Utils;
 
-our %_NO_ESCAPE_HTML = Utils::set(qw(raw html json dump style));
+our %_NO_ESCAPE_HTML = Utils::set(qw(raw html json dump style hidden show));
 
 sub json { JSON::XS->new->encode($_[0]) }
 
@@ -52,6 +52,8 @@ sub ne { if($_is_float->($_[0]) && $_is_float->($_[1])) { $_[0] != $_[1] } elsif
 # атрибуты, классы, стили
 sub visible { $_[0]? "": "display: none" }
 sub style { $_[0]? "style=\"$_[0]\"": "" }
+sub hidden { $_[0]? "style='display:none'": "" }
+sub show { $_[0]? "": "style='display:none'" }
 sub img { return "/img/" unless $_[0]; "/images/" . Utils::img_path($_[0]) }
 
 # запуск функции

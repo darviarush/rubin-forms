@@ -9,7 +9,7 @@ our $app;
 unless($app->ini->{restart}) {
 	msg(":bold black", "load action...");
 	$app->action->compile->write("watch/action.pl");
-	$app->mailer->action->compile->write("watch/action_mailer.pl");
+	$app->mail->action->compile->write("watch/action_mail.pl");
 }
 
 # запускаем главный процесс, за которым будет следить и перезапускать этот. Там так же идёт демонизация
@@ -17,7 +17,10 @@ $app->process->spy unless $app->ini->{restart};
 # тут уже порождённый процесс
 
 require "watch/action.pl";
-require "watch/action_mailer.pl";
+my $action = $app->action;
+$app->action($app->mail->action);
+require "watch/action_mail.pl";
+$app->action($action);
 
 # добавляем роутеры для kitty-cgi
 $app->kitty->route($app->action->{act}) if $app->ini->{site}{kitty};

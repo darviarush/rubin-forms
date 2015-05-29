@@ -1,0 +1,12 @@
+$code = $request->param("code");
+
+if(defined $code) {
+	$request->addError("code", "некорректный код") if 20 != length $code;
+	
+	# показываем ошибки, если они есть
+	return if $request->errors;
+	
+	($reg) = $app->model->register->find("id" => $code);
+	
+	return $response->redirect("/register/time") unless defined $reg;
+}
