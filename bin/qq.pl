@@ -17,10 +17,7 @@ $app->process->spy unless $app->ini->{restart};
 # тут уже порождённый процесс
 
 require "watch/action.pl";
-my $action = $app->action;
-$app->action($app->mail->action);
 require "watch/action_mail.pl";
-$app->action($action);
 
 # добавляем роутеры для kitty-cgi
 $app->kitty->route($app->action->{act}) if $app->ini->{site}{kitty};

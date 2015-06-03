@@ -702,9 +702,9 @@ sub rm {
 	my @dir;
 	by_files(@_, sub {
 		my ($path) = @_;
-		if(-d $path) {push @dir, $path} else {unlink $path}
+		if(-d $path) {push @dir, $path} else {::msg("не могу удалить файл `$path`: $!") unless unlink $path}
 	});
-	rmdir $_ for @dir;
+	do { ::msg("не могу удалить каталог `$_`: $!") unless rmdir $_ } for @dir;
 }
 
 # удаляет всё в указанной директории
@@ -1104,17 +1104,18 @@ sub TemplateBare {
 	$_[1] = $forms;
 	$_[2] = $form;
 	
-	$form->{template} = $_;
+	# текст темплейта
+	#$form->{template} = $_;
 	
-	CODE: for(my $i=0; $i<@code; $i++) {
-		my ($code) = @{$code[$i]};
-		if($code eq "if") {
-			my $k = $i;
-			for(; $code[$i+1]->[0] =~ /^(?:elif|else)$/; $i++) {}
-			if($code[$i+1]->[0] eq "fi") { splice @code, $k, $i-$k+2; goto CODE; }
-		}
-		if($code eq "begin" and $code[$i+1]->[0] eq "end") { splice @code, $i, 2; goto CODE; }
-	}
+	# CODE: for(my $i=0; $i<@code; $i++) {
+		# my ($code) = @{$code[$i]};
+		# if($code eq "if") {
+			# my $k = $i;
+			# for(; $code[$i+1]->[0] =~ /^(?:elif|else)$/; $i++) {}
+			# if($code[$i+1]->[0] eq "fi") { splice @code, $k, $i-$k+2; goto CODE; }
+		# }
+		# if($code eq "begin" and $code[$i+1]->[0] eq "end") { splice @code, $i, 2; goto CODE; }
+	# }
 	
 	my @begin;
 	

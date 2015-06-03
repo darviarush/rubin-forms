@@ -17,6 +17,7 @@ Utils::has(qw/action app/);
 sub new {
 	my ($cls, $app) = @_;
 	my $action = R::Action->new($app);
+	$action->{app_prop} = "mail->action";
 	$action->{dir} = "mail";
 	$action->{dir_c} = "watch/mail_c";
 	$action->{ext_act} = qr/\.act$/;

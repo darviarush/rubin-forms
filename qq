@@ -8,7 +8,10 @@ use lib dirname(__FILE__)."/lib";
 use Msg;
 
 @ARGV = "qq" unless @ARGV;
-my $path = file("bin/$ARGV[0].pl");
+my $path = $ARGV[0];
+my %rename = ('-e' => 'eval');
+$path = $rename{$path} // $path;
+$path = file("bin/$path.pl");
 if($path) { do $path; die $@ // $! if $@ // $! }
 else { msg ":empty", "Команда `", ":red", $ARGV[0], ":reset", "` не найдена"; }
 

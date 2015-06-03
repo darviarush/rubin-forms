@@ -18,7 +18,7 @@ sub new {
 sub reset {
 	my ($self) = @_;
 	my $app = $self->{app};
-	%$self = (app => $app, stash => {}, status => 200, head=>{'Content-Type' => 'text/html; charset=utf-8'}, body=>undef, layout => [] );
+	%$self = (app => $app, stash => {}, status => 200, head=>{'Content-Type' => 'text/html; charset=utf-8'}, body=>undef );
 	$self
 }
 
@@ -159,7 +159,7 @@ sub default_param {
 sub form {
 	my ($self) = @_;
 	$self->{form} //= do {
-		my $form = $self->{app}{request}->param("form");
+		my $form = $self->{app}{request}->param('@form');
 		die "не указан параметр form" unless defined $form;
 		$form =~ s/^[^-]+-//;
 		my $param = $self->{param} //= {};
@@ -214,8 +214,6 @@ sub render {
 	my $response = $self;
 	
 	my $action = $app->action;
-	my $_action_htm = $action->{htm};
-	#my $_HEAD = $request->{head};
 	
 	if(defined $_action) {
 		$request->{action} = $_action;
@@ -227,10 +225,14 @@ sub render {
 		$request->{ids} = {%{$request->{ids}}, %$data};
 		$request->{param} = {%{$request->{param}}, %$data} if defined $request->{param};
 	}
-
+	
+	::msg "!!!", $request->{param};
+	
 	my $_action_act = $action->{act};
-	my $form_action = $request->param("action");
+	my $form_action = $request->param('@action');
 	$_action_act->{$form_action}->($app, $request, $response) if $form_action;
+	
+	::msg "!!!", $request->{param}, $form_action;
 	
 	my @ret;
 	my $action_htm = $action->{htm}{$_action};
@@ -288,6 +290,8 @@ sub wrap {
 	my $_action_act = $action->{act};
 	my $_action_htm = $action->{htm};
 	my $action_act = $_action_act->{$act};
+	
+	::msg 'lay:', $response->layout;
 	
 	my @ret;
 	for my $layout ($response->layout) {

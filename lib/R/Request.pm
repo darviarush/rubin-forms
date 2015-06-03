@@ -113,7 +113,7 @@ sub param {
 			my $val = $self->{ids}{$name} // $self->{get}{$name} // $self->get($name);
 			return $val if defined $val;
 		}
-		#main::msg "xtx", $self->{ids};
+		main::msg "xtx", $self->{ids}, $self->{param};
 		$self->{param} = $param = {%{$self->post}, %{$self->get}, %{$self->{ids}}};
 	}
 	defined($name)? $param->{$name}: $param;

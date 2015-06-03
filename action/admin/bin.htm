@@ -1,0 +1,18 @@
+{% title =%}$name | команда{% end %}
+{% layout "admin/menu-bin" %}
+
+<h3>Команда $name $args</h3>
+
+{% if $error %}<div class="error">$error</div>{% fi %}
+
+<div>$help</div>
+
+<form method=POST>
+	<input type="hidden" name="act" value="1">
+	{% if $args %}<label for="args">Параметры:</label> <input id="args" name="args" placeholder="$args">{% fi %}
+	<input type="submit" class="btn" value="Выполнить">
+</form>
+
+<div>
+$result:raw
+</div>

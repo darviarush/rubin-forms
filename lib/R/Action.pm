@@ -8,6 +8,7 @@ sub new {
 	my($cls, $app, $dir, $dir_c, $ext_act, $ext_htm) = @_;
 	bless {
 		app => $app,
+		app_prop => 'action',
 		dir => $dir // 'action',
 		dir_c => $dir_c // 'watch/action_c',
 		ext_act => $ext_act // qr/\.act$/,
@@ -119,7 +120,10 @@ sub compile_htm {
 	my $code = $page->{code};
 	delete $page->{code};
 	
-	$eval = join "", "\$app->action->{htm}{'$index'} = ", $eval, "\n\n\$app->action->{page}{'$index'} = ", Utils::Dump($page), ";\n\$app->action->{page}{'$index'}{code} = \$app->action->{ajax_htm}{'$index'} = ", $code, ";\n", @write, "\n\n1;";
+	my $app_prop = $self->{app_prop};
+	
+	$eval = join "", "\$app->${app_prop}->{htm}{'$index'} = ", $eval, "\n\n\$app->${app_prop}->{page}{'$index'} = ", Utils::Dump($page), ";\n", @write, "\n\n1;";
+	#";\n\$app->action->{page}{'$index'}{code} = \$app->action->{ajax_htm}{'$index'} = ", $code,
 	
 	my $p = $path;
 	$p =~ s!\b$self->{dir}/!$self->{dir_c}/!;

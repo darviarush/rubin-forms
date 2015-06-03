@@ -1,0 +1,9 @@
+ 
+ 
+$model = $request->param("model");
+$page = $request->param("page");
+
+$meta = $app->modelMetafieldset;
+
+
+$app->reestr->show()
