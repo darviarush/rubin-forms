@@ -1,8 +1,7 @@
 package R::App;
 # содержит различные объекты, необходимые для приложения
 
-use strict;
-use warnings;
+use common::sense;
 use vars '$AUTOLOAD';
 
 sub new {
@@ -29,6 +28,7 @@ sub AUTOLOAD {
 		$load = $base."/".ucfirst($load).".pm";
 		require $load;
 		$self->{$prop} = $new->new($_[0]);
+		{no strict "refs"; ${"${new}::app"} = $_[0] };
 	}
 		
 	goto &$sub;
