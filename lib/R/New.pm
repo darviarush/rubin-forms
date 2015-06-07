@@ -2,8 +2,9 @@ package R::New;
 # 
 
 use common::sense;
+use R::App;
 use vars '$AUTOLOAD';
-our $app;
+
 
 # конструктор
 sub new {
@@ -27,7 +28,7 @@ sub AUTOLOAD {
 	my $load = $prop; $load =~ s![A-Z]!/$&!g;
 	$load = $base."/".ucfirst($load).".pm";
 	require $load;
-	{no strict "refs"; ${"${new}::app"} = $app };
+	#{no strict "refs"; ${"${new}::app"} = $app; ${"${new}::new"} = $self };
 		
 	goto &$sub;
 }

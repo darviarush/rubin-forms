@@ -3,6 +3,7 @@ package R::Persistent;
 
 use common::sense;
 use R::App;
+use AnyEvent;
 
 # конструктор
 sub new {
@@ -75,12 +76,12 @@ sub end {
 # возвращает функцию-замыкание с собой
 sub emitter {
 	my ($self) = @_;
-	Utils::closure($self, $self->can("emit"));
+	$self->{Emitter} //= Utils::closure($self, $self->can("sucess"));
 }
 
 
 # отправляет данные по цепочке
-sub emit {
+sub sucess {
 	my ($self, @args) = @_;
 	for my $code (@{$self->{Then}}, @{$self->{Done}}) {
 		$code->(@args);
@@ -96,5 +97,12 @@ sub failure {
 	}
 }
 
+# устанавливает функцию, которая будет вызываться по таймеру до тех пор, пока не произойдёт событие
+sub progress {
+	my ($self, $sec, $after) = @_;
+	AnyEvent->timer (after => $after // 0, interval => $sec // $app->ini->{persistent}{interval} // 10, cb => sub {
+		
+	});
+}
 
 1;
