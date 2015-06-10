@@ -1,7 +1,10 @@
 package R::New;
-# 
+# создаёт новый экземпляр указанного класса
 
-use common::sense;
+use strict;
+use warnings;
+
+#use common::sense;
 use R::App;
 use vars '$AUTOLOAD';
 
@@ -9,16 +12,16 @@ use vars '$AUTOLOAD';
 # конструктор
 sub new {
 	my ($cls) = @_;
-	bless {base => "R"}, $cls;
+	bless {}, $cls;
 }
 
 
 sub AUTOLOAD {
+	my ($self) = @_;
 	$AUTOLOAD =~ /([^:]+)$/;
 	my $prop = $1;
-	my $base = $self->{base};
+	my $base = $self->{base} // "R";
 	my $new = $prop; $new =~ s![A-Z]!::$&!g; $new = $base."::".ucfirst $new;
-	my ($self) = @_;
 	
 	eval "sub $AUTOLOAD { my (\$self, \@args) = \@_; ${new}->new(\@args) }";
 	die "$AUTOLOAD: ".($@ // $!) if $@ // $!;

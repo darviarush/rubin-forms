@@ -12,7 +12,7 @@ sub new {
 		dir => $dir // 'action',
 		dir_c => $dir_c // 'watch/action_c',
 		ext_act => $ext_act // qr/\.act$/,
-		ext_htm => $ext_htm // qr/\.htm$/,
+		ext_htm => $ext_htm // qr/\.html$/,
 		ajax_htm => {},
 		htm => {},
 		act => {},

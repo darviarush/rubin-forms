@@ -13,11 +13,11 @@
 BEGIN {
 	#use open qw/:utf8 :std/;
 	#use Carp 'verbose';
-	use Term::ANSIColor qw//;
+	#use Term::ANSIColor qw//;
 	#use Fcntl ':flock';
 	#$SIG{ __DIE__ } = \&Carp::confess;
 	
-	our $_UNIX = !!$ENV{SHLVL}; #not $ENV{TERM} eq "dumb";
+	our $_UNIX = !!$ENV{SHLVL} && !$ENV{QQ_NO_COLOR}; #not $ENV{TERM} eq "dumb";
 	
 	our $_FRAMEWORK;
 	
@@ -26,30 +26,12 @@ BEGIN {
 	my @frame = split /\//, __FILE__;
 	my $frame = join("/", @frame[0..@frame-3]) || ".";
 	if($frame ne $root) { $_FRAMEWORK = $frame; unshift @INC, "$root/lib"; }
-	
-	use R::Raise;
-	my $raise = R::Raise->new;
-	
-	$SIG{ __DIE__ } = sub {
-		my ($msg) = @_;
-		eval {
-			$msg = $raise->trace($msg) if ref $msg ne 'R::Raise::Trace';
-		};
-		die $msg if $^S;
-		print STDERR $msg;
-		exit
-	};
-	$SIG{ __WARN__ } = sub {
-		print STDERR $raise->trace($_[0])->color("warning", 'yellow', 'green');
-		exit;
-		exit if $_[0]=~/^Deep recursion on subroutine/;
-	};
 
 }
 our $_FRAMEWORK;
 
 use R::App;
-our $app = R::App->new("R");
+#our $app = R::App->new;
 
 use JSON::XS;
 $app->json(JSON::XS->new->allow_nonref);

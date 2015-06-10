@@ -9,9 +9,9 @@ use Msg;
 
 @ARGV = "qq" unless @ARGV;
 my $path = $ARGV[0];
-splice(@ARGV, 1, 0, $`), $path = $` if $path =~ /:/;
 my %rename = ('-e' => 'eval');
 $path = $rename{$path} // $path;
+$path = $` if $path =~ /:/;
 $path = file("bin/$path.pl");
 if($path) { do $path; die $@ // $! if $@ // $! }
 else { msg ":empty", "Команда `", ":red", $ARGV[0], ":reset", "` не найдена"; }

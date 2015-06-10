@@ -1,11 +1,17 @@
 package R::App;
 # содержит различные объекты, необходимые для приложения
 
+BEGIN {
+	use R::Raise;
+	R::Raise->new;
+}
 
-use common::sense;
+use strict;
+use warnings;
+#use common::sense;
 
 use Exporter 'import';
-@EXPORT_OK = qw/$app $new/;
+our @EXPORT = qw/$app $new/;
 
 our $app = bless {}, "R::App";
 our $new = $app->new;

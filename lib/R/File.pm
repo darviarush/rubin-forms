@@ -1,10 +1,17 @@
 package R::File;
 # асинхронный файл
 
-use common::sense;
+use strict;
+use warnings;
+
+#use common::sense;
 use R::App;
 
+use AnyEvent;
+
 use base "R::Persistent";
+
+Utils::has qw/path encode fh/;
 
 # конструктор
 sub new {
@@ -12,8 +19,7 @@ sub new {
 	my $self = bless {
 		path => $path,
 		encode => $encode,
-		in => undef,
-		out => undef,
+		fh => undef,
 	}, $cls;
 	
 	$self

@@ -1,29 +1,65 @@
-#== Файлы проекта
-#= имя
-#> создаёт файл
+#== Редактор
+#= [-] модуль [функция [аргументы...]]
+#> создаёт файл модуля
+#> тип модуля берётся из названия:
+#>	make - шаблон html
+#>	make:act - шаблон ModelView
+#>	make:r - шаблон библиотеки в lib/R
+#>	make:t - тест
+#>	make:bin - команда
+#> например:
+#> 
 
-if(@ARGV == 3) {
-	$def = $ARGV[1];
-	$name = $ARGV[2];
-} else {
-	$def = "r";
-	$name = $ARGV[1];
+$framework = 1, splice @ARGV, 1, 1 if $ARGV[1] eq "-";
+
+my ($make, $name, $func) = @ARGV;
+
+$make =~ s/^[^:]+:?//;
+$path = $app->path->to($make, $name);
+$path = $app->path->framework($path) if $framework;
+
+if($func) {
+
+	die "Создайте вначале файл $path" if !-e $path;
+
+	$args = join ", ", map { "\$$_" } "self", @ARGV[3..$#ARGV];
+
+	Utils::replace($path, sub {
+		$_[0] =~ s!(\s1;\s*)$!
+
+# функция $func
+sub $func {
+	my ($args) = \@_;
+	\$self
 }
 
-%def = qw();
+$1!;
+	});
+	
+	exit;
+}
 
-$name = ucfirst $name;
-$def = "lib/R/";
-$ext = ".pm";
 
+if($make eq "") {
 
-$path = "$def$name$ext";
+$skel = '{% layout "menu" %}
+{% title =%}' . $name . '{% end %}
 
-die "Файл $path уже существует" if -e $path;
+';
 
-$pack = "R::$name";
+} elsif($make eq "act") {
 
-$body = "package $pack;
+$skel = '
+$ = $request->param("");
+
+return {}
+';
+	
+} elsif($make eq "r") {
+
+$pack = ucfirst $name;
+$pack =~ s![A-Z]!::$&!g;
+$skel = 'package R' . $pack . ';
 # 
 
 use common::sense;
@@ -36,10 +72,42 @@ sub new {
 }
 
 1;
-";
+'
 
-Utils::write($path, $body);
+}
+elsif($make eq "t") {
 
-$npp = $ENV{"notepad++"};
+$skel = '# тестирует lib/R/'.ucfirst($name).'
 
-system "$npp $path" if $npp;
+use common::sense;
+use Test::More tests => 1;
+use App;
+
+ok 1;
+';
+
+}
+elsif($make eq "bin") {
+
+$skel = '#== СЕКЦИЯ
+#=
+#> команда ' . $name . '
+
+($name,) = @ARGV;
+
+$app->;
+';
+}
+else {
+	die "Неизвестная команда `make:$make`";
+}
+
+
+die "Файл $path уже существует" if -e $path;
+
+Utils::mkpath($path);
+Utils::write($path, $skel);
+
+# $npp = $ENV{"notepad++"};
+
+# system "$npp $path" if $npp;

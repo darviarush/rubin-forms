@@ -151,7 +151,7 @@ sub layout {
 sub default_param {
 	my ($self) = @_;
 	my $param = $self->{app}{request}->ids;
-	return {%$param, %{$self->{param}}} if $self->{param};
+	return {%$param, %{$self->{default_param}}} if $self->{default_param};
 	return $param;
 }
 
@@ -162,7 +162,7 @@ sub form {
 		my $form = $self->{app}{request}->param('@form');
 		die "не указан параметр form" unless defined $form;
 		$form =~ s/^[^-]+-//;
-		my $param = $self->{param} //= {};
+		my $param = $self->{default_param} //= {};
 		$param = $param->{$_} //= {} for split /-/, $form;
 		$param
 	};
@@ -226,13 +226,10 @@ sub render {
 		$request->{param} = {%{$request->{param}}, %$data} if defined $request->{param};
 	}
 	
-	::msg "!!!", $request->{param};
-	
 	my $_action_act = $action->{act};
 	my $form_action = $request->param('@action');
+
 	$_action_act->{$form_action}->($app, $request, $response) if $form_action;
-	
-	::msg "!!!", $request->{param}, $form_action;
 	
 	my @ret;
 	my $action_htm = $action->{htm}{$_action};
@@ -291,7 +288,7 @@ sub wrap {
 	my $_action_htm = $action->{htm};
 	my $action_act = $_action_act->{$act};
 	
-	::msg 'lay:', $response->layout;
+	#::msg 'lay:', $response->layout;
 	
 	my @ret;
 	for my $layout ($response->layout) {

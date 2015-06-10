@@ -26,7 +26,7 @@ sub reset {
 	
 	my ($ids, $id);
 	($self->{method}, $self->{url}, $self->{location}, $self->{action}, $id, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body}) = @args;
-
+	
 	#main::msg 'req->reset', $self->{method}, $self->{url}, $self->{location}, $self->{action}, $id, $ids, $self->{ext}, $self->{search}, $self->{version}, $self->{head}, $self->{body};
 	
 	$self->{action} = 'index' unless $self->{action};
@@ -110,10 +110,9 @@ sub param {
 	my $param = $self->{param};
 	unless(defined $param) {
 		if(defined $name) {
-			my $val = $self->{ids}{$name} // $self->{get}{$name} // $self->get($name);
+			my $val = $self->{ids}{$name} // $self->get($name);
 			return $val if defined $val;
 		}
-		main::msg "xtx", $self->{ids}, $self->{param};
 		$self->{param} = $param = {%{$self->post}, %{$self->get}, %{$self->{ids}}};
 	}
 	defined($name)? $param->{$name}: $param;

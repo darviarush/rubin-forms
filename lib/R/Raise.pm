@@ -1,22 +1,44 @@
 package R::Raise;
-# реализует исключение
+# СЂРµР°Р»РёР·СѓРµС‚ РёСЃРєР»СЋС‡РµРЅРёРµ
 
 use strict;
 use warnings;
 
+# СЃРёРЅРіР»РµС‚РѕРЅ
+our $raise;
 
-# конструктор
+# РєРѕРЅСЃС‚СЂСѓРєС‚РѕСЂ
 sub new {
 	my ($cls, $app) = @_;
-	bless {app => $app}, $cls;
+	return $raise if $raise;
+	
+	$raise = bless {app => $app}, $cls;
+	
+	$SIG{ __DIE__ } = sub {
+		my ($msg) = @_;
+		if(ref $msg ne 'R::Raise::Trace') {
+			eval { $msg = $raise->trace($msg) };
+			die "РѕС€РёР±РєР° РІ die: $@" if $@;
+		}
+		die $msg if $^S;
+		print STDERR $msg;
+		exit
+	};
+	$SIG{ __WARN__ } = sub {
+		print STDERR $raise->trace($_[0])->color("warning", 'yellow', 'green');
+		exit;
+		exit if $_[0]=~/^Deep recursion on subroutine/;
+	};
+	
+	$raise
 }
 
-# создаёт исключение без трассировки
+# СЃРѕР·РґР°С‘С‚ РёСЃРєР»СЋС‡РµРЅРёРµ Р±РµР· С‚СЂР°СЃСЃРёСЂРѕРІРєРё
 sub set {
 	R::Raise::Trace->new($_[1]);
 }
 
-# создаёт исключение с трассировкой
+# СЃРѕР·РґР°С‘С‚ РёСЃРєР»СЋС‡РµРЅРёРµ СЃ С‚СЂР°СЃСЃРёСЂРѕРІРєРѕР№
 sub trace {
 	my ($self, $error) = @_;
 
@@ -36,7 +58,7 @@ sub trace {
 
 
 package R::Raise::Trace;
-# преобразует и печатает исключение
+# РїСЂРµРѕР±СЂР°Р·СѓРµС‚ Рё РїРµС‡Р°С‚Р°РµС‚ РёСЃРєР»СЋС‡РµРЅРёРµ
 
 use Term::ANSIColor qw//;
 #use Cwd qw/abs_path getcwd/;
@@ -52,7 +74,7 @@ use overload
 
 
 
-# конструктор
+# РєРѕРЅСЃС‚СЂСѓРєС‚РѕСЂ
 sub new {
 	my ($cls, $error) = @_;
 	local ($_, $`, $', $1, $2);
@@ -62,10 +84,17 @@ sub new {
 	
 	if(ref $error) { $error = $Utils::{Dump}{CODE}? $Utils::{Dump}{CODE}->($error): Dumper($error); }
 	else {
+		#$error = "< РѕС€РёР±РєР°-СЃС‚СЂРѕРєР° >" . $error . "< РєРѕРЅРµС† >";
 		for my $e (split /\n/, $error) {
-			$e =~ s!^syntax error at (\S+) line (\d+), (.*)$!! and push @$trace, { file=>$file=$1, line=>$line=$2, msg=>$3, action=>'syntax error'} or
-			$e =~ s! at (\S+) line (\d+)(?:, <GEN\d+> line \d+)?(,? .*)?\.?\s*$!! and push @$trace, { file=>$file=$1, line=>$line=$2, msg=>$3? $e.$3: $e}
-			or push @$trace, { file=> $file // "?", line=> $line // "?", msg => $e };
+			if($e =~ s!^syntax error at (\S+) line (\d+), (.*)$!!) {
+				push @$trace, { file=>$file=$1, line=>$line=$2, msg=>$3, action=>'syntax error'}
+			} elsif($e =~ s! at (.*?) line (\d+)(?:, <GEN\d+> line \d+)?(,? .*)?\.?\s*$!!) {
+				push @$trace, { file=>$file=$1, line=>$line=$2, msg=>$3? $e.$3: $e}
+			} elsif($e =~ m!:(\d+):\s+!) {
+				push @$trace, { file=> $`, line=> $1, msg => $' };
+			} else {
+				push @$trace, { file=> $file // "?", line=> $line // "?", msg => $e };
+			}
 		}
 		
 	}
@@ -76,7 +105,7 @@ sub new {
 }
 
 
-# преобразует trace перед выводом и возвращает его
+# РїСЂРµРѕР±СЂР°Р·СѓРµС‚ trace РїРµСЂРµРґ РІС‹РІРѕРґРѕРј Рё РІРѕР·РІСЂР°С‰Р°РµС‚ РµРіРѕ
 sub trace {
 	my ($self) = @_;
 	my $trace = $self->{trace};
@@ -107,20 +136,20 @@ sub file {
 	$file
 }
 
-# превращает в строку
+# РїСЂРµРІСЂР°С‰Р°РµС‚ РІ СЃС‚СЂРѕРєСѓ
 sub stringify {
 	my ($self) = @_;
 	$self->color('error', 'red', 'cyan');
 }
 
-# объединяет со строкой
+# РѕР±СЉРµРґРёРЅСЏРµС‚ СЃРѕ СЃС‚СЂРѕРєРѕР№
 sub concat {
 	my ($self, $str, $wrap) = @_;
 	if($wrap) { $str . $self->stringify }
 	else { $self->stringify . $str }
 }
 
-# выводит колоризированным
+# РІС‹РІРѕРґРёС‚ РєРѕР»РѕСЂРёР·РёСЂРѕРІР°РЅРЅС‹Рј
 sub color {
 	my ($self, $action, $color_error, $color_words) = @_;
 
@@ -139,7 +168,7 @@ sub color {
 	} $self->trace;
 }
 
-# изменяет путь cygwin на виндовый
+# РёР·РјРµРЅСЏРµС‚ РїСѓС‚СЊ cygwin РЅР° РІРёРЅРґРѕРІС‹Р№
 sub _winpath {
 	my ($path) = @_;
 	return "--undef path in winpath--" unless defined $path;
@@ -162,7 +191,7 @@ sub _winpath {
 }
 
 
-# строка
+# СЃС‚СЂРѕРєР°
 sub asString {
 	my ($self, $action) = @_;
 	join "", map {
@@ -172,7 +201,7 @@ sub asString {
 	} $self->trace;
 }
 
-# вывод в html
+# РІС‹РІРѕРґ РІ html
 sub html {
 	my ($self) = @_;
 	my $i = 0;

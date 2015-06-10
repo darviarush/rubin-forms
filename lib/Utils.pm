@@ -697,6 +697,18 @@ sub by_files {
 	}, @_);
 }
 
+sub find (&@) {
+	my $fn = shift;
+	require File::Find;
+	File::Find::find({
+		no_chdir => 1,
+		wanted => sub {
+			local $_ = $File::Find::name;
+			$fn->($_);
+		}
+	}, @_);
+}
+
 # удаляет файлы и директории с файлами
 sub rm {
 	my @dir;

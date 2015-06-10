@@ -13,34 +13,34 @@ sub new {
 
 # клонирует себя для 
 sub persistent_clone {
-	my ($self, $new) = @_;
-	$new = bless {%$self, Parent=>$self}, ref $self;
-	delete $new->{Then};
-	delete $new->{Fail};
-	delete $new->{Done};
-	$new
+	my ($self) = @_;
+	$clone = bless {%$self, Parent=>$self}, ref $self;
+	delete $clone->{Then};
+	delete $clone->{Fail};
+	delete $clone->{Done};
+	$clone
 }
 
 # выполняет функцию или выполняет цепочку, если всё ok
 # получает функцию или цепочку. Если ничего не указано - возвращает новый 
 sub then(&) {
-	my ($self, $new) = @_;
-	$new = $self->persistent_clone if @_==1;
-	push @{$self->{Then}}, $new;
+	my ($self, $clone) = @_;
+	$clone = $self->persistent_clone if @_==1;
+	push @{$self->{Then}}, $clone;
 }
 
 # аналог then, но выполняется в случае ошибки
 sub fail(&) {
-	my ($self, $new) = @_;
-	$new = $self->persistent_clone if @_==1;
-	push @{$self->{Fail}}, $new;
+	my ($self, $clone) = @_;
+	$clone = $self->persistent_clone if @_==1;
+	push @{$self->{Fail}}, $clone;
 }
 
 # выполняется в любом случае
 sub done(&) {
-	my ($self, $new) = @_;
-	$new = $self->persistent_clone if @_==1;
-	push @{$self->{Done}}, $new;
+	my ($self, $clone) = @_;
+	$clone = $self->persistent_clone if @_==1;
+	push @{$self->{Done}}, $clone;
 }
 
 # аналог then для цепочек
