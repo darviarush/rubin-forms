@@ -14,9 +14,10 @@ $framework = 1, splice @ARGV, 1, 1 if $ARGV[1] eq "-";
 
 my ($make, $name, $func) = @ARGV;
 
-$make =~ s/^[^:]+:?//;
 $path = $app->path->to($make, $name);
 $path = $app->path->framework($path) if $framework;
+
+$make =~ s/^[^:]+:?//;
 
 if($func) {
 
@@ -35,6 +36,8 @@ sub $func {
 
 $1!;
 	});
+	
+	msg ":space", "функция ", ":cyan", $path, ":red", $func, ":reset", "добавлена";
 	
 	exit;
 }
@@ -107,6 +110,8 @@ die "Файл $path уже существует" if -e $path;
 
 Utils::mkpath($path);
 Utils::write($path, $skel);
+
+msg ":space", "файл ", ":green", $path, ":reset", "создан!";
 
 # $npp = $ENV{"notepad++"};
 

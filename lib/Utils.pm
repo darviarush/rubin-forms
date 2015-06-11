@@ -714,9 +714,9 @@ sub rm {
 	my @dir;
 	by_files(@_, sub {
 		my ($path) = @_;
-		if(-d $path) {push @dir, $path} else {::msg("не могу удалить файл `$path`: $!") unless unlink $path}
+		if(-d $path) {unshift @dir, $path} else {::msg("не могу удалить файл `$path`: $!") unless unlink $path}
 	});
-	do { ::msg("не могу удалить каталог `$_`: $!") unless rmdir $_ } for @dir;
+	do { ::msg("rm: не могу удалить каталог `$_`: $!") unless rmdir $_ } for @dir;
 }
 
 # удаляет всё в указанной директории

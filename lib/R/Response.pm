@@ -74,6 +74,12 @@ sub redirect {
 	$self->body("Redirect to <a href='$url'>".Utils::escapeHTML($text // $url)."</a>");
 }
 
+# есть перенаправление?
+sub be_redirect {
+	my ($self) = @_;
+	$self->{status} == 303;
+}
+
 # status - 404
 sub not_found {
 	my($self) = @_;
@@ -227,9 +233,10 @@ sub render {
 	}
 	
 	my $_action_act = $action->{act};
-	my $form_action = $request->param('@action');
-
-	$_action_act->{$form_action}->($app, $request, $response) if $form_action;
+	if(my $form_action = $request->param('@action')) {
+		$_action_act->{$form_action}->($app, $request, $response);
+		return $self if $response->be_redirect;
+	}
 	
 	my @ret;
 	my $action_htm = $action->{htm}{$_action};

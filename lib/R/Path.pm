@@ -47,10 +47,9 @@ sub framework {
 sub to {
 	my ($self, $to, $name) = @_;
 
-	$to = $to =~ /:/? $': "";
-	
-	
 	$self->to($to, "") =~ m!/\.([^/\.]+)$!, return wantarray? ($`, $1): $` unless defined $name;
+	
+	$to = $to =~ /:/? $': "";
 	
 	if($to eq "") {
 		"action/$name.html";

@@ -13,9 +13,9 @@ sub new {
 		dir_c => $dir_c // 'watch/action_c',
 		ext_act => $ext_act // qr/\.act$/,
 		ext_htm => $ext_htm // qr/\.html$/,
-		ajax_htm => {},
 		htm => {},
 		act => {},
+		validator => {},
 	}, $cls;
 }
 
@@ -134,13 +134,38 @@ sub compile_htm {
 	$self;
 }
 
+# компилирует экшены в коде perl
 sub compile_action {
 	my ($self, $path) = @_;
 	
 	$path =~ /\b$self->{dir}\/(.*)\.\w+$/;
 	my $index = $1;
 
+	# считываем
 	my $action = Utils::read($path);
+	
+	# находим валидаторы
+	my %validator = ();
+	my $pos = 0;
+	$action =~ s/^#[ \t]*([\$\@]([a-z_]\w*))[ \t]+([a-z_]\w*)(?:=(\S+(?: {1,3}\S+)*))?(?:[ \t]+(.*?))?[ \t\r]+$/
+		my ($var, $key, $validator, $val, $remark) = ($1, $2, $3, $4, $5);
+		
+		$pos = length $`;
+		
+		$validator{$key} = {name => $validator};
+		$validator{$key}{val} = $val if defined $val;
+		$validator{$key}{remark} = $remark if defined $remark;
+		
+		$val = defined($val)? ", $val": "";
+		$remark = defined($remark)? ", \"$remark\"": "";
+		my $ret = "$var = \$app->validator->$validator(\"$key\"$val$remark);";
+		$pos += length $ret;
+		$ret
+	/gme;
+	
+	pos() = $pos, $action =~ s/\G/return if \$response->errors;/ if %validator;
+	
+	# находим переменные для экранирования через my
 	my @our = qw//;
 	my %our = Utils::set(@our);
 	my %local = Utils::set(qw/$_ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9 $a $b/);
@@ -153,8 +178,11 @@ sub compile_action {
 	my @my = keys %my;
 	my @local = grep { exists $local{$_} } @my;
 	@my = grep { not exists $our{$_} and not exists $local{$_} and not exists $no{$_} } @my;
-	my $eval = join("", (@our? ("our(", join(", ", @our), "); "): ""), "\$app->action->{act}{'$index'} = sub {" , (@local? ("local(", join(", ", @local), "); "): ()), (@my? ("my(", join(", ", @my), "); "): ()), "(\$app, \$request, \$response) = \@_; ", $action, "\n};\n\n1;");
+	
+	# получаем код
+	my $eval = join("", (@our? ("our(", join(", ", @our), "); "): ""), "\$app->action->{act}{'$index'} = sub {" , (@local? ("local(", join(", ", @local), "); "): ()), (@my? ("my(", join(", ", @my), "); "): ()), "(\$app, \$request, \$response) = \@_; ", $action, "\n};\n\n\$app->action->{validator}{'$index'} = ", Utils::Dump(\%validator), ";\n\n1;");
 
+	# записываем во временный файл
 	my $p = $path;
 	$p =~ s!\b$self->{dir}/!$self->{dir_c}/!;
 	$p .= ".pl";

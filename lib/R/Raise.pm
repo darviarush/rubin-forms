@@ -7,28 +7,34 @@ use warnings;
 # синглетон
 our $raise;
 
-# конструктор
+# обработчик события die
+sub __ondie__ {
+	my ($msg) = @_;
+	if(ref $msg ne 'R::Raise::Trace') {
+		eval { $msg = $raise->trace($msg) };
+		die "ошибка в die: $@" if $@;
+	}
+	die $msg if $^S;
+	print STDERR $msg;
+	exit
+}
+
+# обработчик события warn
+sub __onwarn__ {
+	print STDERR $raise->trace($_[0])->color("warning", 'yellow', 'green');
+	exit;
+	exit if $_[0]=~/^Deep recursion on subroutine/;
+}
+
+# конструктор - синглетон
 sub new {
 	my ($cls, $app) = @_;
 	return $raise if $raise;
 	
 	$raise = bless {app => $app}, $cls;
 	
-	$SIG{ __DIE__ } = sub {
-		my ($msg) = @_;
-		if(ref $msg ne 'R::Raise::Trace') {
-			eval { $msg = $raise->trace($msg) };
-			die "ошибка в die: $@" if $@;
-		}
-		die $msg if $^S;
-		print STDERR $msg;
-		exit
-	};
-	$SIG{ __WARN__ } = sub {
-		print STDERR $raise->trace($_[0])->color("warning", 'yellow', 'green');
-		exit;
-		exit if $_[0]=~/^Deep recursion on subroutine/;
-	};
+	$SIG{ __DIE__ } = \&__ondie__;
+	$SIG{ __WARN__ } = \&__onwarn__;
 	
 	$raise
 }
@@ -45,72 +51,33 @@ sub trace {
 	my $trace = R::Raise::Trace->new($error);
 	my $TRACE = $trace->{trace};
 	
-	for(my $i=1; my @param = caller($i); $i++) {
+	for(my $i=3; my @param = caller($i); $i++) {
+		#::msg("$i:", @param);
 		my ($package, $file, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = @param;
-		$subroutine =~ s!(^|::)__ANON__$!$1~!;
-		$subroutine =~ s!^main(::[^:]+)$!$1!;
 		
-		push @$TRACE, {file=>$file, line=>$line, subroutine=> ($is_require? "require ": "").$subroutine} if $subroutine ne "(eval)";
+		$subroutine = "REQUIRE $evaltext" if $is_require;
+		
+		$subroutine =~ s!(^|::)__ANON__$!$1~!;
+		#$subroutine =~ s!^main(::[^:]+)$!$1!;
+
+		push @$TRACE, {
+			file=>$file,
+			line=>$line,
+			subroutine=> $subroutine
+		} if $subroutine ne "(eval)";
 	}
+	
+	@$TRACE = $self->reverse_trace($TRACE);
+	$trace->{trace} = [reverse @$TRACE];
 	
 	$trace
 }
 
-
-package R::Raise::Trace;
-# преобразует и печатает исключение
-
-use Term::ANSIColor qw//;
-#use Cwd qw/abs_path getcwd/;
-use Data::Dumper;
-use overload
-	'""' => \&stringify,
-	'.' => \&concat,
-	'bool' => sub { @{$_[0]->{trace}}? 1: undef },
-	"0+" => sub { @{$_[0]->{trace}} },
-	"qr" => \&stringify,
-	fallback => 1
-;
-
-
-
-# конструктор
-sub new {
-	my ($cls, $error) = @_;
-	local ($_, $`, $', $1, $2);
-	my $trace = [];
-	
-	my ($file, $line);
-	
-	if(ref $error) { $error = $Utils::{Dump}{CODE}? $Utils::{Dump}{CODE}->($error): Dumper($error); }
-	else {
-		#$error = "< ошибка-строка >" . $error . "< конец >";
-		for my $e (split /\n/, $error) {
-			if($e =~ s!^syntax error at (\S+) line (\d+), (.*)$!!) {
-				push @$trace, { file=>$file=$1, line=>$line=$2, msg=>$3, action=>'syntax error'}
-			} elsif($e =~ s! at (.*?) line (\d+)(?:, <GEN\d+> line \d+)?(,? .*)?\.?\s*$!!) {
-				push @$trace, { file=>$file=$1, line=>$line=$2, msg=>$3? $e.$3: $e}
-			} elsif($e =~ m!:(\d+):\s+!) {
-				push @$trace, { file=> $`, line=> $1, msg => $' };
-			} else {
-				push @$trace, { file=> $file // "?", line=> $line // "?", msg => $e };
-			}
-		}
-		
-	}
-	
-	push(@$trace, { file=> $file // "?", line=> $line // "?", msg => $R::Connect::CURR_SQL }), $R::Connect::CURR_SQL = undef if $R::Connect::CURR_SQL;
-	
-	bless { orig => $error, trace => $trace }, $cls;
-}
-
-
-# преобразует trace перед выводом и возвращает его
-sub trace {
-	my ($self) = @_;
-	my $trace = $self->{trace};
+# преобразует trace
+sub reverse_trace {
+	my ($self, $trace) = @_;
 	my $i = 0;
-	reverse map {
+	map {
 		$_->{file} = file($_->{file});
 		$i++;
 		my $sub = my $x = $trace->[$i]{subroutine} // "~";
@@ -129,11 +96,66 @@ sub trace {
 	} @$trace;
 }
 
+# возвращает ?, если не указан файл
 sub file {
 	my ($file) = @_;
 	return "?" unless defined $file;
 	$file =~ s!/watch/action_c/(.*)\.(\w+)\.pl$!/action/$1.$2!;
 	$file
+}
+
+
+package R::Raise::Trace;
+# преобразует и печатает исключение
+
+use Term::ANSIColor qw//;
+#use Cwd qw/abs_path getcwd/;
+use Data::Dumper;
+use overload
+	'""' => \&stringify,
+	'.' => \&concat,
+	'bool' => sub { @{$_[0]->{trace}}? 1: undef },
+	"0+" => sub { @{$_[0]->{trace}} },
+	"qr" => \&stringify,
+	fallback => 1
+;
+
+# конструктор
+sub new {
+	my ($cls, $error) = @_;
+	local ($_, $`, $', $1, $2);
+	my $trace = [];
+	my @lines;
+	
+	if(ref $error) { $error = $Utils::{Dump}{CODE}? $Utils::{Dump}{CODE}->($error): Dumper($error); }
+	else {
+		#$error = "< ошибка-строка >" . $error . "< конец >";
+		for my $e (split /\n/, $error) {
+			if($e =~ s!^syntax error at (\S+) line (\d+), (.*)$!!) {
+				push @$trace, { file=>$1, line=>$2, msg=>$3, action=>'syntax error'}
+			} elsif($e =~ s! at (.*?) line (\d+)(?:, <GEN\d+> line \d+)?(,? .*)?\.?\s*$!!) {
+				push @$trace, { file=>$1, line=>$2, msg=>$3? $e.$3: $e}
+			} elsif($e =~ m!:(\d+):\s+!) {
+				push @$trace, { file=>$`, line=>$1, msg => $' };
+			} else {
+				push @lines, $e;
+			}
+		}
+		
+	}
+	
+	push @$trace, { file => "?1", line => "?1", msg => join "\n", @lines } if @lines;
+	
+	push(@$trace, { file => "?2", line => "?2", msg => $R::Connect::CURR_SQL }), $R::Connect::CURR_SQL = undef if $R::Connect::CURR_SQL;
+	
+	bless { orig => $error, trace => $trace }, $cls;
+}
+
+# возвращает trace
+sub trace {
+	my ($self) = @_;
+	my $trace = $self->{trace};
+	@$trace
 }
 
 # превращает в строку
@@ -159,11 +181,12 @@ sub color {
 	#my $raz = Term::ANSIColor::colored(":", $color_error);
 	
 	join "", map {
+		$_->{file} //= "??";
+		$_->{line} //= "??";
+		$_->{sub} //= $_->{subroutine};
 		if($_->{sub}) { my $sub = $_->{sub}; $sub =~ s!::([^:]+)$!$col$1!; "$_->{file}:$_->{line}: $sub\n" }
 		else {
-			$_->{file} //= "??";
-			$_->{line} //= "??";
-			"$_->{file}:$_->{line}: " . Term::ANSIColor::colored(($_->{action} // $action).": ", $color_error) . Term::ANSIColor::colored($_->{msg}, $color_words) . "\n"
+			"$_->{file}:$_->{line}: " . Term::ANSIColor::colored(($_->{action} // $action).": ", $color_error) . Term::ANSIColor::colored($_->{msg} // "-", $color_words) . "\n"
 		}
 	} $self->trace;
 }
