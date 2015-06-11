@@ -150,7 +150,7 @@ sub compile_action {
 	$action =~ s/^#[ \t]*([\$\@]([a-z_]\w*))[ \t]+([a-z_]\w*)(?:=(\S+(?: {1,3}\S+)*))?(?:[ \t]+(.*?))?[ \t\r]+$/
 		my ($var, $key, $validator, $val, $remark) = ($1, $2, $3, $4, $5);
 		
-		$pos = length $`;
+		::msg $pos = length $`;
 		
 		$validator{$key} = {name => $validator};
 		$validator{$key}{val} = $val if defined $val;
@@ -159,11 +159,15 @@ sub compile_action {
 		$val = defined($val)? ", $val": "";
 		$remark = defined($remark)? ", \"$remark\"": "";
 		my $ret = "$var = \$app->validator->$validator(\"$key\"$val$remark);";
-		$pos += length $ret;
+		::msg $pos += length $ret;
 		$ret
 	/gme;
 	
-	pos() = $pos, $action =~ s/\G/return if \$response->errors;/ if %validator;
+	if(%validator) {
+		::msg $pos;
+		pos($action) = $pos;
+		$action =~ s/\G/return if \$response->errors;/;
+	}
 	
 	# находим переменные для экранирования через my
 	my @our = qw//;
