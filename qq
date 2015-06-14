@@ -9,7 +9,13 @@ use Msg;
 
 @ARGV = "qq" unless @ARGV;
 my $path = $ARGV[0];
-my %rename = ('-e' => 'eval');
+my %rename = (
+	'-e' => 'eval',
+	'--help' => 'help',
+	'-h' => 'help',
+	'-help' => 'help',
+	'/h' => 'help',
+);
 $path = $rename{$path} // $path;
 $path = $` if $path =~ /:/;
 $path = file("bin/$path.pl");

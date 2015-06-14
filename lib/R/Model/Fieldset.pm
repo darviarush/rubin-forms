@@ -253,6 +253,7 @@ sub testdata {
 sub run_data {
 	my ($self, $rows) = @_;
 	my $model = $self->{name};
+	my $beans = [];
 	for my $row (@$rows) {
 
 		if(CORE::ref $row eq "ARRAY") {
@@ -265,7 +266,7 @@ sub run_data {
 				my $name = $fld->{name};
 				$bean->$name($val);
 			}
-			$bean->store;
+			push @$beans, $bean;
 		} else {
 			die "Что-то неясное попало в инициализирующие данные: $row";
 		}

@@ -7,6 +7,7 @@ requires 'MIME::Lite';
 requires 'MIME::Base64';
 requires 'Authen::SASL';
 requires 'JSON::XS';
+requires 'Graphics::Magick';
 
 #requires 'Package::Rename';
 #requires 'Env::Path';

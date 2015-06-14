@@ -29,7 +29,7 @@ sub stat_begin {
 	my ($self) = @_;
 	my $app = $self->{app};
 	my $request = $app->request;
-	my $_req = $app->ini->{req} // $app->ini->{site}{"log-level"};
+	my $_req = $app->ini->{req} // $app->ini->{site}{"log-level"} // 1;
 	if($_req) { main::msg ":empty", "\n", ":red", $request->method, ":reset", " ", $request->url, " ", ":red", $request->version, " ", ":cyan", "tid", ":reset", ":", " ", threads->tid(), ":cyan", " from ", ":reset", join(", ", threads->list());
 	}
 	if($_req > 1) { main::msg ":empty", ":magenta", $_, ":reset", ":", " ", ":cyan", $request->{head}{$_} for keys %{$request->{head}} };

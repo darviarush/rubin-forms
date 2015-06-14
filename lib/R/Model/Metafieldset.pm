@@ -124,7 +124,7 @@ sub sync {
 			
 		if(@{$fieldset->{data}}) {
 			$fieldset->run_data($fieldset->{data});
-			$bean->can("data")->($fieldset) if $bean->can("data");
+			$bean->can("realdata")->($fieldset) if $bean->can("realdata");
 		}
 		
 		delete $fieldset->{sync};

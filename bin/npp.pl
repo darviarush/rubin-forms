@@ -1,15 +1,17 @@
 #==
-#= [[место] файл]
+#= [[место] файл [функция]]
 #> открывает notepad++ в другом окне
 #> если указаны параметры, то открывает в npp файл
 #> место: t - тест, act - экшн, не указано - шаблон, lib - модуль в lib, 
 
-die "Нет файла rubin.session. Смените директорию" if @ARGV==1 and not file("rubin.session");
+die "Нет файла rubin.session. Смените директорию" if @ARGV==1 and not $app->path->file("rubin.session");
 
 $framework = 1, splice @ARGV, 1, 1 if $ARGV[1] eq "-";
 
 $path = @ARGV>1? $app->path->to(@ARGV): " -multiInst -nosession -openSession rubin.session";
 $path = $app->path->framework($path) if $framework;
+
+msg(":space", "нет файла", ":red", $path), exit unless -e $path;
 
 if(@ARGV>2) {
 	die "не найдена функция $ARGV[2] в $path" unless Utils::read($path) =~ /.*\bsub $ARGV[2]/s;
@@ -22,7 +24,7 @@ if(@ARGV>2) {
 return if fork;
 $ENV{"QQ_NO_COLOR"} = 1;
 
-$npp = "/cygdrive/c/sbin/notepad++/notepad++";
+$npp = $app->ini->{site}{npp} // "/cygdrive/c/sbin/notepad++/notepad++";
 
 open $f, "|-", "$npp $path";
 close $f;

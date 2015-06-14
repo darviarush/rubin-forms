@@ -141,16 +141,16 @@ sub compile_action {
 	$path =~ /\b$self->{dir}\/(.*)\.\w+$/;
 	my $index = $1;
 
-	# считываем
-	my $action = Utils::read($path);
-	
-	# находим валидаторы
+	my @action;
+	my $inc = 0;
+	my $last_index;
 	my %validator = ();
-	my $pos = 0;
-	$action =~ s/^#[ \t]*([\$\@]([a-z_]\w*))[ \t]+([a-z_]\w*)(?:=(\S+(?: {1,3}\S+)*))?(?:[ \t]+(.*?))?[ \t\r]+$/
+	
+	# для замены валидаторов	
+	my $code = sub {
 		my ($var, $key, $validator, $val, $remark) = ($1, $2, $3, $4, $5);
 		
-		::msg $pos = length $`;
+		$last_index = $inc;
 		
 		$validator{$key} = {name => $validator};
 		$validator{$key}{val} = $val if defined $val;
@@ -158,16 +158,9 @@ sub compile_action {
 		
 		$val = defined($val)? ", $val": "";
 		$remark = defined($remark)? ", \"$remark\"": "";
-		my $ret = "$var = \$app->validator->$validator(\"$key\"$val$remark);";
-		::msg $pos += length $ret;
-		$ret
-	/gme;
-	
-	if(%validator) {
-		::msg $pos;
-		pos($action) = $pos;
-		$action =~ s/\G/return if \$response->errors;/;
-	}
+		"$var = \$app->validator->$validator(\"$key\"$val$remark);\n";
+	};
+
 	
 	# находим переменные для экранирования через my
 	my @our = qw//;
@@ -175,16 +168,37 @@ sub compile_action {
 	my %local = Utils::set(qw/$_ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9 $a $b/);
 	my %my = Utils::set(qw/$app $request $response/);
 	my %no = Utils::set(qw/@_ %ENV @INC %INC @ISA/);
-	while($action =~ /\$(\w+)(::\w+)*\s*(\{|\[)|([\%\$\@]\w+)(::\w+)*/g) {
-		next if $2 // $5;$my{$4} = 1 if $4;
-		$my{($3 eq "{"? "%": "@").$1} = 1 if $1;
+	
+	open my $f, "<", $path or die "$path: $!";
+	
+	# считываем
+	while(<$f>) {
+	
+		# находим валидаторы
+		s/^#[ \t]*([\$\@%]([a-z_]\w*))[ \t]+([a-z_]\w*)(?:=(\S+(?: {1,3}\S+)*))?(?:[ \t]+(.*?))?\s*$/$code->()/ige;
+		
+		$inc++;
+		
+		# находим переменные для экранирования через my
+		while(/\$(\w+)(::\w+)*\s*(\{|\[)|([\%\$\@]\w+)(::\w+)*/g) {
+			next if $2 // $5;
+			$my{$4} = 1 if $4;
+			$my{($3 eq "{"? "%": "@").$1} = 1 if $1;
+		}
+		
+		push @action, $_;
 	}
+	
+	close $f;
+	
+	$action[$last_index] =~ s/\s+$/return if \$response->errors;\n/ if %validator;
+
 	my @my = keys %my;
 	my @local = grep { exists $local{$_} } @my;
 	@my = grep { not exists $our{$_} and not exists $local{$_} and not exists $no{$_} } @my;
 	
 	# получаем код
-	my $eval = join("", (@our? ("our(", join(", ", @our), "); "): ""), "\$app->action->{act}{'$index'} = sub {" , (@local? ("local(", join(", ", @local), "); "): ()), (@my? ("my(", join(", ", @my), "); "): ()), "(\$app, \$request, \$response) = \@_; ", $action, "\n};\n\n\$app->action->{validator}{'$index'} = ", Utils::Dump(\%validator), ";\n\n1;");
+	@action = ((@our? ("our(", join(", ", @our), "); "): ()), "\$app->action->{act}{'$index'} = sub {" , (@local? ("local(", join(", ", @local), "); "): ()), (@my? ("my(", join(", ", @my), "); "): ()), "(\$app, \$request, \$response) = \@_; ", @action, "\n};\n\n\$app->action->{validator}{'$index'} = ", Utils::Dump(\%validator), ";\n\n1;");
 
 	# записываем во временный файл
 	my $p = $path;
@@ -192,7 +206,9 @@ sub compile_action {
 	$p .= ".pl";
 	
 	Utils::mkpath($p);
-	Utils::write($p, $eval);
+	open $f, ">", $p or die "не могу сохранить $p: $!";
+	print $f $_ for @action;
+	close $f;
 
 	$self
 }

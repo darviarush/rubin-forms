@@ -886,8 +886,10 @@ sub TemplateBare {
 	$_ = $_[0];
 	#my $index = $_[3];
 	
+	# описывает константу "", '', 6 и 5.5
 	my $RE_TYPE = qr/("(?:\\"|[^"])*"|'(?:\\'|[^'])*'|-?\d+(?:\.\d+)?(?:E[+-]\d+)?)/;
 	
+	# превращает константу в код
 	my $re_type = sub { my ($x)=@_; return unless defined $x; local($`, $', $1); $x=~s/^'(.*)'$/$1/, $x=~s/"/\\"/g, $x="\"$x\"" if $x =~ /^'/; $x};
 
 	my $_tags = qr/(?:input|meta|br)/i;
@@ -907,9 +909,11 @@ sub TemplateBare {
 	
 	my $get_id = sub { $open_id? ($form->{id}? "$form->{id}-$open_id": $open_id): /\bid=["']?([\w-]+)[^<]*\G/i && $1 };
 	
+	# возвращает код для переменной
 	my $vario = sub {
 		my ($type, $var, $const) = @_;
-		defined($const)? $re_type->($const): defined($type)? (
+		defined($const)? $re_type->($const):	# константа - 6, '' или ""
+		defined($type) && $type eq "%"? (		# stash
 			$var eq "user_id"? do { $page->{is_user_id} = 1; $page->{is_stash} = 1; "\$_STASH->{'user_id'}" }:
 			$var eq "_DATA"? "\$data":
 			$var eq "_STASH"? do { $page->{is_stash} = 1; "\$_STASH"}:
@@ -917,8 +921,12 @@ sub TemplateBare {
 			$var eq "i0"? "(\$i-1)":
 			$var eq "id"? "\$id":
 			do { $page->{is_stash} = 1; "\$_STASH->{'$var'}" }
-		): "\$data->{'$var'}"
+		):
+		defined($type) && $type eq "-"? ($var? "\"\$id-$var\"": "\$id"):
+		"\$data->{'$var'}"
 	};
+	
+	# продолжает парсить за переменной :helper(...):helper...
 	my $helper = sub {
 		my ($type, $var, $const, $open_braket) = @_;
 		push @html, $vario->($type, $var, $const);
@@ -930,8 +938,8 @@ sub TemplateBare {
 
 			push @html, (
 			!$VAR && m!\G:(\w+)(\()?!? do { $html[$fn_idx] = "Helper::$1(".$html[$fn_idx]; if($2) { ++$braket; ", " } else { $VAR = !$VAR; ")" } }:
-			$VAR && m!\G(?:\$(%)?(\w+)|$RE_TYPE)!? do { push @fn_idx, $fn_idx; $fn_idx = scalar @html; $vario->($1, $2, $3) }:
-			!$VAR && m!\G,\s*!? do { $fn_idx = pop @fn_idx; $& }:
+			$VAR && m!\G(?:\$(%|-)?(\w+)|$RE_TYPE)!? do { push @fn_idx, $fn_idx; $fn_idx = scalar @html; $vario->($1, $2, $3) }:
+			!$VAR && m!\G(?:,|=>)\s*!? do { $fn_idx = pop @fn_idx; $& }:		# , или =>
 			m!\G\)!? do { $VAR = 1; --$braket; $fn_idx = pop @fn_idx; ")" }:
 			m!\G\}!? do { die "нет `{` для `}`" unless $open_braket; $pos++; last; }:
 			last);
@@ -946,8 +954,8 @@ sub TemplateBare {
 	};
 	
 	
-	
-	my $pop = sub {	# закрывается тег
+	# закрывается тег
+	my $pop = sub {
 		my $tag = pop @T;
 		
 		if(@$tag > 2) {	# тег список - $* или форма - $+
@@ -972,14 +980,14 @@ sub TemplateBare {
 		pos() = $pos;
 
 		push @html,
-		!$NO && m!\G<(\w+)!? do {
+		!$NO && m!\G<(\w+)!? do {		# начало тега
 			$TAG = $1;
 			$open_tag = lc $TAG;
 			$NO=1 if $TAG =~ /^(?:script|style)$/;
 			if(my $re = $tags{$open_tag}) { $pop->() while @T and $T[$#T]->[0] !~ $re; }
 			"<$TAG" 
 		}:
-		!$NO && m!\G>!? do {
+		!$NO && m!\G>!? do {			# конец тега
 			die "Невалидный шаблон - обнаружена `<` без тега: `$_`" if not defined $TAG;
 			if($TAG =~ $_tags) { $TAG = $open_id = undef; ">" } else {
 				my (@ret, $type, $name);
@@ -1008,22 +1016,26 @@ sub TemplateBare {
 				@ret
 			}
 		}:
-		!$NO && m!\G/>!? do { $TAG = $open_id = undef; $& }:
-		!$NO && m!\G</(\w+)\s*>!? do { $TAG = $open_id = undef; my ($tag) = ($1); while(@T and $pop->() ne $tag) {}; $& }:
-		!$NO && m!\G<\!--.*?-->!s? do { $& }:
-		!$NO && m!\G<\!doctype[^>]+>!i? do { $& }:
-		$NO && m!\G</$TAG\s*>!? do { $TAG = $open_id = $open_tag = $NO = undef; $& }:
-		m!\G\$-(\w+)?!? do { $open_id = $1; "', \$id, '".(defined($1)? "-$1": "") }:
-		m!\G\$@([/\w-]+)!? do {
+		!$NO && m!\G/>!? do { $TAG = $open_id = undef; $& }:		# конец неначавшегося тега <div/>
+		!$NO && m!\G</(\w+)\s*>!? do {								# конец тега
+			$TAG = $open_id = undef;
+			my ($tag) = ($1);
+			while(@T and $pop->() ne $tag) {};
+			$&
+		}:
+		!$NO && m!\G<\!--.*?-->!s? do { $& }:						# комментарий
+		!$NO && m!\G<\!doctype[^>]+>!i? do { $& }:					# doctype
+		$NO && m!\G</$TAG\s*>!? do { $TAG = $open_id = $open_tag = $NO = undef; $& }:			# конец тега script или style
+		m!\G\$@([/\w-]+)!? do {							# include
 			my $name = $1;
 			$page->{include}{$1} = 1;
 			push @code, ["include", "\$app->action->include_ajax('$name', \$data, \$id, \$LAYOUT);\n"];
 			"', \$app->action->include('$name', \$data, \$id, \$LAYOUT), '"
 		}:
-		m!\G\$&!? do { $page->{layout_id} = $get_id->(); "', \@\$LAYOUT, '" }:
-		m!\G\{%\s*(\w+)\s*=%\}!? do { $page->{is_stash} = 1; "', do { \$_STASH->{'$1'} = join '', ('" }:
-		m!\G\{%\s*end\s*%\}!? do { "'); () }, '" }:
-		m!\G\{%\s*if\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do {
+		m!\G\$&!? do { $page->{layout_id} = $get_id->(); "', \@\$LAYOUT, '" }:		# лайоут
+		m!\G\{%\s*(\w+)\s*=%\}!? do { $page->{is_stash} = 1; "', do { \$_STASH->{'$1'} = join '', ('" }:	# присвоение блока ключу в stash
+		m!\G\{%\s*end\s*%\}!? do { "'); () }, '" }:					# конец блока
+		m!\G\{%\s*if\s+(?:\$(%|-)?(\w+)|$RE_TYPE)!? do {				# if
 			$pos += length $&;
 			push @html, "', ((";
 			my $from = @html;
@@ -1035,7 +1047,7 @@ sub TemplateBare {
 			push @html, ")? ('";
 			next
 		}:
-		m!\G\{%\s*elif\s+(?:\$(%)?(\w+)|$RE_TYPE)!? do {
+		m!\G\{%\s*el(?:se)if\s+(?:\$(%|-)?(\w+)|$RE_TYPE)!? do {			# elif или elseif
 			die "Нельзя использовать elif" if @ifST==0 or $ifST[$#ifST] != 1;
 			$pos += length $&; push @html, "'): (";
 			my $from = @html;
@@ -1046,29 +1058,46 @@ sub TemplateBare {
 			push @html, ")? ('";
 			next
 		}:
-		m!\G\{%\s*else\s*%\}!? do { die "Нельзя использовать else" if @ifST==0 or $ifST[$#ifST]!=1; $ifST[$#ifST] = 2; push @code, ["else", "\n} else {"]; "'): ('" }:
-		m!\G\{%\s*fi\s*%\}!? do { die "Нельзя использовать fi" if @ifST==0; push @code, ["fi", "}\n"]; "')".(pop(@ifST) == 1? ": ()": "")."), '" }:
-		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do { push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)]; () }:
-		m!\G&#?\w+;?!? $&:
-		m!\G(?:\$(\{\s*)?(?:(%)?(\w+)|$RE_TYPE)|(#)(\{\s*)?(%)?(\w+))!? do {
-			my $open_span = $5;
-			my $open_braket = $1 // $6;
-			my $type = $2 // $7;
-			my $var = $3 // $8;
+		m!\G\{%\s*else\s*%\}!? do {				# else
+			die "Нельзя использовать else" if @ifST==0 or $ifST[$#ifST]!=1;
+			$ifST[$#ifST] = 2;
+			push @code, ["else", "\n} else {"];
+			"'): ('"
+		}:
+		m!\G\{%\s*fi\s*%\}!? do {				# fi
+			die "Нельзя использовать fi" if @ifST==0;
+			push @code, ["fi", "}\n"]; "')".(pop(@ifST) == 1? ": ()": "")."), '"
+		}:
+		# !!! options - нужны ли?
+		# m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do {
+			# push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)];
+			# ()
+		# }:
+		m!\G&#?\w+;?!? $&:				# &nbsp; &#fff;
+		# m!\G\$-(\w+)?!? do {			# $-	идентификатор
+			# $open_id = $1;
+			# "', \$id, '".(defined($1)? "-$1": "")
+		# }:
+		m!\G\$(\{\s*)?(?:(%|-)?(\w+)|$RE_TYPE)!? do {	# переменная $-a, $a или $%a или #a или #%a
+			my $open_braket = $1;
+			my $type = $2 // "";
+			my $var = $3;
 			my $const = $4;
 			my $content = $&;
-			if($open_span && ($open_tag || $TAG && $TAG =~ /^(?:script|style)$/i)) { $content }
+			my $script = !$open_tag && ($TAG // "") =~ /^(?:script)$/i;
+			if( !$open_braket && $script ) { $content }
 			else {
 				$pos += length $content;
-
-				$form->{fields}{$var} = 1 if defined $var and not $type;
-				push @html, "<span id=', \$id, '-$var>" if $open_span;
+				
+				$open_id = $var if $type eq "-" and $open_tag;
+				
+				$form->{fields}{$var} = 1 if defined $var and $type ne "%";		# указываем, что это поле формы
 				push @html, "', ";
-				my $fn_idx = $helper->($type, $var, $const, $open_braket);
+				my $fn_idx = $helper->($type, $var, $const, $open_braket);	# парсим дальше, если есть выражение
 				
-				$html[$fn_idx] = "Helper::html($html[$fn_idx]", push @html, ")" unless $html[$fn_idx] =~ /^Helper::(\w+)/? exists $Helper::_NO_ESCAPE_HTML{$1}: undef;
+				$html[$fn_idx] = "Helper::html($html[$fn_idx]" . ($type eq "-"? ", \$_DATA": ""), push @html, ")" unless $html[$fn_idx] =~ /^Helper::(\w+)/? exists $Helper::_NO_ESCAPE_HTML{$1}: undef;
 				
-				push @html, ", '" . ($open_span? "</span>": "");
+				push @html, ", '";
 				next;
 			}
 		}:
@@ -1103,9 +1132,9 @@ sub TemplateBare {
 			}
 			"', \$id, '-$name";
 		}:
-		$open_tag && m!\G\$([+*])!? "', \$id, '":
-		m!\G[\\']!? "\\$&":
-		m!\G.!s? $&:
+		$open_tag && m!\G\$([+*])!? "', \$id, '":				# $+ или $*
+		m!\G[\\']!? "\\$&":										# ' эскейпится
+		m!\G.!s? $&:											# любой оставшийся символ
 		last;
 		
 		$pos += length $&;

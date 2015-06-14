@@ -55,7 +55,10 @@ sub trace {
 		#::msg("$i:", @param);
 		my ($package, $file, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = @param;
 		
-		$subroutine = "REQUIRE $evaltext" if $is_require;
+		if(defined $evaltext) {
+			$subroutine = "REQUIRE" if $is_require;
+			$subroutine = $evaltext unless $is_require
+		}
 		
 		$subroutine =~ s!(^|::)__ANON__$!$1~!;
 		#$subroutine =~ s!^main(::[^:]+)$!$1!;
@@ -64,7 +67,7 @@ sub trace {
 			file=>$file,
 			line=>$line,
 			subroutine=> $subroutine
-		} if $subroutine ne "(eval)";
+		};# if $subroutine ne "(eval)";
 	}
 	
 	@$TRACE = $self->reverse_trace($TRACE);

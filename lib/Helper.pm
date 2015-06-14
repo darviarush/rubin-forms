@@ -3,27 +3,43 @@ package Helper;
 use warnings;
 use strict;
 
-use JSON::XS;
 use Data::Dumper;
 use Utils;
+use R::App;
 
-our %_NO_ESCAPE_HTML = Utils::set(qw(raw html json dump style hidden show));
+our %_NO_ESCAPE_HTML = Utils::set(qw(raw html json dump style hidden show wx label input error));
 
-sub json { JSON::XS->new->encode($_[0]) }
+# переводит в json
+sub json { $app->json->encode($_[0]) }
 
+# выводит без эскейпа
 sub raw { $_[0] }
 
+# эскейпит
 sub html { defined($_[0])? Utils::escapeHTML($_[0]): "" }
 
+# выводит nbsp, если пусто
 sub nbsp { $_[0] eq ""? "&nbsp;": $_[0] }
 
-sub bool { $_[0]? ($_[1] // '+'): $_[2] }
+# bool(условие [, да [, нет]]) - если условие верно, а 
+sub bool { $_[0]? ($_[1] // '+'): ($_[2] // '') }
 
+# дампер
 sub dump { "<pre>".Utils::escapeHTML(Dumper($_[0]))."</pre>" }
 
+# $array:join(", ", ...) для массива
 sub join { defined($_[0])? Utils::escapeHTML(join(($_[1] // ", "), @{$_[0]}, @_[2..$#_])): "" }
 
-sub at { $_[0]->{ $_[1] } }
+# возвращает элемент хеша или массива
+sub at { ref $_[0] eq "ARRAY"? $_[0]->[ $_[1] ]: $_[0]->{ $_[1] } }
+
+# cсоздаёт хеш
+# ключ:dict(значение, ключ=>значение...)
+sub dict {{@_}}
+sub hash {{@_}}
+
+# создаёт массив
+sub array {[@_]}
 
 # нечётный
 sub odd { $_[0] % 2? ($_[1] // "odd"): $_[2] }
@@ -52,11 +68,36 @@ sub ne { if($_is_float->($_[0]) && $_is_float->($_[1])) { $_[0] != $_[1] } elsif
 # атрибуты, классы, стили
 sub visible { $_[0]? "": "display: none" }
 sub style { $_[0]? "style=\"$_[0]\"": "" }
-sub hidden { $_[0]? "style='display:none'": "" }
+sub hide { $_[0]? "style='display:none'": "" }
 sub show { $_[0]? "": "style='display:none'" }
 sub img { return "/img/" unless $_[0]; "/images/" . Utils::img_path($_[0]) }
 
 # запуск функции
 sub run { my $f = shift; $f->(@_) }
+
+
+
+
+# виджет
+sub _wx {
+	my ($method, $id, %args) = @_;
+	my $name = $args{type};
+	if(!defined $name) {
+		my $form_id = $id =~ /-[\w+]$/? $`: $id;
+		my $model = $app->response->{bean}{$form_id};
+		if($model) {
+			
+		} else {
+			$name = "input";
+		}
+	}
+	$name = "widget" . ucfirst $name;
+	$new->$name($id, %args)->$method;
+}
+sub wx { unshift @_, "render"; goto &_wx }
+sub label { unshift @_, "label"; goto &_wx}
+sub input { unshift @_, "input"; goto &_wx }
+sub error { unshift @_, "error"; goto &_wx }
+
 
 1;

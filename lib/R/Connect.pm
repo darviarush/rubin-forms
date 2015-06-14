@@ -19,7 +19,10 @@ GENERATED	GET	IO_AFTER_GTIDS	IO_BEFORE_GTIDS MASTER_BIND OPTIMIZER_COSTS PARSE_G
 
 sub new {
 	my ($cls, $app) = @_;
-	my ($sql_word) = $app->ini->{connect}{DNS} =~ /^dbi:(\w+)/i;
+	my $DNS = $app->ini->{connect}{DNS};
+	die "main.ini[connect]DNS не указан. См. main.sample.ini" unless defined $DNS;
+	my ($sql_word) = $DNS =~ /^dbi:(\w+)/i;
+	die "main.ini[connect]DNS повреждён" unless $sql_word;
 	my $self = bless { app => $app, sql_word => $SQL_WORD{lc $sql_word} }, $cls;
 	$self->connect
 }

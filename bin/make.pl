@@ -23,7 +23,7 @@ if($func) {
 
 	die "Создайте вначале файл $path" if !-e $path;
 
-	$args = join ", ", map { "\$$_" } "self", @ARGV[3..$#ARGV];
+	$args = join ", ", map { /^[%@]/? $_: "\$$_" } "self", @ARGV[3..$#ARGV];
 
 	Utils::replace($path, sub {
 		$_[0] =~ s!(\s1;\s*)$!
@@ -65,13 +65,15 @@ $pack =~ s![A-Z]!::$&!g;
 $skel = 'package R' . $pack . ';
 # 
 
-use common::sense;
+#use common::sense;
+use strict;
+use warnings;
 use R::App;
 
 # конструктор
 sub new {
-	my (\$cls) = \@_;
-	bless {}, \$cls;
+	my ($cls) = @_;
+	bless {}, $cls;
 }
 
 1;
