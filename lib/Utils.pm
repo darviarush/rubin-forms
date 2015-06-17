@@ -615,6 +615,15 @@ sub escapejs {
 # возвращает строку javascript
 sub stringjs { '"'.escapejs($_[0]).'"' }
 
+# квотирует строку perl: ''
+sub quote {
+	local($_, $`, $', $&);
+	$_ = $_[0];
+	s/['\\]/\\$&/ge;
+	$_;	
+}
+
+
 # парсит из строки
 sub unstring { my $x = $_[0] // ""; if($x=~/^["']/) { $x = substr $x, 1, -1; $x=~s/\\([\\'"nrt])/my $x=$1; $x=~tr!nrtv!\n\r\t!; $x/ge; } $x }
 
@@ -923,6 +932,7 @@ sub TemplateBare {
 			do { $page->{is_stash} = 1; "\$_STASH->{'$var'}" }
 		):
 		defined($type) && $type eq "-"? ($var? "\"\$id-$var\"": "\$id"):
+		defined($type) && $type eq "#"? "'$var', \$data, \$id":
 		"\$data->{'$var'}"
 	};
 	
@@ -939,7 +949,7 @@ sub TemplateBare {
 			push @html, (
 			!$VAR && m!\G:(\w+)(\()?!? do { $html[$fn_idx] = "Helper::$1(".$html[$fn_idx]; if($2) { ++$braket; ", " } else { $VAR = !$VAR; ")" } }:
 			$VAR && m!\G(?:\$(%|-)?(\w+)|$RE_TYPE)!? do { push @fn_idx, $fn_idx; $fn_idx = scalar @html; $vario->($1, $2, $3) }:
-			!$VAR && m!\G(?:,|=>)\s*!? do { $fn_idx = pop @fn_idx; $& }:		# , или =>
+			!$VAR && m!\G(?:,|=)\s*!? do { $fn_idx = pop @fn_idx; $& }:		# , или =>
 			m!\G\)!? do { $VAR = 1; --$braket; $fn_idx = pop @fn_idx; ")" }:
 			m!\G\}!? do { die "нет `{` для `}`" unless $open_braket; $pos++; last; }:
 			last);
@@ -1069,37 +1079,51 @@ sub TemplateBare {
 			push @code, ["fi", "}\n"]; "')".(pop(@ifST) == 1? ": ()": "")."), '"
 		}:
 		# !!! options - нужны ли?
-		# m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do {
-			# push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)];
-			# ()
-		# }:
-		m!\G&#?\w+;?!? $&:				# &nbsp; &#fff;
+		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do {
+			push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)];
+			()
+		}:
+		#m!\G&#?\w+;?!? $&:				# &nbsp; &#fff;
 		# m!\G\$-(\w+)?!? do {			# $-	идентификатор
 			# $open_id = $1;
 			# "', \$id, '".(defined($1)? "-$1": "")
 		# }:
-		m!\G\$(\{\s*)?(?:(%|-)?(\w+)|$RE_TYPE)!? do {	# переменная $-a, $a или $%a или #a или #%a
+		m!\G\$(\{\s*)?(?:(%|-|#)?([a-z_]\w*)|(-)|$RE_TYPE)!? do {	# переменная $-a, $a или $%a или #a или #%a
 			my $open_braket = $1;
 			my $type = $2 // "";
 			my $var = $3;
-			my $const = $4;
+			my $var_id = $4;
+			my $const = $5;
 			my $content = $&;
-			my $script = !$open_tag && ($TAG // "") =~ /^(?:script)$/i;
-			if( !$open_braket && $script ) { $content }
-			else {
-				$pos += length $content;
-				
-				$open_id = $var if $type eq "-" and $open_tag;
-				
-				$form->{fields}{$var} = 1 if defined $var and $type ne "%";		# указываем, что это поле формы
-				push @html, "', ";
-				my $fn_idx = $helper->($type, $var, $const, $open_braket);	# парсим дальше, если есть выражение
-				
-				$html[$fn_idx] = "Helper::html($html[$fn_idx]" . ($type eq "-"? ", \$_DATA": ""), push @html, ")" unless $html[$fn_idx] =~ /^Helper::(\w+)/? exists $Helper::_NO_ESCAPE_HTML{$1}: undef;
-				
-				push @html, ", '";
-				next;
-			}
+			
+			$type = "-" if $var_id;
+			
+			#my $script = !$open_tag && ($TAG // "") =~ /^(?:script)$/i;
+			#if( !$open_braket && $script ) { $content }
+			#else {
+			$pos += length $content;
+		
+			$open_id = $var if $type eq "-" and $open_tag;
+		
+		$form->{fields}{$var} = 1 if defined $var and $type ne "%";		# указываем, что это поле формы
+		push @html, "', ";
+		my $fn_idx = $helper->($type, $var, $const, $open_braket);	# парсим дальше, если есть выражение
+		my ($helper) = $html[$fn_idx] =~ /^Helper::(\w+)/;
+		# если нет хелпера
+		if(!$helper && $type eq "#") {
+			$html[$fn_idx] = "Helper::wx($html[$fn_idx]";
+			push @html, ")";
+		}
+		# если есть хелпер и он в исключениях, то не ставим данные
+		if($type ne "#" && !($helper? exists $Helper::_NO_ESCAPE_HTML{$helper}: undef)) {
+			$html[$fn_idx] = "Helper::html($html[$fn_idx]";
+			push @html, ")";
+		}
+		
+		
+		push @html, ", '";
+		next;
+		#	}
 		}:
 		
 		# :load([model,] "where"|id|%id|5)

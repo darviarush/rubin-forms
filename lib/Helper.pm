@@ -7,7 +7,7 @@ use Data::Dumper;
 use Utils;
 use R::App;
 
-our %_NO_ESCAPE_HTML = Utils::set(qw(raw html json dump style hidden show wx label input error));
+our %_NO_ESCAPE_HTML = Utils::set(qw(raw html json dump style hidden show));
 
 # переводит в json
 sub json { $app->json->encode($_[0]) }
@@ -33,7 +33,7 @@ sub join { defined($_[0])? Utils::escapeHTML(join(($_[1] // ", "), @{$_[0]}, @_[
 # возвращает элемент хеша или массива
 sub at { ref $_[0] eq "ARRAY"? $_[0]->[ $_[1] ]: $_[0]->{ $_[1] } }
 
-# cсоздаёт хеш
+# cоздаёт хеш
 # ключ:dict(значение, ключ=>значение...)
 sub dict {{@_}}
 sub hash {{@_}}
@@ -66,33 +66,60 @@ sub ne { if($_is_float->($_[0]) && $_is_float->($_[1])) { $_[0] != $_[1] } elsif
 
 
 # атрибуты, классы, стили
-sub visible { $_[0]? "": "display: none" }
+sub visible { $_[0]? "": "display: none;" }
+sub show { $_[0]? "": "display: none;" }
+sub hide { $_[0]? "display: none;": "" }
 sub style { $_[0]? "style=\"$_[0]\"": "" }
-sub hide { $_[0]? "style='display:none'": "" }
-sub show { $_[0]? "": "style='display:none'" }
+sub hidden { $_[0]? "style='display:none'": "" }
+sub shower { $_[0]? "": "style='display:none'" }
 sub img { return "/img/" unless $_[0]; "/images/" . Utils::img_path($_[0]) }
 
 # запуск функции
 sub run { my $f = shift; $f->(@_) }
 
+# виджет ошибок формы
+sub errors {
+	my ($key, $data, $form_id, %args) = @_;
+	my $errors = $data->{errors};
+	'<ol class="error"', ($errors && @$errors? '': ' style="display:none"'), '>',
+	map({ ('<li>', Utils::escapeHTML($_)) } $errors? @$errors: ()),
+	'</ol>'
+}
 
+# виджет начала формы без ошибок
+sub ajax_form {
+	my ($key, $data, $form_id, %args) = @_;
+	return '<input type="hidden" name="@action" value="', Utils::escapeHTML($key), '">',
+	'<input type="hidden" name="@form" value="', $form_id, '">'
+}
+
+# виджет начала формы
+sub begin_form {
+	return ajax_form(@_), errors(@_);
+}
 
 
 # виджет
 sub _wx {
-	my ($method, $id, %args) = @_;
+	my ($method, $key, $data, $form_id, %args) = @_;
+	
 	my $name = $args{type};
 	if(!defined $name) {
-		my $form_id = $id =~ /-[\w+]$/? $`: $id;
 		my $model = $app->response->{bean}{$form_id};
 		if($model) {
-			
-		} else {
-			$name = "input";
+			 my $fld = $model->Field->{$key};
+			 my $widget;
+			 if($fld && ($widget = $fld->{widget})) {
+				$name = $widget->{name};
+				%args = (%args, %{$widget->{args}});
+			 }
 		}
 	}
+	
+	$name //= "input";
+	
 	$name = "widget" . ucfirst $name;
-	$new->$name($id, %args)->$method;
+	$new->$name($key, $data, $form_id, %args)->$method;
 }
 sub wx { unshift @_, "render"; goto &_wx }
 sub label { unshift @_, "label"; goto &_wx}

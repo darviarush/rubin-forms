@@ -1,14 +1,5 @@
-# $email	email
-# $pass		password
-
-#$email = $request->param("email");
-#$pass = $request->param("pass");
-
-#$response->addValue("login", "email", $email);
-#$response->addError("email", "Введите email") if $email // "" eq "";
-#$response->addError("pass", "Введите пароль") if $pass // "" eq "";
-
-#return if $response->errors;
+# $email	email			введите e-mail
+# $pass		require			введите пароль
 
 $user_id = $app->model->user->find(email => $email, pass => $pass)->id;
 if($user_id) {
@@ -17,16 +8,16 @@ if($user_id) {
 		#$sess = $request->cookie("sess");
 	} else {
 		$sess = Utils::unic_id(20);
-		$response->cookie("sess", $sess, path => "/");
-		$request->cookie->{sess} = $sess;
 		$request->session->user($user_id)->saveAs($sess);
+		$response->cookie("sess", $sess, path => "/");
+		#$request->cookie->{sess} = $sess;
 	}
 	
 	$referer = $request->referer("/profit");
 	$response->redirect($referer eq "/" ? '/profit': $referer);
 	#{sess => $sess, user_id => $user_id}
 } else {
-	$response->status(403, "Логин или пароль неверен");
+	#$response->status(403, "Логин или пароль неверен");
 	$response->addErrors("Логин или пароль неверен");
 }
 

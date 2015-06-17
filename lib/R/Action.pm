@@ -156,9 +156,9 @@ sub compile_action {
 		$validator{$key}{val} = $val if defined $val;
 		$validator{$key}{remark} = $remark if defined $remark;
 		
-		$val = defined($val)? ", $val": "";
-		$remark = defined($remark)? ", \"$remark\"": "";
-		"$var = \$app->validator->$validator(\"$key\"$val$remark);\n";
+		$val = defined($val)? ", $val": defined($remark)? ", undef": "";
+		$remark = defined($remark)? ", '" . Utils::quote($remark) . "'": "";
+		"$var = \$validator->$validator(\"$key\"$val$remark);\n";
 	};
 
 	
@@ -191,7 +191,7 @@ sub compile_action {
 	
 	close $f;
 	
-	$action[$last_index] =~ s/\s+$/return if \$response->errors;\n/ if %validator;
+	$action[0] =  "\$validator = \$app->new->validator;" . $action[0], $action[$last_index] =~ s/\s+$/return if \$response->errors;\n/ if %validator;
 
 	my @my = keys %my;
 	my @local = grep { exists $local{$_} } @my;

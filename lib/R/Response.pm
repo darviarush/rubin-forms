@@ -105,10 +105,10 @@ sub error {
 	
 	return $self->render($action, {error=>$error}) if !$recursive_error and exists $self->{app}->action->{htm}{$action};
 	
-	$self->type('text/plain');
+	$self->type('text/html');
 	my $httpStatus = $self->{app}->serverHttpStatus;
-	my $msg = "$status " . $httpStatus->{$status} . "\n" . ($error // "");
-	$msg .= "\n\nRecursive error from $recursive_error->[0] " . $httpStatus->{$recursive_error->[0]} . "\n" . ($recursive_error->[1] // "") if $recursive_error;
+	my $msg = "$status " . $httpStatus->{$status} . "<br>" . Utils::escapeHTML($error // "") . "<br>";
+	$msg .= "\n\nRecursive error from " . Utils::escapeHTML($recursive_error->[0]) . " " . Utils::escapeHTML($httpStatus->{$recursive_error->[0]}) . "\n" . Utils::escapeHTML($recursive_error->[1] // "") if $recursive_error;
 	$self->body($msg);
 }
 
@@ -131,6 +131,13 @@ sub prepend {
 
 # добавляет к body массив позади
 sub append {
+	my $self = shift;
+	push @{$self->{body}}, @_;
+	$self
+}
+
+# добавляет к body массив позади
+sub echo {
 	my $self = shift;
 	push @{$self->{body}}, @_;
 	$self
@@ -245,9 +252,9 @@ sub render {
 	} elsif(defined(my $act = $_action_act->{$_action})) {
 		$response->type('application/json; charset=utf-8');
 		@ret = $act->($app, $request, $response);
-	} elsif(exists $app->{modelMetafieldset}{$_action}) {	
-		my $bean = $app->model->$_action($request->param);
-		@ret = {id=>$bean->{id}};
+	# } elsif(exists $app->{modelMetafieldset}{$_action}) {	
+		# my $bean = $app->model->$_action($request->param);
+		# @ret = {id=>$bean->{id}};
 	} else {
 		$response->error(404);
 	}

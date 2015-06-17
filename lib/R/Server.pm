@@ -90,11 +90,11 @@ sub ritter {
 		$response->render;
 		return $response->ajax_redirect if exists $response->{head}{Location} and $app->{request}{head}{Ajax};
 	};
-
+::msg "x123:", $@, $!;
 	if(my $error = $@ // $!) {
 		my $is_io = $!;
 		$@ = $! = undef;
-		
+		::msg "!!!!!!!!!!!!!!!", $error;
 		if(ref $error eq "R::Response::Raise") {
 			$response->body($error);
 		} else {
@@ -105,7 +105,8 @@ sub ritter {
 			$error = $app->ini->{site}{test} ? $error: $app->raise->set("Внутренняя ошибка");
 			
 			eval {
-				$response->error(500, join "", $error->html);
+				$response->error(500);
+				$response->append($error->html);
 			};
 			if($@) {
 				$response->status(500);

@@ -162,6 +162,11 @@ sub check {
 	$self
 }
 
+# добавляет виджет
+sub widget {
+	my ($self, $name, @args) = @_;
+	$self->last->widget({name=>$name, args=>[@args]});
+}
 
 # добавляет или удаляет pk
 sub pk {

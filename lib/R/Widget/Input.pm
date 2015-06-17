@@ -6,16 +6,45 @@ use strict;
 use warnings;
 use R::App;
 
-Utils::has(qw/id/);
+Utils::has(qw/name data form_id/);
 
 # конструктор
 sub new {
-	my ($cls, $id, $data, %args) = @_;
-	bless {id=>$id, data=>$data, %args}, $cls;
+	my ($cls, $key, $data, $id, %args) = @_;
+	bless {name=>$key, form_id=>$id, data=>$data, %args}, $cls;
 }
 
-# возвращает имя 
-sub name { $_[0]->{name} //= do { $_[0]->{id} =~ /\w+$/; $& } }
+# возвращает id
+sub id {
+	my $self = shift;
+	$self->{id} //= $self->id . "-"	. $self->name;
+}
+
+# значение
+sub value {
+	my ($self) = @_;
+	$self->{data}{$self->name};
+}
+
+# значение в html
+sub valueHtml {
+	my ($self) = @_;
+	my $val = $self->{data}{$self->name};
+	$val? Utils::escapeHTML($val): $val
+}
+
+# значение ошибки
+sub errorValue {
+	my ($self) = @_;
+	$self->{data}{$self->name . "_error"};
+}
+
+# значение ошибки в html
+sub errorValueHtml {
+	my ($self) = @_;
+	my $val = $self->{data}{$self->name . "_error"};
+	$val? Utils::escapeHTML($val): $val
+}
 
 # текст для label
 sub description {
@@ -53,17 +82,18 @@ sub attr {
 # функция label
 sub label {
 	my ($self) = @_;
-	"<label for=$id>" . Utils::escapeHTML($self->description) . "</label>"
+	'<label for="' . $self->id . '">' . Utils::escapeHTML($self->description) . '</label>'
 }
 
 # функция input
 sub input {
 	my ($self) = @_;
 	my $name = $self->name;
-	my $value = $self->dualAttr("value", $self->{data}{$self->name});
+	my $value = $self->dualAttr("value", $self->value);
 	my $type = $self->dualAttr("type", $self->{type});
 	my $placeholder = $self->dualAttr("placeholder", $self->{placeholder});
 	my $attr = $self->attr;
+	my $id = $self->id;
 	"<input$type id=$id name=$name$placeholder$attr>"
 }
 
@@ -72,7 +102,8 @@ sub input {
 # функция error
 sub error {
 	my ($self) = @_;
-	'<div class="error"></div>'
+	my $val = $self->errorValue // "";
+	'<div class="error"' . ($val ne ""? "": " style='display:none'") . '>' . Utils::escapeHTML($val) . '</div>'
 }
 
 

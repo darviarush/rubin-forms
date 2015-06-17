@@ -21,7 +21,9 @@ sub __ondie__ {
 
 # обработчик события warn
 sub __onwarn__ {
-	print STDERR $raise->trace($_[0])->color("warning", 'yellow', 'green');
+	my $msg = $raise->trace($_[0])->color("warning", 'yellow', 'green');
+	die $msg if $^S;
+	print STDERR $msg;
 	exit;
 	exit if $_[0]=~/^Deep recursion on subroutine/;
 }
@@ -103,7 +105,8 @@ sub reverse_trace {
 sub file {
 	my ($file) = @_;
 	return "?" unless defined $file;
-	$file =~ s!/watch/action_c/(.*)\.(\w+)\.pl$!/action/$1.$2!;
+	# watch/action_c/index.act.pl -> action/index.act
+	$file =~ s!/watch/(\w+)_c/(.*\.\w+)\.pl$!/$1/$2!;
 	$file
 }
 
@@ -240,7 +243,7 @@ sub html {
 ", # style='overflow: auto; width: 100%; height: 153px'
 	map({
 		"<div class='".($i++ % 2 == 0? 'e-odd': 'e-even')."'>".
-		"<font color=LightSlateGray>".Utils::escapeHTML(file($_->{file})).":".($_->{line} // "?")."</font> ".
+		"<font color=LightSlateGray>".Utils::escapeHTML(R::Raise::file($_->{file})).":".($_->{line} // "?")."</font> ".
 		Utils::escapeHTML($_->{sub} // $_->{msg} // "?").
 		"</div>"
 	} $self->trace), "</div>");

@@ -4,6 +4,7 @@ package R::Model::Field;
 use strict;
 use warnings;
 
+Utils::has(qw/widget/);
 Utils::has_const(qw/fieldset name model compute/);
 Utils::has_array(qw/check/);
 
@@ -17,7 +18,8 @@ sub new {
 		name=>$name,
 		model=>$fieldset->{name},
 		compute=>1,
-		check=>[]
+		check=>[],
+		widget=>{name => "input", args=>{}},
 	}, $cls;
 	
 	push @{$fieldset->{fieldset}}, $fieldset->{field}{$name} = $self;

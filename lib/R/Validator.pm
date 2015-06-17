@@ -8,31 +8,36 @@ use R::App;
 
 # конструктор
 sub new {
-	my (\$cls) = \@_;
-	bless {}, \$cls;
+	my ($cls) = @_;
+	bless {param=>{}}, $cls;
 }
 
+# возвращает параметр по ключу
+sub param {
+	my ($self, $key) = @_;
+	$self->{param} //= $app->request->param($key);
+}
 
 # проверка
 sub noval ($) {
-	my @v = caller(0), die "validator#$v[3]: значение не предусмотрено" if defined $val;
+	my @v; @v = caller(1), die "validator#$v[3]: значение не предусмотрено" if defined $_[0];
 }
 
 # проверка
 sub requireval ($) {
-	my @v = caller(0), die "validator#$v[3]: предусмотрено значение" if not defined $val;
+	my @v; @v = caller(1), die "validator#$v[3]: предусмотрено значение" if not defined $_[0];
 }
 
 # проверка
 sub norealize () {
-	my @v = caller(0), die "validator#$v[3]: ещё не реализовано" if not defined $val;
+	my @v; @v = caller(1), die "validator#$v[3]: ещё не реализовано" if not defined $_[0];
 }
 
 # функция require
 sub require {
 	my ($self, $key, $val, $remark) = @_;
 	noval $val;
-	$val = $app->request->param($key);
+	$val = $self->param($key);
 	$app->response->addError($key, $remark // "введите значение") if not defined $val or $val eq "";
 	$val
 }
@@ -64,7 +69,7 @@ sub min {
 sub max_length {
 	my ($self, $key, $val, $remark) = @_;
 	requireval $val;
-	my $sense =  $app->request->param($key) // "";
+	my $sense =  $self->param($key) // "";
 	$app->response->addError($key, $remark // "длина больше $val") if length($sense) > $val;
 	$sense
 }
@@ -75,7 +80,7 @@ sub max_length {
 sub min_length {
 	my ($self, $key, $val, $remark) = @_;
 	requireval $val;
-	my $sense = $app->request->param($key) // "";
+	my $sense = $self->param($key) // "";
 	$app->response->addError($key, $remark // "длина меньше $val") if length($sense) < $val;
 	$sense
 }
@@ -86,7 +91,7 @@ sub min_length {
 sub default {
 	my ($self, $key, $val, $remark) = @_;
 	requireval $val;
-	my $sense = $app->request->param($key) // $val;
+	my $sense = $self->param($key) // $val;
 	$sense
 }
 
@@ -98,7 +103,7 @@ sub date {
 	norealize;
 	
 	noval $val;
-	$self->pattern('');
+	$self->pattern($key, '', $remark // "дата не верна");
 }
 
 
@@ -144,9 +149,9 @@ sub decimal {
 # функция pattern
 sub pattern {
 	my ($self, $key, $val, $remark) = @_;
-	requireval;
-	my $sense = $app->request->param($key) // "";
-	$app->response->addError($key, $remark // "не соответствует регулярному выражению /$val/") if $sense =~ $val;
+	requireval $val;
+	my $sense = $self->param($key) // "";
+	$app->response->addError($key, $remark // "не соответствует регулярному выражению /$val/") if $sense !~ $val;
 	$sense
 }
 
@@ -177,5 +182,12 @@ sub emailtel {
 	
 }
 
+
+# функция password
+sub password {
+	my ($self, $key, $val, $remark) = @_;
+	noval $val;
+	$self->min_length($key, 3, $remark // "введите пароль не менее 3-х символов");
+}
 
 1;
