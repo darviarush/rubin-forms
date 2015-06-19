@@ -1,6 +1,7 @@
 # $email	email			введите e-mail
 # $pass		require			введите пароль
 
+
 $user_id = $app->model->user->find(email => $email, pass => $pass)->id;
 if($user_id) {
 	$uid = $request->user->id;

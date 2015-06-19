@@ -90,11 +90,11 @@ sub ritter {
 		$response->render;
 		return $response->ajax_redirect if exists $response->{head}{Location} and $app->{request}{head}{Ajax};
 	};
-::msg "x123:", $@, $!;
+	#::msg "x123:", $@, $!;
 	if(my $error = $@ // $!) {
 		my $is_io = $!;
 		$@ = $! = undef;
-		::msg "!!!!!!!!!!!!!!!", $error;
+		#::msg "!!!!!!!!!!!!!!!", $error;
 		if(ref $error eq "R::Response::Raise") {
 			$response->body($error);
 		} else {

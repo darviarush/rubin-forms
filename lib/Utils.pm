@@ -913,7 +913,7 @@ sub TemplateBare {
 	my $forms = {};	# fields=> {}, lists=> {}, forms=> {}
 	
 	
-	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id, @ifST, @code) = ($_, 0);
+	my ($orig, $pos, $open_tag, $open_id, @html, @T, $T, $TAG, $NO, $STASH, $layout_id, @ifST) = ($_, 0);
 	my $page = my $form = {};
 	
 	my $get_id = sub { $open_id? ($form->{id}? "$form->{id}-$open_id": $open_id): /\bid=["']?([\w-]+)[^<]*\G/i && $1 };
@@ -976,8 +976,6 @@ sub TemplateBare {
 			my $call = ")->(\$data".($name? "->{'$name'}": "").", \$id".($name? ".'-$name'": "");
 			push @html, ($type? $code_end: $code_end1) . $call . "), '";
 			
-			push @code, ['end', ($type? $code_end_i: $code_end1_i) . $call . ");\n"];
-			
 			$form->{template} = $template;
 			push @{$_form->{forms}}, $form->{id};
 			$form = $_form;
@@ -1015,10 +1013,8 @@ sub TemplateBare {
 						my $where = exists $form->{where}? ", $form->{where}": '';
 						#$name =~ s!-\d+!!g;
 						$load = "$data = \$app->action->form_load(\$id.'-$name'$where) unless ref($data);";
-						push @code, ["load", $load . "\n"];
 						$load = "do { $load () }, ";
 					}
-					push @code, ["begin", "(" . ($type? $code_begin_i: $code_begin1_i)];
 					@ret=(">", "', $load(" . ($type? $code_begin: $code_begin1))
 				} else { $T = [$open_tag]; @ret = ">" }
 				push @T, $T;
@@ -1039,7 +1035,6 @@ sub TemplateBare {
 		m!\G\$@([/\w-]+)!? do {							# include
 			my $name = $1;
 			$page->{include}{$1} = 1;
-			push @code, ["include", "\$app->action->include_ajax('$name', \$data, \$id, \$LAYOUT);\n"];
 			"', \$app->action->include('$name', \$data, \$id, \$LAYOUT), '"
 		}:
 		m!\G\$&!? do { $page->{layout_id} = $get_id->(); "', \@\$LAYOUT, '" }:		# лайоут
@@ -1053,7 +1048,6 @@ sub TemplateBare {
 			die "Нет закрывающей `%}` для if" unless m!\G\s*%\}!;
 			push @ifST, 1;
 			$pos += length $&;
-			push @code, ["if", join "", "\nif(", @html[$from..$#html], ") {\n"];
 			push @html, ")? ('";
 			next
 		}:
@@ -1064,30 +1058,23 @@ sub TemplateBare {
 			$helper->($1, $2, $3);
 			die "Нет закрывающей `%}` для elif" unless m!\G\s*%\}!;
 			$pos += length $&;
-			push @code, ["elif", join "", "\n} elsif(", @html[$from..$#html], ") {"];
 			push @html, ")? ('";
 			next
 		}:
 		m!\G\{%\s*else\s*%\}!? do {				# else
 			die "Нельзя использовать else" if @ifST==0 or $ifST[$#ifST]!=1;
 			$ifST[$#ifST] = 2;
-			push @code, ["else", "\n} else {"];
 			"'): ('"
 		}:
 		m!\G\{%\s*fi\s*%\}!? do {				# fi
 			die "Нельзя использовать fi" if @ifST==0;
-			push @code, ["fi", "}\n"]; "')".(pop(@ifST) == 1? ": ()": "")."), '"
+			"')".(pop(@ifST) == 1? ": ()": "")."), '"
 		}:
 		# !!! options - нужны ли?
 		m!\G\{%\s*(\w+)\s+$RE_TYPE(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?(?:\s*,\s*$RE_TYPE)?\s*%\}!? do {
 			push @{$page->{options}}, [$1, unstring($2), unstring($3), unstring($4), unstring($5)];
 			()
 		}:
-		#m!\G&#?\w+;?!? $&:				# &nbsp; &#fff;
-		# m!\G\$-(\w+)?!? do {			# $-	идентификатор
-			# $open_id = $1;
-			# "', \$id, '".(defined($1)? "-$1": "")
-		# }:
 		m!\G\$(\{\s*)?(?:(%|-|#)?([a-z_]\w*)|(-)|$RE_TYPE)!? do {	# переменная $-a, $a или $%a или #a или #%a
 			my $open_braket = $1;
 			my $type = $2 // "";
@@ -1105,25 +1092,24 @@ sub TemplateBare {
 		
 			$open_id = $var if $type eq "-" and $open_tag;
 		
-		$form->{fields}{$var} = 1 if defined $var and $type ne "%";		# указываем, что это поле формы
-		push @html, "', ";
-		my $fn_idx = $helper->($type, $var, $const, $open_braket);	# парсим дальше, если есть выражение
-		my ($helper) = $html[$fn_idx] =~ /^Helper::(\w+)/;
-		# если нет хелпера
-		if(!$helper && $type eq "#") {
-			$html[$fn_idx] = "Helper::wx($html[$fn_idx]";
-			push @html, ")";
-		}
-		# если есть хелпер и он в исключениях, то не ставим данные
-		if($type ne "#" && !($helper? exists $Helper::_NO_ESCAPE_HTML{$helper}: undef)) {
-			$html[$fn_idx] = "Helper::html($html[$fn_idx]";
-			push @html, ")";
-		}
-		
-		
-		push @html, ", '";
-		next;
-		#	}
+			$form->{fields}{$var} = 1 if defined $var and $type ne "%";		# указываем, что это поле формы
+			push @html, "', ";
+			my $fn_idx = $helper->($type, $var, $const, $open_braket);	# парсим дальше, если есть выражение
+			my ($helper) = $html[$fn_idx] =~ /^Helper::(\w+)/;
+			# если нет хелпера
+			if(!$helper && $type eq "#") {
+				$html[$fn_idx] = "Helper::wx($html[$fn_idx]";
+				push @html, ")";
+			}
+			# если есть хелпер и он в исключениях, то не ставим данные
+			if($type ne "#" && !($helper? exists $Helper::_NO_ESCAPE_HTML{$helper}: undef)) {
+				$html[$fn_idx] = "Helper::html($html[$fn_idx]";
+				push @html, ")";
+			}
+			
+			
+			push @html, ", '";
+			next;
 		}:
 		
 		# :load([model,] "where"|id|%id|5)
@@ -1169,19 +1155,6 @@ sub TemplateBare {
 	$_[1] = $forms;
 	$_[2] = $form;
 	
-	# текст темплейта
-	#$form->{template} = $_;
-	
-	# CODE: for(my $i=0; $i<@code; $i++) {
-		# my ($code) = @{$code[$i]};
-		# if($code eq "if") {
-			# my $k = $i;
-			# for(; $code[$i+1]->[0] =~ /^(?:elif|else)$/; $i++) {}
-			# if($code[$i+1]->[0] eq "fi") { splice @code, $k, $i-$k+2; goto CODE; }
-		# }
-		# if($code eq "begin" and $code[$i+1]->[0] eq "end") { splice @code, $i, 2; goto CODE; }
-	# }
-	
 	my @begin;
 	
 	#my $code_quote = "my \$dbh = \$app->connect->{dbh}; ";
@@ -1191,8 +1164,6 @@ sub TemplateBare {
 	#push @begin, $code_quote if $form->{is_quote};
 	push @begin, $code_stash if $form->{is_stash};
 	push @begin, $code_user_id if $form->{is_user_id};
-	
-	$form->{code} = join "", "sub { $code_begin_param", @begin, "\n", map({$_->[1]} @code), "\n}";
 	
 	my $x = join "", "sub { $code_begin_param", @begin, " return join \"\", '", @html, "'};";
 	#our $rem++;

@@ -115,6 +115,16 @@ Utils::write($path, $skel);
 
 msg ":space", "файл ", ":green", $path, ":reset", "создан!";
 
+$project = "unicorn.npp.prj";
+if(-e $project) {
+	use XML::Simple qw(:strict);
+	my $xml = XMLin(Utils::read($project));
+	
+	::msg $xml;
+	
+	#Utils::write($project, XMLout($xml));
+}
+
 # $npp = $ENV{"notepad++"};
 
 # system "$npp $path" if $npp;

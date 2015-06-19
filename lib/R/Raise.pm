@@ -181,7 +181,7 @@ sub concat {
 sub color {
 	my ($self, $action, $color_error, $color_words) = @_;
 
-	return $self->asString($action) unless exists $ENV{SHLVL};
+	return $self->asString($action) unless $::_UNIX;
 	
 	my $col = Term::ANSIColor::colored("::", $color_words);
 	#my $raz = Term::ANSIColor::colored(":", $color_error);

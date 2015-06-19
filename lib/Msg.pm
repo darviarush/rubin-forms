@@ -16,8 +16,7 @@ BEGIN {
 	#use Term::ANSIColor qw//;
 	#use Fcntl ':flock';
 	#$SIG{ __DIE__ } = \&Carp::confess;
-	
-	our $_UNIX = !!$ENV{SHLVL} && !$ENV{QQ_NO_COLOR}; #not $ENV{TERM} eq "dumb";
+	our $_UNIX = $ENV{QQ_NO_COLOR}? undef: exists $ENV{SHLVL}? 1: undef; #not $ENV{TERM} eq "dumb";
 	
 	our $_FRAMEWORK;
 	

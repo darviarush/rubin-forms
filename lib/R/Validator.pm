@@ -15,7 +15,7 @@ sub new {
 # возвращает параметр по ключу
 sub param {
 	my ($self, $key) = @_;
-	$self->{param} //= $app->request->param($key);
+	$self->{param}{$key} //= $app->request->param($key);
 }
 
 # проверка
@@ -151,6 +151,7 @@ sub pattern {
 	my ($self, $key, $val, $remark) = @_;
 	requireval $val;
 	my $sense = $self->param($key) // "";
+	::msg $key, $sense, $val, $sense !~ $val;
 	$app->response->addError($key, $remark // "не соответствует регулярному выражению /$val/") if $sense !~ $val;
 	$sense
 }

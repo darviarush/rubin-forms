@@ -163,7 +163,8 @@ sub layout {
 # возвращает дефолтные параметры страницы: $request->param + $errors + $info
 sub default_param {
 	my ($self) = @_;
-	my $param = $self->{app}{request}->ids;
+	my $request = $self->{app}{request};
+	my $param = $request->ids;
 	return {%$param, %{$self->{default_param}}} if $self->{default_param};
 	return $param;
 }
@@ -177,6 +178,9 @@ sub form {
 		$form =~ s/^[^-]+-//;
 		my $param = $self->{default_param} //= {};
 		$param = $param->{$_} //= {} for split /-/, $form;
+		my $request = $self->{app}{request};
+		::msg "param:", $request->param;
+		%$param = %{$request->param};
 		$param
 	};
 }
