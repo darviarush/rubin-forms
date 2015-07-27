@@ -1,5 +1,0 @@
-
-requires 'common::sense';
-requires 'Data::Dumper::AutoEncode';
-
-#requires 'HTML::Entities';

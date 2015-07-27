@@ -1,4 +1,4 @@
-package R::Defer;
+package R::Async::Defer;
 # умеет изменять состтояние promise
 
 use common::sense;
@@ -21,6 +21,9 @@ sub resolve (@) {
 		$code->(@args);
 	}
 }
+
+# синоним для resolve
+\&fulfill = \&resolve;
 
 # эмитит исключение
 sub reject (@) {

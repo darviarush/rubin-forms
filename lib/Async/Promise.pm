@@ -42,7 +42,6 @@ sub resolved {
 
 # синоним для resolved
 \&fulfilled = \&resolved;
-\&fulfill = \&resolve;
 
 # процесс упал
 sub rejected {
