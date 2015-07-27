@@ -1,18 +1,19 @@
 package R::Listener;
 # обработчик событий
 
-use strict;
-use warnings;
+use common::sense;
+use R::App;
 
 # конструктор
 sub new {
-	my ($cls, $app) = @_;
-	bless {app=>$app, listen=>{}}, $cls;
+	my ($self) = @_;
+	bless {listen=>{}}, $cls;
 }
 
 # установка слушателя
-sub listen {
+sub on {
 	my ($self, $on, @listen) = @_;
+	$self->{lastKey} = $on;
 	my @on = split /\s*,\s*/, $on;
 	for my $on (@on) {
 		if($on =~ s/^-//) { unshift @{$self->{listen}{$on}}, @listen }
@@ -21,8 +22,16 @@ sub listen {
 	$self
 }
 
+
+# установка слушателя
+sub then (&) {
+	my ($self, @listen) = @_;
+	$self->on($self->{lastKey}, @listen);
+}
+
+
 # удаление слушателя
-sub drop {
+sub off {
 	my ($self, $on, @listen) = @_;
 	my @on = split /\s*,\s*/, $on;
 	if(@listen) {

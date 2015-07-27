@@ -1,9 +1,0 @@
-<p>Время кода истекло. Зарегистрируйтесь заново</p>
-
-<form id="$+register" method=POST class="box">
-	<input type="hidden" name="form" value="$-">
-	{% if $errors %}<ol id="$*errors" class="error"><li>$error</ol>{% fi %}
-	<div class="w3_5"><input name=email type="text" value="$email" placeholder="Ваш e-mail"></div>
-	{% if $email_error %}<div class="error">$email_error</div>{% fi %}
-	<div class="w2_5"><input type=submit class="btn green" value="Регистрация"></div>
-</form>

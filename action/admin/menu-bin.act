@@ -1,4 +1,0 @@
-
-{
-	menu => $app->command->all
-}

@@ -1,28 +1,28 @@
 package R::Http;
-# всё, что относится к протоколу http - сервер и клиент
+# СЂРµР°Р»РёР·СѓРµС‚ РІСЃС‘ СЃРІСЏР·Р°РЅРЅРѕРµ СЃ РїСЂРѕРєРѕР»РѕРј http
 
 use common::sense;
 use R::App;
 
-# конструктор
+# РєРѕРЅСЃС‚СЂСѓРєС‚РѕСЂ
 sub new {
 	my ($cls) = @_;
 	bless {}, $cls;
 }
 
-# создаёт http-сервер на указанном порту
-sub makeServer {
-	my ($self, $port) = @_;
-	my $server = $app->new->serverHttp;
-	$server
-}
-
-# коннектится к чему-то по протоколу http
+# РєРѕРЅРЅРµРєС‚РёС‚СЃСЏ Рє СЃР°Р№С‚Сѓ Рё РІРѕР·РІСЂР°С‰Р°РµС‚ СЃС‚СЂР°РЅРёС†Сѓ
 sub connect {
-	$app->new->connectHttp;
+	my ($self, ) = @_;
+	#use AnyEvent::HTTP;
+	todo;
 }
 
 
+# СЃРѕР·РґР°С‘С‚ СЃРµСЂРІРµСЂ
+sub listen {
+	my ($self, $port) = @_;
+	$app->httpServer($port);
+}
 
 
 

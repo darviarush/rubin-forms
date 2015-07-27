@@ -1,9 +1,0 @@
-# Выход пользователя
-
-if(defined $request->cookie("sess")) {
-	$response->cookie("sess", "", expires => 150723948, path => "/"),
-	$request->session->erase;
-	$request->cookie->{sess} = undef;
-}
-
-return $response->redirect("/");

@@ -1,0 +1,27 @@
+== Шаблонизатор
+
+=== Условие **if**
+
+	$app->patternHtml->parse( {a=>6}, << END ) # 5
+		{if $a == 6}5{/if}
+	END
+	
+	$app->patternHtml->parse( {a=>6}, << END ) # 3
+		{if $a != 6}2{else}3{/if}
+	END
+	
+	$app->patternHtml->parse( {a=>6}, << END ) # 2
+		{if $a < 6}1{elseif $a == 6}2{else}3{/if}
+	END
+	
+	$app->patternHtml->parse( {a=>6}, << END ) # 2
+		{if $a < 6}1{elseif $a == 6}2{/if}
+	END
+
+=== Цикл
+
+	$app->patternHtml->parse( {iter=> [{a=>1}, {a=>2}, {a=>3}]}, '
+		<div id="$*iter">$a </div>
+	') # <div id="iter">1 2 3 </div>
+	
+	

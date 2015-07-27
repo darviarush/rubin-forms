@@ -1,20 +1,41 @@
 package R::Raise;
-# реализует исключение
+# исключение. В программе может быть только одно исключение
 
-use strict;
-use warnings;
+use common::sense;
+# use strict;
+# use warnings;
+
+# устанавливает обработчики
+sub setdie {
+	$main::SIG{ __DIE__ } = \&__ondie__;
+	$main::SIG{ __WARN__ } = \&__onwarn__;
+}
+
+
+if(defined $^S) {
+	setdie();
+}
 
 # синглетон
 our $raise;
 
+# конструктор - синглетон
+sub new {
+	my ($cls) = @_;
+	$raise //= bless {}, $cls;
+}
+
 # обработчик события die
 sub __ondie__ {
 	my ($msg) = @_;
+	
 	if(ref $msg ne 'R::Raise::Trace') {
-		eval { $msg = $raise->trace($msg) };
-		die "ошибка в die: $@" if $@;
+		#$SIG{ __DIE__ } = \&CORE::die;
+		$msg = $raise->trace($msg);
+		#$SIG{ __DIE__ } = \&__ondie__;
 	}
-	die $msg if $^S;
+	
+	die( $msg ) if $^S;
 	print STDERR $msg;
 	exit
 }
@@ -22,29 +43,16 @@ sub __ondie__ {
 # обработчик события warn
 sub __onwarn__ {
 	my $msg = $raise->trace($_[0])->color("warning", 'yellow', 'green');
-	die $msg if $^S;
-	print STDERR $msg;
+	CORE::warn( $msg ) if $^S;
+	print STDERR "WARNING IN WARN: " . $msg;
 	exit;
 	exit if $_[0]=~/^Deep recursion on subroutine/;
 }
 
-# конструктор - синглетон
-sub new {
-	my ($cls, $app) = @_;
-	return $raise if $raise;
-	
-	$raise = bless {app => $app}, $cls;
-	
-	$SIG{ __DIE__ } = \&__ondie__;
-	$SIG{ __WARN__ } = \&__onwarn__;
-	
-	$raise
-}
-
 # создаёт исключение без трассировки
-sub set {
-	R::Raise::Trace->new($_[1]);
-}
+# sub set {
+	# R::Raise::Trace->new($_[1]);
+# }
 
 # создаёт исключение с трассировкой
 sub trace {
@@ -111,12 +119,12 @@ sub file {
 }
 
 
-package R::Raise::Trace;
-# преобразует и печатает исключение
 
-use Term::ANSIColor qw//;
+package R::Raise::Trace;
+# класс ошибки
+
+use Term::ANSIColor qw/colorstrip/;
 #use Cwd qw/abs_path getcwd/;
-use Data::Dumper;
 use overload
 	'""' => \&stringify,
 	'.' => \&concat,
@@ -126,6 +134,7 @@ use overload
 	fallback => 1
 ;
 
+
 # конструктор
 sub new {
 	my ($cls, $error) = @_;
@@ -133,17 +142,23 @@ sub new {
 	my $trace = [];
 	my @lines;
 	
+	#print STDERR "$error\n";
+	
 	if(ref $error) { $error = $Utils::{Dump}{CODE}? $Utils::{Dump}{CODE}->($error): Dumper($error); }
 	else {
 		#$error = "< ошибка-строка >" . $error . "< конец >";
+		$error = colorstrip($error);
 		for my $e (split /\n/, $error) {
-			if($e =~ s!^syntax error at (\S+) line (\d+), (.*)$!!) {
-				push @$trace, { file=>$1, line=>$2, msg=>$3, action=>'syntax error'}
-			} elsif($e =~ s! at (.*?) line (\d+)(?:, <GEN\d+> line \d+)?(,? .*)?\.?\s*$!!) {
-				push @$trace, { file=>$1, line=>$2, msg=>$3? $e.$3: $e}
-			} elsif($e =~ m!:(\d+):\s+!) {
-				push @$trace, { file=>$`, line=>$1, msg => $' };
-			} else {
+			if($e =~ m!^syntax error at (.*) line (\d+), (.*)$!) {
+				push @$trace, { file=>$1, line=>$2, msg=>$3, action=>'syntax error'};
+			}
+			elsif($e =~ m!^(.*) at (.*?) line (\d+)(?:, <GEN\d+> line \d+)?(,? .*)?\.?\s*$!) {
+				push @$trace, { file=>$2, line=>$3, msg=>$4? $1.$4: $1};
+			}
+			elsif($e =~ m!:(\d+):\s+!) {
+				push @$trace, { file=>$`, line=>$1, msg => $', action=>"prev error" };
+			}
+			else {
 				push @lines, $e;
 			}
 		}
@@ -177,11 +192,13 @@ sub concat {
 	else { $self->stringify . $str }
 }
 
+my $_UNIX = 1;
+
 # выводит колоризированным
 sub color {
 	my ($self, $action, $color_error, $color_words) = @_;
 
-	return $self->asString($action) unless $::_UNIX;
+	return $self->asString($action) unless $_UNIX;
 	
 	my $col = Term::ANSIColor::colored("::", $color_words);
 	#my $raz = Term::ANSIColor::colored(":", $color_error);
@@ -202,7 +219,7 @@ sub _winpath {
 	my ($path) = @_;
 	return "--undef path in winpath--" unless defined $path;
 	
-	return $path if $main::_UNIX;
+	return $path if $_UNIX;
 	
 	local ($`, $');
 	

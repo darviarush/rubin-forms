@@ -1,3 +1,0 @@
-convert 800px-Flag_of_Abkhazia.svg.png -resize '16x11!' ab.png
-composite -geometry +192+165 ab.png  flags.png flags2.png
-cp flags2.png flags.png
