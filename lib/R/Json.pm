@@ -6,14 +6,16 @@ use R::App;
 
 use JSON::XS;
 my $json_xs = JSON::XS->new->allow_nonref;
+our $true = $JSON::XS::true;
+our $false = $JSON::XS::false;
 
 # конструктор синглетона
 my $singleton;
 sub new {
-	$singleton //= do {
-		my ($cls) = @_;
-		bless {}, $cls;
-	}
+	my ($cls) = @_;
+	$singleton = bless \(my $json=1), $cls;
+	*new = sub {$singleton};
+	$singleton
 }
 
 
@@ -30,5 +32,14 @@ sub to ($$) {
 	$json_xs->encode($val);
 }
 
+# возвращает true
+sub true {
+	$true
+}
+
+# возвращает false
+sub false {
+	$false
+}
 
 1;

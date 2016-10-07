@@ -9,12 +9,24 @@ my $main_ini;
 # конструктор
 sub new {
 	my ($cls, $path) = @_;
-	return $main_ini if !defined $path and defined $main_ini;
-	$path = "main.ini";
-	$main_ini = bless parse_ini($path), ref $cls || $cls;
-	$main_ini->{path} = $path;
+	return $main_ini if defined $main_ini;
+	if(!defined $path) {
+		$path = ($app->project_name // "main") . ".ini";
+		$path = "etc/$path" if !-e $path;
+	};
+	$main_ini = -e $path? parse_ini($path): {};
+	$main_ini = bless $main_ini, ref $cls || $cls;
+	#$main_ini->{path} = $path;
 	$main_ini
 }
+
+
+sub parse {my ($self, $path) = @_; bless parse_ini($path), ref $self}
+sub parse_str {my ($self, $text) = @_; bless parse_ini(undef, $text), ref $self}
+sub dump {goto &dump_ini}
+sub print {goto &print_ini}
+#sub inject {}
+#sub delete {}
 
 # разбирает ini-файл и возвращает хэш
 sub parse_ini {
@@ -22,7 +34,7 @@ sub parse_ini {
 	my $f;
 	if(defined $path) {
 		return {} unless -e $path;
-		open $f, $path or die "not open ini file `$path`. $!\n";
+		open $f, "<:utf8", $path or die "not open ini file `$path`. $!\n";
 	} else {
 		require IO::String;
 		$f = IO::String->new($text);

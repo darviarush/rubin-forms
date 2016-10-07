@@ -1,5 +1,5 @@
 package R::Http;
-# реализует всё связанное с проколом http
+# протокол http
 
 use common::sense;
 use R::App;
@@ -7,23 +7,25 @@ use R::App;
 # конструктор
 sub new {
 	my ($cls) = @_;
-	bless {}, $cls;
+	bless {}, ref $cls || $cls;
 }
 
-# коннектится к сайту и возвращает страницу
-sub connect {
-	my ($self, ) = @_;
-	#use AnyEvent::HTTP;
-	todo;
+# возвращает клиента http (LWP) с куками
+sub ua {
+	my $self = shift;
+	require LWP::UserAgent;
+	require LWP::ConnCache;
+	my $ua = LWP::UserAgent->new(agent => 'RubinForms-Agent', conn_cache => 1, @_);
+	$ua->conn_cache(LWP::ConnCache->new);
+	$ua->conn_cache->total_capacity(undef);
+	$ua->cookie_jar({});
+	$ua
 }
 
-
-# создаёт сервер
-sub listen {
-	my ($self, $port) = @_;
-	$app->httpServer($port);
+# возвращает клиента websocket
+sub ws {
+	my ($self, $url) = @_;
+	$app->httpWs->new($url);
 }
-
-
 
 1;

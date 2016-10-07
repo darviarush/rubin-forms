@@ -1,188 +1,175 @@
 package R::Raise;
-# исключение. В программе может быть только одно исключение
+# исключение фоматирует исключение
+
 
 use common::sense;
-# use strict;
-# use warnings;
+
+use Carp qw/shortmess longmess/;
+use Scalar::Util qw/blessed/;
+
+use Term::ANSIColor qw/colorstrip color/;
+
+
+use overload
+	'""' => \&stringify,
+	'.' => \&concat,
+	'bool' => sub { 1 },
+	"0+" => sub { $_[0]->{msg}? 1: 0 },
+	"qr" => \&stringify,
+	fallback => 1
+;
+
 
 # устанавливает обработчики
+my $__DIE__;
+my $__WARN__;
 sub setdie {
+	$__DIE__ = $main::SIG{ __DIE__ } if $main::SIG{ __DIE__ } != \&__ondie__;
+	$__WARN__ = $main::SIG{ __WARN__ } if $main::SIG{ __WARN__ } != \&__onwarn__;
 	$main::SIG{ __DIE__ } = \&__ondie__;
 	$main::SIG{ __WARN__ } = \&__onwarn__;
 }
 
+# возвращает как было
+sub retdie {
+	$main::SIG{ __DIE__ } = $__DIE__ // "DEFAULT";
+	$main::SIG{ __WARN__ } = $__WARN__  // "DEFAULT";
+}
+
+# возвращает дефолтные
+sub defdie {
+	$main::SIG{ __DIE__ } = "DEFAULT";
+	$main::SIG{ __WARN__ } = "DEFAULT";
+}
 
 if(defined $^S) {
 	setdie();
 }
 
-# синглетон
-our $raise;
+# конструктор
+sub bingo {
+	my ($cls, $abbr, $msg) = @_;
+	my $self = $cls->new(longmess($msg), "bingo", $msg);
+	$self->{abbr} = $abbr;
+	$self
+}
 
-# конструктор - синглетон
+# конструктор
 sub new {
-	my ($cls) = @_;
-	$raise //= bless {}, $cls;
+	my ($cls, $msg, $who, $orig) = @_;
+	
+	# longmess почему-то бывает выдаёт скаляр $orig
+	$msg = $$msg if ref $msg eq "SCALAR";
+	
+	if(@_ == 2) {
+		$who = "throw";
+		$orig = $msg;
+		$msg = longmess($msg);
+	}
+	
+	bless {
+		msg => $msg,
+		who => $who,
+		orig => $orig,
+		color => 1,
+	}, ref $cls || $cls;
 }
 
 # обработчик события die
 sub __ondie__ {
 	my ($msg) = @_;
 	
-	if(ref $msg ne 'R::Raise::Trace') {
-		#$SIG{ __DIE__ } = \&CORE::die;
-		$msg = $raise->trace($msg);
-		#$SIG{ __DIE__ } = \&__ondie__;
+	unless(blessed($msg) and $msg->isa('R::Raise')) {
+		#print STDERR "=== $msg\n";
+		#use R::App qw/msg1/;
+		#msg1 ":size10000", $msg;
+		$msg = __PACKAGE__->new( longmess($msg), "error", $msg );
 	}
 	
-	die( $msg ) if $^S;
-	print STDERR $msg;
-	exit
+	#print STDERR "@$ S==$^S ".@_."\@_==@_ GLOBAL_PHASE=${^GLOBAL_PHASE}\n";
+	
+	#die $msg;
+
+	#return $msg if !defined $^S;
+	die $msg if $^S <= 1;
+	_log($msg);
+	exit;
 }
 
 # обработчик события warn
 sub __onwarn__ {
-	my $msg = $raise->trace($_[0])->color("warning", 'yellow', 'green');
-	CORE::warn( $msg ) if $^S;
-	print STDERR "WARNING IN WARN: " . $msg;
-	exit;
+	my ($msg) = @_;
+	
+	unless(blessed($msg) and $msg->isa('R::Raise')) {
+		$msg = __PACKAGE__->new( shortmess($msg), "warning", $msg );
+	}
+	
+	warn $msg;
+	_log($msg) if $^S > 1 || $^S < 0; # не в eval и не как обычно
+	#exit;
 	exit if $_[0]=~/^Deep recursion on subroutine/;
 }
 
-# создаёт исключение без трассировки
-# sub set {
-	# R::Raise::Trace->new($_[1]);
-# }
-
-# создаёт исключение с трассировкой
-sub trace {
-	my ($self, $error) = @_;
-
-	my $trace = R::Raise::Trace->new($error);
-	my $TRACE = $trace->{trace};
+# логирует
+sub _log {
+	my ($msg) = @_;
 	
-	for(my $i=3; my @param = caller($i); $i++) {
-		#::msg("$i:", @param);
-		my ($package, $file, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = @param;
-		
-		if(defined $evaltext) {
-			$subroutine = "REQUIRE" if $is_require;
-			$subroutine = $evaltext unless $is_require
-		}
-		
-		$subroutine =~ s!(^|::)__ANON__$!$1~!;
-		#$subroutine =~ s!^main(::[^:]+)$!$1!;
-
-		push @$TRACE, {
-			file=>$file,
-			line=>$line,
-			subroutine=> $subroutine
-		};# if $subroutine ne "(eval)";
+	if($^S == 5) {
+		$msg = "$msg\n\nRAISE IN DESTRUCT\n";
+	}
+	elsif($^S != 0) {
+		$msg = "$msg\n\n\$^S == $^S";
 	}
 	
-	@$TRACE = $self->reverse_trace($TRACE);
-	$trace->{trace} = [reverse @$TRACE];
+	#print STDERR $msg;
 	
-	$trace
-}
-
-# преобразует trace
-sub reverse_trace {
-	my ($self, $trace) = @_;
-	my $i = 0;
-	map {
-		$_->{file} = file($_->{file});
-		$i++;
-		my $sub = my $x = $trace->[$i]{subroutine} // "~";
-		$x =~ s!::!/!g;
-		$x =~ s!/[^/]+$!!;
-		$x = quotemeta $x;
-		$sub =~ s!.*::([^:]+)$!$1! if $_->{file} =~ /$x\.pm$/;
-		
-		if($_->{subroutine}) {
-			$_->{sub} = $sub;
-			$_
-		} elsif(@$trace!=$i and $trace->[$i]{subroutine} and $sub ne "~") {
-			($_, {file => $_->{file}, line => $_->{line}, sub => $sub })
-		}
-		else {$_}
-	} @$trace;
-}
-
-# возвращает ?, если не указан файл
-sub file {
-	my ($file) = @_;
-	return "?" unless defined $file;
-	# watch/action_c/index.act.pl -> action/index.act
-	$file =~ s!/watch/(\w+)_c/(.*\.\w+)\.pl$!/$1/$2!;
-	$file
-}
-
-
-
-package R::Raise::Trace;
-# класс ошибки
-
-use Term::ANSIColor qw/colorstrip/;
-#use Cwd qw/abs_path getcwd/;
-use overload
-	'""' => \&stringify,
-	'.' => \&concat,
-	'bool' => sub { @{$_[0]->{trace}}? 1: undef },
-	"0+" => sub { @{$_[0]->{trace}} },
-	"qr" => \&stringify,
-	fallback => 1
-;
-
-
-# конструктор
-sub new {
-	my ($cls, $error) = @_;
-	local ($_, $`, $', $1, $2);
-	my $trace = [];
-	my @lines;
-	
-	#print STDERR "$error\n";
-	
-	if(ref $error) { $error = $Utils::{Dump}{CODE}? $Utils::{Dump}{CODE}->($error): Dumper($error); }
-	else {
-		#$error = "< ошибка-строка >" . $error . "< конец >";
-		$error = colorstrip($error);
-		for my $e (split /\n/, $error) {
-			if($e =~ m!^syntax error at (.*) line (\d+), (.*)$!) {
-				push @$trace, { file=>$1, line=>$2, msg=>$3, action=>'syntax error'};
-			}
-			elsif($e =~ m!^(.*) at (.*?) line (\d+)(?:, <GEN\d+> line \d+)?(,? .*)?\.?\s*$!) {
-				push @$trace, { file=>$2, line=>$3, msg=>$4? $1.$4: $1};
-			}
-			elsif($e =~ m!:(\d+):\s+!) {
-				push @$trace, { file=>$`, line=>$1, msg => $', action=>"prev error" };
-			}
-			else {
-				push @lines, $e;
-			}
-		}
-		
-	}
-	
-	push @$trace, { file => "?1", line => "?1", msg => join "\n", @lines } if @lines;
-	
-	push(@$trace, { file => "?2", line => "?2", msg => $R::Connect::CURR_SQL }), $R::Connect::CURR_SQL = undef if $R::Connect::CURR_SQL;
-	
-	bless { orig => $error, trace => $trace }, $cls;
-}
-
-# возвращает trace
-sub trace {
-	my ($self) = @_;
-	my $trace = $self->{trace};
-	@$trace
+	#&retdie;
+	eval {
+		require R::App;
+		$R::App::app->log->alert("$msg");
+		#print STDERR $msg if !$R::App::app->log->{logs}{std};
+	};
+	print STDERR $msg if $@;
+	#&setdie;
 }
 
 # превращает в строку
 sub stringify {
-	my ($self) = @_;
-	$self->color('error', 'red', 'cyan');
+	my $self = shift;
+	
+	local($_, $`, $', $1);
+	$_ = $self->{msg};
+	$_ = ref($_) eq "SCALAR"? $$_: $_;
+	#$_ = (utf8::is_utf8($_)?"utf8":"no")."$_\n";
+	#s/\\x\{(\w+)\}/ chr hex $1 /ge;
+	
+	#print STDERR "XXXXX: ".$self->{who}." $_\n\n";
+	
+	my @lines = split /\n/, $_;
+	
+	my $color = $self->{who} eq "bingo"? "cyan": $self->{who} eq "warning"? "yellow": "red";
+	
+	my $who = color($color) . $self->{who} . ": " . color("reset");
+	
+	for(@lines) {
+		s{^\t?(.*?)(?: called)? at (.*?) line (\d+)}{
+			my ($x, $f, $l)=($1, $2, $3);
+			
+			$x=~s{^\w+::(?:\w+::)+}{
+				my $y = my $tmp = $&;
+				$y =~ s!::!/!g; $y =~ s!/$!!;
+				$f =~ m!\b$y\.pm$! ? "": $tmp
+			}e;
+			$x=~s![:\(\)]+!color("cyan") . $& . color("reset")!ge;
+			"$f:".color("green")."$l".color("reset").": $who$x"
+		}e;
+		
+		$who = "";
+	}
+	
+	unshift @lines, $R::App::app->{connect}{CURR_SQL} if $R::App::app && $R::App::app->{connect} && $R::App::app->{connect}{CURR_SQL};
+	
+	join("\n", reverse @lines) . "\n";
 }
 
 # объединяет со строкой
@@ -192,78 +179,51 @@ sub concat {
 	else { $self->stringify . $str }
 }
 
-my $_UNIX = 1;
-
-# выводит колоризированным
-sub color {
-	my ($self, $action, $color_error, $color_words) = @_;
-
-	return $self->asString($action) unless $_UNIX;
-	
-	my $col = Term::ANSIColor::colored("::", $color_words);
-	#my $raz = Term::ANSIColor::colored(":", $color_error);
-	
-	join "", map {
-		$_->{file} //= "??";
-		$_->{line} //= "??";
-		$_->{sub} //= $_->{subroutine};
-		if($_->{sub}) { my $sub = $_->{sub}; $sub =~ s!::([^:]+)$!$col$1!; "$_->{file}:$_->{line}: $sub\n" }
-		else {
-			"$_->{file}:$_->{line}: " . Term::ANSIColor::colored(($_->{action} // $action).": ", $color_error) . Term::ANSIColor::colored($_->{msg} // "-", $color_words) . "\n"
-		}
-	} $self->trace;
+# Возвращает оригинальную ошибку
+sub orig {
+	my ($self) = @_;
+	$self->{orig}
 }
 
-# изменяет путь cygwin на виндовый
-sub _winpath {
-	my ($path) = @_;
-	return "--undef path in winpath--" unless defined $path;
-	
-	return $path if $_UNIX;
-	
-	local ($`, $');
-	
-	my $file = $path;
+# возвращает сообщение без at line
+sub message {
+	my ($self) = @_;
+	ref $self->{orig}? $self->{orig}{message}: do { $self->{orig}=~ / at .* line \d+.*$/? $`: $self->{orig}  }
+}
 
-	if(-e $path) {
-		$path = eval { require Cwd; Cwd::fast_abs_path($path) };
-		$file = $path unless $@ // $!;
+# добавляет в начало сообщения
+sub messageAdd {
+	my ($self, $add) = @_;
+	$self->{orig} = join "", $add, "\n", $self->{orig};
+	$self
+}
+
+# сообщает, что аббревиатура совпадает
+sub is {
+	my ($self, $abbr) = @_;
+	$self->{abbr} && $self->{abbr} eq $abbr
+}
+
+# возвращает трейсбак
+# count - количество строк с конца
+sub trace {
+	my ($self, $count) = @_;
+	
+	my $msg = longmess("app.raise.trace");
+
+	if(defined $count) {
+		local ($&, $`, $');
+		my $r = "\n.*" x $count;
+		$msg = $& if $msg =~ /$r$/;
 	}
 	
-	$file =~ s!^/cygdrive/(\w)!$1:!;
-	$file =~ s!^/(usr/)?!c:/cygwin/!;
-	$file =~ s!/!\\!g;
-	$file
+	__PACKAGE__->new( $msg, "trace", undef );
 }
 
-
-# строка
-sub asString {
-	my ($self, $action) = @_;
-	join "", map {
-		my $file = _winpath($_->{file});
-		if($_->{sub}) { "$file:$_->{line}:1: $_->{sub}\n" }
-		else { "$file:$_->{line}:1: " . ($_->{action} // $action) .": " . $_->{msg} . "\n" }
-	} $self->trace;
-}
-
-# вывод в html
-sub html {
-	my ($self) = @_;
-	my $i = 0;
-	join "", ("<style><!--
-.e-container .e-even {background: lavender}
-.e-container .e-odd {background: AliceBlue}
-.e-container .e-even, .e-container .e-odd { padding: 4pt 4pt 4pt 20pt; overflow: visible; color: black }
---></style>
-<div class=e-container>
-", # style='overflow: auto; width: 100%; height: 153px'
-	map({
-		"<div class='".($i++ % 2 == 0? 'e-odd': 'e-even')."'>".
-		"<font color=LightSlateGray>".Utils::escapeHTML(R::Raise::file($_->{file})).":".($_->{line} // "?")."</font> ".
-		Utils::escapeHTML($_->{sub} // $_->{msg} // "?").
-		"</div>"
-	} $self->trace), "</div>");
+# возвращает строку
+sub tracex {
+	my ($self, $count) = @_;
+	$self->trace($count)->stringify
 }
 
 1;
