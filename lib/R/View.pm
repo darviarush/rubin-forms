@@ -304,20 +304,20 @@ my $re_gosub_after = qr{
 
 
 my $re_masking = qr{
-	(?<=[\w\}\]\)"'\+\-!])$re_rem(?P<endline>$re_endline) |
-	$re_rem(?P<endline_then>$re_endline) |
+	(?<=[\w\}\]\)"'\+\-!])$re_rem(?P<endline>$re_endline) (?{ $self->{lineno}++ }) |
+	$re_rem(?P<endline_then>$re_endline) (?{ ; $self->{lineno}++ }) |
 	
-	(?P<sepexpression> ;) |
+	(?P<sepexpression> ;) (?{ &stmt_sepexpression }) |
 	
-	" (?P<QR> (?:[^"]|\\")* ) "! (?P<qr_args> \w+ )? |
+	" (?P<QR> (?:[^"]|\\")* ) "! (?P<qr_args> \w+ )? (?{ &stmt_qr }) |
 	
-	(?P<array> \[ ) |
-	(?P<hash> \{ ) |
-	(?P<group> \( ) |
-	(?P<end_tag> [\}\]\)] ) |
+	(?P<array> \[ ) 				(?{ &stmt_array }) |
+	(?P<hash> \{ ) 					(?{ &stmt_hash }) |
+	(?P<group> \( ) 				(?{ &stmt_group }) |
+	(?P<end_tag> [\}\]\)] ) 		(?{ &stmt_end_tag }) |
 	
-	(?P<string>$re_string) |
-	(?P<func>$re_id)\( |
+	(?P<string>$re_string) 			(?{ &stmt_string }) |
+	(?P<func>$re_id)\( 				(?{ &stmt_func }) |
 	(?P<key>$re_id) $re_space_ask => |
 	
 	(?P<method>\.\$|[\.:\$]|::)(?P<m_id>$re_id)(?P<m_sk> $re_sk | \( ) |
@@ -1623,7 +1623,7 @@ sub require {
 		my $cc = $app->file($file)->ext("ag.pm")->path;
 		if(!-e $cc or -M $cc > -M $file) {
 			#$self->parsefile($file, $cc);
-			$app->file($cc)->write( $self->masking( $app->file($file)->read ) );
+			$app->file($cc)->write( $self->masking( join "", "class $class ", $app->file($file)->read, " end" ) );
 		}
 		
 		require $cc;
@@ -1631,6 +1631,8 @@ sub require {
 		die "после подключения файла `" . $file . "` класс не появился" if !exists $self->{class}{$class};
 		
 		#$self->{INC}{$ag} = $class;
+		
+		# TODO: тут нужно подгрузить все классы, к-х нет, но которые используются в файле
 		
 		return $class;
 	}
