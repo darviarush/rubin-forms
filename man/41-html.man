@@ -1,0 +1,178 @@
+= R::Html и R::Htmlquery
+
+
+[init]
+
+	use common::sense;
+	use lib "lib";
+	use R::App qw/$app msg msg1/;
+
+	# добавим логирование
+	$app->man->conf;
+	
+[test]
+
+
+== Коллекция html-элементов `R::Htmlquery`
+
+`new` из переданных параметров создаёт коллекцию.
+
+Строка, начинающаяся на "<" парсится как html.
+
+	$app->htmlquery->new("<!doctype html>1<j>2</j>3")->as_html;		# 1<j>2</j>3
+	
+	$app->htmlquery->new("<!doctype html><html>1<j>2</j>3</html>")->as_html;		# <html>1<j>2</j>3</html>
+	
+	$app->htmlquery->new("<html>1<j>2</j>3</html>")->as_html;		# <html>1<j>2</j>3</html>
+	
+Иначе строка воспринимается как селектор и применяется от рута элементов коллекции.
+	
+	my $root = $app->htmlquery->new("<j><k></k><r class=r> 123 </r></j>");
+	
+	my $q = $root->find("k");
+	
+	$q->as_html;				# <k></k>
+	
+	$q->new(".r")->as_html;		# <r class="r"> 123 </r>
+	
+Стираем дерево.
+
+	undef $root;
+	
+Если бы мы не указали тут `undef $root`, то сработал бы деструктор после `$root->find("k")` и `$q->new(".r")` не сработало бы, так как у `<k></k>` в `$q` уже не было бы родителя.
+	
+== `find`
+
+Поиск по селектору в дереве подэлементов.
+
+	my $root = $app->htmlquery->new("<j><k><r> 123 </r></k><r> 345 </r></j>");
+	
+	my $k = $root->find("k");
+	
+	$k->find("r")->size;		# 1
+	$root->find("r")->size;		# 2
+	
+	
+== `filter`
+
+Фильтрует элементы в коллекции.
+
+	my $q = $app->htmlquery->new("<i></i><o></o>", "<p></p>");
+	
+	$q->size;						# 3
+	
+	$q->filter("p,o")->size;		# 2
+	
+== `siblings`
+
+Все элементы этого уровня.
+
+	my $root = $app->htmlquery->new("<root><i></i><o></o><m></m></root>");
+	
+	my $q = $root->find("o")->siblings->as_html;		# <i></i><m></m>
+	
+	undef $root;
+	
+== `prev`
+
+Предыдущие элементы каждого элемента коллекции.
+
+	my $root = $app->htmlquery->new("<root><i></i><o></o><p></p></root>");
+
+	$root->find("o,p")->prev->as_html;		# <i></i><o></o>
+	
+	undef $root;
+	
+== `next`
+
+Следующие элементы каждого элемента коллекции.
+
+	my $root = $app->htmlquery->new("<root><i></i><o></o><m></m></root>");
+
+	$root->children->next->as_html;		# <o></o><m></m>
+	
+	undef $root;
+	
+== `nextUntil`
+
+	my $root = $app->htmlquery->new("<root>1<i></i>2<o></o>3<m></m>4</root>");
+	
+	$root->find("i")->nextUntil("m")->as_html;	# 2<o></o>3
+	
+	undef $root;
+	
+== `prevUntil`
+
+	my $root = $app->htmlquery->new("<root>1<i></i>2<o></o>3<m></m>4</root>");
+	
+	$root->find("m")->prevUntil("i")->as_html;	# 2<o></o>3
+	
+	undef $root;
+	
+== `html`
+
+	my $q = $app->htmlquery->new("<i>1</i><o>2</o>", "<m>3</m>");
+	
+	$q->html("123");
+	
+	$q->html;			# 123123123
+	
+	$q->as_html;		# <i>123</i><o>123</o><m>123</m>
+	
+== `text`
+
+	my $q = $app->htmlquery->new("<i>1<o>2</o></i>", "<m>3</m>");
+	
+	$q->find("o")->text("123");
+	
+	$q->text;			# 11233
+	
+	$q->as_html;		# <i>1<o>123</o></i><m>3</m>
+	
+== `insertBefore`
+
+	my $root = $app->htmlquery->new("<i>1<o><g>2</g></o></i>");
+	
+	$root->find("g")->insertBefore( $root->find("o") );
+	
+	$root->as_html;			# <i>1<g>2</g><o></o></i>
+
+== `before`
+
+	my $root = $app->htmlquery->new("<i>1<o><g>2</g></o></i>");
+	
+	$root->find("o")->before( $root->find("g") );
+	
+	$root->as_html;			# <i>1<g>2</g><o></o></i>
+
+== `replace`
+
+	my $root = $app->htmlquery->new("<i>1<o><g>2</g></o></i>");
+	
+	my $o = $root->find("o");
+	$o->replace("~678");
+	
+	$root->as_html;			# <i>1678</i>
+	
+	$root->append($o);
+	
+	$root->as_html;			# <i>1678<o><g>2</g></o></i>
+	
+== `prepend`
+
+	my $root = $app->htmlquery->new("<i>1<o><g>2</g></o></i>");
+	
+	$root->find("g")->prepend( $root->find("o") );	#@ ~ обнаружено зацикливание
+	
+	$root->as_html;			# <i>1<o><g>2</g></o></i>
+	
+== `children`
+
+	my $root = $app->htmlquery->new("<i>1<o><g>2</g></o></i>");
+	
+	$root->children("o")->as_html;	# <o><g>2</g></o>
+	$root->children(-1)->as_html;	# <o><g>2</g></o>
+	$root->children(1)->as_html;	# <o><g>2</g></o>
+	$root->children(0)->as_html;	# 1
+	
+	$root->as_html;			# <i>1<o><g>2</g></o></i>

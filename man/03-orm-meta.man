@@ -1,0 +1,17 @@
+= Метаинформация о структуре модели
+
+== Инициализация
+
+Подключаем наш фреймворк:
+
+[init]
+
+	use common::sense;
+	use lib "lib";
+	use R::App qw/$app msg msg1/;
+
+Зададим конфигурацию:
+
+	$app->man->configure;
+
+[test]

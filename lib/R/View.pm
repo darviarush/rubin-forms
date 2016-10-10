@@ -922,7 +922,7 @@ sub expression {
 		$in = 0;
 		if($top->{v_in} // 1) {
 			my($v_in_begin, $v_in_end) = $self->{lang}->v_in;
-			$top->{end} = join "", $v_in_begin, $top->{end}, $v_in_end;
+			$top->{end} = join "", $v_in_begin, (ref $top->{end} eq "CODE"? $top->{end}->(): $top->{end}), $v_in_end;
 		}
 		$self->endstmt;
 	}:
@@ -1036,7 +1036,7 @@ sub expression {
 	$word eq "metafilter"? do {	# фильтр в html
 		$self->error( "<% metafilter name %>" ) unless $expression =~ s!^($re_id)\s*$!!;
 		push @{$self->{metafilters}}, $self->metafilter($1);
-		$self->push(stmt=>"metafilter", end=>closure $self, sub { pop @{shift->{metafilters}}; "" });
+		$self->push(stmt=>"metafilter", end=>closure($self, sub { pop @{shift->{metafilters}}; "" }));
 		$in=0;
 		""
 	}:
@@ -1487,7 +1487,7 @@ sub eval {
 	
 	my $from = $self->{lang}->len_classes;
 
-	msg1 ":empty", "\n\n", $code, "\n";
+	#msg1 ":empty", "\n\n", $code, "\n";
 	
 	my @res = $self->{lang}->eval( $code );
 	die $@ if $@;

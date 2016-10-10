@@ -23,9 +23,19 @@ category "СЦЕНАРИИ";
 
 
 name "man";
-args "[опции miu] [маска файлов] [маска разделов]...";
+args "[-] | [опции miu] [маска файлов] [маска разделов]...";
 desc "компиллирует файлы man компиллятором miu";
 sub man {
+	
+	# список тестов
+	if($_[0] eq "-") {
+		$app->file("man/*")->glob->then(sub {
+			$app->log->info( $_->file );
+		});
+		
+		return;
+	}
+	
 	# добавляем каталог
 	@ARGV = @_;
 	$ARGV[0] = join ":", map { "man/$_" } split /:/, $ARGV[0];

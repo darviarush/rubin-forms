@@ -1,0 +1,84 @@
+= Пейджеры
+
+Пейджеры копирующими содержимое N раз разбитое постранично.
+
+Пейджер содержит форму, которая разбирает параметры и 
+
+[init]
+
+	use common::sense;
+	use lib "lib";
+	use R::App qw/$app msg msg1/;
+
+Настраиваем:
+
+	$app->man->configure->form;
+	
+Объявляем переменную `$ret`:
+	
+	my $ret;
+	
+[test]
+
+
+== Пример пейджеров
+
+Пейджеры обладают скрытым инпутом (`hidden`) page. Изменить название этого параметра можно перепределив метод `page_param`.
+
+	$app->meta->fieldset("page_test")->
+	sync;
+
+	$app->model->page_test->insert(map {+{}} 1..20);
+
+	$app->q->action("/");
+
+	$ret = $app->view->create(q{
+	<% new SimplePages %>
+	<% class SimplePages inherits RubinPages
+			sub fields
+				self.add("search" => "line").placeholder("введите что-то")
+			end
+			sub page_size then 3
+			sub allow* then 1
+			sub success*,* then app.model.page_test.order("id")
+		
+		%>
+		<% sub item row %>$row:id<% end %>
+	<% END %>
+	});
+	
+	$ret;		#~ 123
+	
+	$app->q->action("/?page=4&search=555");
+	
+	$ret = $app->view->create(q{<% new SimplePages %>});
+	
+	$ret;		#~ 555
+	$ret;		#~ 456
+	
+	
+== Методы для настройки
+
+* `page_param` - параметр страницы
+* `page_size` - количество выводимых на страницу элементов
+* `prev` - текст для ссылки на предыдущую страницу
+* `next` - текст для ссылки на следующую страницу
+* `previous` - шаблон ссылки на предыдущую страницу
+* `nextious` - шаблон ссылки на следующую страницу
+* `not_found` - шаблон отображающийся, если на странице ничего нет
+* `permission_denied` - шаблон отображается, если `allow` заблокировал отображение списка
+
+TODO...
+
+
+=== page_param
+
+Параметр страницы
+
+	
+== Много пейджеров на странице
+
+В случае если пейджеров на странце несколько, то все их параметры должны называться по-празному, чтобы не пересечься.
+
+
+== Горизонтальный пейджер

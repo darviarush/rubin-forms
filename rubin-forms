@@ -1,0 +1,60 @@
+#!/usr/bin/env perl
+
+# BEGIN {
+
+# # http://elinux.org/Runtime_Memory_Measurement
+
+	# my $page_size = 4;
+	
+	# my $mem = sub {
+	
+		# sysopen my $fh, "/proc/$$/statm", 0 or die $!;
+		# sysread $fh, my $line, 255 or die $!;
+		# close $fh;
+		# local $_;
+		
+		# # total program size|
+		# # resident set size|
+		# # shared pages|
+		# # text (code) |
+		# # data/stack |
+		# # library |
+		# # dirty pages |
+		
+		# my ($vsz, $rss, $share, $text, $crap, $data, $crap2) = map {$_ * $page_size} split(/\s+/, $line,  7);
+		# #return "vsz=${vsz}k rss=${rss}k share=${share}k text=${text}k data=${data}k";
+		# $vsz
+	# };
+	
+	# my $prev = $mem->();
+	# printf(STDERR "%.2fm\tCORE PERL\n\n", $prev / 1024);
+
+	# *CORE::GLOBAL::require = sub {
+		# my ($path) = @_;
+		# return CORE::require($path) if exists $INC{$path};
+			
+		# my(@res, $res);
+		# if(wantarray) { @res = CORE::require($path); }
+		# else { $res = CORE::require($path); }
+		
+		# my $vsz = $mem->();
+		
+		# my $diff = $vsz - $prev;
+		# $diff = $diff / 1024 > 1? sprintf("%.2fm", $diff / 1024): "${diff}k";
+		
+		# print STDERR sprintf("%0.2fm", $vsz/1024) . "\t$diff\t$path\n";
+		# $prev = $vsz;
+
+		# wantarray? @res: $res
+	# }
+# };
+
+
+
+#use lib "lib";
+BEGIN { push @INC, "lib" }
+use common::sense;
+use R::App;
+use R::Make;
+
+$app->make->load->run;

@@ -1,0 +1,25 @@
+= Сессии
+
+Сессии основаны на R::Cache::Ttl
+
+== Инициализация
+
+
+[init]
+
+	use common::sense;
+	use lib "lib";
+	use R::App qw/$app msg msg1/;
+
+	# добавим логирование
+	$app->man->conf;
+	
+[test]
+
+
+Создадим наше приложение c кэшем и очередями:
+
+	#$app->httpServerUnicorn->run;
+	
+	0;		# 0
+	

@@ -252,7 +252,7 @@ use R::App;
 $app->view->require($ARGV[0]);
 $app->view->init_classes;
 
-')->mod(0777);
+')->mod(0744);
 
 	# выполнить выражение с командной строки
 	$app->file("$dir/age")->write('#!'.$^X. $app->copiright->file . '
@@ -260,8 +260,11 @@ BEGIN { push @INC, \''.$path.'\' }
 use common::sense;
 use R::App;
 
-$app->view->eval(@ARGV);
-')->mod(0777);
+$app->log->info( $app->view->eval(@ARGV) );
+')->mod(0744);
+
+	# Assetfile, Rubinfile, Alfile, Aquafile, Asfile, Accfile, Aliasfile
+	# Al2O3, al2o3
 
 	# мэйк
 	$app->file("$dir/al")->write('#!'.$^X. $app->copiright->file . '
@@ -272,13 +275,13 @@ use R::Make;
 
 $app->make->load;
 
-if( $app->file("Rubinfile")->isfile ) {
-	$app->view->require("Rubinfile");
+if( $app->file("Aquafile")->isfile ) {
+	$app->view->require("Aquafile");
 	$app->view->init_classes;
 }
 
 $app->make->run;
-')->mod(0777);
+')->mod(0744);
 
 	print "ag, age, al созданы\n";
 }
@@ -288,14 +291,11 @@ name "dist";
 args "";
 desc "пушит все из этого каталога и всех каталогов в каталоге выше";
 sub dist {
-	
 	my $root = $app->file("..")->abs;
 	
-	$root->sub("/*")->glob->grep(sub { $_->isdir })->then(sub {
-		$_->chdir, msg1("\n", ":red", $_->path, "\n"), print(`git add .; git commit -am dist; git pull --no-edit && git push`), $root->chdir if $_->sub("/.git")->isdir;
+	$root->sub("/*")->glob->grep("-d")->then(sub {
+		$_->chdir, msg1(":red", $_->path), print(`git add .; git commit -am dist; git pull --no-edit && git push`), $root->chdir if $_->sub("/.git")->isdir;
 	});
-	
-	
 }
 
 

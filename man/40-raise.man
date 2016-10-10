@@ -1,0 +1,19 @@
+= 
+
+
+[init]
+
+	use common::sense;
+	use lib "lib";
+	use R::App qw/$app msg msg1/;
+
+	# добавим логирование
+	$app->man->conf;
+	
+[test]
+
+== Приёмы отладки
+
+	ref $app->raise->trace;			# R::Raise
+	
+	$app->raise->tracex;			#~ app.raise.trace

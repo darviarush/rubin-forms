@@ -1,0 +1,50 @@
+#!/bin/sh
+
+# в /etc/defaults/rc.conf добавляем строку unicorn_enable="NO"
+. /etc/rc.subr
+
+name="unicorn"
+#unicorn_user="unicorn"
+#unicorn_group="unicorn"
+
+#rcvar=`set_rcvar`
+
+start_cmd="${name}_start"
+stop_cmd="${name}_stop"
+restart_cmd="${name}_restart"
+
+load_rc_config $name
+#eval "${rcvar}=\${${rcvar}:-'NO'}"
+
+unicorn_enable=${unicorn_enable:-"NO"}
+
+perl=/usr/local/bin/perl
+home=/home/unicorn/unicorn/
+
+unicorn_start()
+{
+cd "$home"
+su  unicorn -c "$perl ./unicorn start"
+}
+
+unicorn_stop()
+{
+cd "$home"
+su  unicorn -c "$perl ./unicorn stop"
+}
+
+
+unicorn_restart()
+{
+cd "$home"
+su  unicorn -c "$perl ./unicorn restart"
+}
+
+unicorn_status()
+{
+cd "$home"
+su  unicorn -c "$perl ./unicorn status"
+}
+
+
+run_rc_command "$1"

@@ -16,7 +16,7 @@ sub file {
 	
 	'
 #                               
-# @author  Yaroslav O. Kosmina
+# @author  
 # @site    
 # @email   
 # @license BSD

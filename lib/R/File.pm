@@ -72,10 +72,10 @@ sub one {
 	$self->clone(files=>[$path]);
 }
 
-# возвращает n-й файл. Счёт с нуля
+# возвращает n-й файл. Счёт с нуля. -1 - последний
 sub get {
 	my ($self, $n) = @_;
-	$self->one($self->{files}[0]($n));
+	$self->one($self->{files}[$n]);
 }
 
 # хелпер для превращения глоба в регулярку
@@ -103,49 +103,44 @@ sub _glob_to_regex {
 	qr!^(?:$glob)$!;
 }
 
-# устанавливает/возвращает маску для сравнения файлов или регулярку. Она используется в find для отсечения ненужных файлов
-sub filter {
-	my $self = shift;
-	if(@_) {
-		my $filters = [];
-		$filters = [@{$self->{filter}}] if $self->{filter};
-		
-		for my $filter (@_) {
-			my $fn;
-			if(!ref $filter and $filter =~ /^-\w$/) {
-				$fn = eval "sub {$filter}";
-				die $@ if $@;
-			}
-			elsif(!ref $filter) {
-				$fn = _glob_to_regex($filter);
-				$fn = closure($fn, sub { scalar $_ =~ $_[0] });
-			}
-			elsif(ref $filter eq "Regexp") {
-				$fn = closure($filter, sub { scalar $_ =~ $_[0] });
-			}
-			elsif(ref $filter eq "CODE") { $fn = $filter }
-			else {
-				die "параметр - не функция и не Regexp: $filter " . ref $filter;
-			}
-			
-			push @$filters, $fn;
-		}
+# возвращает функцию для сравнения файлов или регулярку. Она используется в find для отсечения ненужных файлов
+sub _filters {
 	
-		$self->clone(filter => $filters);
-	} else {
-		$self->{filter}
+	my $filters;
+	
+	for my $filter (@_) {
+		my $fn;
+		if(!ref $filter and $filter =~ /^-\w$/) {
+			$fn = eval "sub {$filter}";
+			die $@ if $@;
+		}
+		elsif(!ref $filter) {
+			$fn = _glob_to_regex($filter);
+			$fn = closure($fn, sub { scalar $_ =~ $_[0] });
+		}
+		elsif(ref $filter eq "Regexp") {
+			$fn = closure($filter, sub { scalar $_ =~ $_[0] });
+		}
+		elsif(ref $filter eq "CODE") { $fn = $filter }
+		else {
+			die "параметр - не функция и не Regexp: $filter " . ref $filter;
+		}
+		
+		push @$filters, $fn;
 	}
+
+	$filters;
 }
 
-# очищает фильтр и добавляет в него новые
-sub reset_filter {
-	my $self = shift;
+# # очищает фильтр и добавляет в него новые
+# sub reset_filter {
+	# my $self = shift;
 	
-	delete $self->{filter};
-	$self->filter(@_) if @_;
+	# delete $self->{filter};
+	# $self->filter(@_) if @_;
 	
-	$self
-}
+	# $self
+# }
 
 # ищет файлы и применяет к ним функцию
 sub find {
@@ -155,37 +150,34 @@ sub find {
 	
 	if(@{$self->{files}}) {
 	
-		$self = $self->filter(@_) if @_;
+		my $filters = _filters(@_);
 		
 		require File::Find;
 		
-		my $filter = $self->{filter};
-		
 		File::Find::find({
 			no_chdir => 1,
-			wanted => sub {
-				if(defined $filter) {
-					local $_ = $File::Find::name;
-					for my $fn (@$filter) {
-						return if !$fn->();
-					}
+			wanted => ($filters? sub {
+				local $_;
+				for my $fn (@$filters) {
+					$_ = $File::Find::name;
+					return if !$fn->();
 				}
 				push @$files, $File::Find::name;
-			},
+			}: sub {
+				push @$files, $File::Find::name;
+			}),
 		}, @{$self->{files}});
 
 	}
 	
-	$self = $self->clone(files => $files);
-	delete $self->{filter};
-	$self
+	$self->clone(files => $files)
 }
 
 # выполняет функцию для каждого из файлов
 sub then {
 	my ($self, $sub) = @_;
 	local $_;
-	for my $file ($self->files) {
+	for my $file (@{$self->{files}}) {
 		$_ = $self->one($file);
 		$sub->();
 	}
@@ -194,9 +186,23 @@ sub then {
 
 # возвращает файлы прошедшие проверку
 sub grep {
-	my ($self, $sub) = @_;
+	my $self = shift;
 	local $_;
-	$self->clone(files => [grep { my $save=$_; $_ = $self->one($_); my $ret=$sub->(); $_=$save; $ret } $self->files]);
+	if(my $filters = _filters(@_)) {
+		my $files = [];
+	
+		FILE: for my $path (@{$self->{files}}) {
+			for my $fn (@$filters) {
+				$_ = $path;
+				next FILE if !$fn->();
+				push @$files, $path;
+			}
+		}
+		
+		$self->clone(files => $files);
+	} else {
+		$self->clone
+	}
 }
 
 # маппинг для файлов
@@ -258,7 +264,7 @@ sub join {
 
 # пропускает имена файлов маской - не модифицирует изначальный массив
 sub glob {
-	my ($self) = @_;
+	my $self = shift;
 	
 	my $files = [];
 	
@@ -266,7 +272,7 @@ sub glob {
 		push @$files, glob $file;
 	}
 	
-	$self->clone(files => $files);
+	$self->clone(files => $files)->grep(@_)
 }
 
 # a моложе b

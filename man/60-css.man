@@ -1,0 +1,18 @@
+= css-фреймворк
+
+== Инициализация
+
+[init]
+
+	use common::sense;
+	use lib "lib";
+	use R::App qw/$app msg msg1/;
+	
+	# добавим логирование
+	$app->man->conf;
+
+[test]
+
+
+== Замена в шаблонах
+

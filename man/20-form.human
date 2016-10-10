@@ -1,0 +1,518 @@
+= Формы
+
+В шаблонах есть формы. Формы умеют:
+
+1. Отображаться
+1.1. в режиме редактирования
+1.1. и в режиме чтения
+1. валидировать параметры
+1. преобразовывать параметры
+1. отображать ошибки
+
+[init]
+
+	use common::sense;
+	use lib "lib";
+	use R::App qw/$app msg msg1/;
+
+Зададим конфигурацию:
+	
+	$app->man->configure->form;
+	
+Объявляем переменную `$ret`:
+	
+	my $ret;
+	
+	
+[test]
+
+== Стандартная форма
+
+Форма порождается наследованием от класса другой формы. Стандартный класс формы - `RubinForm`.
+
+=== Пример
+
+Вот пример формы:
+
+	$ret = $app->view->create(q{<% CALL
+		class SimpleForm inherits RubinForm
+			sub fields
+				self.add("search" => "line").min_length(1, "введите значение!").placeholder("введите что-то")
+			end
+			sub allow* then 1
+			sub success*,* then 
+		end
+	%>});
+
+При этом создаётся диспетчер **/simple/form** по которому можно отправить запрос к форме.
+
+А ещё форма реагирует на `@action`:
+
+	$app->q->action("/", {'@action' => "/simple/form", search => ""});
+	
+	$ret = $app->view->create(q{<% new SimpleForm %>});
+	
+	$ret;		#~ введите значение!
+	
+Тоесть, если указан параметр `@action`, то будет вызван обработчик формы, который вернёт ошибки с формы и значение `hasAllow`. Они будут присвоены новой форме, с совпадающим `uri`.
+	
+Форма имеет по умолчанию кнопку для отправки:
+
+	$ret;		#~ <button type="submit" id="SimpleForm-submit">
+
+Как только будет удалена форма из памяти, так же сразу будут удалены и её поля.
+
+	delete $app->q->{form};
+	0+keys %{$app->{_FORMS}};			# 0
+	0+keys %{$app->{_INPUTS}};			# 0
+	
+В `$app->q->{form}` хранится форма из параметра `@action` созданная и обработанная перед запросом.
+	
+== Отображение и сохранение формы
+	
+При сохранении формы, когда указан параметр `@action` форма будет сохранена перед отображением страницы.
+
+На странице форма может быть отображена, а может быть и нет: в зависимости от условий в шаблоне.
+
+Если она отображается, то её конструктор (`new`) вернёт уже созданную для сохранения форму.
+Если в форму передаются какие-то значения через конструктор или init, то форма считается совпавшей. Если не передаются, то так же считается совпавшей.
+То есть у форм, которые в списке должны передаваться инициализирующие параметры в `form:param_init` и они должны совпадать. Иначе форма не сможет отобразить ошибки.
+
+Вот схема показывающая, какие методы вызываются при сохранении формы:
+
+```
+#             save
+#              |
+#             init
+#              |
+#            check(1)
+#              |
+#    нет --- allow --- да
+#     |                 |
+#     |               check
+#     |                 |
+#     |              validate
+#     |                 |
+#     |         нет - isErrors - да
+#     |          |                |
+#     |        error          success
+#     |          |                |
+#     |          ---- complete ----
+#     |                  |
+#     --------------------
+#               |
+```
+
+`init`, `allow`, `validate`, `error`, `success` и `complete` - обработчики. Их можно переопределять в Вашей форме. В форме `RubinForm` они пустые.
+
+`init` нужен, чтобы установить инициализирующие переменные в ассоциативный массив `form:param_init`.
+
+`check` c параметром `1` (`check(1)`) считывает параметры (значение инпутов формы) с `allow` через `$app->q->param("параметр")` в хэш `form:param_allow`. Если параметр не передан, то он считывается из `form:param_init`.
+
+`allow` определяет разрешено ли сохранение формы. Если да, то `check` считывает оставшиеся параметры.
+
+`validate` позволяет провести дополнительную валидацию и через `form.addErrors` и `form.addError` вывести на форму ошибки.
+
+`isErrors` проверяет есть ли ошибки на форме, если есть, то запускается `error`, иначе - `success`. Ну и в любом случае после кого-нибуть из них запуститься `complete`.
+
+А эта схема показывает, какие методы вызываются при сохранении, а затем отображдении формы:
+
+```
+#             save
+#              |
+#             init
+#              |
+#            check(1)
+#              |
+#    нет --- allow --- да
+#     |                 |
+#     |               check
+#     |                 |
+#     |              validate
+#     |                 |
+#     |         нет - isErrors - да
+#     |          |                |
+#     |        error           success
+#     |          |                |
+#     |          ---- complete ----
+#     |                 |
+#     ------ start ------
+#              |
+#    нет - isErrors - да
+#     |               |
+#    view             |
+#     |               |
+#     ---- content ----
+#             |
+#           finish
+#             |
+#            end
+```
+
+Здесь добавился блок отображения формы.
+
+`start` вызывает `view`, позволяющий изменить параметры для отображения. 
+
+Однако это делается только в том случае, если не было ошибок. Если ошибки были, то нужно отобразить форму с теми параметрами, которые были введены.
+
+Перед `view` заново валидируются параметры для отображения. Их же значения переписываются и в `form:param`. Они берутся из инициализированных данных (`form:param_init`), а если там нет - из `input:meta:value`, т.е из свойства `value` метаинпута формы (которое устанавливается одноимённым методом).
+
+Отключить такое поведение можно методом `MOD` метаформы в `fields`. Тогда `view` запускаться не будет, а параметры - не будут заново валидироваться.
+
+Связанные с моделями параметры заполняются сами из модели.
+
+Затем выводится тег формы и начало обёрток, если они установлены методами `wrap` или `before` в `fields`.
+
+`content` выводит содержимое формы. Его можно переопределять, а так он выводит инпуты как они установлены в `fields` с их ошибками.
+
+`finish` нужен чтобы выполнить какие-то действия после отображения формы. Сам он ничего не делает, его следует переопределять.
+
+
+Ну и схема для формы которая просто отображается:
+
+```
+#             new
+#              |
+#             init
+#              |
+#            check(1)
+#              |
+#            allow
+#              |
+#            start
+#              |
+#             view
+#              |
+#           content
+#              |
+#            finish
+#              |
+#             end
+```
+
+	
+=== allow
+
+Метод `allow` должен вернуть `1` или `undef`.
+
+`1` - разрешает редактирование формы. При этом отображаются поля формы в виде инпутов. И сработает запрос к форме.
+
+Если `allow` не разрешит редактировать форму, то форма отобразится для просмотра.
+
+	$app->view->create(q{<% CALL
+		class AllowForm inherits RubinForm
+			sub fields
+				self.add("allow" => "hidden").allow
+				self.add("search" => "line").default("67")
+			end
+			sub allow* then allow
+			sub success*,* then 
+		end
+	%>});
+	
+	$app->q->action("/", {'@action' => "/allow/form", allow => 0});
+	
+	$ret = $app->view->create(q{<% new AllowForm %>});
+	
+	$ret;		#~ нет прав
+	$ret;		#~ <span id="AllowForm-search">67</span>
+	
+	$app->q->action("/", {'@action' => "/allow/form", allow => 1, search => 66});
+	
+	$ret = $app->view->create(q{<% new AllowForm %>});
+	
+	$ret;		#~ <input id="AllowForm-search" name="search" value="67">
+
+
+=== Allow-параметры
+
+При сохранении формы параметры берутся из POST-параметров, если форма POST и из GET-параметров, если форма GET.
+
+	$app->view->create(q{<% CALL
+		class AllowParamForm inherits RubinForm
+			sub fields
+				self.add("allow" => "hidden").id2.allow
+				self.add("search" => "line").default("67")
+			end
+			sub allow* then allow
+			sub success*,* then 
+		end
+	%>});
+
+	$app->q->action("/im1_1?id2=1", {'@action' => "/allow/param/form"});
+	
+	$ret = $app->view->create(q{<% new AllowParamForm %>});
+	
+	$ret;		#~ нет прав
+	$ret;		#~ <span id="AllowParamForm-search">67</span>
+
+При отображении формы allow-параметры формы берутся из IDS-параметров.
+
+	$app->q->action("/im1_1");
+	
+	$ret = $app->view->create(q{<% new AllowParamForm %>});
+	
+	$ret;		#!~ нет прав
+	$ret;		#~ <input id="AllowParamForm-search" name="search" value="67">
+
+При сохранении формы через линк или ajax параметры беруться из `q.param` (то есть из `q.ids`, `q.get` и `q.post`):
+
+	# $app->q->action(AllowParamForm->new(allow=>1)->href);
+
+=== Ошибки на форме
+	
+	$ret = $app->view->create(q{<% CALL
+		class ErrorForm inherits RubinForm
+			sub fields
+				self.add("search" => "line").min_length(1,"введите значение!").placeholder("введите что-то")
+				self.add("myid" => "hidden").undef.need("не передано значение")
+			end
+			sub allow* then 1
+			sub success*,* then 
+		end
+	%>});
+	
+	$app->q->action("/", {'@action' => "/error/form", search=>""});
+	
+	$ret = $app->view->create(q{<% GET
+		new ErrorForm
+	%>});
+	
+	$ret;		#~ введите значение!
+	$ret;		#!~ введите значение![^\f]*введите значение!
+	
+	$ret;		#~ не передано значение
+	$ret;		#!~ не передано значение[^\f]*не передано значение
+
+Ошибки выводятся в конце формы, если не были выведены до этого:
+	
+	$app->view->create(q{<% sub content class ErrorForm %>
+
+		$self.search
+
+	<% end %>});
+	
+	$app->q->action("/", {'@action' => "/error/form", search=>""});
+	
+	$ret = $app->view->create(q{<% new ErrorForm %>});
+	
+	$ret;		#~ введите значение!
+
+И только один раз:
+	
+	$ret;		#!~ введите значение![^\f]*введите значение!
+	
+	
+== init-параметры или много одинаковых форм на странице
+
+Формы должны отличаться своими инициализирующими параметрами, переданными в конструктор или установленными методом init.
+Если у отображаемой формы они есть, то они сверяются с параметрами в сохранённой форме и если они совпали, то возвращается сохранённая форма. При этом сохранённой форме будут проставлены init-параметры отображаемой формы для `view`.
+
+	$ret = $app->view->create(q{<% CALL
+		class ManyForm inherits RubinForm
+			sub fields
+				self.add("many" => "hidden").natural("не натуральное число")
+				self.add("hi" => "line")
+			end
+			sub allow* then 1
+			sub success*,* then 
+		end
+	%>});
+	
+	$app->q->action("/", {'@action' => "/many/form", many=>-3, hi=>6});
+	
+	$ret = $app->view->create(q{
+		<% new ManyForm(many=>1, hi=>2) %>
+		<% new ManyForm(many=>-3, hi=>6) %>
+	});
+	
+	$app->q->{form}->isErrors;								# 1
+	$app->q->{form}->hasError("не натуральное число");		# 1
+	
+	$ret;		#~ ManyForm[^\f]*ManyForm1[^\f]*не натуральное число
+	$ret;		#~ <input type="hidden" name="many" value="-3">
+	$ret;		#~ <input id="ManyForm1-hi" name="hi" value="6">
+
+	
+== Формы моделей
+
+У любой модели с методом `owner`, возвращающим владельца модели, может быть порождена своя форма методом `form` модели.
+
+	# $app->meta->fieldset("author")->
+		# col("name" => "string(4)")->default("123")
+	# sync;
+
+	# $ret = $app->view->create(q{
+		# <% app.model.author(undef).as_form %>
+	# });
+	
+	# $ret;		#~ <form .*>
+	# $ret;		#~ <input type="hidden" name="@action" value="/any/model/form">
+	# $ret;		#~ <input type="hidden" name="@model" value="author">
+	# $ret;		#~ <input id="AnyModelForm-name" name="name" value="123">
+	
+	# $app->q->action("/", {'@action' => "/any/model/form", '@model'=>"author", name=>"Лев Толстой"});
+	
+	# $ret = $app->view->create(q{
+		# <% app.model.author(undef).as_form %>
+	# });
+	
+	# $ret;		# <form name="AnyModelForm".*>
+	# $ret;		#~ <input type="hidden" name="@model" value="author">
+	# $ret;		#~ <input id="AnyModelForm-name" name="name" value="Лев Толстой">
+	# $ret;		#~ много букоф
+	
+	
+== Создаём свои атрибуты инпутов
+
+== Создаём свои чекеры
+	
+Чекеры создаются из класса 
+	
+== Теги
+
+У формы есть функции, которые устанавливают . `pre`, `post`, `after`, `before`, `each`
+
+	
+	
+=== label
+	
+
+
+	
+	
+	
+=== ChForm
+
+
+
+== Обёртки
+
+Форму и инпуты можно обернуть в дополнительные теги.
+
+
+	$app->view->create(q{<% CALL
+		class InputsWrapForm inherits RubinForm
+			sub fields
+				self.add("allow" => "hidden").allow
+				self.add("search" => "line").wrapin("s").wrapsh("abbr").wrap("i")
+			end
+			sub allow* then allow
+			sub success*,* then 
+		end
+	%>});
+	
+	$app->q->action("/", {'@action' => "/inputs/wrap/form", allow => 0});
+	
+	$ret = $app->view->create(q{<% new InputsWrapForm %>});
+	
+	$ret;		#~ <i><abbr>\s*<span id="InputsWrapForm-search"></span>\s*</abbr></i>
+	
+	$app->q->action("/", {'@action' => "/inputs/wrap/form", allow => 1});
+	
+	$ret = $app->view->create(q{<% new InputsWrapForm %>});
+	
+	$ret;		#~ <i><s>\s*<input id="InputsWrapForm-search" name="search" value="">\s*</s></i>
+	
+	
+	
+	$app->view->create(q{<% CALL
+		class TestWrapForm inherits RubinForm
+			sub fields
+				# окружает тег формы
+				self.wrapin("s.s").wrapsh("abbr.s").wrap("i.s")
+				# окружает контент формы
+				self.innerin("s.x").innersh("abbr.x").inner("i.x")
+				# добавляет перед открывающим тегом формы
+				self.pre("m").prein("m1").presh("m2")
+				# добавляет после закрывающего тега формы
+				self.post("r").postin("r1").postsh("r2")
+				# добавляет после открывающего тега формы
+				self.before("y").beforein("y1").beforesh("y2")
+				# добавляет перед закрывающим тегом формы
+				self.after("z").afterin("z1").aftersh("z2")
+				
+				self.add("allow" => "hidden").allow
+				self.add("name" => "line")
+			end
+			sub allow* then allow
+			sub success*,* then 
+		end
+	%>});
+	
+	$app->q->action("/", {'@action' => "/test/wrap/form", allow => 0});
+	
+	$ret = $app->view->create(q{<% new TestWrapForm %>});
+	
+	$ret;		#~ <m></m><i class="s">\s*<m2></m2><abbr class="s">\s*<div name="TestWrapForm">\s*<y2></y2><abbr class="x">\s*<y></y><i class="x">
+	$ret;		#~ </i><z></z></abbr><z2></z2></div></abbr><r2></r2></i><r>
+	
+Можно указать форме обернуть все инпуты.
+	
+	$app->view->create(q{<% CALL
+		class EachWrapForm inherits RubinForm
+			sub fields
+				self.each("x").eachin("y").eachsh("z")
+				self.add("allow" => "hidden").allow
+				self.add("name" => "line")
+				self.add("desc" => "line")
+			end
+			sub allow* then allow
+			sub success*,* then 
+		end
+	%>});
+	
+	$app->q->action("/", {'@action' => "/each/wrap/form", allow => 0});
+	
+	$ret = $app->view->create(q{<% new EachWrapForm %>});
+	
+	$ret;		#~ <x><z>\s*<span id="EachWrapForm-name"></span>\s*</z></x>
+	$ret;		#~ <x><z>\s*<span id="EachWrapForm-desc"></span>\s*</z></x>
+	
+	$app->q->action("/", {'@action' => "/each/wrap/form", allow => 1});
+	
+	$ret = $app->view->create(q{<% new EachWrapForm %>});
+	
+	$ret;		#~ <x><y>\s*<input id="EachWrapForm-name" name="name" value="">\s*</y></x>
+	$ret;		#~ <x><y>\s*<input id="EachWrapForm-desc" name="desc" value="">\s*</y></x>
+	
+Ещё одна возможность: обернуть группу инпутов.
+Тут метод `wrap` открывает свои новые возможности.
+Она имеет три необязательных параметра и 4-м .
+
+	$app->view->create(q{<% CALL
+		class TestingWrapForm inherits RubinForm
+			sub fields
+				self.add("allow" => "hidden").allow
+				
+				self.wrap "s" do then
+				
+				self.add("bef" => "line")
+				
+				self.wrap "x", "y", "z" do
+					self.add("name" => "line")
+					self.add("desc" => "line")
+				end
+				
+				self.add("fin" => "line")
+			end
+			sub allow* then allow
+			sub success*,* then 
+		end
+	%>});
+	
+	$app->q->action("/", {'@action' => "/testing/wrap/form", allow => 0});
+	
+	$ret = $app->view->create(q{<% new TestingWrapForm %>});
+
+	$ret;		#~ <s>\s*</s>
+	$ret;		#~ <x><z>\s*<span id="TestingWrapForm-name"></span>\s*<span id="TestingWrapForm-desc"></span>\s*</z></x>
+	
+	$app->q->action("/", {'@action' => "/testing/wrap/form", allow => 1});
+	
+	$ret = $app->view->create(q{<% new TestingWrapForm %>});
+
+TODO: убрать \s* из <s>\s*</s> и посмотреть что за фигня твориться?
+	
+	$ret;		#~ <s>\s*</s>
+	$ret;		#~ <x><y>\s*<input id="TestingWrapForm-name" name="name" value="">\s*<input id="TestingWrapForm-desc" name="desc" value="">\s*</y></x>
