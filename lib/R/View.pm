@@ -36,8 +36,9 @@ sub new {
 		metafilter => $app->ini->{design}{metafilter},	# наименования дефолтных метафильтров
 		metafilters => [],		# метафильтры
 		meta => {},				# данные метафильтров - очищаются при завершении шаблона
-		INC => {},				# подключённые шаблоны и файлы кода
+		INC => {},				# подключённые шаблоны и файлы кода => класс
 		inc => ["."],			# пути в которых искать шаблоны и файлы кода
+		class => {},			# скомпилированный класс
 	}, ref $cls || $cls;
 }
 
@@ -303,20 +304,20 @@ my $re_gosub_after = qr{
 
 
 my $re_masking = qr{
-	(?<=[\w\}\]\)"'\+\-!])$re_rem(?P<endline>$re_endline) |
-	$re_rem(?P<endline_then>$re_endline) |
+	(?<=[\w\}\]\)"'\+\-!])$re_rem(?P<endline>$re_endline) (?{ $self->{lineno}++ }) |
+	$re_rem(?P<endline_then>$re_endline) (?{ ; $self->{lineno}++ }) |
 	
-	(?P<sepexpression> ;) |
+	(?P<sepexpression> ;) (?{ &stmt_sepexpression }) |
 	
-	" (?P<QR> (?:[^"]|\\")* ) "! (?P<qr_args> \w+ )? |
+	" (?P<QR> (?:[^"]|\\")* ) "! (?P<qr_args> \w+ )? (?{ &stmt_qr }) |
 	
-	(?P<array> \[ ) |
-	(?P<hash> \{ ) |
-	(?P<group> \( ) |
-	(?P<end_tag> [\}\]\)] ) |
+	(?P<array> \[ ) 				(?{ &stmt_array }) |
+	(?P<hash> \{ ) 					(?{ &stmt_hash }) |
+	(?P<group> \( ) 				(?{ &stmt_group }) |
+	(?P<end_tag> [\}\]\)] ) 		(?{ &stmt_end_tag }) |
 	
-	(?P<string>$re_string) |
-	(?P<func>$re_id)\( |
+	(?P<string>$re_string) 			(?{ &stmt_string }) |
+	(?P<func>$re_id)\( 				(?{ &stmt_func }) |
 	(?P<key>$re_id) $re_space_ask => |
 	
 	(?P<method>\.\$|[\.:\$]|::)(?P<m_id>$re_id)(?P<m_sk> $re_sk | \( ) |
@@ -1177,6 +1178,8 @@ sub stmt_class {
 		$end = join "", $end, $obegin, $with_args, $oend;
 	}
 	
+	$self->{class}{$cls} = 1;
+	
 	$end = join "", $end1, $end, $end2;
 	
 	$self->push(stmt => ($its_module? "module": "class"), class_name => $cls, end => $end, @_);
@@ -1601,31 +1604,40 @@ sub scenario {
 }
 
 # подключает скрипт, написанный на R::View
+# получает путь к скрипту
+# возвращает класс
 sub require {
-	my ($self, $lukull) = @_;
+	my ($self, $class) = @_;
 	
-	return $lukull if exists $self->{INC}{$lukull};
+	return $class if exists $self->{class}{$class};
 	
+	local ($`, $', $&);
+	my $ag = $class;
+	$ag =~ s!::!/!g;
+	$ag .= ".ag";
+	
+	# перебираем пути в которых ищем скрипт
 	for my $path (@{$self->{inc}}) {
-		my $file = "$path/$lukull";
+		my $file = "$path/$ag";
 		next if !-e $file;
-		my $cc = $app->file($file)->ext("lukull.pm")->path;
+		my $cc = $app->file($file)->ext("ag.pm")->path;
 		if(!-e $cc or -M $cc > -M $file) {
-			$self->parsefile($file, $cc);
+			#$self->parsefile($file, $cc);
+			$app->file($cc)->write( $self->masking( join "", "class $class ", $app->file($file)->read, " end" ) );
 		}
 		
 		require $cc;
 		
-		$self->{INC}{$lukull} = 1;
+		die "после подключения файла `" . $file . "` класс не появился" if !exists $self->{class}{$class};
 		
-		my $package = $app->file($lukull)->exts("")->path;
-		local ($`, $', $&);
-		$package =~ s!/!::!g;
+		#$self->{INC}{$ag} = $class;
 		
-		return $package;
+		# TODO: тут нужно подгрузить все классы, к-х нет, но которые используются в файле
+		
+		return $class;
 	}
 	
-	die "Файл `$lukull` не найден";
+	die "Файл `$ag` не найден";
 }
 
 
