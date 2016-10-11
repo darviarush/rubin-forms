@@ -246,8 +246,15 @@ sub mkage {
 	my $ag = $app->file("$dir/ag");
 	my $age = $app->file("$dir/age");
 	my $al = $app->file("$dir/al");
+	my @is;
 	
+	push @is, "ag" if $ag->exists;
+	push @is, "age" if $age->exists;
+	push @is, "al" if $al->exists;
 	
+	if(@is) {
+		return if !$app->tty->confirm("Файлы ". join(", ", @is) ." уже существуют, перезаписать?");
+	}
 	
 	# запустить указанный файл, если без параметров - то запускает сервер
 	$ag->write('#!'.$^X. $app->copiright->file . '
@@ -255,7 +262,7 @@ BEGIN { push @INC, \''.$path.'\' }
 use common::sense;
 use R::App;
 
-$app->view->require($ARGV[0]);
+$app->view->require($_) for @ARGV;
 $app->view->init_classes;
 
 ')->mod(0744);
@@ -289,7 +296,7 @@ if( $app->file("Aquafile")->isfile ) {
 $app->make->run;
 ')->mod(0744);
 
-	print "ag, age, al созданы\n";
+	print "ag, age, al ".(@is? "перезаписаны": "созданы")."\n";
 }
 
 

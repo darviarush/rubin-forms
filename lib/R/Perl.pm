@@ -16,6 +16,25 @@ sub new {
 	}, $cls;
 }
 
+# проверяет - существует ли указанный класс
+sub exists {
+	my ($self, $class) = @_;
+	
+	my $path = \%{"main::"};
+	for my $x (split /::/, $class) {
+		my $key = "${x}::";
+		return if !exists $path->{$key};
+		$path = $path->{$key};
+	}
+	
+	# если в классе есть хоть одна переменная или функция, то он - существует
+	while(my($k, $v) = each %$path) {
+		return 1 if $k !~ /::$/;
+	}
+	
+	return;
+}
+
 # возвращает количество ссылок на значение. Разыменовывает ссылку
 sub refcnt {
 	my $ref = reftype($_[1]);
