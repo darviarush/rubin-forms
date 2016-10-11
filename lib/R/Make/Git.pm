@@ -76,4 +76,30 @@ sub to {
 	
 }
 
+name "dist";
+args "";
+desc "пушит все из этого каталога и всех каталогов в каталоге выше";
+sub dist {
+	my $root = $app->file("..")->abs;
+	
+	$app->tty->raw;
+	
+	$root->sub("/*")->glob("-d")->then(sub {
+		$_->chdir, msg1(":red", $_->path), print(`git add .; git commit -am dist; git pull --no-edit && git push`), $root->chdir if $_->sub("/.git")->isdir;
+	});
+}
+
+name "pullall";
+args "";
+desc "обновляет все каталоги на каталог выше";
+sub pullall {
+	my $root = $app->file("..")->abs;
+	
+	$app->tty->raw;
+	
+	$root->sub("/*")->glob("-d")->then(sub {
+		$_->chdir, msg1(":red", $_->path), print(`git add .; git commit -am pullall; git pull --no-edit`), $root->chdir if $_->sub("/.git")->isdir;
+	});
+}
+
 1;

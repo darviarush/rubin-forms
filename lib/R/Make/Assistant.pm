@@ -243,8 +243,14 @@ sub mkage {
 	my $path = $app->file(__FILE__)->file("")->sub("/../../")->abs->path;
 	$path =~ s/'/\\'/g;
 	
+	my $ag = $app->file("$dir/ag");
+	my $age = $app->file("$dir/age");
+	my $al = $app->file("$dir/al");
+	
+	
+	
 	# запустить указанный файл, если без параметров - то запускает сервер
-	$app->file("$dir/ag")->write('#!'.$^X. $app->copiright->file . '
+	$ag->write('#!'.$^X. $app->copiright->file . '
 BEGIN { push @INC, \''.$path.'\' }
 use common::sense;
 use R::App;
@@ -255,7 +261,7 @@ $app->view->init_classes;
 ')->mod(0744);
 
 	# выполнить выражение с командной строки
-	$app->file("$dir/age")->write('#!'.$^X. $app->copiright->file . '
+	$age->write('#!'.$^X. $app->copiright->file . '
 BEGIN { push @INC, \''.$path.'\' }
 use common::sense;
 use R::App;
@@ -267,7 +273,7 @@ $app->log->info( $app->view->eval(@ARGV) );
 	# Al2O3, al2o3
 
 	# мэйк
-	$app->file("$dir/al")->write('#!'.$^X. $app->copiright->file . '
+	$al->write('#!'.$^X. $app->copiright->file . '
 BEGIN { push @INC, \''.$path.'\' }
 use common::sense;
 use R::App;
@@ -286,17 +292,6 @@ $app->make->run;
 	print "ag, age, al созданы\n";
 }
 
-
-name "dist";
-args "";
-desc "пушит все из этого каталога и всех каталогов в каталоге выше";
-sub dist {
-	my $root = $app->file("..")->abs;
-	
-	$root->sub("/*")->glob->grep("-d")->then(sub {
-		$_->chdir, msg1(":red", $_->path), print(`git add .; git commit -am dist; git pull --no-edit && git push`), $root->chdir if $_->sub("/.git")->isdir;
-	});
-}
 
 
 1;
