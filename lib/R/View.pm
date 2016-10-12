@@ -32,7 +32,7 @@ sub new {
 		trace => "view/classes/input1.html",				# шаблон трейс которого показать
 		lineno => 1,			# номер строки в текущем файле
 		INHERITS => undef,		# вспомогательная для шаблонов
-		lang => $app->viewPerl->new,	# драйвер текущего языка
+		_lang => undef,	# драйвер текущего языка
 		metafilter => $app->ini->{design}{metafilter},	# наименования дефолтных метафильтров
 		metafilters => [],		# метафильтры
 		meta => {},				# данные метафильтров - очищаются при завершении шаблона
@@ -44,13 +44,16 @@ sub new {
 
 # устанавливает язык
 sub lang {
-	if(@_ == 1) { shift->{lang} } else {
+	if(@_ == 1) {
+		my $self = shift;
+		$self->{_lang} // $self->lang("perl")->{_lang}
+	} else {
 		my ($self, $lang) = @_;
-		if(ref $lang) { $self->{lang} = $lang } else {
-			if($lang eq "js") { $self->{lang} = $app->viewJavascript->new }
-			elsif($lang eq "perl") { $self->{lang} = $app->viewPerl->new }
-			else { die "неизвестный язык $lang" }
-		}
+	
+		if($lang eq "js") { $self->{lang} = $app->use("R::View::Javascript") }
+		elsif($lang eq "perl") { $self->{lang} = $app->use("R::View::Perl") }
+		else { die "неизвестный язык $lang" }
+
 		$self
 	}
 }
@@ -306,15 +309,11 @@ my $re_gosub_after = qr{
 my %CloseTag = qw/ ( ) { } [ ] /;
 
 sub masking {
-	my ($self, $expirience, $with_open_sk) = @_;
+	my ($self) = @_;
 	local ($&, $_, $`, $');
 	
-	if(!$with_open_sk) {
-		my $class_name = $self->etop->{class_name};
-		$self->push(stmt => "masking", ($class_name? (class_name => $class_name): ()));
-	}
 	
-	while($expirience =~ m{
+	while($_[1] =~ m{
 	
 	(?<=[\w\}\]\)"'\+\-!])$re_rem(?P<endline>$re_endline) (?{ $self->stmt_endline; $self->{lineno}++ }) |
 	$re_rem(?P<endline_then>$re_endline) (?{ $self->{lineno}++ }) |
@@ -346,6 +345,11 @@ sub masking {
 		app			 						(?{ $self->code('app') }) 	|
 		q		 	(?{ $self->code('q') }) 	|
 		user 		(?{ $self->code('user') })  |
+		FOR			(?{ $self->push("for", then=>1) })  |
+		IN			(?{ $self->check("for", then=>1)->code("in") })  |
+		OF			(?{ $self->check("for", then=>1)->code("of") })  |
+		TO			(?{ $self->check("for", then=>1)->code("to") })  |
+		STEP		(?{ $self->check("for", then=>1)->code("step") })  |
 		WHILE		(?{ $self->push('while', then=>1) }) |
 		REPEAT		(?{ $self->push('repeat', noend=>1) }) |
 		UNTIL		(?{ $self->pop('repeat')->push('until', endline=>1) }) |
@@ -381,8 +385,6 @@ sub masking {
 	\b (?P<try> try ) \b		(?{ $self->push('try') })  |
 	\b (?P<catch> catch ) (?: $re_space (?P<catch_var> $re_id) (?: $re_space AS $re_space (?P<catch_isa> $re_class (?: $re_space_ask , $re_space_ask $re_class )* )? )? )? 
 			(?{ $self->check(stmt=>"try")->code('catch') }) |
-			
-	\b FOR $re_space $re_for		(?{ $self->stmt_for })  |
 	
 	\b ON $re_space (?P<route>$re_string) 		(?{ $self->push('on', route=>$app->perl->unstring($+{route})) })  |
 	
@@ -398,19 +400,19 @@ sub masking {
 	\b NEW $re_space (?P<new>$re_id(?:::$re_id)*)		(?{ $self->code('new') })  |
 
 	
-	\@(?P<unarray> $re_id(?:[\.:]$re_id)* (?P<sk>$re_sk)? | \{ ) |
-	%(?P<unhash> $re_id(?:[\.:]$re_id)* (?P<sk>$re_sk)? | \{ ) |
+	\@		(?{ $self->code('unarray') }) |
+	%		(?{ $self->code('unhash') })  |
 	
 	(?P<gosub>$re_id) $re_gosub_after		(?{ $self->push("gosub", gosub=>1, endline=>1) })  |
 	
 	(?P<var>$re_id)			(?{ $self->stmt_var })  |
-	(?P<num>$re_number)		(?{ $self->code('number') })  |
+	(?P<num>$re_number)		(?{ $self->code('num') })  |
 	
 	# (?P<outdoor> %> ) |
 	
 	=>	(?{ $self->code('ass_delim') })  |
 	(?P<operator> //= | // | \|\|= | \|\| | &&= | && | <<= | >>= | << | >> | <=> | =~ | !~ | \+\+ | -- | ~~ | \*= | \+= | -= | /= | == | != | <= | >= | < | > | ! | - | \+ | \* | / | \^ | ~ | % | \.\.\. | \.\. | \.= | \. | \? | : )
-		(?{ $self->code('oprator') })  |
+		(?{ $self->code('operator') })  |
 	=		(?{ $self->{_assign} = 1; $self->code('assign') })  |
 	, 		(?{ $self->code('comma') })  |
 	(?P<space> $re_space) | # ничего не делаем, если пробелы
@@ -418,18 +420,7 @@ sub masking {
 	
 	}gsxiom) {}
 	
-	$self->{_assign} = 0, $_[3] = 1 if $self->{_assign};
-	
-	if(!$with_open_sk) {
-		my $end = $self->endline;
-		
-		$self->check(stmt => "masking");
-		$self->pop;
-
-		join "", $expirience . $end;		
-	} else {
-		$expirience
-	}
+	$self
 }
 
 # конец строки
@@ -562,14 +553,14 @@ sub endgosub {
 	$self
 }
 
-# выбрасывает унарные операции
-sub endunary {
-	my ($self) = @_;
-	while($self->etop->{unary}) {
-		$self->pop;
-	}
-	$self
-}
+# # выбрасывает унарные операции
+# sub endunary {
+	# my ($self) = @_;
+	# while($self->etop->{unary}) {
+		# $self->pop;
+	# }
+	# $self
+# }
 
 
 
@@ -599,16 +590,16 @@ sub replace_dollar {
 
 }
 
-# аналог parse для кода, а не шаблона
-sub mask {
-	my ($self, $expirience) = @_;
-	#$self->push(stmt=>"mask");
-	$expirience = $self->masking($expirience);
-	$expirience = $self->{lang}->expirience($expirience);
-	#$self->check(stmt=>"mask");
-	#$self->pop;
-	$expirience
-}
+# # аналог parse для кода, а не шаблона
+# sub mask {
+	# my ($self, $expirience) = @_;
+	# #$self->push(stmt=>"mask");
+	# $expirience = $self->masking($expirience);
+	# $expirience = $self->{lang}->expirience($expirience);
+	# #$self->check(stmt=>"mask");
+	# #$self->pop;
+	# $expirience
+# }
 
 # парсит из строки шаблон и возвращает пакет perl
 sub parse {
@@ -620,11 +611,10 @@ sub parse {
 	$self->{stack} = [];
 	$self->{lineno} = 1;
 	$self->{INHERITS} = undef;
-	$self->{lang}{view} = $self;
 	
 	my $class = $self->get_name($name);
 	
-	$self->push(stmt=>"template", class=>$class);
+	$self->push("TEMPLATE", class=>$class, block => "__RENDER__");
 	
 	# если указаны метафильтры - фильтруем
 	my $metafilter = $self->{metafilters};
@@ -634,23 +624,11 @@ sub parse {
 	
 	my $prev;	# предыдущая лексема или undef
 	
-	my $re_expression = qr{
-		(?P<ex_html> .*? )
-	
-		(?:
-			<% $re_space_ask (?P<ex_stmt> .*? ) %> |
-			\$(?P<ex_id>$re_id([\.:]$re_id)*) |
-			<\*\*\* (?P<ex_comment>.*?) \*\*\*> |
-			$
-		)
-	}isx;
-	
-	my $expression = sub {
-	
-		my $html = $+{ex_html};
-	
-		if(length $html) {
+	my $tmpl_html = sub {
+		my $html = $+{html};
+		{
 			local(%+);
+			
 			$self->{lineno} += $app->perl->lines($html);
 		
 			for my $filter (@$metafilter) {
@@ -659,50 +637,135 @@ sub parse {
 			
 			$prev = $html;
 			$html =~ s/['\\]/\$&/g;
+			$self->code('HTML', html=>$html);
 		}
-	
-		$html .
-		(exists $+{ex_stmt}? $self->expression($+{ex_stmt}):
-		exists $+{ex_id}? do {
-			my $expression = $self->masking($+{ex_id});
-			my ($begin, $end) = $self->{lang}->v_escape;
-			join "", $begin, $expression, $end
-		}:
-		exists $+{ex_comment}? do {
-			my $i = $app->perl->lines($+{ex_comment});
-			$self->{lineno} += $i;
-			my ($begin, $end) = $self->{lang}->v_in;
-			join "", $begin, ("\n" x $i), $end
-		}:
-		"");
+		undef
 	};
 	
-	$buf =~ s{ $re_expression }{ $expression->() }isgxe;
+	while( $buf =~ m{
+	
+	(?<html> .*? )		(?{ $tmpl_html->() if length $+{html} }) 
+
+	(?:
+	
+		<% $re_space_ask GET \b				(?{ $self->push('GET')->masking($buf)->pop('GET') })   |
+		
+		
+		\$(?<id>$re_id([\.:]$re_id)*) 		(?{ $self->push('GET')->masking($+{id})->pop('GET') }) |
+		<\*\*\* (?<comment>.*?) \*\*\*>		(?{ $self->{lineno} += my $i = $app->perl->lines($+{comment}); $self->code('COMMENT', lines=>("\n" x $i)) }) |
+		$
+	)
+	
+	}isgx ) {}
 	
 	# у темплейта не должно быть завершающего end
-	$self->check(stmt => "template");
+	$self->check(stmt => "TEMPLATE");
 	
 	$self->error("стек не пуст: нет <% end " . $self->top(1)->{stmt} . " %>") if @{$self->stack}>1;
 	
-	my $inherits = delete $self->{INHERITS};
-	
-	my @inherits = split /\s+/, $inherits;
-	@inherits = map { $self->get_name($_) } @inherits;
-	
-	# код, который выполниться при загрузке скрипта
+	# # код, который выполниться при загрузке скрипта
 	my $begin = $self->{begin};
-	my $begin = @$begin? do { my $ret = " " . join "", @$begin; @$begin = (); $ret }: "";
+	$self->top->{begin} = @$begin? do { my $ret = " " . join "", @$begin; @$begin = (); $ret }: "";
 	
-	my ($begin, $end) = $self->{lang}->template($class, \@inherits, $begin);
-	my ($v_in_begin, $v_in_end) = $self->{lang}->v_in;
-	
-	$buf = $self->{lang}->expirience(join "", $begin, $v_in_end, $buf, $v_in_begin, $end);
+	my $out = $self->expirience;
 	
 	$self->pop;
 	
 	%{$self->{meta}} = ();
 	
-	$buf
+	$out
+}
+
+
+# возвращает шаблоны языка
+sub get_lang_modifiers {
+	my ($self) = @_;
+	
+	my $cache = $self->lang . "::modifiers";
+	return \%$cache;
+}
+
+
+# возвращает шаблоны языка
+sub get_lang_templates {
+	my ($self) = @_;
+	
+	my $cache = $self->{lang} . "::cashe_templates";
+	return \%$cache if %$cache;
+	
+	my $c = \%$cache;
+	
+	my $key = $self->lang . "::templates"
+	
+	while(my ($key, $val) = each %$key) {
+		$val =~ s/'/\\'/g;
+		$val =~ s/\{\{\s*(\w+)\s*\}\}/', \$_->{$1} ,'/g;
+		
+		$c->{$key} = eval "sub { join '', '$val' }";
+	}
+
+	$c
+}
+
+
+
+# осуществляет два прохода по дереву кода и формирует код
+sub expirience {
+	my ($self) = @_;
+	
+	die "expirience: в стеке должен быть 1-н элемент" if @{$self->{stack}} != 1;
+	
+	# обход в глубину - модификации дерева
+	my $modifiers = $self->get_lang_modifiers;
+	my @path = $self->top;
+	while(@path) {
+		my $node = $path[$#path];
+		
+		# вызываем модификатор, если мы на элементе впервые
+		if(!exists $node->{"&"}) {
+			my $fn = $modifiers->{$node->{stmt}};
+			$fn->($self, $node, \@path) if $fn;
+		}
+		
+		my $code = $node->{code};
+		if($code && $node->{"&"} < @$code) {	# на подэлемент
+			push @path, $code->{ $node->{"&"}++ };
+		}
+		else {
+			pop @path;		# удаляем элемент
+		}
+	}
+	
+	# формирование кода из шаблонов
+	my $templates = $self->get_lang_templates;
+	my $out;
+	my @path = $self->top;
+	while(@path) {
+		my $node = $path[$#path];
+		
+		my $code = $node->{code};
+		if($code && $node->{"#"} < @$code) {	# на подэлемент
+			push @path, $code->{ $node->{"#"}++ };
+		}
+		else {
+			$_ = pop @path;		# удаляем элемент
+			
+			$_->{code} = join "", @$code if $code;
+			
+			my $template = $templates->{ $_->{stmt} };
+			die "нет шаблона $_->{stmt} в языке $self->{lang}" if !$template;
+			
+			if(@path) {
+				my $parent = $path[$#path];
+				$parent->{code}[$parent->{"#"}-1] = $template->();
+			}
+			else {
+				$out = $template->();
+			}
+		}
+	}
+	
+	$out
 }
 
 
@@ -930,13 +993,13 @@ sub expression {
 	$RET
 }
 
-# начало цикла
-sub stmt_for {
-	my ($self) = @_;
-	$self->error("for k, v, i можно использовать только с of") if $+{for_i} && !$+{for_of};
-	$self->push("for", then=>1);
-	$self
-}
+# # начало цикла
+# sub stmt_for {
+	# my ($self) = @_;
+	# $self->error("for k, v, i можно использовать только с of") if $+{for_i} && !$+{for_of};
+	# $self->push("for", then=>1);
+	# $self
+# }
 
 # возвращает текущий класс по стеку
 sub current_class {
@@ -968,12 +1031,12 @@ sub current_sub {
 
 
 
-# добавляет ; для вывода, если есть выражение
-sub masking_quote {
-	my ($self, $masking) = @_;
-	my $masking = $self->masking($masking);
-	return $masking =~ /^\s*$/? $masking: "$masking;";
-}
+# # добавляет ; для вывода, если есть выражение
+# sub masking_quote {
+	# my ($self, $masking) = @_;
+	# my $masking = $self->masking($masking);
+	# return $masking =~ /^\s*$/? $masking: "$masking;";
+# }
 
 # возвращает название блока
 sub get_name {
