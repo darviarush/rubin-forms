@@ -11,9 +11,13 @@ sub new {
 	my ($cls) = @_;
 	bless {
 		name => "perl",
-		tree => 0,
 	}, ref $cls || $cls;
 }
+
+my %template = (
+sepexpression => ";",
+);
+
 
 # заменяет спецсимволы в строке
 sub escape_string {
