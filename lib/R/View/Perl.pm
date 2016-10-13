@@ -43,6 +43,8 @@ array => '[ {{ code }} ]',
 hash => '{ {{ code }} }',
 group => '( {{ code }} )',
 
+gosub => '->( {{ code }} )',
+key => '{{ key }} => ',
 
 ";" => '; ',
 "," => ', ',

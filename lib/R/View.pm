@@ -433,10 +433,10 @@ sub stmt_endline {
 		$self->code("then");
 	}
 	elsif($top->{stmt} eq "array" || $top->{stmt} eq "hash" || $top->{stmt} eq "group") {
-		$self->endunary->code(",");
+		$self->code(",", operator=>",");
 	}
 	else {
-		$self->code("endline");
+		$self->code("endline", operator=>1);
 	}
 
 	$self
@@ -1107,7 +1107,7 @@ sub trace {
 		delete @$after{qw/stmt e code/};
 		my @after = pairmap { "$a=$b" } %$after;
 		
-		$app->log->info( ":space", "$self->{lineno}:", ($op eq "+"? ":red": $op eq "-"? ":bold blue": ":dark white"), $op, $stmt, ":reset", @after );
+		$app->log->info( ":space", "$self->{lineno}:", ($op eq "+" || $op eq "↑"? ":red": $op eq "-"? ":bold blue": ":dark white"), $op, $stmt, ":reset", @after );
 	}
 	
 	$self
@@ -1147,11 +1147,18 @@ sub code_add {
 	
 	# преобразуем переменную или незакончившийся вызов метода в gosub
 	if( !exists $push->{operator}
+		and !exists $push->{of}
 		and @{$code = $self->top->{code}}
 		and exists(( my $prev = $code->[$#$code] )->{var})
 	) {
-		$prev->{gosub} = 1;
-		$prev->{endline} = 1;
+		if(exists $prev->{tag} or exists $prev->{gosub}) {
+			push @$code, $prev = {stmt => 'gosub', var => 1, endline => 1, gosub => 1};
+		}
+		else {
+			$prev->{gosub} = 1;
+			$prev->{endline} = 1;
+			$prev->{stmt} .= "_go";
+		}
 		push @{$self->{stack}}, $prev;
 		$self->trace("↑", $prev);
 	}
