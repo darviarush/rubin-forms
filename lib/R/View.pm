@@ -29,10 +29,10 @@ sub new {
 		#before => undef,
 		stack => undef,			# стек выражений языка
 		route => {},			# все роутеры route->{key} = [1-<% ACTION %>|2-on|0-cls, cls, sub|sub_name]
-		trace => "view/classes/input1.html",				# шаблон трейс которого показать
+		trace => "EXAMPLE",				# шаблон трейс которого показать
 		lineno => 1,			# номер строки в текущем файле
 		INHERITS => undef,		# вспомогательная для шаблонов
-		_lang => undef,	# драйвер текущего языка
+		lang => undef,			# драйвер текущего языка
 		metafilter => $app->ini->{design}{metafilter},	# наименования дефолтных метафильтров
 		metafilters => [],		# метафильтры
 		meta => {},				# данные метафильтров - очищаются при завершении шаблона
@@ -46,7 +46,7 @@ sub new {
 sub lang {
 	if(@_ == 1) {
 		my $self = shift;
-		$self->{_lang} // $self->lang("perl")->{_lang}
+		$self->{lang} // $self->lang("perl")->{lang}
 	} else {
 		my ($self, $lang) = @_;
 	
@@ -202,8 +202,6 @@ sub recompile {
 sub load {
 	my $self = shift;
 	
-	#$self->{lang}->clear_classes;
-	
 	my $dir = $self->dir;
 	my $compile_dir = $self->compile_dir;
 	my @dir = @_? (map { "$compile_dir/$_" } @_): $compile_dir;
@@ -273,32 +271,32 @@ sub parsefile {
 # маскирование переменных
 my $re_space = qr/[\ \t]+/;
 my $re_space_ask = qr/[\ \t]*/;
-my $re_rem = qr/[\ \t]*(?:(?:\#|\brem\b)(?P<rem>[^\n\r]*))?/i;
-my $re_sk = qr/[\[\{]/;
+my $re_rem = qr/[\ \t]*(?:(?:\#|\brem\b)(?<rem>[^\n\r]*))?/i;
+my $re_sk = qr/[\[\{\(]/;
 my $re_arg = qr/(?:$re_id|\*)/o;
 my $re_class = qr/$re_id(?:::$re_id)*/o;
 my $re_extends = qr!$re_class(?:$re_space_ask,$re_space_ask$re_class)*!;
 my $re_class_stmt = qr!
-(?P<class>$re_class)
-(?: [\ \t]+ (?:EXTENDS|INHERITS) [\ \t]+ (?P<extends>$re_extends))?
-(?P<with> [\t\ ]+ with [\t\ ]+ (?P<with_args> [^\r\n]+) )?
+(?<class>$re_class)
+(?: [\ \t]+ (?:EXTENDS|INHERITS) [\ \t]+ (?<extends>$re_extends))?
+(?<with> [\t\ ]+ with [\t\ ]+ (?<with_args> [^\r\n]+) )?
 !xismo;				
 my $re_args = qr!
-(?: [\ \t]* (?P<sub_args>$re_arg (?:$re_space_ask,$re_space_ask $re_arg)*))??
+(?: [\ \t]* (?<sub_args>$re_arg (?:$re_space_ask,$re_space_ask $re_arg)*))??
 !xismo;
 my $re_sub = qr!
-	(?P<sub>$re_id|"\w+"|[[:punct:]]+|0\+)
+	(?<sub>$re_id|"\w+"|[[:punct:]]+|0\+)
 	$re_args
-	(?: [\ \t]+ CLASS [\ \t]+ (?P<sub_in>(?P<sub_self>::)?$re_class) )?
+	(?: [\ \t]+ CLASS [\ \t]+ (?<sub_in>(?<sub_self>::)?$re_class) )?
 !xismo;
 my $re_for = qr!
-(?P<for_k>$re_id) (?: $re_space_ask,$re_space_ask (?P<for_v>$re_id) (?: $re_space_ask,$re_space_ask (?P<for_i>$re_id) )? )? (?: $re_space (?P<for_in>IN) \b | $re_space (?P<for_of>OF) \b | $re_space_ask = )
+(?<for_k>$re_id) (?: $re_space_ask,$re_space_ask (?<for_v>$re_id) (?: $re_space_ask,$re_space_ask (?<for_i>$re_id) )? )? (?: $re_space (?<for_in>IN) \b | $re_space (?<for_of>OF) \b | $re_space_ask = )
 !xismo;
-my $re_gosub_after = qr{
-\b [\ \t]* (?! [ !\+\-\*/<>=  \)\}\] \|& \? .:,; \r\n ] | %\s |  (?:or|and|not|eq|ne|le|ge|lt|gt|then|else|end|cmp|from) \b | $ )
-}xismo;
+# my $re_gosub_after = qr{
+# \b [\ \t]* (?! [ !\+\-\*/<>=  \)\}\] \|& \? .:,; \r\n ] | %\s |  (?:or|and|not|eq|ne|le|ge|lt|gt|then|else|end|cmp|from) \b | $ )
+# }xismo;
 
-
+#\p{Uppercase}
 
 # describe context it Given
 
@@ -307,20 +305,23 @@ my $re_gosub_after = qr{
 
 
 my %CloseTag = qw/ ( ) { } [ ] /;
+my %OpenName = qw/ ( go { of [ at /;
+my %RefName = qw/ .$ dotref . dot : colon /;
 
 sub masking {
 	my ($self) = @_;
 	local ($&, $_, $`, $');
 	
+	#my $IN = 1;
 	
 	while($_[1] =~ m{
 	
-	(?<=[\w\}\]\)"'\+\-!])$re_rem(?P<endline>$re_endline) (?{ $self->stmt_endline; $self->{lineno}++ }) |
-	$re_rem(?P<endline_then>$re_endline) (?{ $self->{lineno}++ }) |
+	(?<=[\w\}\]\)"'\+\-!])$re_rem $re_endline (?{ $self->stmt_endline; $self->{lineno}++ }) |
+	$re_rem(?<endline_then>$re_endline) (?{ $self->{lineno}++ }) |
 	
-	;				(?{ $self->endgosub->code('sepexpression') }) |
+	;				(?{ $self->endgosub->code(';') }) |
 	
-	" (?P<QR> (?:[^"]|\\")* ) "! (?P<qr_args> \w+ )?  (?{ $self->code('regexp') }) |
+	" (?<QR> (?:[^"]|\\")* ) "! (?<qr_args> \w+ )?  (?{ $self->code('regexp') }) |
 	
 	\[				 				(?{ $self->push('array', tag=>']') }) |
 	\{								(?{ $self->push('hash', tag=>"\}") }) |
@@ -328,17 +329,18 @@ sub masking {
 	
 	(?<end_tag> [\]\}\)] )		 	(?{ $self->stmt_endtag }) |
 	
-	(?P<string>$re_string) 			(?{ $self->code('string', string=>$self->replace_dollar($+{string})) })  |
-	(?P<name> $re_id ) \( 			(?{ $self->push('gosub', tag=>')') })  |
-	(?P<key>$re_id) $re_space_ask => 		(?{ $self->code('key') })  |
+	(?<string>$re_string) 			(?{ $self->replace_dollar($+{string}) })  |
+	(?<var> $re_id ) \( 			(?{ $self->push('gosub', tag=>')') })  |
+	(?<key>$re_id) $re_space_ask => 		(?{ $self->code('key') })  |
 	
-	(?P<method>\.\$|[\.:\$]|::)(?P<name>$re_id)(?P<m_sk> $re_sk | \( )		(?{ $self->stmt_method })  |
-	(?P<method>\.\$|[\.:\$]|::)(?P<name>$re_id)(?P<gosub>) $re_gosub_after	(?{ $self->stmt_method }) |
-	(?P<method>\.\$|[\.:\$]|::)(?P<name>$re_id)		(?{ $self->stmt_method }) |
+	(?<of> \.\$ | \. | : ) (?<var>$re_id) (?<sk>$re_sk)		(?{ $self->push($RefName{$+{of}} . '_' . $OpenName{$+{sk}}, tag=>$CloseTag{$+{sk}}) }) |
 	
-	(?P<var>$re_id)(?P<var_sk>$re_sk)		(?{ $self->stmt_var }) |
+	(?<of> \.\$ | \. | : ) (?<var>$re_id)		(?{ $self->code($RefName{$+{of}}) }) |
 	
-	^ (?P<name> [\t\ ]* THEN ) \b		(?{ $self->push("gosub", gosub=>1, endline=>1) })  |
+	
+	(?<var>$re_id)(?<sk>$re_sk)		(?{ $self->push('var_' . $OpenName{$+{sk}}, tag=>$CloseTag{$+{sk}}) }) |
+	
+	\b SUPER (?<sk>$re_sk)			(?{ $self->push('super_' . $OpenName{$+{sk}}, tag=>$CloseTag{$+{sk}} ) }) |
 	
 	\b (
 		self | this | me					(?{ $self->code('self') })  |
@@ -346,10 +348,10 @@ sub masking {
 		q		 	(?{ $self->code('q') }) 	|
 		user 		(?{ $self->code('user') })  |
 		FOR			(?{ $self->push("for", then=>1) })  |
-		IN			(?{ $self->check("for", then=>1)->code("in") })  |
-		OF			(?{ $self->check("for", then=>1)->code("of") })  |
-		TO			(?{ $self->check("for", then=>1)->code("to") })  |
-		STEP		(?{ $self->check("for", then=>1)->code("step") })  |
+		IN			(?{ $self->check(stmt=>"for", then=>1)->code("in") })  |
+		OF			(?{ $self->check(stmt=>"for", then=>1)->code("of") })  |
+		TO			(?{ $self->check(stmt=>"for", then=>1)->code("to") })  |
+		STEP		(?{ $self->check(stmt=>"for", then=>1)->code("step") })  |
 		WHILE		(?{ $self->push('while', then=>1) }) |
 		REPEAT		(?{ $self->push('repeat', noend=>1) }) |
 		UNTIL		(?{ $self->pop('repeat')->push('until', endline=>1) }) |
@@ -365,60 +367,57 @@ sub masking {
 		SORT		(?{ $self->push('sort', noend=>1) }) |
 		FROM		(?{ $self->stmt_from }) |
 		addhandler		(?{ $self->check(stmt=>"on")->code('addhandler') }) |
-		(?P<paramarray> paramarray | arguments ) 		(?{ $self->code('paramarray') })  |
+		(?<paramarray> paramarray | arguments ) 		(?{ $self->code('paramarray') })  |
 		BEGIN		(?{ $self->push('begin') }) |
 		
-		(?P<operator> cmp|mod|xor|or|and|not|eq|ne|le|ge|lt|gt )  		(?{ $self->code('operator') })  |
+		(?<operator> cmp|mod|xor|or|and|not|eq|ne|le|ge|lt|gt )  		(?{ $self->code($+{operator}) })  |
 		
-		(?P<word> undef|next|last|redo|return|use|wantarray ) 		(?{ $self->code('word', word=>lc $+{word}) }) |
+		SUPER			(?{ $self->code('super') })  |
+		
+		(?<word> undef|next|last|redo|return|use|wantarray ) 		(?{ $self->code('word', word=>lc $+{word}) }) |
 		
 		(?<name> ref|pairs|scalar|defined|length|exists )		(?{ $self->code('unary') }) |
 
+		
+		
 		(?<nothing> null | nothing) 		(?{ $self->code('null') }) |
-		true		 						(?{ $self->code('true') }) |
-		false								(?{ $self->code('false') })  |
-		throw			(?{ $self->push('throw', gosub=>1, endline=>1) }) 
+		TRUE		 						(?{ $self->code('true') }) |
+		FALSE								(?{ $self->code('false') })  |
+		THROW			(?{ $self->push('throw', gosub=>1, endline=>1) }) 
 	) \b |
+
 	
-	\b super \b (?: \.(?P<super_call> $re_id) (?P<super_sk> \( )? | \b) |
-	
-	\b (?P<try> try ) \b		(?{ $self->push('try') })  |
-	\b (?P<catch> catch ) (?: $re_space (?P<catch_var> $re_id) (?: $re_space AS $re_space (?P<catch_isa> $re_class (?: $re_space_ask , $re_space_ask $re_class )* )? )? )? 
+	\b (?<try> TRY ) \b		(?{ $self->push('try') })  |
+	\b (?<catch> CATCH ) (?: $re_space (?<catch_var> $re_id) (?: $re_space AS $re_space (?<catch_isa> $re_class (?: $re_space_ask , $re_space_ask $re_class )* )? )? )? 
 			(?{ $self->check(stmt=>"try")->code('catch') }) |
 	
-	\b ON $re_space (?P<route>$re_string) 		(?{ $self->push('on', route=>$app->perl->unstring($+{route})) })  |
+	\b ON $re_space (?<route>$re_string) 		(?{ $self->push('on', route=>$app->perl->unstring($+{route})) })  |
 	
 	\b CLASS $re_space $re_class_stmt		(?{ $self->push('class') })  |
 	\b OBJECT $re_space $re_class_stmt		(?{ $self->push('object') }) |
 	\b MODULE $re_space $re_class_stmt		(?{ $self->push('module') })  |
-	\b DEF $re_space $re_sub (?: (?P<sub_then> [\ \t]+ THEN \b) | $re_rem $re_endline) 		
+	\b DEF $re_space $re_sub (?: (?<sub_then> [\ \t]+ THEN \b) | $re_rem $re_endline) 		
 					(?{ $self->push('def', endline=>exists $+{sub_then}) }) |
-	\b SUB $re_space $re_sub (?: (?P<sub_then> [\ \t]+ THEN \b) | $re_rem $re_endline) 
+	\b SUB $re_space $re_sub (?: (?<sub_then> [\ \t]+ THEN \b) | $re_rem $re_endline) 
 					(?{ $self->push('sub', endline=>exists $+{sub_then}) })  |
-	\b DO $re_args (?: (?P<sub_then> [\ \t]+ THEN \b) | $re_rem $re_endline)
+	\b DO $re_args (?: (?<sub_then> [\ \t]+ THEN \b) | $re_rem $re_endline)
 			(?{ $self->push('do', endline=>exists $+{sub_then}) })  |
-	\b NEW $re_space (?P<new>$re_id(?:::$re_id)*)		(?{ $self->code('new') })  |
+	\b NEW $re_space (?<new>$re_id(?:::$re_id)*)		(?{ $self->code('new') })  |
 
+	# %>		(?{ $IN = 0 })  |
 	
-	\@		(?{ $self->code('unarray') }) |
-	%		(?{ $self->code('unhash') })  |
+	(?<var>$re_id)			(?{ $self->code('var') })  |
+	(?<num>$re_number)		(?{ $self->code('num') })  |
 	
-	(?P<gosub>$re_id) $re_gosub_after		(?{ $self->push("gosub", gosub=>1, endline=>1) })  |
 	
-	(?P<var>$re_id)			(?{ $self->stmt_var })  |
-	(?P<num>$re_number)		(?{ $self->code('num') })  |
-	
-	# (?P<outdoor> %> ) |
-	
-	=>	(?{ $self->code('ass_delim') })  |
-	(?P<operator> //= | // | \|\|= | \|\| | &&= | && | <<= | >>= | << | >> | <=> | =~ | !~ | \+\+ | -- | ~~ | \*= | \+= | -= | /= | == | != | <= | >= | < | > | ! | - | \+ | \* | / | \^ | ~ | % | \.\.\. | \.\. | \.= | \. | \? | : )
-		(?{ $self->code('operator') })  |
-	=		(?{ $self->{_assign} = 1; $self->code('assign') })  |
-	, 		(?{ $self->code('comma') })  |
-	(?P<space> $re_space) | # ничего не делаем, если пробелы
-	(?P<nosim> . )		(?{ $self->error("неизвестный науке символ `$+{nosim}`") }) 
+	(?<operator> //= | // | \|\|= | \|\| | &&= | && | <<= | >>= | << | >> | <=> | => | =~ | !~ | \+\+ | -- | ~~ | \*= | \+= | -= | /= | == | != | <= | >= | < | > | ! | - | \+ | \* | / | \^ | ~ | % | \.\.\. | \.\. | \.= | \. | \? | : | , | \@ )
+		(?{ $self->code($+{operator}) })  |
+	=		(?{ $self->{_assign} = 1; $self->code('=', operator=>"=") })  |
+	(?<space> $re_space) | # пропускаем пробелы
+	(?<nosim> . )		(?{ $self->error("неизвестный науке символ `$+{nosim}`") }) 
 	
 	}gsxiom) {}
+
 	
 	$self
 }
@@ -434,10 +433,10 @@ sub stmt_endline {
 		$self->code("then");
 	}
 	elsif($top->{stmt} eq "array" || $top->{stmt} eq "hash" || $top->{stmt} eq "group") {
-		$self->endunary->code("comma");
+		$self->endunary->code(",");
 	}
 	else {
-		$self->code("exp");
+		$self->code("endline");
 	}
 
 	$self
@@ -454,33 +453,33 @@ sub stmt_endtag {
 	$self
 }
 
-# метод
-sub stmt_method {
-	my ($self) = @_;
+# # метод
+# sub stmt_method {
+	# my ($self) = @_;
 	
-	my $method = $+{method};
-	my $sk = $+{m_sk};
-	my $gosub = exists $+{gosub};
+	# my $method = $+{method};
+	# my $sk = $+{m_sk};
+	# my $gosub = exists $+{gosub};
 	
-	my $stmt =
-		$method eq ".\$"? "dotref":
-		$method eq "."? "dot":
-		$method eq ":"? "colon":
-		$method eq "::"? "twocolon":
-		"dollar";
+	# my $stmt =
+		# $method eq ".\$"? "dotref":
+		# $method eq "."? "dot":
+		# $method eq ":"? "colon":
+		# $method eq "::"? "twocolon":
+		# "dollar";
 	
-	if($gosub) {
-		$self->push($stmt . "_sk", endline=>1, gosub=>1);
-	}
-	elsif($sk) {
-		$self->push($stmt . "_sk", tag=>$CloseTag{$sk});
-	}
-	else {
-		$self->code($stmt);
-	}
+	# if($gosub) {
+		# $self->push($stmt . "_sk", endline=>1, gosub=>1);
+	# }
+	# elsif($sk) {
+		# $self->push($stmt . "_sk", tag=>$CloseTag{$sk});
+	# }
+	# else {
+		# $self->code($stmt);
+	# }
 	
-	$self
-}
+	# $self
+# }
 
 # переменная, возможно с открытой скобкой
 sub stmt_var {
@@ -568,26 +567,51 @@ sub endgosub {
 # заменяет переменные в строке
 #my $re_id = $R::Re::id;
 sub replace_dollar {
-	my ($self, $string) = @_;
-	local ($_, $`, $', $&, $1, $2);
+	my ($self) = @_;
 	
-	$string =~ /(.)/; my $kav = $1;
+	my $is_string;
+	{
+		local %+;
+		$is_string = $_[1] =~ /^"/g;
+	}
 	
-	my $dollar = sub {
-		defined($1)? do {
-			my $dollar = $2;
-			$self->{lang}->escape_string($1, $kav) .
-			(defined($dollar)? $self->{lang}->replace_dollar($self->masking($dollar), $kav): $kav)
-		}:
-		$kav
-	};
+	if($is_string) {
+		$self->push('string');
 	
-	$string =~ s{
-		^ ['"] |
-		( .*? ) (?: \$($re_id(?:[\.:]$re_id)*) | ['"] $ )
-	}{ $dollar->() }gexs;
-	$string
-
+		while($_[1] =~ m{
+		
+			(?<str> .*? )
+			(?:
+				\$(?<id> $re_id(?:[\.:]$re_id)* )		(?{
+					$self->code('str');
+					$self->push('interpolation')->masking($+{id})->pop('interpolation') }) |
+				(?: \\" | "" )		(?{ $self->code('str')->code('kav') })  |
+				" $			(?{ $self->code('str') })
+			)
+			
+		}gxs) {}
+		
+		$self->pop('string');
+		
+		return $self;
+	}
+	
+	todo;
+	
+	# $self->push($stmt);
+	
+	# while($_[1] =~ m{
+		# ^ ['"] |
+		# (?<str> .*? )		(?{ $self->code($str) }) 
+		# (?:
+			# \$(?<id> $re_id(?:[\.:]$re_id)* )		(?{ $self->push($interpolation)->masking($+{id})->pop($interpolation) }) | 
+			# ['"] $ 
+		# )
+	# }gxs) {}
+	
+	# $self->pop($stmt);
+	
+	$self
 }
 
 # # аналог parse для кода, а не шаблона
@@ -624,9 +648,8 @@ sub parse {
 	
 	my $prev;	# предыдущая лексема или undef
 	
-	my $tmpl_html = sub {
-		my $html = $+{html};
-		{
+	my $html = sub {
+		if(length(my $html = $+{html}))	{
 			local(%+);
 			
 			$self->{lineno} += $app->perl->lines($html);
@@ -639,21 +662,28 @@ sub parse {
 			$html =~ s/['\\]/\$&/g;
 			$self->code('HTML', html=>$html);
 		}
-		undef
+		$self
 	};
 	
 	while( $buf =~ m{
 	
-	(?<html> .*? )		(?{ $tmpl_html->() if length $+{html} }) 
+	(?<html> .*? )
 
 	(?:
 	
-		<% $re_space_ask GET \b				(?{ $self->push('GET')->masking($buf)->pop('GET') })   |
+		<% $re_space_ask GET \b (?<A>.*?) %>	(?{ &$html->push('GET')->masking($+{A})->pop('GET') })   |
+		
+		<% $re_space_ask RAW \b (?<A>.*?) %>	(?{ &$html->push('RAW')->masking($+{A})->pop('RAW') })   |
+		
+		<% $re_space_ask (?: LET | CALL ) \b (?<A>.*?) %>	(?{ &$html->push('LET')->masking($+{A})->pop('LET') })   |
 		
 		
-		\$(?<id>$re_id([\.:]$re_id)*) 		(?{ $self->push('GET')->masking($+{id})->pop('GET') }) |
-		<\*\*\* (?<comment>.*?) \*\*\*>		(?{ $self->{lineno} += my $i = $app->perl->lines($+{comment}); $self->code('COMMENT', lines=>("\n" x $i)) }) |
-		$
+		
+		\$(?<id>$re_id([\.:]$re_id)*) 		(?{ &$html->push('GET')->masking($+{id})->pop('GET') }) |
+		
+		<\*\*\* (?<comment>.*?) \*\*\*>		(?{ &$html; $self->{lineno} += my $i = $app->perl->lines($+{comment}); $self->code('COMMENT', lines=>("\n" x $i)) }) |
+		
+		$		(?{ &$html })
 	)
 	
 	}isgx ) {}
@@ -690,20 +720,20 @@ sub get_lang_modifiers {
 sub get_lang_templates {
 	my ($self) = @_;
 	
-	my $cache = $self->{lang} . "::cashe_templates";
+	my $cache = $self->lang . "::cashe_templates";
 	return \%$cache if %$cache;
 	
 	my $c = \%$cache;
 	
-	my $key = $self->lang . "::templates"
-	
-	while(my ($key, $val) = each %$key) {
-		$val =~ s/'/\\'/g;
-		$val =~ s/\{\{\s*(\w+)\s*\}\}/', \$_->{$1} ,'/g;
-		
-		$c->{$key} = eval "sub { join '', '$val' }";
-	}
+	my $key = $self->lang . "::templates";
 
+	while(my ($k, $v) = each %$key) {
+		$v =~ s/'/\\'/g;
+		$v =~ s/\{\{\s*(\w+)\s*\}\}/', \$_->{$1} ,'/g;
+		
+		$c->{$k} = eval "sub { join '', '$v' }";
+	}
+	
 	$c
 }
 
@@ -714,6 +744,8 @@ sub expirience {
 	my ($self) = @_;
 	
 	die "expirience: в стеке должен быть 1-н элемент" if @{$self->{stack}} != 1;
+
+	#msg1 ":size10000", $self->top;
 	
 	# обход в глубину - модификации дерева
 	my $modifiers = $self->get_lang_modifiers;
@@ -729,7 +761,7 @@ sub expirience {
 		
 		my $code = $node->{code};
 		if($code && $node->{"&"} < @$code) {	# на подэлемент
-			push @path, $code->{ $node->{"&"}++ };
+			push @path, $code->[ $node->{"&"}++ ];
 		}
 		else {
 			pop @path;		# удаляем элемент
@@ -745,7 +777,7 @@ sub expirience {
 		
 		my $code = $node->{code};
 		if($code && $node->{"#"} < @$code) {	# на подэлемент
-			push @path, $code->{ $node->{"#"}++ };
+			push @path, $code->[ $node->{"#"}++ ];
 		}
 		else {
 			$_ = pop @path;		# удаляем элемент
@@ -1057,19 +1089,25 @@ sub get_name {
 
 # отображает операции со стеком в лог
 sub trace {
-	my ($self, $op) = @_;
+	my ($self, $op, $top) = @_;
 	
 	my $trace = $self->{trace};
 	if( defined($trace) && $self->{file} eq $trace ) {
-		my $top = $self->top;
-		my $stmt = $top->{stmt};
-		my $class = $top->{class_name};
-		my $sub = $top->{sub_name};
-		my $name = $top->{name} // "";
 	
-		my $after = $stmt eq "sub"? "$sub :$class": $stmt eq "class"? $class: $name;
+		local($+, $`, $', $&, $_, $a, $b);
+	
+		$top //= $self->top;
+		my $stmt = $top->{stmt};
+		# my $class = $top->{class_name};
+		# my $sub = $top->{sub_name};
+		# my $name = $top->{name} // "";
+	
+		#my $after = $stmt eq "sub"? "$sub :$class": $stmt eq "class"? $class: $name;
+		my $after = {%$top};
+		delete @$after{qw/stmt e code/};
+		my @after = pairmap { "$a=$b" } %$after;
 		
-		$app->log->info( ":space", "$self->{lineno}:", ($op eq "+"? ":red": ":bold blue"), $op, $stmt, $after );
+		$app->log->info( ":space", "$self->{lineno}:", ($op eq "+"? ":red": $op eq "-"? ":bold blue": ":dark white"), $op, $stmt, ":reset", @after );
 	}
 	
 	$self
@@ -1094,21 +1132,62 @@ sub check {
 		next if $k eq "e";
 		if( $top->{$k} ne $v ) {
 			my %check = @_;
-			$self->error("$check{stmt}: не совпадает $_[$i] в стеке. $check{e}");
+			$self->error($check{e}? $check{e}: "$check{stmt}: не совпадает $k в стеке. Оно $top->{$k}, а должно быть $v");
 		}
 	}
+	$self
+}
+
+
+# добавляет в код
+sub code_add {
+	my ($self, $push) = @_;
+	
+	my $code;
+	
+	# преобразуем переменную или незакончившийся вызов метода в gosub
+	if( !exists $push->{operator}
+		and @{$code = $self->top->{code}}
+		and exists(( my $prev = $code->[$#$code] )->{var})
+	) {
+		$prev->{gosub} = 1;
+		$prev->{endline} = 1;
+		push @{$self->{stack}}, $prev;
+		$self->trace("↑", $prev);
+	}
+	
+	push @{$self->top->{code}}, $push;
+	
+	$self
+}
+
+# добавляет код к элементу
+sub code {
+	my $self = shift;
+	my $push = {%+, 'stmt', @_};
+	{
+		local(%+, $`, $', $&, $_);		
+		$self->code_add($push);
+		$self->trace("¤", $push);
+	}
+	
 	$self
 }
 
 # записывает в стек
 sub push {
 	my $self = shift;
-	
 	my $push = {%+, 'stmt', @_};
-	
-	push @{$self->{stack}}, $push;
-	
-	$self->trace("+");
+	{
+		local(%+, $`, $', $&, $_);
+		my $stack = $self->{stack};
+		
+		$self->code_add($push) if @$stack;
+		
+		push @$stack, $push;
+		
+		$self->trace("+", $push);
+	}
 	
 	$self
 }
@@ -1148,11 +1227,12 @@ sub empty {
 	@{$self->{stack}} == 0;
 }
 
-# добавляет код к элементу
-sub code {
-	my $self = shift;
-	push @{$self->top->{code}}, {%+, 'stmt', @_};
-	$self
+
+# последний код
+sub last_code {
+	my ($self) = @_;
+	my $code = $self->etop->{code};
+	@$code? $code->[$#$code]: undef
 }
 
 # возвращает текущий класс
@@ -1196,7 +1276,7 @@ $app->html;
 # рендерит в output
 sub render {
 	my ($self, $name, $data, $output) = @_;
-	$self->{lang}->render($name, $data, $output);
+	$self->lang->can("render")->($self, $name, $data, $output);
 	$self;
 }
 
@@ -1223,13 +1303,13 @@ sub eval {
 	my $name = $self->get_name($path);
 	
 	$code = $self->mask($code);
-	$code = $self->{lang}->foreval($code);
+	$code = $self->lang->can("foreval")->($self, $code);
 	
-	my $from = $self->{lang}->len_classes;
+	my $from = $self->lang->can("len_classes")->($self);
 
 	#msg1 ":empty", "\n\n", $code, "\n";
 	
-	my @res = $self->{lang}->eval( $code );
+	my @res = $self->lang->can("eval")->( $self, $code );
 	die $@ if $@;
 	
 	$self->init_classes($from);

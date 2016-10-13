@@ -12,10 +12,31 @@ my $esc = "', R::View::Views::escapeHTML(scalar do { "; my $_esc = " }), '";
 
 ### шаблоны
 our %templates = (
-sepexpression => ';',
-assign => ' = ',
-comm => ', ',
-var => '{{ var }}',
+
+endline => ";\n",
+
+dotref => '->${$DATA->{{{ var }}}}',
+dot => '->{{ var }}',
+colon => '->{{{ var }}}',
+
+dotref_go => '->${$DATA->{{{ var }}}}({{ code }})',
+dotref_of => '->${$DATA->{{{ var }}}}{{{ code }}}',
+dotref_at => '->${$DATA->{{{ var }}}}[{{ code }}]',
+
+dot_go => '->{{ var }}({{ code }})',
+dot_of => '->{{ var }}{{{ code }}}',
+dot_at => '->{{ var }}[{{ code }}]',
+
+colon_go => '->{{{ var }}}({{ code }})',
+colon_of => '->{{{ var }}}{{{ code }}}',
+colon_at => '->{{{ var }}}[{{ code }}]',
+
+string => '"{{ code }}"',
+str => '{{ str }}',
+kav => '\"',
+interpolation => '".( {{ code }} )."',
+
+var => '$DATA->{{{ var }}}',
 num => '{{ num }}',
 regexp => 'qr({{ QR }}){{ qr_args }}',
 array => '[ {{ code }} ]',
@@ -23,11 +44,16 @@ hash => '{ {{ code }} }',
 group => '( {{ code }} )',
 
 
+";" => '; ',
+"," => ', ',
+"=" => ' = ',
 
 HTML => '{{ html }}',
 GET => $esc . '{{ code }}' . $_esc,
+RAW => $raw . '{{ code }}' . $_raw,
+LET => $in . '{{ code }}' . $_in,
 COMMENT => $in . '{{ lines }}' . $_in,
-TEMPLATE => 'package {{ class }};{{ extends }} use common::sense; use R::App; use List::Util;{{ begin }} sub {{ block }} { my $DATA = shift; {{ code }} return; } 1;',
+TEMPLATE => 'package {{ class }};{{ extends }} use common::sense; use R::App; use List::Util;{{ begin }} sub {{ block }} { my $DATA = shift; '.$_in.'{{ code }}'.$in.' return; } 1;',
 INHERITS => '',
 
 );
@@ -50,16 +76,16 @@ INHERITS => sub  {
 ### конец модификаторов
 );
 
-# # заменяет спецсимволы в строке
-# sub escape_string {
-	# my ($self, $string, $kav) = @_;
-	# if($kav eq "'") {
-		# $string =~ s/'/\\'/g;
-	# } else {
-		# $string =~ s/[\$\@]/\\$&/g;
-	# }
-	# $string
-# }
+# заменяет спецсимволы в строке
+sub escape_string {
+	my ($self, $string, $kav) = @_;
+	if($kav eq "'") {
+		$string =~ s/'/\\'/g;
+	} else {
+		$string =~ s/[\$\@]/\\$&/g;
+	}
+	$string
+}
 
 # # заменяет выражение в строке
 # sub replace_dollar {
@@ -602,7 +628,7 @@ INHERITS => sub  {
 sub render {
 	my ($self, $name, $data, $output) = @_;
 	
-	my $class = $self->{view}->get_name($name);
+	my $class = $self->get_name($name);
 	
 	$data //= {};
 	bless $data, $class;

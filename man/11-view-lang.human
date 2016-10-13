@@ -14,29 +14,49 @@
 	
 [test]
 
-== Комментарии
+== Переменные и цифры
 
-Комментарии однострочные.
-	
-	$res = $app->view->create(q{<% GET
-		rem комментарий0
-		sub mysub1 then 6 rem комментарий sub1
-		sub mysub rem комментарий sub2
-			a = 1 rem комментарий1
-			if 1 then return 3  rem комментарий2
-		end
-		rem комментарий3
-		mysub1() . mysub()
-	%>});
+	$res = $app->view->create(q{<% GET a=10; a %>});
 
-	$res;	# 63
+	$res;	# 10
 	
+	$res = $app->view->create(q{<% GET a=1_000_000.65; a %>});
+
+	$res;	# 1000000.65
 	
 == Строки
 
-	$res = $app->view->create(q{<% GET a=10; "$a" %>});
+Строки допускают escape-последовательности:
 
-	$res;	# 10
+	$res = $app->view->create(q{<% GET "\r\n" %>});
+	
+	$res;	# \r\n
+	
+Строки могут быть многострочными:
+
+	$res = $app->view->create(q{<% GET "1
+	2" 
+	%>});
+	
+	$res;	# 1\n2
+
+В строках возможна интерполяция переменных.
+
+	$res = $app->view->create(q{<% GET a=10; "_$a\_$a:" %>});
+
+	$res;	# _10_10:
+	
+Доступ к элементу хэша:
+	
+	$res = $app->view->create(q{<% GET x={a=>{b=>5}}; "$x:a:b" %>});
+
+	$res;	# 5
+	
+Вызов методов:
+	
+	#$res = $app->view->create(q{<% GET x={a=>{b=>5}}; "$x:a:b" %>});
+
+	#$res;	# 5
 	
 == Массивы
 
@@ -259,7 +279,8 @@
 	$res;	# -1, -2, -3
 	
 	
-=== Функции
+	
+== Функции
 
 Однострочная функция:
 
@@ -439,6 +460,23 @@
 
 	$res;	# ну так...
 	
+== Комментарии
+
+Комментарии однострочные. И начинаются на `#` или `REM`.
+	
+	$res = $app->view->create(q{<% GET
+		rem комментарий0
+		sub mysub1 then 6 rem комментарий sub1
+		sub mysub rem комментарий sub2
+			a = 1 rem комментарий1
+			if 1 then return 3  rem комментарий2
+		end
+		rem комментарий3
+		mysub1() . mysub()
+	%>});
+
+	$res;	# 63
+
 	
 == Классы
 
