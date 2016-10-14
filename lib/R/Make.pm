@@ -55,7 +55,7 @@ sub category ($) {
 sub name ($;$$$) {
 	my ($name, $args, $desc, $spec) = @_;
 	
-	die "команда `$name` уже описана" if exists $TASK{$name};
+	die "команда `$name` уже описана в $TASK{$name}{file}:$TASK{$name}{line}" if exists $TASK{$name};
 	
 	if($LAST) {
 		die "в задаче $LAST->{name} нет task-а" if !$LAST->{code};

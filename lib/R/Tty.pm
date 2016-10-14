@@ -18,7 +18,7 @@ sub confirm {
 	return $yes =~ /yes/;
 }
 
-# спрашивает пользователя через stdin
+# предлагает пользователю выбрать вариант через stdin
 sub select {
 	my ($self, $data, $confirm) = @_;
 	
@@ -53,6 +53,27 @@ sub raw {
 	my ($self) = @_;
 	
 	$self->mode(":raw");
+	
+	$self
+}
+
+
+# Loading… [][][][][][][][][][] 0%
+# Loading… █[][][][][][][][][] 10%
+# Loading… ██[][][][][][][][] 20%
+# Loading… ███[][][][][][][] 30%
+# Loading… ████[][][][][][] 40%
+# Loading… █████[][][][][] 50%
+# показывает прогресс-бар
+sub progress {
+	my ($self, $prefix, $pos, $to) = @_;
+	
+	$pos = 0 if $pos > $to;
+	my $proc = $pos*100/$to;
+	
+	$prefix .= " " if length $prefix;
+	
+	print STDERR "$prefix";
 	
 	$self
 }
