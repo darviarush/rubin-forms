@@ -303,10 +303,116 @@ my $re_for = qr!
 # ключевые слова:
 # super null extends action of block process include raw wrapper eq ne le ge lt gt keys values use sort scenario pairmap map grep reduce from repeat self this me                 ucfirst lcfirst uc lc ref cmp push pop undef next last redo return pairs or and not eq ne le ge lt gt scalar msg msg1 keys values exists closure length use push pop shift unshift splice delete defined wantarray
 
+# термы
+# скобки
+# операторы
+
+our $nonassoc = 0b000001;		# правосторонняя ассоциативность
+our $leftassoc = 0b000010;		# левосторонняя ассоциативность
+our $rightassoc = 0b000100;		# правосторонняя ассоциативность
+
+our $infix = 0b001000;		# инфиксный оператор
+our $prefix = 0b010000;		# префиксный оператор
+our $postfix = 0b100000;		# постфиксный оператор
+
+our $xfy=$infix | $leftassoc;			# левоассоциативный инфиксный
+our $yfx=$infix | $rightassoc;			# правоассоциативный инфиксный
+our $xfx=$infix | $nonassoc;			# неассоциативный инфиксный
+
+our $xf=$infix | $rightassoc;			# правоассоциативный префиксный
+our $yf=$postfix | $nonassoc;			# неассоциативный префиксный
+
+our $fx=$postfix | $leftassoc;			# левоассоциативный постфиксный
+our $fy=$postfix | $nonassoc;			# неассоциативный постфиксный
+
+our %FIX = (
+	xfy => $xfy,
+	yfx => $yfx,
+	xfx => $xfx,
+	xf => $xf,
+	yf => $yf,
+	fx => $fx,
+	fy => $fy,
+);
+
+# приоритет операторов
+my(%INFIX, %PREFIX, $POSTFIX, $_PRIO);
+
+sub _op {
+	my $type = shift;
+	
+	my $fix = $FIX{$type};
+	die "нет $type префикса" if !defined $fix;
+
+	my $p = {
+		prio=>$_PRIO++,
+		fix=>$vfix,
+		type=>$fix,
+		infix=>$fix & $infix,
+		prefix=>$fix & $prefix,
+		postfix=>$fix & $postfix,
+		left => $fix & $leftassoc,
+		right => $fix & $rightassoc,
+		nonassoc => $fix & $nonassoc,
+	};
+	
+	if($p->{infix}) {
+		for my $x (@_) {
+			die "оператор $type $_ существует" if exists $INFIX{$_};
+			$INFIX{$_} = $p;
+		}
+	}
+	elsif($p->{prefix}) {
+		for my $x (@_) {
+			die "оператор $type $_ существует" if exists $PREFIX{$_};
+			$PREFIX{$_} = $p;
+		}
+	}
+	else {
+		for my $x (@_) {
+			die "оператор $type $_ существует" if exists $POSTFIX{$_};
+			$POSTFIX{$_} = $p;
+		}
+	}
+	
+}
+
+_op("xfy", qw{		:op				});
+_op("xf",  qw{		++ --			}); $_PRIO--; _op("fx", qw{ ++ -- });
+_op("yfx", qw{		^				});
+_op("yfx", qw{		! ~ \			}); $_PRIO--; _op("fx", qw{ + - });
+_op("xfy", qw{		=~ !~			});
+_op("xfy", qw{		* / mod **		});
+_op("xfy", qw{		+ - .				});
+_op("xfy", qw{		<< >>				});
+_op("fy",  my @named_unary_operators = qw{ ref pairs scalar defined length exists });
+_op("xfx", qw{	< > <= >= lt gt le ge		});
+_op("xfx", qw{	== != <=> eq ne cmp ~~		});
+_op("xfy", qw{		&					});
+_op("xfy", qw{		|  xor				});
+_op("xfy", qw{		&&					});
+_op("xfy", qw{		|| //				});
+_op("xfx", qw{		..  to				});
+#_op("yfx", qw{		?:					});
+_op("yfx", qw{		= += -= *= /=			});				# goto last next redo dump
+_op("xfy", qw{		, =>					});
+#_op("xfx", qw{	list operators (rightward)});
+_op("yfx", qw{	not						});
+_op("xfy", qw{	and						});
+_op("xfy", qw{	or						});
+
+
+my $named_unary_operators = join "|", @named_unary_operators;
 
 my %CloseTag = qw/ ( ) { } [ ] /;
-my %OpenName = qw/ ( go { of [ at /;
+my %OpenNameVar = qw/ ( var_go { var_of [ var_at /;
+my %OpenNameSuper = qw/ ( super_go { super_of [ super_at /;
 my %RefName = qw/ .$ dotref . dot : colon /;
+my %RefNameSk = (
+	'.$' => {qw/ ( dotref_go { dotref_of [ dotref_at /},
+	'.' => {qw/ ( dot_go { dot_of [ dot_at /},
+	':' => {qw/ ( colon_go { colon_of [ colon_at /},
+);
 
 sub masking {
 	my ($self) = @_;
@@ -333,14 +439,14 @@ sub masking {
 	(?<var> $re_id ) \( 			(?{ $self->push('gosub', tag=>')') })  |
 	(?<key>$re_id) $re_space_ask => 		(?{ $self->code('key') })  |
 	
-	(?<of> \.\$ | \. | : ) (?<var>$re_id) (?<sk>$re_sk)		(?{ $self->push($RefName{$+{of}} . '_' . $OpenName{$+{sk}}, tag=>$CloseTag{$+{sk}}) }) |
+	(?<of> \.\$ | \. | : ) (?<var>$re_id) (?<sk>$re_sk)		(?{ $self->push($RefNameSk{$+{of}}{$+{sk}}, tag=>$CloseTag{$+{sk}}) }) |
 	
 	(?<of> \.\$ | \. | : ) (?<var>$re_id)		(?{ $self->code($RefName{$+{of}}) }) |
 	
 	
-	(?<var>$re_id)(?<sk>$re_sk)		(?{ $self->push('var_' . $OpenName{$+{sk}}, tag=>$CloseTag{$+{sk}}) }) |
+	(?<var>$re_id)(?<sk>$re_sk)		(?{ $self->push($OpenNameVar{$+{sk}}, tag=>$CloseTag{$+{sk}}) }) |
 	
-	\b SUPER (?<sk>$re_sk)			(?{ $self->push('super_' . $OpenName{$+{sk}}, tag=>$CloseTag{$+{sk}} ) }) |
+	\b SUPER (?<sk>$re_sk)			(?{ $self->push($OpenNameSuper{$+{sk}}, tag=>$CloseTag{$+{sk}} ) }) |
 	
 	\b (
 		self | this | me					(?{ $self->code('self') })  |
@@ -376,7 +482,7 @@ sub masking {
 		
 		(?<word> undef|next|last|redo|return|use|wantarray ) 		(?{ $self->code('word', word=>lc $+{word}) }) |
 		
-		(?<name> ref|pairs|scalar|defined|length|exists )		(?{ $self->code('unary') }) |
+		(?<name> $named_unary_operators )		(?{ $self->code('unary') }) |
 
 		
 		
@@ -759,9 +865,13 @@ sub expirience {
 			$fn->($self, $node, \@path) if $fn;
 		}
 		
-		my $code = $node->{code};
-		if($code && $node->{"&"} < @$code) {	# на подэлемент
-			push @path, $code->[ $node->{"&"}++ ];
+		if(exists $node->{left} && $node->{"&"} < 1) {	# на подэлемент
+			$node->{"&"}=1;
+			push @path, $node->{left};
+		}
+		elsif(exists $node->{right} && $node->{"&"} < 2) {	# на подэлемент
+			$node->{"&"}=2;
+			push @path, $node->{right};
 		}
 		else {
 			pop @path;		# удаляем элемент
@@ -775,21 +885,29 @@ sub expirience {
 	while(@path) {
 		my $node = $path[$#path];
 		
-		my $code = $node->{code};
-		if($code && $node->{"#"} < @$code) {	# на подэлемент
-			push @path, $code->[ $node->{"#"}++ ];
+		if(exists $node->{left} && $node->{"#"} < 1) {	# на подэлемент
+			$node->{"#"}=1;
+			push @path, $node->{left};
+		}
+		elsif(exists $node->{right} && $node->{"#"} < 1) {	# на подэлемент
+			$node->{"#"}=1;
+			push @path, $node->{right};
 		}
 		else {
 			$_ = pop @path;		# удаляем элемент
 			
-			$_->{code} = join "", @$code if $code;
+			#$_->{code} = join "", @$code if $code;
 			
 			my $template = $templates->{ $_->{stmt} };
 			die "нет шаблона $_->{stmt} в языке $self->{lang}" if !$template;
 			
 			if(@path) {
 				my $parent = $path[$#path];
-				$parent->{code}[$parent->{"#"}-1] = $template->();
+				if($parent->{"#"} == 1) {
+					$parent->{left} = $template->();
+				} else {
+					$parent->{right} = $template->();
+				}
 			}
 			else {
 				$out = $template->();
@@ -1139,11 +1257,40 @@ sub check {
 }
 
 
-# добавляет в код
+# # добавляет оператор
+# sub op {
+	# my $self = shift;
+	# my $op = $_[0];
+	# my $push = {%+, 'stmt', @_};
+	
+	# # оператор выбрасывает все операторы с меньшим приоритетом, чем у него
+	# # при левосторонней свёртке он выбрасывает так же все операторы, которые равны по приоритету
+	
+	# my $prio = $PRIO{ $op };
+	
+	# # правосторонний оператор
+	# my $right = exists $RIGHT{ $op };
+	
+	
+	
+	
+	# $self
+# }
+
+# добавляет операнд или оператор
 sub code_add {
 	my ($self, $push) = @_;
 	
-	my $code;
+	my $stmt = $push->{stmt};
+	my $OP = $self->{OP};		# 0 - пришёл оператор, 1 - операнд или постфиксный оператор
+	
+	my $operator = exists $INFIX{ $stmt };
+	if(!$operator && $OP) {			# обнаружен gosub
+		
+	}
+	
+	if($operator && $OP) {
+	}
 	
 	# преобразуем переменную или незакончившийся вызов метода в gosub
 	if( !exists $push->{operator}
