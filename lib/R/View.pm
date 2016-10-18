@@ -1281,6 +1281,7 @@ sub check {
 sub code_add {
 	my ($self, $push) = @_;
 	
+
 	# a++ b - gosub
 	# a + -b
 	
