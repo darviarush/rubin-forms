@@ -13,6 +13,9 @@ my $esc = "', R::View::Views::escapeHTML(scalar do { "; my $_esc = " }), '";
 ### шаблоны
 our %templates = (
 
+"+" => '({{ left }} + {{ right }})',
+"*" => '({{ left }} * {{ right }})',
+
 endline => ";\n",
 
 dotref => '->${$DATA->{{{ var }}}}',
@@ -50,12 +53,13 @@ key => '{{ key }} => ',
 "," => ', ',
 "=" => ' = ',
 
-HTML => '{{ html }}',
-GET => $esc . '{{ code }}' . $_esc,
-RAW => $raw . '{{ code }}' . $_raw,
-LET => $in . '{{ code }}' . $_in,
-COMMENT => $in . '{{ lines }}' . $_in,
-TEMPLATE => 'package {{ class }};{{ extends }} use common::sense; use R::App; use List::Util;{{ begin }} sub {{ block }} { my $DATA = shift; '.$_in.'{{ code }}'.$in.' return; } 1;',
+HTML => "{{ html }}",
+CAT => "{{ left }}{{ right }}",
+GET => "{{ html }}" . $esc . '{{ right }}' . $_esc,
+RAW => "{{ html }}" . $raw . '{{ right }}' . $_raw,
+LET => "{{ html }}" . $in . '{{ right }}' . $_in,
+COMMENT => "{{ html }}" . $in . '{{ lines }}' . $_in,
+TEMPLATE => 'package {{ class }};{{ extends }} use common::sense; use R::App; use List::Util;{{ begin }} sub {{ block }} { my $DATA = shift; '.$_in.'{{ right }}'.$in.' return; } 1;',
 INHERITS => '',
 
 );

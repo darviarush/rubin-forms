@@ -1,0 +1,51 @@
+<HTML>
+<HEAD>
+ <TITLE>Моя программа</TITLE>
+ <HTA:APPLICATION ID="Handy" 
+  APPLICATIONNAME="Handy" 
+  BORDER=""
+  CAPTION="yes"
+  ICON="handy.ico"
+  SHOWINTASKBAR="yes"
+  SINGLEINSTANCE="yes"
+  SYSMENU="yes"
+  WINDOWSTATE="normal"
+  NAVIGABLE="yes"
+ >
+ 
+<style>
+.tab {width:100%; height:100%}
+
+</style>
+<script>
+
+var npp_path = "notepad++";
+var shell = new ActiveXObject("Wscript.shell");
+
+function npp(args) {
+	var bWaitOnReturn = true;
+	var intWindowStyle = 0;
+	shell.Run(npp_path+" "+args, intWindowStyle, bWaitOnReturn);
+}
+
+</script>
+
+</HEAD>
+<BODY BGCOLOR="ButtonFace" SCROLL="no">
+
+<table class="tab">
+<tr>
+<!-- список проектов -->
+<td>
+<!-- список классов -->
+<td>
+<!-- список категорий методов -->
+<td>
+<!-- список методов -->
+<td>
+
+</table>
+
+
+</BODY>
+</HTML>
