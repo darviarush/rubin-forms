@@ -1281,10 +1281,13 @@ sub check {
 sub code_add {
 	my ($self, $push) = @_;
 	
+	# a++ b - gosub
+	# a + -b
+	
 	my $stmt = $push->{stmt};
 	my $OP = $self->{OP};		# 0 - пришёл оператор, 1 - операнд или постфиксный оператор
 	
-	my $operator = exists $INFIX{ $stmt };
+	my $operator = $INFIX{ $stmt } // $PREFIX{ $stmt };
 	if(!$operator && $OP) {			# обнаружен gosub
 		
 	}
