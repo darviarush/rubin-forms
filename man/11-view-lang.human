@@ -16,11 +16,33 @@
 
 == Выражения
 
-	$res = $app->view->create(q{<% GET 5 + 6 * 10 %>});
-
-	$res;	# 65
+	$res = $app->view->create(q{});
 	
-	exit;
+	$res;		# 
+
+	$res = $app->view->create(q{123});
+	
+	$res;		# 123
+
+	$res = $app->view->create(q{<% GET 5 + 6 * 10 - 12 %>});
+
+	$res;	# 53
+	
+	$res = $app->view->create(q{<% GET (5 + (6)) * 10 %>});
+
+	$res;	# 110
+	
+	$res = $app->view->create(q{<% GET - 6 %>});
+
+	$res;	# -6
+	
+	$res = $app->view->create(q{<% GET 5 + - 6 %>});
+
+	$res;	# -1
+	
+	$res = $app->view->create(q{<% GET -5+(- 6)*10 %>});
+
+	$res;	# -65
 
 == Переменные и цифры
 
@@ -56,7 +78,7 @@
 	
 Доступ к элементу хэша:
 	
-	$res = $app->view->create(q{<% GET x={a=>{b=>5}}; "$x:a:b" %>});
+	$res = $app->view->createlog(q{<% GET x={a=>{b=>5}}; "$x:a:b" %>});
 
 	$res;	# 5
 	
@@ -74,10 +96,11 @@
 			2
 		]
 		push @a, 10, @c, 11
+		a[] = 15, 12
 		join ",", @a 
 	%>});
 	
-	$res;	# 10,1,2,11
+	$res;	# 10,1,2,11,15,12
 	
 == Хэши
 

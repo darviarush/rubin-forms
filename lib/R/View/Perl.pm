@@ -14,44 +14,64 @@ my $esc = "', R::View::Views::escapeHTML(scalar do { "; my $_esc = " }), '";
 our %templates = (
 
 "+" => '({{ left }} + {{ right }})',
+"-" => '({{ left }} - {{ right }})',
 "*" => '({{ left }} * {{ right }})',
+"/" => '({{ left }} / {{ right }})',
+
+"+u" => 'int({{ right }})',
+"-u" => '-({{ right }})',
+
 
 endline => ";\n",
 
-dotref => '->${$DATA->{{{ var }}}}',
-dot => '->{{ var }}',
-colon => '->{{{ var }}}',
+dotref => '{{ left }}->${$DATA->{{{ var }}}}',
+dot => '{{ left }}->{{ var }}',
+colon => '{{ left }}->{{{ var }}}',
 
-dotref_go => '->${$DATA->{{{ var }}}}({{ code }})',
-dotref_of => '->${$DATA->{{{ var }}}}{{{ code }}}',
-dotref_at => '->${$DATA->{{{ var }}}}[{{ code }}]',
+dotref_go => '{{ left }}->${$DATA->{{{ var }}}}({{ right }})',
+dotref_of => '{{ left }}->${$DATA->{{{ var }}}}{{{ right }}}',
+dotref_at => '{{ left }}->${$DATA->{{{ var }}}}[{{ right }}]',
 
-dot_go => '->{{ var }}({{ code }})',
-dot_of => '->{{ var }}{{{ code }}}',
-dot_at => '->{{ var }}[{{ code }}]',
+dot_go => '{{ left }}->{{ var }}({{ right }})',
+dot_of => '{{ left }}->{{ var }}{{{ right }}}',
+dot_at => '{{ left }}->{{ var }}[{{ right }}]',
 
-colon_go => '->{{{ var }}}({{ code }})',
-colon_of => '->{{{ var }}}{{{ code }}}',
-colon_at => '->{{{ var }}}[{{ code }}]',
+colon_go => '{{ left }}->{{{ var }}}({{ right }})',
+colon_of => '{{ left }}->{{{ var }}}{{{ right }}}',
+colon_at => '{{ left }}->{{{ var }}}[{{ right }}]',
 
-string => '"{{ code }}"',
+colon_sk => '{{ right }}',
+
+# строки
+string => '"{{ right }}"',
 str => '{{ str }}',
-kav => '\"',
-interpolation => '".( {{ code }} )."',
+kav => '{{ str }}\"',
+interpolation => '{{ str }}${\( {{ right }} )}',
 
+# атомы
 var => '$DATA->{{{ var }}}',
 num => '{{ num }}',
 regexp => 'qr({{ QR }}){{ qr_args }}',
-array => '[ {{ code }} ]',
-hash => '{ {{ code }} }',
-group => '( {{ code }} )',
+'[]' => '[]',
+'()' => '()',
+'{}' => '{}',
 
-gosub => '->( {{ code }} )',
-key => '{{ key }} => ',
+# массивы
+'[' => '[ {{ right }} ]',
+'{' => '{ {{ right }} }',
+'(' => '( {{ right }} )',
 
-";" => '; ',
-"," => ', ',
-"=" => ' = ',
+# операторы 
+'[]=' => 'push(@{{{ left }}}, {{ right }})',
+
+'=>' => '({{ left }} => {{ right }})',
+gosub => '->( {{ right }} )',
+
+# операторы распределения данных
+";" => '{{ left }}; {{ right }}',
+"," => '{{ left }}, {{ right }}',
+"=" => '({{ left }} = {{ right }})',
+"as" => '({{ right }} = {{ left }})',
 
 HTML => "{{ html }}",
 CAT => "{{ left }}{{ right }}",
