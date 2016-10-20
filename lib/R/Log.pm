@@ -62,20 +62,12 @@ inline inline_end nonewline
 SIZE
 /));
 
-# сообщение
-sub send {
+
+# возвращает колоризированную строку
+sub colorized {
 	my $self = shift;
 	
-	my $log_as_is = $self->{_log_as_is};
-	my $logs = $self->{_log};
-	
-	return $self if @$log_as_is == 0 && @$logs == 0;
-	
-	my $level = shift;
-	
 	local ($_, $`, $', $&);
-	
-	#return $self unless exists $levels{$level};
 	
 	my ($sep, $next, $reset, $inline) = ", ";
 	my $newline = 1;
@@ -143,7 +135,22 @@ sub send {
 	push @msg, color("reset") if $reset;
 	push @msg, "\n" if $newline;
 	
-	my $msg = join "", @msg;
+	join "", @msg;
+}
+
+# сообщение
+sub send {
+	my $self = shift;
+	
+	my $log_as_is = $self->{_log_as_is};
+	my $logs = $self->{_log};
+	
+	return $self if @$log_as_is == 0 && @$logs == 0;
+	
+	my $level = shift;
+	#return $self unless exists $levels{$level};
+	
+	my $msg = $self->colorized(@_);
 	
 	for my $log (@$log_as_is) {
 		$log->send($level, $msg);

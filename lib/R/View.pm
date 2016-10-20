@@ -33,9 +33,8 @@ sub new {
 		lineno => 1,			# номер строки в текущем файле
 		stack => undef,			# стек операторов
 		terms => undef,			# стек операндов
+		space => undef,			# дополнительный стек скобок
 		front => 1,				# обозначает границу операторов (порядок их выборки)
-		then => undef,			# мы в then
-		bro => undef,			# мы в скобках
 		
 		INHERITS => undef,		# вспомогательная для шаблонов
 		lang => undef,			# драйвер текущего языка
@@ -326,11 +325,11 @@ our $xfy=$infix | $leftassoc;			# левоассоциативный инфик�
 our $yfx=$infix | $rightassoc;			# правоассоциативный инфиксный
 our $xfx=$infix | $nonassoc;			# неассоциативный инфиксный
 
-our $xf=$postfix | $rightassoc;			# правоассоциативный префиксный
-our $yf=$postfix | $nonassoc;			# неассоциативный префиксный
+our $yf=$postfix | $leftassoc;			# правоассоциативный префиксный
+our $xf=$postfix | $nonassoc;			# неассоциативный префиксный
 
-our $fx=$prefix | $leftassoc;			# левоассоциативный постфиксный
-our $fy=$prefix | $nonassoc;			# неассоциативный постфиксный
+our $fy=$prefix | $rightassoc;			# левоассоциативный постфиксный
+our $fx=$prefix | $nonassoc;			# неассоциативный постфиксный
 
 our %FIX = (
 	xfy => $xfy,
@@ -380,19 +379,20 @@ sub _op {
 
 sub _lp { $_PRIO--; goto &_op }
 
-_op("xf",  qw{		dotref dot colon		}); _lp("yfx", qw{		dotref_go dot_go colon_go	dotref_at dot_at colon_at	dotref_of dot_of colon_of	});
-_op("xf",  qw{		++ --			}); _lp("fx", qw{ ++ -- });
-_op("yfx", qw{		**				});
-_op("yfx", qw{		! ~ \			}); _lp("fx", qw{ + - });
-_op("xfy", qw{		=~ !~			});
-_op("xfy", qw{		* / mod		});
+_op("yf",  qw{		dotref dot colon		}); _lp("yfx", qw{		dotref_go dot_go colon_go	dotref_at dot_at colon_at	dotref_of dot_of colon_of	});
+_op("fy",  my @named_unary_operators = qw{ ref pairs scalar defined length exists });
+_op("yf",  qw{		++ --			}); _lp("fy", qw{ ++ -- });
+_op("yfx", qw{		^				});
+_op("yfx", qw{		! +~ \			}); _lp("fy", qw{ + - });
+_op("xfy", qw{		=~ !~	~		});
+_op("xfy", qw{		* / mod **		});
 _op("xfy", qw{		+ - .				});
 _op("xfy", qw{		<< >>				});
-_op("fy",  my @named_unary_operators = qw{ ref pairs scalar defined length exists });
+# in perl in this: named unary operators
 _op("xfx", qw{	< > <= >= lt gt le ge		});
 _op("xfx", qw{	== != <=> eq ne cmp ~~		});
-_op("xfy", qw{		&					});
-_op("xfy", qw{		|  ^				});
+_op("xfy", qw{		+&					});
+_op("xfy", qw{		+|  +^				});
 _op("xfy", qw{		&&					});
 _op("xfy", qw{		|| //				});
 _op("xfx", qw{		..  to				});
@@ -457,11 +457,11 @@ sub masking {
 	\{ $re_space_ask \}							(?{ $self->atom('{}') }) |
 	\( $re_space_ask \)							(?{ $self->atom('()') }) |
 	
-	\[				 				(?{ $self->push('[', tag=>']')->{bro}=1 }) |
-	\{								(?{ $self->push('{', tag=>'}')->{bro}=1 }) |
-	\(								(?{ $self->push('(', tag=>')')->{bro}=1 }) |
+	\[				 				(?{ $self->push('[', tag=>']', bro=>1) }) |
+	\{								(?{ $self->push('{', tag=>'}', bro=>1) }) |
+	\(								(?{ $self->push('(', tag=>')', bro=>1) }) |
 	
-	(?<end_tag> [\]\}\)] )		 	(?{ $self->pop( $+{end_tag} )->{bro}=0 }) |
+	(?<end_tag> [\]\}\)] )		 	(?{ $self->pop( $+{end_tag} ) }) |
 	
 	(?<string>$re_string) 			(?{ $self->replace_dollar($+{string}) })  |
 	(?<var> $re_id ) \( 			(?{ $self->push('gosub', tag=>')') })  |
@@ -483,18 +483,18 @@ sub masking {
 		as			 						(?{ $self->op('as') }) 		|
 		q		 	(?{ $self->atom('q') }) 	|
 		user 		(?{ $self->atom('user') })  |
-		FOR			(?{ $self->push("for")->{then}="for_then" })  |
+		FOR			(?{ $self->push("for", then=>"for_then") })  |
 		IN			(?{ $self->op("in") })  |
 		OF			(?{ $self->op("of") })  |
 		TO			(?{ $self->op("to") })  |
 		STEP		(?{ $self->op("step") })  |
-		WHILE		(?{ $self->push('while')->{then}="while_then" }) |
+		WHILE		(?{ $self->push('while', then=>"while_then") }) |
 		REPEAT		(?{ $self->push('repeat', noend=>1) }) |
 		UNTIL		(?{ $self->pop('repeat')->push('until', endline=>1) }) |
-		IF			(?{ $self->push('if')->{then}="if_then" }) |
-		THEN		(?{ $self->endgosub->op($self->{then}); $self->{stack}[-2]{endline}=1; undef $self->{then} }) |
-		ELSEIF		(?{ $self->check(stmt=>"if", else=>"", then=>"")->endgosub->code('elseif')->top->{then}=1 }) |
-		ELSE		(?{ $self->check(stmt=>"if", else=>"", then=>"")->endgosub->code('else')->top->{else}=1 }) |
+		IF			(?{ $self->push('if', then=>"if_then") }) |
+		THEN		(?{ my $x=$self->{space}[-1]; $self->endgosub->op($x->{then}); $x->{endline}=1; undef $x->{then} }) |
+		ELSEIF		(?{ $self->check(stmt=>"if", else=>"", then=>"")->endgosub->op('elseif')->top->{then}=1 }) |
+		ELSE		(?{ $self->check(stmt=>"if", else=>"", then=>"")->endgosub->op('else')->top->{else}=1 }) |
 		END			(?{ $self->stmt_end }) |
 		MAP			(?{ $self->push('map', noend=>1) }) |
 		PAIRMAP		(?{ $self->push('pairmap', noend=>1) }) |
@@ -563,14 +563,14 @@ sub masking {
 sub stmt_endline {
 	my ($self) = @_;
 	
-	$self->endline;
+	my $top = $self->endline->top;
 	
-	if($self->{then}) {
+	if($top->{then}) {
 		$self->op($self->{then});
 		undef $self->{then};
 	}
-	elsif($self->{bro}) {
-		$self->op(",");
+	elsif($top->{bro}) {
+		#$self->op(",") if !$self->{front};
 	}
 	else {
 		$self->op("endline");
@@ -668,7 +668,7 @@ sub endline {
 	my ($self) = @_;
 	my $S = $self->{stack};
 	while(@$S && $S->[-1]{endline}) {	# если есть endline - сбрасываем
-		$self->xpop;
+		$self->pop;
 	}
 	$self
 }
@@ -678,7 +678,7 @@ sub endgosub {
 	my ($self) = @_;
 	my $S = $self->{stack};
 	while(@$S && $S->[-1]{gosub}) {
-		$self->xpop;
+		$self->pop;
 	}
 	$self
 }
@@ -753,6 +753,7 @@ sub parse {
 	
 	$self->{stack} = [];
 	$self->{terms} = [];
+	$self->{space} = [];
 	$self->{front} = 1;
 	$self->{lineno} = 1;
 	$self->{INHERITS} = undef;
@@ -1230,6 +1231,17 @@ sub get_name {
 	$name
 }
 
+
+# возвращает колоризированный массив стеков для trace и error
+sub color_stacks {
+	my ($self) = @_;
+	local $_;
+	return ":space",
+		":dark white", "\tC:", ":reset", map({ $_->{stmt} } @{$self->{space}}),
+		":dark white", "\tT:", ":reset", map({ $_->{stmt} } @{$self->{terms}}),
+		":dark white", "\tS:", ":reset", map({ defined($_->{prio})? (":bold blue", $_->{stmt}, ":reset"): $_->{stmt} } @{$self->{stack}})
+}
+
 # отображает операции со стеком в лог
 sub trace {
 	my ($self, $op, $top) = @_;
@@ -1249,8 +1261,7 @@ sub trace {
 		}
 		
 		if(1) {
-			push @after, ":dark white", "\tT:", ":reset", map { $_->{stmt} } @{$self->{terms}};
-			push @after, ":dark white", "\tS:", ":reset", map { defined($_->{prio})? (":bold blue", $_->{stmt}, ":reset"): $_->{stmt} } @{$self->{stack}};
+			push @after, $self->color_stacks;
 		}
 		
 		$app->log->info( ":space", "$self->{lineno}:", ($op eq "+" || $op eq "↑"? ":red": $op eq "-"? ":bold blue": $op eq "∧"? ":red": $op eq "∨"? ":bold blue": ":dark white"), $op, $stmt, ":reset", @after );
@@ -1264,41 +1275,28 @@ sub error {
 	my ($self, $msg) = @_;
 	local ($_, $`, $', $&);
 	
-	$app->log->error( "$self->{file}:$self->{lineno}: $msg", ":dark white space", "S:", ":reset", map({ $_->{stmt} } @{$self->{stack}}), ":dark white", "T:", ":reset", map({ $_->{stmt} } @{$self->{terms}}) );
+	my $color_msg = $app->log->colorized( "$self->{file}:$self->{lineno}: $msg", $self->color_stacks );
 	
-	die "$self->{file}:$self->{lineno}: $msg";
+	die "$self->{file}:$self->{lineno}: $color_msg";
 }
 
-# проверяет параметры на верхушке стека и выбрасывает ошибку, если они не совпадают
-sub check {
+# проверяет параметры на верхушке стека скобок и выбрасывает ошибку, если они не совпадают
+sub _check {
 	my $self = shift;
-	my $top = $self->top;
 	for(my $i=0; $i<@_; $i+=2) {
 		my ($k, $v) = @_[$i, $i+1];
-		next if $k eq "e";
-		if( $top->{$k} ne $v ) {
+		next if $k == 1;
+		if( $_->{$k} ne $v ) {
 			my %check = @_;
-			$self->error($check{e}? $check{e}: "$check{stmt}: не совпадает $k в стеке. Оно $top->{$k}, а должно быть $v");
+			$self->error(exists($check{1})? $check{1}: "$check{stmt}: не совпадает $k в стеке. Оно $_->{$k}, а должно быть $v");
 		}
 	}
 	$self
 }
 
-# проверяет параметры в self
-sub selfcheck {
-	my $self = shift;
-	for(my $i=0; $i<@_; $i+=2) {
-		my ($k, $v) = @_[$i, $i+1];
-		next if $k eq "e";
-		if( $self->{$k} ne $v ) {
-			my %check = @_;
-			$self->error($check{e}? $check{e}: "$check{stmt}: не совпадает $k. Оно $self->{$k}, а должно быть $v");
-		}
-	}
-	$self
-}
-
-
+sub check { local $_ = $_[0]->{space}[-1]; goto &_check}
+sub opcheck { local $_ = $_[0]->{stack}[-1]; goto &_check}
+sub atcheck { local $_ = $_[0]->{terms}[-1]; goto &_check}
 
 
 # # добавляет операнд или оператор
@@ -1437,33 +1435,15 @@ sub op {
 
 # добавляет открывающую скобку
 sub push {
-	my $self = shift;
-	my $push = {%+, 'stmt', @_};
+	my $self = shift; 
+	my $push = {%+, 'stmt', @_, 'T+' => 1 + @{$self->{terms}} };
 	
 	$self->{front} = 1;
 	
-	my $stack = $self->{stack};	
-	push @$stack, $push;
+	push @{$self->{stack}}, $push;
+	push @{$self->{space}}, $push;
 	
 	$self->trace("+", $push);
-	
-	$self
-}
-
-# выбросить без проверки
-sub xpop {
-	my ($self) = @_;
-	
-	my $S = $self->{stack};
-	my $T = $self->{terms};
-	
-	$self->error("стек T пуст: невозможно достать операнд для скобки") if !@$T;
-	
-	my $sk = pop @$S;
-	$sk->{right} = pop @$T;
-	push @$T, $sk;
-	
-	$self->trace("-", $sk);
 	
 	$self
 }
@@ -1476,22 +1456,31 @@ sub pop {
 	
 	my $S = $self->{stack};
 	my $T = $self->{terms};
+	my $C = $self->{space};
 	
 	# ошибка
-	$self->error("нет открывающей скобки к $stag") if !@$S;
+	$self->error("нет открывающей скобки" . (defined($stag)? "к $stag": "")) if !@$S;
 	
 	# выбрасываем все операторы до скобки
 	while(@$S && defined $S->[-1]{prio}) {
 		$self->popop;
 	}
 	
-	$self->error("нет открывающей скобки к $stag - стек S пуст") if !@$S;
+	$self->error("нет открывающей скобки ".(defined($stag)? "к $stag ": "")."- стек S пуст") if !@$S;
+	$self->error("нет открывающей скобки ".(defined($stag)? "к $stag ": "")."- стек С пуст") if !@$C;
 	
 	my $sk = pop @$S;
-	my $tag = $sk->{tag} // $sk->{stmt};
-	$self->error("закрывающая скобка $stag конфликтует со скобкой $tag") if $tag ne $stag;
+	my $Sk = pop @$C;
 	
-	$self->error("стек T пуст: невозможно достать операнд для скобки") if !@$T;
+	
+	$self->error("скобка $Sk->{stmt} не смогла закрыться. Проверьте скобки между открывающейся и закрывающейся этими скобками") if $sk != $Sk;
+	
+	$self->error("при закрытии скобки $stag выброшено ".(@$T < $sk->{'T+'}? 'больше': 'меньше')." терминалов чем нужно") if $sk->{'T+'} != @$T;
+	
+	my $tag;
+	$self->error("закрывающая скобка $stag конфликтует со скобкой $tag") if defined $stag and ($tag = $sk->{tag} // $sk->{stmt}) ne $stag;
+	
+	#$self->error("стек T пуст: невозможно достать операнд для скобки") if !@$T;
 	
 	$sk->{right} = pop @$T;
 	push @$T, $sk;
@@ -1504,10 +1493,27 @@ sub pop {
 # просматривает вершину стека
 sub top {
 	my ($self) = @_;
+	my $С = $self->{space};
+	$self->error("нет элементов в стеке скобок") if @$С == 0;
+	$С->[-1]
+}
+
+# просматривает вершину стека
+sub optop {
+	my ($self) = @_;
 	my $S = $self->{stack};
-	$self->error("нет элементов в стеке") if @$S == 0;
+	$self->error("нет элементов в стеке операторов") if @$S == 0;
 	$S->[-1]
 }
+
+# просматривает вершину стека
+sub attop {
+	my ($self) = @_;
+	my $T = $self->{terms};
+	$self->error("нет элементов в стеке терминалов") if @$T == 0;
+	$T->[-1]
+}
+
 
 # # просматривает вершину стека, если в стеке ничего нет выдаёт {}
 # sub etop {
@@ -1516,11 +1522,11 @@ sub top {
 	# $count>0? $self->{stack}->[$count-1]: {};
 # }
 
-# стек пуст
-sub empty {
-	my ($self) = @_;
-	@{$self->{stack}} == 0;
-}
+# # стек пуст
+# sub empty {
+	# my ($self) = @_;
+	# @{$self->{stack}} == 0;
+# }
 
 
 
@@ -1587,6 +1593,7 @@ sub eval {
 	$self->{file} = $path;	
 	$self->{stack} = [];
 	$self->{terms} = [];
+	$self->{space} = [];
 	$self->{front} = 1;
 	$self->{lineno} = 1;
 	$self->{INHERITS} = undef;

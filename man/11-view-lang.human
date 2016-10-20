@@ -14,6 +14,8 @@
 	
 [test]
 
+== Операторы
+
 == Выражения
 
 	$res = $app->view->create(q{});
@@ -78,7 +80,7 @@
 	
 Доступ к элементу хэша:
 	
-	$res = $app->view->createlog(q{<% GET x={a=>{b=>5}}; "$x:a:b" %>});
+	$res = $app->view->create(q{<% GET x={a=>{b=>5}}; "$x:a:b" %>});
 
 	$res;	# 5
 	
