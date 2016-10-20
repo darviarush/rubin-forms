@@ -397,9 +397,12 @@ _op("xfx", qw{		..  to				});
 _op("yfx", qw{		= += -= *= /=			});				# goto last next redo dump
 _op("xfy", qw{		, =>					});
 #_op("xfx", qw{	list operators (rightward)});
-_op("yfx", qw{	not						});
-_op("xfy", qw{	and						});
-_op("xfy", qw{	or						});
+_op("yfx", qw{		not						});
+_op("xfy", qw{		and						});
+_op("xfy", qw{		or						});
+_op("xfy", qw{		;						});
+_op("xfy", qw{		endline					});
+_op("xfy", qw{		then elseif else		});
 
 
 my $named_unary_operators = join "|", @named_unary_operators;
@@ -667,7 +670,11 @@ sub endgosub {
 	# $self
 # }
 
-
+# выбрасывает операторы
+sub endop {
+	my ($self) = @_;
+	$self
+}
 
 
 # заменяет переменные в строке
@@ -1282,23 +1289,18 @@ sub code_add {
 	my ($self, $push) = @_;
 	
 	my $stmt = $push->{stmt};
-	my $OP = $self->{OP};		# 0 - пришёл оператор, 1 - операнд или постфиксный оператор
+	my $OP = $self->top->{OP};		# 1-после операнда или постфиксного оператора
 	
-	my $operator = exists $INFIX{ $stmt };
+	# a++ b - gosub			после a уст. 1
+	# a b - gosub
+	# a +b = a + b
+	# a + -b
+	
+	
+	my $operator = $OP? $INFIX{ $stmt } || $POSTFIX{ $stmt }: ;
 	if(!$operator && $OP) {			# обнаружен gosub
-		
-	}
-	
-	if($operator && $OP) {
-	}
-	
-	# преобразуем переменную или незакончившийся вызов метода в gosub
-	if( !exists $push->{operator}
-		and !exists $push->{of}
-		and @{$code = $self->top->{code}}
-		and exists(( my $prev = $code->[$#$code] )->{var})
-	) {
-		if(exists $prev->{tag} or exists $prev->{gosub}) {
+		# преобразуем переменную или незакончившийся вызов метода в gosub
+		if(exists $OP->{tag} or exists $OP->{gosub}) {
 			push @$code, $prev = {stmt => 'gosub', var => 1, endline => 1, gosub => 1};
 		}
 		else {
@@ -1309,8 +1311,14 @@ sub code_add {
 		push @{$self->{stack}}, $prev;
 		$self->trace("↑", $prev);
 	}
+	elsif(!$operator && !($operator = $POSTFIX{ $stmt })) {	# пришёл операнд
+		
+	}
+	else {
+		$operator = 
+	}
 	
-	push @{$self->top->{code}}, $push;
+	push @{$self->top->{'$'}}, $push;
 	
 	$self
 }
