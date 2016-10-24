@@ -15,6 +15,8 @@ my $re_id = $R::Re::id;
 my $re_endline = $R::Re::endline;
 my $re_number = $R::Re::number;
 
+my $OPERATORTABLE = __PACKAGE__->new;
+
 # конструктор
 sub new {
 	my ($cls) = @_;
@@ -30,6 +32,13 @@ sub new {
 		
 		route => {},			# все роутеры route->{key} = [1-<% ACTION %>|2-on|0-cls, cls, sub|sub_name]
 		trace => "EXAMPLE",		# файл трейс которого показать
+		
+		PREFIX => {%{$OPERATORTABLE->{PREFIX}}},			# операторы
+		INFIX => {%{$OPERATORTABLE->{INFIX}}},			# операторы 
+		POSTFIX => {%{$OPERATORTABLE->{POSTFIX}}},			# операторы
+		
+		PRIO => 0,				# инкремент приоритета
+		
 		lineno => 1,			# номер строки в текущем файле
 		stack => undef,			# стек операторов
 		terms => undef,			# стек операндов
@@ -277,7 +286,6 @@ sub parsefile {
 my $re_space = qr/[\ \t]+/;
 my $re_space_ask = qr/[\ \t]*/;
 my $re_rem = qr/[\ \t]*(?:(?:\#|\brem\b)(?<rem>[^\n\r]*))?/i;
-my $re_endlines = qr/ (\s* $re_rem $re_endline )+ /x;
 my $re_sk = qr/[\[\{\(]/;
 my $re_arg = qr/(?:$re_id|\*)/o;
 my $re_class = qr/$re_id(?:::$re_id)*/o;
@@ -341,80 +349,111 @@ our %FIX = (
 	fy => $fy,
 );
 
-# приоритет операторов
-my(%INFIX, %PREFIX, %POSTFIX, $_PRIO);
 
-sub _op {
+# ячейка таблицы операторов
+sub td {
+	my $self = shift;
 	my $type = shift;
 	
 	my $fix = $FIX{$type};
-	die "нет $type префикса" if !defined $fix;
+	die "нет $type фикса" if !defined $fix;
 
-	my $p = {
-		prio=>$_PRIO++,
+	my %p = (
+		prio=>$_PRIO,
 		fix=>$fix,
 		type=>$type,
-	};
+	);
 	
-	if($fix & $infix) {
-		for my $x (@_) {
-			die "оператор $type `$x` уже объявлен" if exists $INFIX{$x};
-			$INFIX{$x} = $p;
-		}
+	my $key = $fix & $infix? "INFIX": $fix & $prefix? "PREFIX": "POSTFIX";
+	for my $x (@_) {
+		die "оператор $type `$x` уже объявлен" if exists $self->{$key}{$x};
+		$self->{$key}{$x} = {%p, name=>"$type $x"};
 	}
-	elsif($fix & $prefix) {
-		for my $x (@_) {
-			die "оператор $type `$x` уже объявлен" if exists $PREFIX{$x};
-			$PREFIX{$x} = $p;
-		}
-	}
-	else {
-		for my $x (@_) {
-			die "оператор $type `$x` уже объявлен" if exists $POSTFIX{$x};
-			$POSTFIX{$x} = $p;
-		}
-	}
-	
+
+	$self
 }
 
-sub _lp { $_PRIO--; goto &_op }
+# строка таблицы операторов
+sub tr { my $self = shift; $self->{PRIO}++; $self->td(@_) if @_; $self }
 
-_op("yf",  qw{		dotref dot colon		}); _lp("yfx", qw{		dotref_go dot_go colon_go	dotref_at dot_at colon_at	dotref_of dot_of colon_of	});
-_op("fy",  my @named_unary_operators = qw{ ref pairs scalar defined length exists });
-_op("yf",  qw{		++ --			}); _lp("fy", qw{ ++ -- });
-_op("yfx", qw{		^				});
-_op("yfx", qw{		! +~ \			}); _lp("fy", qw{ + - });
-_op("xfy", qw{		=~ !~	~		});
-_op("xfy", qw{		* / mod **		});
-_op("xfy", qw{		+ - .				});
-_op("xfy", qw{		<< >>				});
+# формирует список имён операторов
+sub operators {
+	my ($self) = @_;
+	keys +{ %{$self->{INFIX}}, %{$self->{PREFIX}}, ${$self->{POSTFIX}} };
+}
+
+# операторы-слова
+sub wordoperators {
+	my ($self) = @_;
+	grep { /^\w+$/ } $self->operators
+}
+
+# операторы начинающиеся на слово, но заканчивающиеся на не слово
+sub prewordoperators {
+	my ($self) = @_;
+	grep { /^\w+\W+$/ } $self->operators
+}
+
+# операторы содержащие слово
+sub inwordoperators {
+	my ($self) = @_;
+	grep { /^\W+\w+\W+$/ } $self->operators
+}
+
+# операторы заканчивающиеся на слово, но не начинающиеся на слово
+sub postwordoperators {
+	my ($self) = @_;
+	grep { /^\W+\w+$/ } $self->operators
+}
+
+# операторы не содержащие слов
+sub nowordoperators {
+	my ($self) = @_;
+	grep { !/\w/ } $self->operators
+}
+
+{
+my $s = $OPERATORTABLE;
+	
+$s->tr("yf",  qw{		dotref dot colon		})->td("yfx", qw{		dotref_go dot_go colon_go	dotref_at dot_at colon_at	dotref_of dot_of colon_of	});
+$s->tr("fy",  my @named_unaryoperators = qw{ ref pairs scalar defined length exists });
+$s->tr("yf",  qw{		++ --			})->td("fy", qw{ ++ -- });
+$s->tr("yfx", qw{		^				});
+$s->tr("yfx", qw{		! +~ \			})->td("fy", qw{ + - });
+$s->tr("xfy", qw{		=~ !~	~		});
+$s->tr("xfy", qw{		* / % mod **		});
+$s->tr("xfy", qw{		+ - .				});
+$s->tr("xfy", qw{		<< >>				});
 # in perl in this: named unary operators
-_op("xfx", qw{	< > <= >= lt gt le ge		});
-_op("xfx", qw{	== != <=> eq ne cmp ~~		});
-_op("xfy", qw{		+&					});
-_op("xfy", qw{		+|  +^				});
-_op("xfy", qw{		&&					});
-_op("xfy", qw{		|| //				});
-_op("xfx", qw{		..  to				});
-#_op("yfx", qw{		?:					});
-_op("yfx", qw{		= += -= *= /= &&= ||= //=  and= or= xor= []= <<=	});				# goto last next redo dump
-_op("xfy", qw{		, =>					});
-#_op("xfx", qw{	list operators (rightward)});
-_op("yfx", qw{		not						});
-_op("xfy", qw{		and						});
-_op("xfy", qw{		or	xor					});
-_op("yfx", qw{		as						});
+$s->tr("xfx", qw{	< > <= >= lt gt le ge		});
+$s->tr("xfx", qw{	== != <=> eq ne cmp ~~		});
+$s->tr("xfy", qw{		+&					});
+$s->tr("xfy", qw{		+|  +^				});
+$s->tr("xfy", qw{		&&					});
+$s->tr("xfy", qw{		|| //				});
+$s->tr("xfx", qw{		..  to				});
+#$s->tr("yfx", qw{		?:					});
+$s->tr("yfx", qw{		= += -= *= /= &&= ||= //=  and= or= xor= ,= =, <<=	});				# goto last next redo dump
+$s->tr("xfy", qw{		, =>					});
+#$s->tr("xfx", qw{	list operators (rightward)});
+$s->tr("yfx", qw{		not						});
+$s->tr("xfy", qw{		and						});
+$s->tr("xfy", qw{		or	xor					});
+$s->tr("yfx", qw{		as						});
 
-_op("xfy", qw{		;						});
-_op("xfy", qw{		endline					});
+$s->tr("xfy", qw{		;						});
+$s->tr("xfy", qw{		endline					});
 
-_op("xfy", qw{		CAT						});			# операция конкантенации в шаблонах
+$s->tr("xfy", qw{		CAT						});			# операция конкантенации в шаблонах
+};
 
+#//= | // | \|\|= | \|\| | &&= | && | <<= | >>= | << | >> | <=> | => | =~ | !~ | \+\+ | -- | ~~ | \*= | \+= | -= | /= | == | != | <= | >= | < | > | ! | - | \+ | \* | / | \^ | ~ | % | \.\.\. | \.\. | \.= | \. | \? | : | , | \@ | %
 
-$PREFIX{"+"}{stmt} = "+u";
-$PREFIX{"-"}{stmt} = "-u";
+#my $named_unary_operators = join "|", @named_unary_operators;
 
-my $named_unary_operators = join "|", @named_unary_operators;
+my $re_nowordoperators = join "|", map { quotemeta $_ } $self->nowordoperators;
+my $re_prewordoperators = join "|", map { quotemeta $_ } $self->prewordoperators;
+my $re_wordoperators = join "|", $self->wordoperators;
 
 my %CloseTag = qw/ ( ) { } [ ] /;
 my %OpenNameVar = qw/ ( var_go { var_of [ var_at /;
@@ -433,14 +472,16 @@ sub masking {
 	local ($&, $_, $`, $');
 	
 	#my $IN = 1;
+	my $re_endlines = qr/ (\s* $re_rem $re_endline (?{ $self->{lineno}++ }) )+ /x;
+	
 	
 	while($_[1] =~ m{
 	
 	# в начале и конце не катит
-	^ $re_endlines 		(?{ $self->{lineno}+=$app->perl->lines($+{space}) }) |
-	$re_endlines $		(?{ $self->{lineno}+=$app->perl->lines($+{space}) }) |
+	^ $re_endlines 		|
+	$re_endlines $		|
 	
-	(?<space> $re_endlines)		(?{ $self->{lineno}+=$app->perl->lines($+{space}); $self->stmt_endline }) |
+	$re_endlines		(?{ $self->stmt_endline }) |
 	
 	\s+				|		# пропускаем пробелы
 	
@@ -513,7 +554,7 @@ sub masking {
 		
 		(?<word> undef|next|last|redo|return|use|wantarray ) 		(?{ $self->atom('word', word=>lc $+{word}) }) |
 		
-		(?<name> $named_unary_operators )		(?{ $self->op('unary') }) |
+		(?<name> $re_wordoperators )		(?{ $self->op($+{name}) }) |
 
 		
 		
@@ -544,10 +585,7 @@ sub masking {
 	(?<var>$re_id)			(?{ $self->atom('var') })  |
 	(?<num>$re_number)		(?{ $self->atom('num') })  |
 	
-	%			(?{ $self->op("mod") })  |
-	
-	(?<operator> //= | // | \|\|= | \|\| | &&= | && | <<= | >>= | << | >> | <=> | => | =~ | !~ | \+\+ | -- | ~~ | \*= | \+= | -= | /= | == | != | <= | >= | < | > | ! | - | \+ | \* | / | \^ | ~ | % | \.\.\. | \.\. | \.= | \. | \? | : | , | \@ )
-		(?{ $self->op($+{operator}) })  |
+	(?<name>$re_nowordoperators )	(?{ $self->op($+{name}) })  |
 		
 	=		(?{ $_[2] = 1; $self->op('=') })  |
 
