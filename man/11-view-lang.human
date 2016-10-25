@@ -14,6 +14,38 @@
 	
 [test]
 
+== Операторы
+
+== Выражения
+
+	$res = $app->view->create(q{});
+	
+	$res;		# 
+
+	$res = $app->view->create(q{123});
+	
+	$res;		# 123
+
+	$res = $app->view->create(q{<% GET 5 + 6 * 10 - 12 %>});
+
+	$res;	# 53
+	
+	$res = $app->view->create(q{<% GET (5 + (6)) * 10 %>});
+
+	$res;	# 110
+	
+	$res = $app->view->create(q{<% GET - 6 %>});
+
+	$res;	# -6
+	
+	$res = $app->view->create(q{<% GET 5 + - 6 %>});
+
+	$res;	# -1
+	
+	$res = $app->view->create(q{<% GET -5+(- 6)*10 %>});
+
+	$res;	# -65
+
 == Переменные и цифры
 
 	$res = $app->view->create(q{<% GET a=10; a %>});
@@ -66,10 +98,11 @@
 			2
 		]
 		push @a, 10, @c, 11
+		a[] = 15, 12
 		join ",", @a 
 	%>});
 	
-	$res;	# 10,1,2,11
+	$res;	# 10,1,2,11,15,12
 	
 == Хэши
 
