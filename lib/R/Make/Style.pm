@@ -41,6 +41,8 @@ sub sprite {
 	use File::Basename;
 	use POSIX qw/strftime/;
 
+	my $border = " -bordercolor transparent -border 1 ";
+	
 	$" = " ";
 
 	while(<html/sprite/*>) {
@@ -77,11 +79,14 @@ sub sprite {
 		my @img = ();
 		for my $info (@info) {	
 			my $file = $info->{file};
-			my $width = $info->{width};
-			my $height = $info->{height};
+			my $real_width = $info->{width};
+			my $real_height = $info->{height};
+			my $width = $real_width+2;
+			my $height = $real_height+2;
+
 			
 			if($x+$width >= $max_width) {
-				$add .= " +append \\) \\( " if $append > 0;
+				$add .= " $border +append \\) \\( " if $append > 0;
 				$y += $max_y;
 				$x = 0;
 				$max_y = 0;
@@ -90,7 +95,9 @@ sub sprite {
 
 			$add .= ' '.$file;
 			my $sel = $app->file($dir)->name . "-" . $app->file($file)->name;
-			push @img, ".$sel { background-position: -${x}px -${y}px; width: ${width}px; height: ${height}px }\n";
+			my $real_x = $x+1;
+			my $real_y = $y+1;
+			push @img, ".$sel { background-position: -${real_x}px -${real_y}px; width: ${real_width}px; height: ${real_height}px;}\n";
 			push @css, ".".$sel;
 
 			$x+=$width;
@@ -103,7 +110,7 @@ sub sprite {
 		print $f join(", ", @css)." { background: url(\"/$url?update=".strftime("%F_%T", localtime)."\") no-repeat; display: -moz-inline-stack; display: inline-block; *zoom: 1; *display: inline; }\n\n".join("", @img);
 		close $f;
 		
-		$add .= " +append \\) \\( ";
+		$add .= " $border +append \\) \\( ";
 		
 		my $cmd = "convert -background transparent \\( $add \\) -append $sprite";
 		print `$cmd`;

@@ -145,7 +145,7 @@ exts - расширения файлов через точку с запятой
 regexp - регулярное выражение для замены в файле
 sub - текст для замены, может содержать \$1-10, \$& и \$1:camel
 ";
-task {
+sub replace {
 	my ($files, $exts, $regexp, $sub);
 	
 	if(@_ == 2) { ($regexp, $sub) = @_; }
@@ -163,14 +163,14 @@ task {
 		my $is = s!$regexp!$sub!g;
 		print( ($is? "*  ": "   ") . $file->path . "\n");
 	});
-};
+}
 
 
 
 name "chmod";
 args "";
 desc "изменяет права файлов на 0600, а директорий на 0744";
-task {
+sub chmod {
 	my @hide = qw/lib migrate model man var view etc ex .gitignore Makefile/;
 	my @front = qw/html/;
 	
@@ -182,7 +182,7 @@ task {
 	
 	$app->log->info("изменены права файлов на стандартные");
 	
-};
+}
 
 
 name "mk";

@@ -1,0 +1,34 @@
+= Язык шаблонизатора R::View
+
+== Инициализация фреймворка
+
+[init]
+
+	use common::sense;
+	use lib "lib";
+	use R::App qw/$app msg msg1/;
+	
+	$app->man->conf;
+	
+	my $res;
+	
+[test]
+
+
+== 
+
+Синтаксический анализатор 
+
+	my $s = $app->syntax->new;
+	
+	$s->tr("yf", qw/+ -/);
+	$s->tr("xfy", qw/* \//)->td("xf", qw//);
+	$s->tr("xfy", qw/+ -/);
+	
+	$s->templates(
+		"+" => "",
+	);
+	
+	while("a + -b" =~ m{
+		
+	}gx) {};

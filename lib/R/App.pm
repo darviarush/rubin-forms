@@ -3,15 +3,18 @@ package R::App;
 
 use common::sense;
 
-use List::Util qw/pairmap reduce/;
+use List::Util qw/pairmap pairgrep pairkeys pairvalues pairfirst first reduce all any/;
 use Scalar::Util qw/blessed looks_like_number/;
+use Time::HiRes qw/sleep/;
 
 #use Exporter 'import';
 
 
 # импортирует в вызывавший модуль функции
-my %EXPORT = ('$app' => 'app', map {$_=>1} qw/app msg msg1 has has_const Isa Can Num closure pairmap reduce todo
+my %EXPORT = ('$app' => 'app', map {$_=>1} qw/app msg msg1 has has_const Isa Can Num closure todo
 in out body invariant RETURN assert
+pairmap pairgrep pairkeys pairvalues pairfirst first reduce all any
+sleep
 /);
 sub import {
 	my $self = shift;
@@ -199,10 +202,12 @@ sub file {
 
 # возвращает app->{ini}
 sub ini {
-	require R::Ini;
-	my $ini = R::Ini->new;
-	*ini = sub { $ini };
-	$ini
+	if(@_==1) {
+		require R::Ini;
+		$app->{ini} = R::Ini->new;
+	}
+	*ini = sub { @_>1? do { $app->{ini}=$_[1]; $_[0] }: $app->{ini} };
+	goto &ini;
 }
 
 ### Контрактное программирование ###
