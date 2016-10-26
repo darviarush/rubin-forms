@@ -376,11 +376,13 @@ sub td {
 # строка таблицы операторов
 sub tr { my $self = shift; $self->{PRIO}++; $self->td(@_) if @_; $self }
 
+
 # формирует список имён операторов
 sub operators {
 	my ($self) = @_;
 	keys +{ %{$self->{INFIX}}, %{$self->{PREFIX}}, ${$self->{POSTFIX}} };
 }
+
 
 # операторы-слова
 sub wordoperators {
@@ -394,11 +396,13 @@ sub prewordoperators {
 	grep { /^\w+\W+$/ } $self->operators
 }
 
+
 # операторы содержащие слово
 sub inwordoperators {
 	my ($self) = @_;
 	grep { /^\W+\w+\W+$/ } $self->operators
 }
+
 
 # операторы заканчивающиеся на слово, но не начинающиеся на слово
 sub postwordoperators {
@@ -443,6 +447,11 @@ $s->tr("yfx", qw{		as						});
 
 $s->tr("xfy", qw{		;						});
 $s->tr("xfy", qw{		endline					});
+
+$s->tr("xfy", qw{		;						});
+$s->tr("xfy", qw{		endline					});
+$s->tr("xfy", qw{		then elseif else		});
+
 
 $s->tr("xfy", qw{		CAT						});			# операция конкантенации в шаблонах
 };
@@ -720,7 +729,6 @@ sub endgosub {
 	}
 	$self
 }
-
 
 # заменяет переменные в строке
 #my $re_id = $R::Re::id;
@@ -1399,26 +1407,34 @@ sub atom {
 sub popop {
 	my ($self) = @_;
 	
-	my $S = $self->{stack};
-	my $T = $self->{terms};
+	my $front = $self->{front};
+	my $op = $self->{OP};
+	my $stmt = $push->{stmt};
+	#my $OP = $self->top->{OP};		# 1-после операнда или постфиксного оператора
 	
-	$self->error("стек S пуст") unless my $operator = pop @$S;
-	$self->error("стек T пуст") unless my $operand2 = pop @$T;
+	# a++ b - gosub			после a уст. 1
+	# a b - gosub
+	# a +b = a + b
+	# a + -b
 	
-	my $fix = $operator->{fix};
-	if($fix & $infix) {
-		$self->error("стек T пуст") unless my $operand1 = pop @$T;
-		$operator->{left} = $operand1;
-		$operator->{right} = $operand2;
-	} elsif($fix & $prefix) {
-		$operator->{right} = $operand2;
-	}
-	else {
-		$operator->{left} = $operand2;
-	}
 	
-	push @$T, $operator;
-	$self->trace("∨", $operator);
+	
+	# if(!$operator && $OP) {			# обнаружен gosub
+		# # преобразуем переменную или незакончившийся вызов метода в gosub
+		# if(exists $OP->{tag} or exists $OP->{gosub}) {
+			# push @$code, $prev = {stmt => 'gosub', var => 1, endline => 1, gosub => 1};
+		# }
+		# else {
+			# $prev->{gosub} = 1;
+			# $prev->{endline} = 1;
+			# $prev->{stmt} .= "_go";
+		# }
+		# push @{$self->{stack}}, $prev;
+		# $self->trace("↑", $prev);
+
+
+	#push @$T, $operator;
+	#$self->trace("∨", $operator);
 	
 	$self
 }
