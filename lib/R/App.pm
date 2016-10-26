@@ -7,11 +7,8 @@ use List::Util qw/pairmap pairgrep pairkeys pairvalues pairfirst first reduce al
 use Scalar::Util qw/blessed looks_like_number/;
 use Time::HiRes qw/sleep/;
 
-#use Exporter 'import';
-
-
 # импортирует в вызывавший модуль функции
-my %EXPORT = ('$app' => 'app', map {$_=>1} qw/app msg msg1 has has_const Isa Can Num closure todo
+my %EXPORT = ('$app' => 'app', map {$_=>1} qw/app msg msg1 has has_const Isa Can Num closure todo qsort nsort
 in out body invariant RETURN assert
 pairmap pairgrep pairkeys pairvalues pairfirst first reduce all any
 sleep
@@ -162,16 +159,26 @@ sub Num ($) {
 	goto &looks_like_number;
 }
 
-# порождает параметры для переданного метода
-# sub public (@) {
-	# my ($class) = caller(0);
-	# for(my $i=0; $i < @_; $i+=2) {
-		# my ($key, $val) = @_[$i, $i+1];
-		# my $name = "${class}::$key";
-		# eval "sub $name { if(\@_>1) { \$_[0]->{'$key'} = \$_[1]; \$_[0] } else { \$_[0]->{'$key'} } }";
-	# }
-	# @_
-# }
+# построчная сортировка
+sub qsort (&@) {
+	my $code = shift;
+	sort {
+		$_ = $a; my $x = $code->();
+		$_ = $b; my $y = $code->();
+		$x cmp $y
+	} @_
+}
+
+# почисловая сортировка
+sub nsort (&@) {
+	my $code = shift;
+	sort {
+		$_ = $a; my $x = $code->();
+		$_ = $b; my $y = $code->();
+		$x <=> $y
+	} @_
+}
+
 
 # замыкание:
 #	closure \&{$self->can("method")}, $self

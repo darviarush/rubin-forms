@@ -239,6 +239,7 @@ sub reduce {
 # сортирует файлы
 sub sort {
 	my ($self, $code) = @_;
+	local $_;
 	if(@_ == 1) {
 		@{$self->{files}} = sort @{$self->{files}};
 	}
