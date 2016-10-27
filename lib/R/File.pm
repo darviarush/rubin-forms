@@ -519,7 +519,7 @@ sub owned {
 # -C  Same for inode change time (Unix, may differ for other platforms)
 
 
-# подсчитывает размер всех файлов в папках
+# подсчитывает размер всех файлов и папок
 sub space {
 	my ($self) = @_;
 	my $space = 0;
