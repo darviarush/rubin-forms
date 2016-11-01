@@ -121,8 +121,8 @@ name "del13";
 args "";
 desc "удаляет 13-й символ";
 sub del13 {
-	
-	$app->file("etc", "lib", "view", "migrate", "model", "html", "man", $0)->find("*.{pm|pl|man|human|html|ini}")->replace(sub { print $_[0]->path . "\n" if s/\r//g })
+	# "etc", "lib", "view", "migrate", "model", "html", "man", $0
+	$app->file(".")->encode(undef)->find("*.{pm|pl|man|human|*htm*|js|css|coffee|yml|ini|*php*|twig|tmpl}")->replace(sub { print $_[0]->path . "\n" if s/\r//g })
 	
 }
 
@@ -171,16 +171,26 @@ name "chmod";
 args "";
 desc "изменяет права файлов на 0600, а директорий на 0744";
 sub chmod {
-	my @hide = qw/lib migrate model man var view etc ex .gitignore Makefile/;
-	my @front = qw/html/;
+
+	if( $app->file(".git")->isdir ) {
+
+		my @hide = qw/lib migrate model man var view etc ex .gitignore Makefile/;
+		my @front = qw/html/;
+		
+		$app->file(@hide)->find("-f")->mod(0600);
+		$app->file((@hide, @front))->find("-d")->mod(0744);
+		
+		$app->file(@front)->find("-f")->mod(0622);
+		$app->file($app->project_name)->mod(0700);
+		
+		$app->log->info("изменены права файлов на стандартные");
+	}
+	else {
+		$app->file(".")->find("-f", sub { $_->mod!=0622 })->mod(0622)->then(sub { print "-f 0622\t" . $_->path . "\n" });
+		$app->file(".")->find("-d", sub { $_->mod!=0744 })->mod(0744)->then(sub { print "-d 0744 " . $_->path . "\n" });
+	}
 	
-	$app->file(@hide)->find("-f")->mod(0600);
-	$app->file((@hide, @front))->find("-d")->mod(0744);
 	
-	$app->file(@front)->find("-f")->mod(0622);
-	$app->file($app->project_name)->mod(0700);
-	
-	$app->log->info("изменены права файлов на стандартные");
 	
 }
 
