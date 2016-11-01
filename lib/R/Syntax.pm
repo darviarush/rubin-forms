@@ -216,49 +216,6 @@ sub lexx {
 
 ###############################  синтаксический разбор  ###############################
 
-=pod таблица приведения
-
-
-
-=cut
-
-
-
-# выбрасывает оператор
-sub popop {
-	my ($self) = @_;
-	
-	my $front = $self->{front};
-	my $op = $self->{OP};
-	my $stmt = $push->{stmt};
-	#my $OP = $self->top->{OP};		# 1-после операнда или постфиксного оператора
-	
-	# a++ b - gosub			после a уст. 1
-	# a b - gosub
-	# a +b = a + b
-	# a + -b
-	
-	
-	
-	# if(!$operator && $OP) {			# обнаружен gosub
-		# # преобразуем переменную или незакончившийся вызов метода в gosub
-		# if(exists $OP->{tag} or exists $OP->{gosub}) {
-			# push @$code, $prev = {stmt => 'gosub', var => 1, endline => 1, gosub => 1};
-		# }
-		# else {
-			# $prev->{gosub} = 1;
-			# $prev->{endline} = 1;
-			# $prev->{stmt} .= "_go";
-		# }
-		# push @{$self->{stack}}, $prev;
-		# $self->trace("^", $prev);
-
-
-	#push @$T, $operator;
-	#$self->trace("?", $operator);
-	
-	$self
-}
 
 
 # пришёл оператор
@@ -266,66 +223,18 @@ sub op {
 	my $self = shift;
 	my $push = {%+, 'stmt', @_};
 	
-	$self->popop($push) if $self->{op};
-	
-	$self->{op} = $push;
-	
-	#my $stmt = $_[0];
-	
-	# вначале и после инфиксного оператора и открывающей скобки = 1
-	# после терма, закрывающей скобки и постфиксного оператора = 0
-	# ^ ( +				=1
-	# a ) a++ -a		=0
-	
-	# 0 + 1
-	# 0 -a 1
-	
-	# my $front = $self->{front};
-	
-	# my $op = $front? $PREFIX{ $stmt }: $INFIX{ $stmt } // $POSTFIX{ $stmt };
-	
-	# $self->error("не объявлен ".($front? "префиксный": "инфиксный или постфиксный")." оператор $stmt") unless $op;
-	
-	# my $fix = $op->{fix};
-	# $self->{front} = !($fix & $postfix);
-	
-	# my $S = $self->{stack};
-	
-	# # выбрасываем все операторы с меньшим приоритетом		
-	# my $prio = $op->{prio};
-	# my $x; my $s;
-	# while(@$S && defined($x = ($s = $S->[-1])->{prio}) && (
-			# $x < $prio || $x==$prio && $s->{fix} & $leftassoc
-		# )) {
-		# $self->popop;
-	# }
-	
-	# $self->error("оператор $s->{stmt} неассоциативен") if $s && $s->{fix} & $nonassoc && $prio == $x;
-	
-	
-	# my $name = $op->{stmt};
-	# $push->{stmt} = $name if defined $name;
-	# $push->{prio} = $prio;
-	# $push->{fix} = $fix;
-	# push @$S, $push;
-	# $self->trace("?", $push);
-	
+	push @{$self->{stack}[-1]{'A+'}}, $push;
+	$self->trace("¤", $push);
 	$self
 }
 
 
-# добавляет терм
+# пришёл терм
 sub atom {
 	my $self = shift;
 	my $push = {%+, 'stmt', @_};
 	
-	if(my $op = $self->{op}) {
-		if($op->{FIX} & $postfix)
-	}
-	
-	$self->{front} = 0;
-	my $terms = $self->{terms};
-	push @$terms, $push;
+	push @{$self->{stack}[-1]{'A+'}}, $push;
 	$self->trace("¤", $push);
 	$self
 }
@@ -333,56 +242,104 @@ sub atom {
 
 
 # добавляет открывающую скобку
+# все операторы и атомы добавляются в неё
 sub push {
 	my $self = shift; 
-	my $push = {%+, 'stmt', @_, 'T+' => 1 + @{$self->{terms}} };
-	
-	$self->{front} = 1;
+	my $push = {%+, 'stmt', @_};
 	
 	push @{$self->{stack}}, $push;
-	push @{$self->{space}}, $push;
-	
 	$self->trace("+", $push);
-	
 	$self
 }
 
 # закрывающая скобка
+# происходит разбор операторов и термов, попавших меж скобок
 sub pop {
 	my ($self, $stag) = @_;
 	
 	$self->{front} = 0;
 	
-	my $S = $self->{stack};
-	my $T = $self->{terms};
-	my $C = $self->{space};
+	my $S = $self->{stack};		# стек скобок
 	
-	# ошибка
-	$self->error("нет открывающей скобки" . (defined($stag)? "к $stag": "")) if !@$S;
-	
-	# выбрасываем все операторы до скобки
-	while(@$S && defined $S->[-1]{prio}) {
-		$self->popop;
-	}
-	
+	# выбрасываем скобки
 	$self->error("нет открывающей скобки ".(defined($stag)? "к $stag ": "")."- стек S пуст") if !@$S;
-	$self->error("нет открывающей скобки ".(defined($stag)? "к $stag ": "")."- стек С пуст") if !@$C;
 	
 	my $sk = pop @$S;
-	my $Sk = pop @$C;
-	
-	
-	$self->error("скобка $Sk->{stmt} не смогла закрыться. Проверьте скобки между открывающейся и закрывающейся этими скобками") if $sk != $Sk;
-	
-	$self->error("при закрытии скобки $stag выброшено ".(@$T < $sk->{'T+'}? 'больше': 'меньше')." терминалов чем нужно") if $sk->{'T+'} != @$T;
-	
+
 	my $tag;
 	$self->error("закрывающая скобка $stag конфликтует со скобкой $tag") if defined $stag and ($tag = $sk->{tag} // $sk->{stmt}) ne $stag;
 	
-	#$self->error("стек T пуст: невозможно достать операнд для скобки") if !@$T;
+	my $A = $sk->{'A+'};
+	$self->error("скобки ".($stag eq $tag? $tag: $tag." ".$stag)." не могут быть пусты") if !$A;
 	
-	$sk->{right} = pop @$T;
-	push @$T, $sk;
+	my $PREFIX =  $self->{PREFIX};
+	my $INFIX =  $self->{INFIX};
+	my $POSTFIX =  $self->{POSTFIX};
+	
+	my @T;
+	my @S;
+	my $front = 1;
+	my $op;
+	my $meta;
+	
+	my $popop = sub {
+		my $prio = $meta->{prio};
+		my $s;
+		while(@S &&
+			($x = ($s = $S[-1])->{prio}) < $prio || 
+			$x==$prio && $s->{fix} & $leftassoc
+		) {
+			my $r = pop @S;
+			if($r->{fix} & $infix) {
+				$r->{right} = pop @T;
+				$r->{left} = pop @T;
+			}
+			elsif($r->{fix} & $postfix) {
+				$r->{right} = pop @T;
+			}
+			else {
+				$r->{left} = pop @T;
+			}
+			push @T, $r;
+		}
+		$op->{prio} = $prio;
+		$op->{fix} = $meta->{fix};
+		push @S, $op;
+	};
+	
+	# определяем с конца сколько постфиксных операторов
+	for(my $n=$#$A; $n>=0; $n--) {
+		last if !exists $POSTFIX->{$A->[$n]};
+	}
+	
+	# определяем операторы
+	for(my $i=0; $i<@$A; $i++) {
+		if($front and $meta = $PREFIX->{$op}) {
+			$popop->();
+		}
+		elsif(!$front and $meta = $INFIX->{$op} and $i<=$n) {
+			$popop->();
+			$front = 1;
+		}
+		elsif($meta = $POSTFIX->{$op}) {
+			$popop->();
+		}
+		else {	# терминал
+			$front = 0;
+			push @T, $op;
+		}
+	}
+	
+	# выбрасываем всё
+	$op = {};
+	$meta = {prio => 1_000_000};
+	$popop->();
+	
+	$self->error("стек T пуст: невозможно достать операнд для скобки") if !@T;
+	$self->error("стек T содержит больше одного операнда") if @T>1;
+	
+	$sk->{right} = pop @T;
+	push @{$S->[-1]{'A+'}}, $sk;
 	
 	$self->trace("-", $sk);
 
@@ -394,8 +351,6 @@ sub color_stacks {
 	my ($self) = @_;
 	local $_;
 	return ":space",
-		":dark white", "\tC:", ":reset", map({ $_->{stmt} } @{$self->{space}}),
-		":dark white", "\tT:", ":reset", map({ $_->{stmt} } @{$self->{terms}}),
 		":dark white", "\tS:", ":reset", map({ defined($_->{prio})? (":bold blue", $_->{stmt}, ":reset"): $_->{stmt} } @{$self->{stack}})
 }
 
