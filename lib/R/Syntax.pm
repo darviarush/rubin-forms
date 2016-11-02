@@ -1,68 +1,68 @@
 package R::Syntax;
-# синтаксический анализатор
-# просматривает на один оператор вперёд, благодаря чему может определить арность оператора
+# СЃРёРЅС‚Р°РєСЃРёС‡РµСЃРєРёР№ Р°РЅР°Р»РёР·Р°С‚РѕСЂ
+# РїСЂРѕСЃРјР°С‚СЂРёРІР°РµС‚ РЅР° РѕРґРёРЅ РѕРїРµСЂР°С‚РѕСЂ РІРїРµСЂС‘Рґ, Р±Р»Р°РіРѕРґР°СЂСЏ С‡РµРјСѓ РјРѕР¶РµС‚ РѕРїСЂРµРґРµР»РёС‚СЊ Р°СЂРЅРѕСЃС‚СЊ РѕРїРµСЂР°С‚РѕСЂР°
 
 use common::sense;
 use R::App;
 
-# конструктор
+# РєРѕРЅСЃС‚СЂСѓРєС‚РѕСЂ
 sub new {
 	my ($cls) = @_;
 	bless {
 		
-		PREFIX => {},			# префикс-операторы
-		INFIX => {},			# инфикс-операторы 
-		POSTFIX => {},			# постфикс-операторы
+		PREFIX => {},			# РїСЂРµС„РёРєСЃ-РѕРїРµСЂР°С‚РѕСЂС‹
+		INFIX => {},			# РёРЅС„РёРєСЃ-РѕРїРµСЂР°С‚РѕСЂС‹ 
+		POSTFIX => {},			# РїРѕСЃС‚С„РёРєСЃ-РѕРїРµСЂР°С‚РѕСЂС‹
 		
-		BR => {},				# скобки
-		CR => {},				# закрывающие скобки (для формирования лексики)
-		X => {},				# терминалы
+		BR => {},				# СЃРєРѕР±РєРё
+		CR => {},				# Р·Р°РєСЂС‹РІР°СЋС‰РёРµ СЃРєРѕР±РєРё (РґР»СЏ С„РѕСЂРјРёСЂРѕРІР°РЅРёСЏ Р»РµРєСЃРёРєРё)
+		X => {},				# С‚РµСЂРјРёРЅР°Р»С‹
 		
-		PRIO => 0,				# инкремент приоритета
+		PRIO => 0,				# РёРЅРєСЂРµРјРµРЅС‚ РїСЂРёРѕСЂРёС‚РµС‚Р°
 		
-		LEXX => undef,			# лексический анализатор
+		LEX => undef,			# Р»РµРєСЃРёС‡РµСЃРєРёР№ Р°РЅР°Р»РёР·Р°С‚РѕСЂ
 		
-		trace => "EXAMPLE",		# файл трейс которого показать
-		file => "",				# путь к текущему файлу
-		lineno => 1,			# номер строки в текущем файле
+		trace => "EXAMPLE",		# С„Р°Р№Р» С‚СЂРµР№СЃ РєРѕС‚РѕСЂРѕРіРѕ РїРѕРєР°Р·Р°С‚СЊ
+		file => "",				# РїСѓС‚СЊ Рє С‚РµРєСѓС‰РµРјСѓ С„Р°Р№Р»Сѓ
+		lineno => 1,			# РЅРѕРјРµСЂ СЃС‚СЂРѕРєРё РІ С‚РµРєСѓС‰РµРј С„Р°Р№Р»Рµ
 		
-		stack => undef,			# стек операторов
-		terms => undef,			# стек операндов
-		space => undef,			# дополнительный стек скобок
+		stack => undef,			# СЃС‚РµРє РѕРїРµСЂР°С‚РѕСЂРѕРІ
+		terms => undef,			# СЃС‚РµРє РѕРїРµСЂР°РЅРґРѕРІ
+		space => undef,			# РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹Р№ СЃС‚РµРє СЃРєРѕР±РѕРє
 		
-		op => "",				# запомненный оператор
-		front => 1,				# обозначает границу операторов (порядок их выборки)
+		op => "",				# Р·Р°РїРѕРјРЅРµРЅРЅС‹Р№ РѕРїРµСЂР°С‚РѕСЂ
+		front => 1,				# РѕР±РѕР·РЅР°С‡Р°РµС‚ РіСЂР°РЅРёС†Сѓ РѕРїРµСЂР°С‚РѕСЂРѕРІ (РїРѕСЂСЏРґРѕРє РёС… РІС‹Р±РѕСЂРєРё)
 		
-		error => {				# ошибки
-			sym => "неизвестный символ `%s`",
+		error => {				# РѕС€РёР±РєРё
+			sym => "РЅРµРёР·РІРµСЃС‚РЅС‹Р№ СЃРёРјРІРѕР» `%s`",
 		},
 		
 	}, ref $cls || $cls;
 }
 
-###############################  формирование таблицы ###############################
+###############################  С„РѕСЂРјРёСЂРѕРІР°РЅРёРµ С‚Р°Р±Р»РёС†С‹ ###############################
 
-# термы
-# скобки
-# операторы
+# С‚РµСЂРјС‹
+# СЃРєРѕР±РєРё
+# РѕРїРµСЂР°С‚РѕСЂС‹
 
-our $nonassoc = 0b000001;				# неассоциативность
-our $leftassoc = 0b000010;				# левосторонняя ассоциативность
-our $rightassoc = 0b000100;				# правосторонняя ассоциативность
+our $nonassoc = 0b000001;				# РЅРµР°СЃСЃРѕС†РёР°С‚РёРІРЅРѕСЃС‚СЊ
+our $leftassoc = 0b000010;				# Р»РµРІРѕСЃС‚РѕСЂРѕРЅРЅСЏСЏ Р°СЃСЃРѕС†РёР°С‚РёРІРЅРѕСЃС‚СЊ
+our $rightassoc = 0b000100;				# РїСЂР°РІРѕСЃС‚РѕСЂРѕРЅРЅСЏСЏ Р°СЃСЃРѕС†РёР°С‚РёРІРЅРѕСЃС‚СЊ
 
-our $infix = 0b001000;					# инфиксный оператор
-our $prefix = 0b010000;					# префиксный оператор
-our $postfix = 0b100000;				# постфиксный оператор
+our $infix = 0b001000;					# РёРЅС„РёРєСЃРЅС‹Р№ РѕРїРµСЂР°С‚РѕСЂ
+our $prefix = 0b010000;					# РїСЂРµС„РёРєСЃРЅС‹Р№ РѕРїРµСЂР°С‚РѕСЂ
+our $postfix = 0b100000;				# РїРѕСЃС‚С„РёРєСЃРЅС‹Р№ РѕРїРµСЂР°С‚РѕСЂ
 
-our $xfy=$infix | $leftassoc;			# левоассоциативный инфиксный
-our $yfx=$infix | $rightassoc;			# правоассоциативный инфиксный
-our $xfx=$infix | $nonassoc;			# неассоциативный инфиксный
+our $xfy=$infix | $leftassoc;			# Р»РµРІРѕР°СЃСЃРѕС†РёР°С‚РёРІРЅС‹Р№ РёРЅС„РёРєСЃРЅС‹Р№
+our $yfx=$infix | $rightassoc;			# РїСЂР°РІРѕР°СЃСЃРѕС†РёР°С‚РёРІРЅС‹Р№ РёРЅС„РёРєСЃРЅС‹Р№
+our $xfx=$infix | $nonassoc;			# РЅРµР°СЃСЃРѕС†РёР°С‚РёРІРЅС‹Р№ РёРЅС„РёРєСЃРЅС‹Р№
 
-our $yf=$postfix | $leftassoc;			# правоассоциативный префиксный
-our $xf=$postfix | $nonassoc;			# неассоциативный префиксный
+our $yf=$postfix | $leftassoc;			# РїСЂР°РІРѕР°СЃСЃРѕС†РёР°С‚РёРІРЅС‹Р№ РїСЂРµС„РёРєСЃРЅС‹Р№
+our $xf=$postfix | $nonassoc;			# РЅРµР°СЃСЃРѕС†РёР°С‚РёРІРЅС‹Р№ РїСЂРµС„РёРєСЃРЅС‹Р№
 
-our $fy=$prefix | $rightassoc;			# левоассоциативный постфиксный
-our $fx=$prefix | $nonassoc;			# неассоциативный постфиксный
+our $fy=$prefix | $rightassoc;			# Р»РµРІРѕР°СЃСЃРѕС†РёР°С‚РёРІРЅС‹Р№ РїРѕСЃС‚С„РёРєСЃРЅС‹Р№
+our $fx=$prefix | $nonassoc;			# РЅРµР°СЃСЃРѕС†РёР°С‚РёРІРЅС‹Р№ РїРѕСЃС‚С„РёРєСЃРЅС‹Р№
 
 our %FIX = (
 	xfy => $xfy,
@@ -75,30 +75,30 @@ our %FIX = (
 );
 
 
-# ячейка таблицы операторов
+# СЏС‡РµР№РєР° С‚Р°Р±Р»РёС†С‹ РѕРїРµСЂР°С‚РѕСЂРѕРІ
 sub td {
 	my $self = shift;
 	my $type = shift;
 	
 	my $fix = $FIX{$type};
-	die "нет $type фикса" if !defined $fix;
+	die "РЅРµС‚ $type С„РёРєСЃР°" if !defined $fix;
 
 	my %p = (
-		prio=>$_PRIO,
+		prio=>$self->{PRIO},
 		fix=>$fix,
 		type=>$type,
 	);
 	
 	my $key = $fix & $infix? "INFIX": $fix & $prefix? "PREFIX": "POSTFIX";
 	for my $x (@_) {
-		die "оператор $type `$x` уже объявлен" if exists $self->{$key}{$x};
+		die "РѕРїРµСЂР°С‚РѕСЂ $type `$x` СѓР¶Рµ РѕР±СЉСЏРІР»РµРЅ" if exists $self->{$key}{$x};
 		$self->{$key}{$x} = {%p, name=>"$type $x"};
 	}
 
 	$self
 }
 
-# строка таблицы операторов
+# СЃС‚СЂРѕРєР° С‚Р°Р±Р»РёС†С‹ РѕРїРµСЂР°С‚РѕСЂРѕРІ
 sub tr {
 	my $self = shift;
 	$self->{PRIO}++;
@@ -106,32 +106,33 @@ sub tr {
 	$self
 }
 
-# скобки
+# СЃРєРѕР±РєРё
 sub br {
 	my $self = shift;
 	
 	my $br = $self->{BR};
 	my $closest = $self->{CR};
-	my $open;			# открывающая скобка
-	my $close = 1;		# закрывающая скобка
+	my $open;				# РѕС‚РєСЂС‹РІР°СЋС‰Р°СЏ СЃРєРѕР±РєР°
+	my $close = 1;		# Р·Р°РєСЂС‹РІР°СЋС‰Р°СЏ СЃРєРѕР±РєР°
 	
-	for(my $i=0; $i<@_; $i++) {
-		my $a = $_[$i];
+	for my $a (@_) {
+
 		if(ref $a eq "Regexp") {
-			my $r = $close? $close: $open;
-			die "регулярка уже есть у скобки $r->{name}" if exists $r->{re};
+			my $r = $close // $open;
+			die "СЂРµРіСѓР»СЏСЂРєР° СѓР¶Рµ РµСЃС‚СЊ Сѓ СЃРєРѕР±РєРё $r->{name}" if exists $r->{re};
 			$r->{re} = $a;
 		}
 		elsif(ref $a eq "CODE") {
-			my $r = $close? $close: $open;
-			die "код уже есть у скобки $r->{name}" if exists $r->{sub};
+			my $r = $close // $open;
+			die "РєРѕРґ СѓР¶Рµ РµСЃС‚СЊ Сѓ СЃРєРѕР±РєРё $r->{name}" if exists $r->{sub};
 			$r->{sub} = $a;
 		}
-		elsif($close) {	# открывающая скобка
-			die "скобка `$a` уже есть" if exists $br->{ $a };
+		elsif($close) {	# РѕС‚РєСЂС‹РІР°СЋС‰Р°СЏ СЃРєРѕР±РєР°, С‚.Рє. РїСЂРµРґС‹РґСѓС‰Р°СЏ - Р·Р°РєСЂС‹РІР°СЋС‰Р°СЏ
+			die "СЃРєРѕР±РєР° `$a` СѓР¶Рµ РµСЃС‚СЊ" if exists $br->{ $a };
 			$br->{ $a } = $open = { name => "br $a" };
+			undef $close;
 		}
-		else {	# закрывающая скобка
+		else {	# Р·Р°РєСЂС‹РІР°СЋС‰Р°СЏ СЃРєРѕР±РєР°
 			if(exists $closest->{ $a }) {
 				$close = $closest->{ $a };
 			} else {
@@ -144,105 +145,114 @@ sub br {
 	$self
 }
 
-# операнды (терминалы)
+# РѕРїРµСЂР°РЅРґС‹ (С‚РµСЂРјРёРЅР°Р»С‹)
 sub x {
 	my $self = shift;
 	
-	#die "формирование таблицы символов уже завершено" if $self->{LEXX};
+	#die "С„РѕСЂРјРёСЂРѕРІР°РЅРёРµ С‚Р°Р±Р»РёС†С‹ СЃРёРјРІРѕР»РѕРІ СѓР¶Рµ Р·Р°РІРµСЂС€РµРЅРѕ" if $self->{LEX};
 	
 	my $x = $self->{X};
 	my $prev;
+	my @term;
 	
-	for(my $i=0; $i<@_; $i++) {
-		my $a = $_[$i];
+	for my $a (@_) {
 		if(ref $a eq "Regexp") {
-			die "регулярка уже есть у терминала $prev->{name}" if exists $prev->{re};
+			die "СЂРµРіСѓР»СЏСЂРєР° СѓР¶Рµ РµСЃС‚СЊ Сѓ С‚РµСЂРјРёРЅР°Р»Р° $prev->{name}" if exists $prev->{re};
 			$prev->{re} = $a;
 		}
 		elsif(ref $a eq "CODE") {
-			die "код уже есть у терминала $prev->{name}" if exists $prev->{sub};
+			die "РєРѕРґ СѓР¶Рµ РµСЃС‚СЊ Сѓ С‚РµСЂРјРёРЅР°Р»Р° $prev->{name}" if exists $prev->{sub};
 			$prev->{sub} = $a;
 		}
 		else {
-			die "терминал `$a` уже есть" if exists $x->{ $a };
-			$x->{ $a } = $prev = { name => "x $a" };
+			die "С‚РµСЂРјРёРЅР°Р» `$a` СѓР¶Рµ РµСЃС‚СЊ" if exists $x->{ $a };
+			$x->{ $a } = $prev = { name => $a };
+			push @term, $prev;
 		}
+	}
+	
+	for my $a (@term) {
+		$a->{re} = quotemeta $a->{name} if !exists $a->{re};
+		$a->{re} = "(?<$a->{name}>$a->{re})";
 	}
 	
 	$self
 }
 
-###############################  лексический анализатор ###############################
+###############################  Р»РµРєСЃРёС‡РµСЃРєРёР№ Р°РЅР°Р»РёР·Р°С‚РѕСЂ ###############################
 
-# формирует список имён операторов
+# С„РѕСЂРјРёСЂСѓРµС‚ СЃРїРёСЃРѕРє РёРјС‘РЅ РѕРїРµСЂР°С‚РѕСЂРѕРІ
 sub operators {
 	my ($self) = @_;
 	keys %{ +{ keys %{$self->{INFIX}}, keys %{$self->{PREFIX}}, keys %{$self->{POSTFIX}} } };
 }
 
-# формирует лексемы
+# С„РѕСЂРјРёСЂСѓРµС‚ Р»РµРєСЃРµРјС‹
 sub _lex {
 	my $self = shift;
 	join "|", map {
 		$_->{re} // do { 
-			my $x = quotemeta($_->{name} =~ /^\w+ /? $`: die("странное name"))
+			my $x = quotemeta($_->{name} =~ /^\w+ /? $': die("СЃС‚СЂР°РЅРЅРѕРµ name"));
 			$x = "\\b$x" if $x =~ /^\w/;
 			$x = "$x\\b" if $x =~ /\w$/;
+			$x
 		}
 	} @_
 }
 
-# формирует лексический анализатор из таблиц операторов, скобок и операндов
-sub lexx {
+# С„РѕСЂРјРёСЂСѓРµС‚ Р»РµРєСЃРёС‡РµСЃРєРёР№ Р°РЅР°Р»РёР·Р°С‚РѕСЂ РёР· С‚Р°Р±Р»РёС† РѕРїРµСЂР°С‚РѕСЂРѕРІ, СЃРєРѕР±РѕРє Рё РѕРїРµСЂР°РЅРґРѕРІ
+sub lex {
 	my ($self) = @_;
 	
-	return $self->{LEXX} if defined $self->{LEXX};
+	return $self->{LEX} if defined $self->{LEX};
 	
 	my $re_op = $self->_lex( values %{ +{ %{$self->{INFIX}}, %{$self->{PREFIX}}, %{$self->{POSTFIX}} } } );
 	
 	my $open_brakets = $self->_lex( values %{$self->{BR}} );
 	my $close_brakets = $self->_lex( values %{$self->{CR}} );
-	my $terms = $self->_lex( values %{$self->{X}} );	
+	my $terms = $self->_lex( values %{$self->{X}} );
 	
-	$self->{LEXX} = qr{
+	msg1 $re_op;
+	
+	$self->{LEX} = qr{
 		(?<op> $re_op )				(?{ $self->op($+{op}) }) |
 		(?<br> $open_brakets )		(?{ $self->push($+{br}) }) |
 		(?<cr> $close_brakets )		(?{ $self->pop($+{cr}) }) |
-		(?<x>  $terms )				(?{ $self->atom($+{x}) }) |
-		\s+							|	# пропускаем пробелы
+		(?: $terms )					(?{ my($k,$v)=each %+; $self->atom($k) }) |
+		\s+							|	# РїСЂРѕРїСѓСЃРєР°РµРј РїСЂРѕР±РµР»С‹
 		(?<sym> . )					(?{ $self->error(sprintf($self->{error}{sym}, $+{sym})) })
 	}sxo
 }
 
-###############################  синтаксический разбор  ###############################
+###############################  СЃРёРЅС‚Р°РєСЃРёС‡РµСЃРєРёР№ СЂР°Р·Р±РѕСЂ  ###############################
 
 
 
-# пришёл оператор
+# РїСЂРёС€С‘Р» РѕРїРµСЂР°С‚РѕСЂ
 sub op {
 	my $self = shift;
 	my $push = {%+, 'stmt', @_};
 	
 	push @{$self->{stack}[-1]{'A+'}}, $push;
-	$self->trace("¤", $push);
+	#$self->trace("В¤", $push);
 	$self
 }
 
 
-# пришёл терм
+# РїСЂРёС€С‘Р» С‚РµСЂРј
 sub atom {
 	my $self = shift;
 	my $push = {%+, 'stmt', @_};
 	
 	push @{$self->{stack}[-1]{'A+'}}, $push;
-	$self->trace("¤", $push);
+	#$self->trace("В¤", $push);
 	$self
 }
 
 
 
-# добавляет открывающую скобку
-# все операторы и атомы добавляются в неё
+# РґРѕР±Р°РІР»СЏРµС‚ РѕС‚РєСЂС‹РІР°СЋС‰СѓСЋ СЃРєРѕР±РєСѓ
+# РІСЃРµ РѕРїРµСЂР°С‚РѕСЂС‹ Рё Р°С‚РѕРјС‹ РґРѕР±Р°РІР»СЏСЋС‚СЃСЏ РІ РЅРµС‘
 sub push {
 	my $self = shift; 
 	my $push = {%+, 'stmt', @_};
@@ -252,25 +262,25 @@ sub push {
 	$self
 }
 
-# закрывающая скобка
-# происходит разбор операторов и термов, попавших меж скобок
+# Р·Р°РєСЂС‹РІР°СЋС‰Р°СЏ СЃРєРѕР±РєР°
+# РїСЂРѕРёСЃС…РѕРґРёС‚ СЂР°Р·Р±РѕСЂ РѕРїРµСЂР°С‚РѕСЂРѕРІ Рё С‚РµСЂРјРѕРІ, РїРѕРїР°РІС€РёС… РјРµР¶ СЃРєРѕР±РѕРє
 sub pop {
 	my ($self, $stag) = @_;
 	
 	$self->{front} = 0;
 	
-	my $S = $self->{stack};		# стек скобок
+	my $S = $self->{stack};		# СЃС‚РµРє СЃРєРѕР±РѕРє
 	
-	# выбрасываем скобки
-	$self->error("нет открывающей скобки ".(defined($stag)? "к $stag ": "")."- стек S пуст") if !@$S;
+	# РІС‹Р±СЂР°СЃС‹РІР°РµРј СЃРєРѕР±РєРё
+	$self->error("РЅРµС‚ РѕС‚РєСЂС‹РІР°СЋС‰РµР№ СЃРєРѕР±РєРё ".(defined($stag)? "Рє $stag ": "")."- СЃС‚РµРє S РїСѓСЃС‚") if !@$S;
 	
 	my $sk = pop @$S;
 
 	my $tag;
-	$self->error("закрывающая скобка $stag конфликтует со скобкой $tag") if defined $stag and ($tag = $sk->{tag} // $sk->{stmt}) ne $stag;
+	$self->error("Р·Р°РєСЂС‹РІР°СЋС‰Р°СЏ СЃРєРѕР±РєР° $stag РєРѕРЅС„Р»РёРєС‚СѓРµС‚ СЃРѕ СЃРєРѕР±РєРѕР№ $tag") if defined $stag and ($tag = $sk->{tag} // $sk->{stmt}) ne $stag;
 	
 	my $A = $sk->{'A+'};
-	$self->error("скобки ".($stag eq $tag? $tag: $tag." ".$stag)." не могут быть пусты") if !$A;
+	$self->error("СЃРєРѕР±РєРё ".($stag eq $tag? $tag: $tag." ".$stag)." РЅРµ РјРѕРіСѓС‚ Р±С‹С‚СЊ РїСѓСЃС‚С‹") if !$A;
 	
 	my $PREFIX =  $self->{PREFIX};
 	my $INFIX =  $self->{INFIX};
@@ -285,6 +295,7 @@ sub pop {
 	my $popop = sub {
 		my $prio = $meta->{prio};
 		my $s;
+		my $x;
 		while(@S &&
 			($x = ($s = $S[-1])->{prio}) < $prio || 
 			$x==$prio && $s->{fix} & $leftassoc
@@ -293,27 +304,33 @@ sub pop {
 			if($r->{fix} & $infix) {
 				$r->{right} = pop @T;
 				$r->{left} = pop @T;
+				$self->trace("в‡“", $r);
 			}
 			elsif($r->{fix} & $postfix) {
 				$r->{right} = pop @T;
+				$self->trace("в†’", $r);
 			}
 			else {
 				$r->{left} = pop @T;
+				$self->trace("в†µ", $r);
 			}
 			push @T, $r;
 		}
 		$op->{prio} = $prio;
 		$op->{fix} = $meta->{fix};
 		push @S, $op;
+		$self->trace("в™ ", $op);
 	};
 	
-	# определяем с конца сколько постфиксных операторов
-	for(my $n=$#$A; $n>=0; $n--) {
+	# РѕРїСЂРµРґРµР»СЏРµРј СЃ РєРѕРЅС†Р° СЃРєРѕР»СЊРєРѕ РїРѕСЃС‚С„РёРєСЃРЅС‹С… РѕРїРµСЂР°С‚РѕСЂРѕРІ
+	my $n;
+	for($n=$#$A; $n>=0; $n--) {
 		last if !exists $POSTFIX->{$A->[$n]};
 	}
 	
-	# определяем операторы
-	for(my $i=0; $i<@$A; $i++) {
+	# РѕРїСЂРµРґРµР»СЏРµРј РѕРїРµСЂР°С‚РѕСЂС‹
+	my $i = 0;
+	for my $op (@$A) {
 		if($front and $meta = $PREFIX->{$op}) {
 			$popop->();
 		}
@@ -324,19 +341,23 @@ sub pop {
 		elsif($meta = $POSTFIX->{$op}) {
 			$popop->();
 		}
-		else {	# терминал
+		else {	# С‚РµСЂРјРёРЅР°Р»
 			$front = 0;
 			push @T, $op;
+			$self->trace("В¤", $op);
 		}
 	}
+	continue {
+		$i++;
+	}
 	
-	# выбрасываем всё
+	# РІС‹Р±СЂР°СЃС‹РІР°РµРј РІСЃС‘
 	$op = {};
 	$meta = {prio => 1_000_000};
 	$popop->();
 	
-	$self->error("стек T пуст: невозможно достать операнд для скобки") if !@T;
-	$self->error("стек T содержит больше одного операнда") if @T>1;
+	$self->error("СЃС‚РµРє T РїСѓСЃС‚: РЅРµРІРѕР·РјРѕР¶РЅРѕ РґРѕСЃС‚Р°С‚СЊ РѕРїРµСЂР°РЅРґ РґР»СЏ СЃРєРѕР±РєРё") if !@T;
+	$self->error("СЃС‚РµРє T СЃРѕРґРµСЂР¶РёС‚ Р±РѕР»СЊС€Рµ РѕРґРЅРѕРіРѕ РѕРїРµСЂР°РЅРґР°") if @T>1;
 	
 	$sk->{right} = pop @T;
 	push @{$S->[-1]{'A+'}}, $sk;
@@ -346,7 +367,16 @@ sub pop {
 	$self
 }
 
-# возвращает колоризированный массив стеков для trace и error
+my %COLOR = (
+	"+" => ":red",
+	"-" => ":bold blue",
+	"в‡“" => ":red on_yellow",
+	"в†’" => ":red on_yellow",
+	"в†µ" => ":red on_yellow",
+	"в™ " => ":red on_yellow",
+);
+
+# РІРѕР·РІСЂР°С‰Р°РµС‚ РєРѕР»РѕСЂРёР·РёСЂРѕРІР°РЅРЅС‹Р№ РјР°СЃСЃРёРІ СЃС‚РµРєРѕРІ РґР»СЏ trace Рё error
 sub color_stacks {
 	my ($self) = @_;
 	local $_;
@@ -354,7 +384,7 @@ sub color_stacks {
 		":dark white", "\tS:", ":reset", map({ defined($_->{prio})? (":bold blue", $_->{stmt}, ":reset"): $_->{stmt} } @{$self->{stack}})
 }
 
-# отображает операции со стеком в лог
+# РѕС‚РѕР±СЂР°Р¶Р°РµС‚ РѕРїРµСЂР°С†РёРё СЃРѕ СЃС‚РµРєРѕРј РІ Р»РѕРі
 sub trace {
 	my ($self, $op, $top) = @_;
 	
@@ -376,34 +406,35 @@ sub trace {
 			push @after, $self->color_stacks;
 		}
 		
-		$app->log->info( ":space", "$self->{lineno}:", ($op eq "+" || $op eq "^"? ":red": $op eq "-"? ":bold blue": $op eq "?"? ":red": $op eq "?"? ":bold blue": ":dark white"), $op, $stmt, ":reset", @after );
+		
+		$app->log->info( ":space", "$self->{lineno}:", $COLOR{$op} // ":dark white", $op, $stmt, ":reset", @after );
 	}
 	
 	$self
 }
 
-# выбрасывает ошибку
+# РІС‹Р±СЂР°СЃС‹РІР°РµС‚ РѕС€РёР±РєСѓ
 sub error {
 	my ($self, $msg) = @_;
 	local ($_, $`, $', $&);
 	
 	my $color_msg = $app->log->colorized( "$self->{file}:$self->{lineno}: $msg", $self->color_stacks );
 	
-	die "$self->{file}:$self->{lineno}: $color_msg";
+	die $color_msg;
 }
 
-# формирует дерево
+# С„РѕСЂРјРёСЂСѓРµС‚ РґРµСЂРµРІРѕ
 sub masking {
 	my ($self, $s) = @_;
 	
-	my $lex = $self->lexx;
+	my $lex = $self->lex;
 	
-	while($s =~ /$lex/g) {}			# формируем дерево
+	while($s =~ /$lex/g) {}			# С„РѕСЂРјРёСЂСѓРµРј РґРµСЂРµРІРѕ
 	
 	$self
 }
 
-# устанавливает шаблоны языка
+# СѓСЃС‚Р°РЅР°РІР»РёРІР°РµС‚ С€Р°Р±Р»РѕРЅС‹ СЏР·С‹РєР°
 sub templates {
 	my $self = shift;
 	
@@ -423,67 +454,65 @@ sub templates {
 
 
 
-# осуществляет два прохода по дереву кода и формирует код
+# РѕСЃСѓС‰РµСЃС‚РІР»СЏРµС‚ РґРІР° РїСЂРѕС…РѕРґР° РїРѕ РґРµСЂРµРІСѓ РєРѕРґР° Рё С„РѕСЂРјРёСЂСѓРµС‚ РєРѕРґ
 sub expirience {
 	my ($self) = @_;
 	
 	my $S = $self->{stack};
-	my $T = $self->{terms};
 	
-	$self->error("expirience: стек S не пуст") if @$S != 0;
-	$self->error("expirience: в стеке T должен быть 1-н элемент") if @$T != 1;
+	$self->error("expirience: РІ СЃС‚РµРєРµ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ 1-РЅ СЌР»РµРјРµРЅС‚") if @$S != 1;
 	
 
 	#msg1 ":size10000", $self->top;
 	
-	# обход в глубину - модификации дерева
+	# РѕР±С…РѕРґ РІ РіР»СѓР±РёРЅСѓ - РјРѕРґРёС„РёРєР°С†РёРё РґРµСЂРµРІР°
 	if(defined(my $modifiers = $self->{lang}{modifiers})) {
-		my @path = $T->[0];
+		my @path = $S->[0];
 		while(@path) {
 			my $node = $path[-1];
 			
-			# вызываем модификатор, если мы на элементе впервые
+			# РІС‹Р·С‹РІР°РµРј РјРѕРґРёС„РёРєР°С‚РѕСЂ, РµСЃР»Рё РјС‹ РЅР° СЌР»РµРјРµРЅС‚Рµ РІРїРµСЂРІС‹Рµ
 			if(!exists $node->{"&"}) {
 				my $fn = $modifiers->{$node->{stmt}};
 				$fn->($self, $node, \@path) if $fn;
 			}
 			
-			if(exists $node->{left} && $node->{"&"} < 1) {	# на подэлемент
+			if(exists $node->{left} && $node->{"&"} < 1) {	# РЅР° РїРѕРґСЌР»РµРјРµРЅС‚
 				$node->{"&"}=1;
 				push @path, $node->{left};
 			}
-			elsif(exists $node->{right} && $node->{"&"} < 2) {	# на подэлемент
+			elsif(exists $node->{right} && $node->{"&"} < 2) {	# РЅР° РїРѕРґСЌР»РµРјРµРЅС‚
 				$node->{"&"}=2;
 				push @path, $node->{right};
 			}
 			else {
-				pop @path;		# удаляем элемент
+				pop @path;		# СѓРґР°Р»СЏРµРј СЌР»РµРјРµРЅС‚
 			}
 		}
 	}
 	
-	# формирование кода из шаблонов
+	# С„РѕСЂРјРёСЂРѕРІР°РЅРёРµ РєРѕРґР° РёР· С€Р°Р±Р»РѕРЅРѕРІ
 	my $templates = $self->{lang}{templates};
 	my $out;
-	my @path = $T->[0];
+	my @path = $S->[0];
 	while(@path) {
 		my $node = $path[-1];
 		
-		if(exists $node->{left} && $node->{"&"} < 3) {	# на подэлемент
+		if(exists $node->{left} && $node->{"&"} < 3) {	# РЅР° РїРѕРґСЌР»РµРјРµРЅС‚
 			$node->{"&"}=3;
 			push @path, $node->{left};
 		}
-		elsif(exists $node->{right} && $node->{"&"} < 4) {	# на подэлемент
+		elsif(exists $node->{right} && $node->{"&"} < 4) {	# РЅР° РїРѕРґСЌР»РµРјРµРЅС‚
 			$node->{"&"}=4;
 			push @path, $node->{right};
 		}
 		else {
-			$_ = pop @path;		# удаляем элемент
+			$_ = pop @path;		# СѓРґР°Р»СЏРµРј СЌР»РµРјРµРЅС‚
 			
 			#$_->{code} = join "", @$code if $code;
 			
 			my $template = $templates->{ $_->{stmt} };
-			die "нет шаблона $_->{stmt} в языке $self->{lang}" if !$template;
+			die "РЅРµС‚ С€Р°Р±Р»РѕРЅР° $_->{stmt} РІ СЏР·С‹РєРµ $self->{lang}" if !$template;
 			
 			if(@path) {
 				my $parent = $path[-1];
@@ -504,13 +533,21 @@ sub expirience {
 
 
 
-# морфирует в другой язык
+# РјРѕСЂС„РёСЂСѓРµС‚ РІ РґСЂСѓРіРѕР№ СЏР·С‹Рє
 sub morf {
-	my ($self, $s) = @_;
-	$self->masking($s)->expirience;
+	my ($self, $s, $file) = @_;
+	$self->{file} = $file // "В«evalВ»";
+	$self->push("ВҐ")->masking($s);
+	my $S = $self->{stack};
+	$self->error("РєРѕРЅРµС†: СЃС‚РµРє РґРѕР»Р¶РµРЅ СЃРѕРґРµСЂР¶Р°С‚СЊ 1-РЅ СЌР»РµРјРµРЅС‚") if @$S != 1;
+	my $push = pop @$S;
+	msg1 $push;
+	$self->error("РєРѕРЅРµС†: РїСѓСЃС‚РѕР№ РєРѕРґ") if !defined $push->{right};
+	push @$S, $push->{right};
+	$self->expirience;
 }
 
-# вычисляет выражение
+# РІС‹С‡РёСЃР»СЏРµС‚ РІС‹СЂР°Р¶РµРЅРёРµ
 sub eval {
 	my ($self, $code) = @_;
 	my $ret = eval $self->morf($code);
