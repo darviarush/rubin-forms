@@ -295,6 +295,35 @@ sub ltrim {
 	$s
 }
 
+# 'laquo' => '«',
+# 'raquo' => '»',
+# 'prime' => '′',
+# 'Prime' => '″',
+# 'lsquo' => '‘',
+# 'rsquo' => '’',
+# 'sbquo' => '‚',
+# 'ldquo' => '“',
+# 'rdquo' => '”',
+# 'bdquo' => '„',
+
+# оборачивает текст в кавычки «...»
+sub q {
+	my ($self, $text) = @_;
+	"«$text»"
+}
+
+# оборачивает текст в кавычки “...”
+sub qq {
+	my ($self, $text) = @_;
+	"“$text”"
+}
+
+# оборачивает текст в кавычки ‘...’
+sub mq {
+	my ($self, $text) = @_;
+	"‘$text’"
+}
+
 # замена для шаблонов
 sub replace {
 	my ($self, $subject, $from, $to) = @_;

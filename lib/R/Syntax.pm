@@ -22,13 +22,11 @@ sub new {
 		
 		LEX => undef,			# лексический анализатор
 		
-		trace => "EXAMPLE",		# файл трейс которого показать
+		trace => "«eval»",		# файл трейс которого показать
 		file => "",				# путь к текущему файлу
 		lineno => 1,			# номер строки в текущем файле
 		
-		stack => undef,			# стек операторов
-		terms => undef,			# стек операндов
-		space => undef,			# дополнительный стек скобок
+		stack => undef,			# стек скобок
 		
 		op => "",				# запомненный оператор
 		front => 1,				# обозначает границу операторов (порядок их выборки)
@@ -191,7 +189,7 @@ sub operators {
 sub _lex {
 	my $self = shift;
 	join "|", map {
-		$_->{re} // do { 
+		$_->{re} // do {
 			my $x = quotemeta($_->{name} =~ /^\w+ /? $': die("странное name"));
 			$x = "\\b$x" if $x =~ /^\w/;
 			$x = "$x\\b" if $x =~ /\w$/;
@@ -234,7 +232,7 @@ sub op {
 	my $push = {%+, 'stmt', @_};
 	
 	push @{$self->{stack}[-1]{'A+'}}, $push;
-	#$self->trace("¤", $push);
+	$self->trace("_", $push);
 	$self
 }
 
@@ -245,7 +243,7 @@ sub atom {
 	my $push = {%+, 'stmt', @_};
 	
 	push @{$self->{stack}[-1]{'A+'}}, $push;
-	#$self->trace("¤", $push);
+	$self->trace(",", $push);
 	$self
 }
 
@@ -269,12 +267,12 @@ sub pop {
 	
 	$self->{front} = 0;
 	
-	my $S = $self->{stack};		# стек скобок
+	my $stack = $self->{stack};		# стек скобок
 	
 	# выбрасываем скобки
-	$self->error("нет открывающей скобки ".(defined($stag)? "к $stag ": "")."- стек S пуст") if !@$S;
+	$self->error("нет открывающей скобки ".(defined($stag)? "к $stag ": "")."- стек S пуст") if !@$stack;
 	
-	my $sk = pop @$S;
+	my $sk = pop @$stack;
 
 	my $tag;
 	$self->error("закрывающая скобка $stag конфликтует со скобкой $tag") if defined $stag and ($tag = $sk->{tag} // $sk->{stmt}) ne $stag;
@@ -289,13 +287,13 @@ sub pop {
 	my @T;
 	my @S;
 	my $front = 1;
-	my $op;
 	my $meta;
 	
 	my $popop = sub {
 		my $prio = $meta->{prio};
 		my $s;
 		my $x;
+
 		while(@S &&
 			($x = ($s = $S[-1])->{prio}) < $prio || 
 			$x==$prio && $s->{fix} & $leftassoc
@@ -316,10 +314,13 @@ sub pop {
 			}
 			push @T, $r;
 		}
-		$op->{prio} = $prio;
-		$op->{fix} = $meta->{fix};
-		push @S, $op;
-		$self->trace("♠", $op);
+		
+		if(my $op = $_[0]) {
+			$op->{prio} = $prio;
+			$op->{fix} = $meta->{fix};
+			push @S, $op;
+			$self->trace("♠", $op);
+		}
 	};
 	
 	# определяем с конца сколько постфиксных операторов
@@ -331,15 +332,18 @@ sub pop {
 	# определяем операторы
 	my $i = 0;
 	for my $op (@$A) {
-		if($front and $meta = $PREFIX->{$op}) {
-			$popop->();
+	
+		my $stmt = $op->{stmt};
+	
+		if($front and $meta = $PREFIX->{$stmt}) {
+			$popop->($op);
 		}
-		elsif(!$front and $meta = $INFIX->{$op} and $i<=$n) {
-			$popop->();
+		elsif(!$front and $meta = $INFIX->{$stmt} and $i<=$n) {
+			$popop->($op);
 			$front = 1;
 		}
-		elsif($meta = $POSTFIX->{$op}) {
-			$popop->();
+		elsif($meta = $POSTFIX->{$stmt}) {
+			$popop->($op);
 		}
 		else {	# терминал
 			$front = 0;
@@ -352,15 +356,15 @@ sub pop {
 	}
 	
 	# выбрасываем всё
-	$op = {};
 	$meta = {prio => 1_000_000};
 	$popop->();
 	
 	$self->error("стек T пуст: невозможно достать операнд для скобки") if !@T;
 	$self->error("стек T содержит больше одного операнда") if @T>1;
+	$self->error("стек S содержит операторы") if @S;
 	
 	$sk->{right} = pop @T;
-	push @{$S->[-1]{'A+'}}, $sk;
+	push @{$stack->[-1]{'A+'}}, $sk;
 	
 	$self->trace("-", $sk);
 
@@ -392,7 +396,7 @@ sub trace {
 	if( defined($trace) && $self->{file} eq $trace ) {
 	
 		local($+, $`, $', $&, $_, $a, $b);
-	
+
 		my $stmt = $top->{stmt};
 	
 		my @after;
@@ -405,7 +409,6 @@ sub trace {
 		if(1) {
 			push @after, $self->color_stacks;
 		}
-		
 		
 		$app->log->info( ":space", "$self->{lineno}:", $COLOR{$op} // ":dark white", $op, $stmt, ":reset", @after );
 	}
@@ -456,18 +459,14 @@ sub templates {
 
 # осуществляет два прохода по дереву кода и формирует код
 sub expirience {
-	my ($self) = @_;
-	
-	my $S = $self->{stack};
-	
-	$self->error("expirience: в стеке должен быть 1-н элемент") if @$S != 1;
+	my ($self, $root) = @_;
 	
 
 	#msg1 ":size10000", $self->top;
 	
 	# обход в глубину - модификации дерева
 	if(defined(my $modifiers = $self->{lang}{modifiers})) {
-		my @path = $S->[0];
+		my @path = $root;
 		while(@path) {
 			my $node = $path[-1];
 			
@@ -494,7 +493,7 @@ sub expirience {
 	# формирование кода из шаблонов
 	my $templates = $self->{lang}{templates};
 	my $out;
-	my @path = $S->[0];
+	my @path = $root;
 	while(@path) {
 		my $node = $path[-1];
 		
@@ -507,12 +506,12 @@ sub expirience {
 			push @path, $node->{right};
 		}
 		else {
-			$_ = pop @path;		# удаляем элемент
+			my $node = pop @path;		# удаляем элемент
 			
-			#$_->{code} = join "", @$code if $code;
+			#$node->{code} = join "", @$code if $code;
 			
-			my $template = $templates->{ $_->{stmt} };
-			die "нет шаблона $_->{stmt} в языке $self->{lang}" if !$template;
+			my $template = $templates->{ $node->{stmt} };
+			die "нет шаблона `$node->{stmt}` в языке " . ($self->{lang}{name} // "«язык Батькович»") if !$template;
 			
 			if(@path) {
 				my $parent = $path[-1];
@@ -537,14 +536,21 @@ sub expirience {
 sub morf {
 	my ($self, $s, $file) = @_;
 	$self->{file} = $file // "«eval»";
-	$self->push("¥")->masking($s);
-	my $S = $self->{stack};
+	
+	my $S = $self->{stack} = [my $root = {stmt=>$app->perl->mq("root")}];
+	
+	$self->push("¥")->masking($s)->pop("¥");
+	
 	$self->error("конец: стек должен содержать 1-н элемент") if @$S != 1;
-	my $push = pop @$S;
-	msg1 $push;
-	$self->error("конец: пустой код") if !defined $push->{right};
-	push @$S, $push->{right};
-	$self->expirience;
+	
+	my $A = $root->{"A+"};
+	$self->error("конец: пустой код") if !defined $A;
+	
+	$self->error("конец: рут должен содержать 1-н элемент") if @$A != 1;
+
+	my $ret = $self->expirience($A->[0]{right});
+	msg1 ":space cyan", "code:", $s, ":reset", , ":red", "->", ":reset", $ret;
+	$ret
 }
 
 # вычисляет выражение
