@@ -22,14 +22,11 @@ sub new {
 		
 		LEX => undef,			# лексический анализатор
 		
-		#trace => "«eval»",		# файл трейс которого показать
+		trace => "«eval»",		# файл трейс которого показать
 		file => "",				# путь к текущему файлу
 		lineno => 1,			# номер строки в текущем файле
 		
 		stack => undef,			# стек скобок
-		
-		op => "",				# запомненный оператор
-		front => 1,				# обозначает границу операторов (порядок их выборки)
 		
 		error => {				# ошибки
 			sym => "неизвестный символ `%s`",
@@ -170,8 +167,16 @@ sub x {
 	}
 	
 	for my $a (@term) {
-		$a->{re} = quotemeta $a->{name} if !exists $a->{re};
-		$a->{re} = "(?<$a->{name}>$a->{re})";
+		#$a->{re} = quotemeta $a->{name} if !exists $a->{re};
+		#my $name = quotemeta $a->{name};
+		#use charnames;
+		#$name =~ s/\W/charnames::viacode(ord $&)/ge;
+		if($a->{re}) {
+			$a->{re} = "(?<$a->{name}>$a->{re})";
+		}
+		else {
+			$a->{re} = quotemeta $a->{name};
+		}
 	}
 	
 	$self
@@ -210,15 +215,24 @@ sub lex {
 	my $open_brakets = $self->_lex( values %$BR );
 	my $close_brakets = $self->_lex( values %{$self->{CR}} );
 	my $terms = $self->_lex( values %{$self->{X}} );
+
+	my $_op = $re_op eq ''? "#": "";
+	my $_br = $open_brakets eq ''? "#": "";
+	my $_cr = $close_brakets eq ''? "#": "";
+	my $_x = $terms eq ''? "#": "";
 	
 	$self->{LEX} = qr{
-		(?<op> $re_op )				(?{ $self->op($+{op}) }) |
-		(?<br> $open_brakets )		(?{ my $x=$BR->{$+{br}}; $self->push($x->{name}, tag=>$x->{tag}) }) |
-		(?<cr> $close_brakets )		(?{ $self->pop($+{cr}) }) |
-		(?: $terms )					(?{ my($k,$v)=each %+; $self->atom($k) }) |
+		$_op (?<op> $re_op )				(?{ $self->op($+{op}) }) |
+		$_br (?<br> $open_brakets )		(?{ my $x=$BR->{$+{br}}; $self->push($x->{name}, tag=>$x->{tag}) }) |
+		$_cr (?<cr> $close_brakets )		(?{ $self->pop($+{cr}) }) |
+		$_x  (?: $terms )					(?{ my($k,$v)=each %+; $self->atom($k // $&) }) |
 		\s+							|	# пропускаем пробелы
 		(?<sym> . )					(?{ $self->error(sprintf($self->{error}{sym}, $+{sym})) })
-	}sxo
+	}sx;
+	
+	msg1 "lexx", 0+$self->{LEX}, $self->{LEX};
+	
+	$self->{LEX}
 }
 
 ###############################  синтаксический разбор  ###############################
