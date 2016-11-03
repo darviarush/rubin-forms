@@ -22,7 +22,7 @@ sub new {
 		
 		LEX => undef,			# лексический анализатор
 		
-		trace => "«eval»",		# файл трейс которого показать
+		#trace => "«eval»",		# файл трейс которого показать
 		file => "",				# путь к текущему файлу
 		lineno => 1,			# номер строки в текущем файле
 		
@@ -206,15 +206,14 @@ sub lex {
 	
 	my $re_op = $self->_lex( values %{ +{ %{$self->{INFIX}}, %{$self->{PREFIX}}, %{$self->{POSTFIX}} } } );
 	
-	my $open_brakets = $self->_lex( values %{$self->{BR}} );
+	my $BR = $self->{BR};
+	my $open_brakets = $self->_lex( values %$BR );
 	my $close_brakets = $self->_lex( values %{$self->{CR}} );
 	my $terms = $self->_lex( values %{$self->{X}} );
 	
-	msg1 $re_op;
-	
 	$self->{LEX} = qr{
 		(?<op> $re_op )				(?{ $self->op($+{op}) }) |
-		(?<br> $open_brakets )		(?{ $self->push($+{br}) }) |
+		(?<br> $open_brakets )		(?{ my $x=$BR->{$+{br}}; $self->push($x->{name}, tag=>$x->{tag}) }) |
 		(?<cr> $close_brakets )		(?{ $self->pop($+{cr}) }) |
 		(?: $terms )					(?{ my($k,$v)=each %+; $self->atom($k) }) |
 		\s+							|	# пропускаем пробелы
@@ -316,8 +315,9 @@ sub pop {
 		}
 		
 		if(my $op = $_[0]) {
-			$op->{prio} = $prio;
-			$op->{fix} = $meta->{fix};
+			@$op{qw/stmt fix prio/} = @$meta{qw/name fix prio/};
+			#$op->{prio} = $prio;
+			#$op->{fix} = $meta->{fix};
 			push @S, $op;
 			$self->trace("♠", $op);
 		}
@@ -442,12 +442,12 @@ sub templates {
 	my $self = shift;
 	
 	my $c = $self->{lang}{templates} //= {};
-
+	
 	for(my $i=0; $i<@_; $i+=2) {
 		my ($k, $v) = @_[$i, $i+1];
-		
 		$v =~ s/'/\\'/g;
 		$v =~ s/\{\{\s*(\w+)\s*\}\}/', \$_->{$1} ,'/g;
+		$k =~ s/\s+/ /g;
 		
 		$c->{$k} = eval "sub { join '', '$v' }";
 	}
@@ -506,12 +506,14 @@ sub expirience {
 			push @path, $node->{right};
 		}
 		else {
-			my $node = pop @path;		# удаляем элемент
 			
-			#$node->{code} = join "", @$code if $code;
+			# $_ используется в функциях-шаблонах. Так передаётся параметр
+			$_ = pop @path;		# удаляем элемент
 			
-			my $template = $templates->{ $node->{stmt} };
-			die "нет шаблона `$node->{stmt}` в языке " . ($self->{lang}{name} // "«язык Батькович»") if !$template;
+			#$_->{code} = join "", @$code if $code;
+			
+			my $template = $templates->{ $_->{stmt} };
+			die "нет шаблона `$_->{stmt}` в языке " . ($self->{lang}{name} // "«язык Батькович»") if !$template;
 			
 			if(@path) {
 				my $parent = $path[-1];
@@ -547,7 +549,7 @@ sub morf {
 	$self->error("конец: пустой код") if !defined $A;
 	
 	$self->error("конец: рут должен содержать 1-н элемент") if @$A != 1;
-
+	
 	my $ret = $self->expirience($A->[0]{right});
 	msg1 ":space cyan", "code:", $s, ":reset", , ":red", "->", ":reset", $ret;
 	$ret
