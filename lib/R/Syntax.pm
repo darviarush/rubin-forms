@@ -22,11 +22,13 @@ sub new {
 		
 		LEX => undef,			# лексический анализатор
 		
-		trace => "«eval»",		# файл трейс которого показать
+		show_morf => 0,			# отражать ли преобразование в лог
+		#trace => "«eval»",		# файл трейс которого показать
 		file => "",				# путь к текущему файлу
 		lineno => 1,			# номер строки в текущем файле
 		
 		stack => undef,			# стек скобок
+		lex => undef,			# кэш - лексический анализатор
 		
 		error => {				# ошибки
 			sym => "неизвестный символ `%s`",
@@ -131,7 +133,7 @@ sub br {
 			if(exists $closest->{ $a }) {
 				$close = $closest->{ $a };
 			} else {
-				$closest->{ $a } = $close = { name => "cr $a" };
+				$closest->{ $a } = $close = { name => "cr $a", cr=>1 };
 			}
 			$open->{tag} = $a;
 		}
@@ -193,13 +195,26 @@ sub operators {
 # формирует лексемы
 sub _lex {
 	my $self = shift;
-	join "|", map {
-		$_->{re} // do {
-			my $x = quotemeta($_->{name} =~ /^\w+ /? $': die("странное name"));
+	join "", map {
+	
+		my $name = $_->{name};
+		$name =~ s/^\w+\s+// if $_->{fix} || $_->{cr} || exists $_->{tag};
+		$name = quotemeta $name;
+		
+		my $ret = exists $_->{tag}? "\$self->push(\"$name\", tag=>\"".quotemeta($_->{tag})."\")":
+		$_->{cr}? "\$self->pop(\"$name\")":
+		"\$self->op(\"$name\")";
+		
+		"\t\t$_->{re}		(?{ $ret }) |\n"
+	
+	} nsort { -length $_->{re} } map {
+		$_->{re} //= do {
+			my $x = quotemeta($_->{name} =~ /^\w+\s+/? $': $_->{name});
 			$x = "\\b$x" if $x =~ /^\w/;
 			$x = "$x\\b" if $x =~ /\w$/;
 			$x
-		}
+		};
+		$_
 	} @_
 }
 
@@ -207,32 +222,26 @@ sub _lex {
 sub lex {
 	my ($self) = @_;
 	
-	return $self->{LEX} if defined $self->{LEX};
-	
-	my $re_op = $self->_lex( values %{ +{ %{$self->{INFIX}}, %{$self->{PREFIX}}, %{$self->{POSTFIX}} } } );
+	return $self->{lex} if defined $self->{lex};
 	
 	my $BR = $self->{BR};
-	my $open_brakets = $self->_lex( values %$BR );
-	my $close_brakets = $self->_lex( values %{$self->{CR}} );
-	my $terms = $self->_lex( values %{$self->{X}} );
-
-	my $_op = $re_op eq ''? "#": "";
-	my $_br = $open_brakets eq ''? "#": "";
-	my $_cr = $close_brakets eq ''? "#": "";
-	my $_x = $terms eq ''? "#": "";
 	
-	$self->{LEX} = qr{
-		$_op (?<op> $re_op )				(?{ $self->op($+{op}) }) |
-		$_br (?<br> $open_brakets )		(?{ my $x=$BR->{$+{br}}; $self->push($x->{name}, tag=>$x->{tag}) }) |
-		$_cr (?<cr> $close_brakets )		(?{ $self->pop($+{cr}) }) |
-		$_x  (?: $terms )					(?{ my($k,$v)=each %+; $self->atom($k // $&) }) |
-		\s+							|	# пропускаем пробелы
-		(?<sym> . )					(?{ $self->error(sprintf($self->{error}{sym}, $+{sym})) })
-	}sx;
+	my $re = $self->_lex( values %{$self->{INFIX}}, values %{$self->{PREFIX}}, values %{$self->{POSTFIX}}, values %$BR, values %{$self->{CR}}, values %{$self->{X}} );
+		
+	$re = "\n$re" if $re ne "";
+		
+	my $lex = "qr{$re
+		\\n		(?{ \$self->{lineno}++; \$self->{charlineno}=length \$` })  |
+		\\s+		|	# пропускаем пробелы
+		(?<sym> . )	(?{ \$self->error(sprintf(\$self->{error}{sym}, \$+{sym})) })
+	}sx";
 	
-	msg1 "lexx", 0+$self->{LEX}, $self->{LEX};
+	my $lexx = eval $lex;
+	die $@ if $@;
 	
-	$self->{LEX}
+	$self->{lex} = $lexx;
+	
+	$lexx
 }
 
 ###############################  синтаксический разбор  ###############################
@@ -245,7 +254,7 @@ sub op {
 	my $push = {%+, 'stmt', @_};
 	
 	push @{$self->{stack}[-1]{'A+'}}, $push;
-	$self->trace("_", $push);
+	#$self->trace("_", $push);
 	$self
 }
 
@@ -256,7 +265,7 @@ sub atom {
 	my $push = {%+, 'stmt', @_};
 	
 	push @{$self->{stack}[-1]{'A+'}}, $push;
-	$self->trace(",", $push);
+	#$self->trace(",", $push);
 	$self
 }
 
@@ -308,39 +317,37 @@ sub pop {
 		my $x;
 
 		while(@S &&
-			($x = ($s = $S[-1])->{prio}) < $prio || 
-			$x==$prio && $s->{fix} & $leftassoc
+			(($x = ($s = $S[-1])->{prio}) < $prio || 
+			$x==$prio && $s->{fix} & $leftassoc)
 		) {
 			my $r = pop @S;
 			if($r->{fix} & $infix) {
-				$r->{right} = pop @T;
-				$r->{left} = pop @T;
-				$self->trace("⇓", $r);
+				$self->error("нет операндов для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
+				$self->error("нет левого операнда для оператора $r->{stmt}") if !defined( $r->{left} = pop @T );
+				$self->trace("%", $r);
 			}
-			elsif($r->{fix} & $postfix) {
-				$r->{right} = pop @T;
-				$self->trace("→", $r);
+			elsif($r->{fix} & $prefix) {	# -x
+				$self->error("нет операнда для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
+				$self->trace(">", $r);
 			}
-			else {
-				$r->{left} = pop @T;
-				$self->trace("↵", $r);
+			else {	# x--
+				$self->error("нет операнда для оператора $r->{stmt}") if !defined( $r->{left} = pop @T );
+				$self->trace("<", $r);
 			}
 			push @T, $r;
 		}
 		
 		if(my $op = $_[0]) {
 			@$op{qw/stmt fix prio/} = @$meta{qw/name fix prio/};
-			#$op->{prio} = $prio;
-			#$op->{fix} = $meta->{fix};
 			push @S, $op;
-			$self->trace("♠", $op);
+			$self->trace("^", $op);
 		}
 	};
 	
 	# определяем с конца сколько постфиксных операторов
 	my $n;
-	for($n=$#$A; $n>=0; $n--) {
-		last if !exists $POSTFIX->{$A->[$n]};
+	for($n=@$A; $n>0; $n--) {
+		last if !exists $POSTFIX->{$A->[$n-1]{stmt}};
 	}
 	
 	# определяем операторы
@@ -352,11 +359,11 @@ sub pop {
 		if($front and $meta = $PREFIX->{$stmt}) {
 			$popop->($op);
 		}
-		elsif(!$front and $meta = $INFIX->{$stmt} and $i<=$n) {
+		elsif(!$front and $meta = $INFIX->{$stmt} and $i<$n) {
 			$popop->($op);
 			$front = 1;
 		}
-		elsif($meta = $POSTFIX->{$stmt}) {
+		elsif(!$front and $meta = $POSTFIX->{$stmt}) {
 			$popop->($op);
 		}
 		else {	# терминал
@@ -388,10 +395,10 @@ sub pop {
 my %COLOR = (
 	"+" => ":red",
 	"-" => ":bold blue",
-	"⇓" => ":red on_yellow",
-	"→" => ":red on_yellow",
-	"↵" => ":red on_yellow",
-	"♠" => ":red on_yellow",
+	"<" => ":cyan",
+	">" => ":cyan",
+	"%" => ":cyan",
+	"^" => ":magenta",
 );
 
 # возвращает колоризированный массив стеков для trace и error
@@ -399,7 +406,7 @@ sub color_stacks {
 	my ($self) = @_;
 	local $_;
 	return ":space",
-		":dark white", "\tS:", ":reset", map({ defined($_->{prio})? (":bold blue", $_->{stmt}, ":reset"): $_->{stmt} } @{$self->{stack}})
+		":dark white", "\tS:", ":reset", map({ $_->{stmt} } @{$self->{stack}})
 }
 
 # отображает операции со стеком в лог
@@ -424,7 +431,7 @@ sub trace {
 			push @after, $self->color_stacks;
 		}
 		
-		$app->log->info( ":space", "$self->{lineno}:", $COLOR{$op} // ":dark white", $op, $stmt, ":reset", @after );
+		$app->log->info( ":space", "$self->{lineno}:", $COLOR{$op} // ":dark white", $op, $stmt . (exists $top->{$stmt}? "<$top->{$stmt}>": ""), ":reset", @after );
 	}
 	
 	$self
@@ -527,7 +534,7 @@ sub expirience {
 			#$_->{code} = join "", @$code if $code;
 			
 			my $template = $templates->{ $_->{stmt} };
-			die "нет шаблона `$_->{stmt}` в языке " . ($self->{lang}{name} // "«язык Батькович»") if !$template;
+			die "нет шаблона `$_->{stmt}` в языке " . ($self->{lang}{name} // "«язык Батькович»") . " для " . $app->perl->dump($_) . " со стеком " . $app->perl->inline_dump(\@path) if !$template;
 			
 			if(@path) {
 				my $parent = $path[-1];
@@ -552,6 +559,8 @@ sub expirience {
 sub morf {
 	my ($self, $s, $file) = @_;
 	$self->{file} = $file // "«eval»";
+	$self->{lineno} = 1;
+	$self->{charlineno} = 0;
 	
 	my $S = $self->{stack} = [my $root = {stmt=>$app->perl->mq("root")}];
 	
@@ -565,16 +574,17 @@ sub morf {
 	$self->error("конец: рут должен содержать 1-н элемент") if @$A != 1;
 	
 	my $ret = $self->expirience($A->[0]{right});
-	msg1 ":space cyan", "code:", $s, ":reset", , ":red", "->", ":reset", $ret;
+	msg1 ":space cyan", "code:", $s, ":reset", , ":red", "->", ":reset", $ret if $self->{show_morf};
 	$ret
 }
 
 # вычисляет выражение
 sub eval {
 	my ($self, $code) = @_;
-	my $ret = eval $self->morf($code);
+	my $morf = $self->morf($code);
+	my @ret = wantarray? eval $morf: scalar eval $morf;
 	die $@ if $@;
-	$ret
+	wantarray? @ret: $ret[0]
 }
 
 1;
