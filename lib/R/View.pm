@@ -1,6 +1,8 @@
 package R::View;
 # шаблонизатор
 
+use base R::Syntax;
+
 use common::sense;
 use R::App;
 use R::Re;
@@ -20,7 +22,7 @@ my $OPERATORTABLE = __PACKAGE__->new;
 # конструктор
 sub new {
 	my ($cls) = @_;
-	bless {
+	$cls->SUPER::new(
 		dir => "view",
 		compile_dir => "var/c_view",
 		scenario_dir => "var/c_scenario",
@@ -41,7 +43,7 @@ sub new {
 		INC => {},				# подключённые шаблоны и файлы кода => класс
 		inc => ["."],			# пути в которых искать шаблоны и файлы кода
 		class => {},			# скомпилированный класс
-	}, ref $cls || $cls;
+	);
 }
 
 # устанавливает язык
@@ -311,7 +313,7 @@ my $re_for = qr!
 my $s = $OPERATORTABLE;
 	
 $s->tr("yf",  qw{		dotref dot colon		})->td("yfx", qw{		dotref_go dot_go colon_go	dotref_at dot_at colon_at	dotref_of dot_of colon_of	});
-$s->tr("fy",  my @named_unaryoperators = qw{ ref pairs scalar defined length exists });
+$s->tr("fy",  qw{ ref pairs scalar defined length exists });
 $s->tr("yf",  qw{		++ --			})->td("fy", qw{ ++ -- });
 $s->tr("yfx", qw{		^				});
 $s->tr("yfx", qw{		! +~ \			})->td("fy", qw{ + - });
@@ -338,9 +340,6 @@ $s->tr("yfx", qw{		as						});
 
 $s->tr("xfy", qw{		;						});
 $s->tr("xfy", qw{		endline					});
-
-$s->tr("xfy", qw{		;						});
-$s->tr("xfy", qw{		endline					});
 $s->tr("xfy", qw{		then elseif else		});
 
 
@@ -351,9 +350,12 @@ $s->tr("xfy", qw{		CAT						});			# операция конкантенации 
 
 #my $named_unary_operators = join "|", @named_unary_operators;
 
-my $re_nowordoperators = join "|", map { quotemeta $_ } $self->nowordoperators;
-my $re_prewordoperators = join "|", map { quotemeta $_ } $self->prewordoperators;
-my $re_wordoperators = join "|", $self->wordoperators;
+my @set_operators = $OPERATORTABLE->operators;
+
+my $re_operators = join "|", map { quotemeta $_ } grep { /^\W/ && /\W$/ } @set_operators;
+my $re_prewordoperators = join "|", map { quotemeta $_ } grep { /^\w/ && /\W$/ } @set_operators;
+my $re_postwordoperators = join "|",  grep { /^\W/ && /\w$/ } @set_operators;
+my $re_wordoperators = join "|",  grep { /^\w/ && /\w$/ } @set_operators;
 
 my %CloseTag = qw/ ( ) { } [ ] /;
 my %OpenNameVar = qw/ ( var_go { var_of [ var_at /;
@@ -368,14 +370,16 @@ my %RefNameOp = (
 
 
 sub masking {
-	my ($self) = @_;
+	my ($self, $s) = @_;
 	local ($&, $_, $`, $');
 	
 	#my $IN = 1;
 	my $re_endlines = qr/ (\s* $re_rem $re_endline (?{ $self->{lineno}++ }) )+ /x;
 	
+	my $lex = $self->lex;
 	
-	while($_[1] =~ m{
+	
+	while($s =~ m{
 	
 	# в начале и конце не катит
 	^ $re_endlines 		|
@@ -388,12 +392,7 @@ sub masking {
 	; 				(?{ $self->endgosub->op(';') }) |
 	
 	" (?<QR> (?:[^"]|\\")* ) "! (?<qr_args> \w+ )?  (?{ $self->atom('regexp') }) |
-	
-	or $re_space_ask =				(?{ $self->op("or=") })  |
-	xor $re_space_ask =				(?{ $self->op("xor=") })  |
-	and $re_space_ask =				(?{ $self->op("and=") }) |
-	\[ $re_space_ask \] $re_space_ask =			(?{ $self->op("[]=") })  |
-	
+		
 	\[ $re_space_ask \]							(?{ $self->atom('[]') }) |
 	\{ $re_space_ask \}							(?{ $self->atom('{}') }) |
 	\( $re_space_ask \)							(?{ $self->atom('()') }) |
@@ -421,7 +420,6 @@ sub masking {
 	\b (
 		self | this | me					(?{ $self->atom('self') })  |
 		app			 						(?{ $self->atom('app') }) 	|
-		as			 						(?{ $self->op('as') }) 		|
 		q		 	(?{ $self->atom('q') }) 	|
 		user 		(?{ $self->atom('user') })  |
 		FOR			(?{ $self->push("for", then=>"for_then") })  |
@@ -464,6 +462,13 @@ sub masking {
 		THROW			(?{ $self->push('throw', gosub=>1, endline=>1) }) 
 	) \b |
 
+	=		(?{ $_[2] = 1; $self->op('=') })  |
+	
+	\b (?<op> $re_wordoperators) \b			(?{ $self->push($+{op}) }) |
+	\b (?<op> $re_prewordoperators)			(?{ $self->push($+{op}) }) |
+	   (?<op> $re_postwordoperators) \b		(?{ $self->push($+{op}) }) |
+	   (?<op> $re_operators)				(?{ $self->push($+{op}) }) |
+	 
 	
 	\b (?<try> TRY ) \b		(?{ $self->push('try') })  |
 	\b (?<catch> CATCH ) (?: $re_space (?<catch_var> $re_id) (?: $re_space AS $re_space (?<catch_isa> $re_class (?: $re_space_ask , $re_space_ask $re_class )* )? )? )? 
@@ -484,10 +489,6 @@ sub masking {
 	
 	(?<var>$re_id)			(?{ $self->atom('var') })  |
 	(?<num>$re_number)		(?{ $self->atom('num') })  |
-	
-	(?<name>$re_nowordoperators )	(?{ $self->op($+{name}) })  |
-		
-	=		(?{ $_[2] = 1; $self->op('=') })  |
 
 	(?<nosim> . )		(?{ $self->error("неизвестный науке символ `$+{nosim}`") }) 
 	
@@ -1058,112 +1059,6 @@ sub get_name {
 }
 
 
-
-# проверяет параметры на верхушке стека скобок и выбрасывает ошибку, если они не совпадают
-sub _check {
-	my $self = shift;
-	for(my $i=0; $i<@_; $i+=2) {
-		my ($k, $v) = @_[$i, $i+1];
-		next if $k == 1;
-		if( $_->{$k} ne $v ) {
-			my %check = @_;
-			$self->error(exists($check{1})? $check{1}: "$check{stmt}: не совпадает $k в стеке. Оно $_->{$k}, а должно быть $v");
-		}
-	}
-	$self
-}
-
-sub check { local $_ = $_[0]->{space}[-1]; goto &_check}
-sub opcheck { local $_ = $_[0]->{stack}[-1]; goto &_check}
-sub atcheck { local $_ = $_[0]->{terms}[-1]; goto &_check}
-
-
-# # добавляет операнд или оператор
-# sub code_add {
-	# my ($self, $push) = @_;
-	
-
-	# # a++ b - gosub
-	# # a + -b
-	
-	# my $stmt = $push->{stmt};
-	# my $top = $self->top;
-	# my $OP = $top->{"+OP"};		# 0 - пришёл оператор, 1 - операнд или постфиксный оператор
-	
-	# my $S = $top->{"S+"} //= [];
-	# my $T = $top->{"T+"} //= [];
-	
-	# my $op = $INFIX{ $stmt };
-	# if($op) {			# оператор
-		
-	# }
-	# else {	# операнд - забрасываем в стек Т
-		# push @$T, $push;
-		# $self->trace("¤", $push);
-	# }
-	
-	# # # преобразуем переменную или незакончившийся вызов метода в gosub
-	# # if( !exists $push->{operator}
-		# # and !exists $push->{of}
-		# # and @{$code = $self->top->{code}}
-		# # and exists(( my $prev = $code->[$#$code] )->{var})
-	# # ) {
-		# # if(exists $prev->{tag} or exists $prev->{gosub}) {
-			# # push @$code, $prev = {stmt => 'gosub', var => 1, endline => 1, gosub => 1};
-		# # }
-		# # else {
-			# # $prev->{gosub} = 1;
-			# # $prev->{endline} = 1;
-			# # $prev->{stmt} .= "_go";
-		# # }
-		# # push @{$self->{stack}}, $prev;
-		# # $self->trace("↑", $prev);
-	# # }
-	
-	
-	
-	# $self
-# }
-
-
-
-# просматривает вершину стека
-sub top {
-	my ($self) = @_;
-	my $С = $self->{space};
-	$self->error("нет элементов в стеке скобок") if @$С == 0;
-	$С->[-1]
-}
-
-# просматривает вершину стека
-sub optop {
-	my ($self) = @_;
-	my $S = $self->{stack};
-	$self->error("нет элементов в стеке операторов") if @$S == 0;
-	$S->[-1]
-}
-
-# просматривает вершину стека
-sub attop {
-	my ($self) = @_;
-	my $T = $self->{terms};
-	$self->error("нет элементов в стеке терминалов") if @$T == 0;
-	$T->[-1]
-}
-
-
-# # просматривает вершину стека, если в стеке ничего нет выдаёт {}
-# sub etop {
-	# my ($self, $n) = @_;
-	# my $count = @{$self->{stack}} - $n;
-	# $count>0? $self->{stack}->[$count-1]: {};
-# }
-
-# # стек пуст
-# sub empty {
-	# my ($self) = @_;
-	# @{$self->{stack}} == 0;
-# }
 
 
 

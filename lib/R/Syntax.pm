@@ -7,7 +7,7 @@ use R::App;
 
 # конструктор
 sub new {
-	my ($cls) = @_;
+	my $cls = shift;
 	bless {
 		
 		PREFIX => {},			# префикс-операторы
@@ -31,9 +31,10 @@ sub new {
 		lex => undef,			# кэш - лексический анализатор
 		
 		error => {				# ошибки
-			sym => "неизвестный символ `%s`",
+			nosym => "неизвестный науке символ `%s`",
 		},
 		
+		@_
 	}, ref $cls || $cls;
 }
 
@@ -85,11 +86,24 @@ sub td {
 		fix=>$fix,
 		type=>$type,
 	);
+	my $op;
 	
 	my $key = $fix & $infix? "INFIX": $fix & $prefix? "PREFIX": "POSTFIX";
 	for my $x (@_) {
-		die "оператор $type `$x` уже объявлен" if exists $self->{$key}{$x};
-		$self->{$key}{$x} = {%p, name=>"$type $x"};
+		if(ref $x eq "Regexp") {
+			die "не указан оператор" if !$op;
+			die "регулярка уже есть у оператора $op->{name}" if exists $op->{re};
+			$op->{re} = $x;
+		}
+		elsif(ref $x eq "CODE") {
+			die "не указан оператор" if !$op;
+			die "подпрограмма уже есть у оператора $op->{name}" if exists $op->{sub};
+			$op->{sub} = $x;
+		}
+		else {
+			die "оператор `$type $x` уже объявлен" if exists $self->{$key}{$x};
+			$op = $self->{$key}{$x} = {%p, name=>"$type $x"};
+		}
 	}
 
 	$self
@@ -116,11 +130,13 @@ sub br {
 
 		if(ref $a eq "Regexp") {
 			my $r = $close // $open;
+			die "не указана скобка" if !$r;
 			die "регулярка уже есть у скобки $r->{name}" if exists $r->{re};
 			$r->{re} = $a;
 		}
 		elsif(ref $a eq "CODE") {
 			my $r = $close // $open;
+			die "не указана скобка" if !$r;
 			die "код уже есть у скобки $r->{name}" if exists $r->{sub};
 			$r->{sub} = $a;
 		}
@@ -154,10 +170,12 @@ sub x {
 	
 	for my $a (@_) {
 		if(ref $a eq "Regexp") {
+			die "не указан терминал" if !$prev;
 			die "регулярка уже есть у терминала $prev->{name}" if exists $prev->{re};
 			$prev->{re} = $a;
 		}
 		elsif(ref $a eq "CODE") {
+			die "не указан терминал" if !$prev;
 			die "код уже есть у терминала $prev->{name}" if exists $prev->{sub};
 			$prev->{sub} = $a;
 		}
@@ -209,7 +227,7 @@ sub _lex {
 	
 	} nsort { -length $_->{re} } map {
 		$_->{re} //= do {
-			my $x = quotemeta($_->{name} =~ /^\w+\s+/? $': $_->{name});
+			my $x = quotemeta($_->{fix} && $_->{name} =~ /^\w+\s+/? $': $_->{name});
 			$x = "\\b$x" if $x =~ /^\w/;
 			$x = "$x\\b" if $x =~ /\w$/;
 			$x
@@ -233,7 +251,7 @@ sub lex {
 	my $lex = "qr{$re
 		\\n		(?{ \$self->{lineno}++; \$self->{charlineno}=length \$` })  |
 		\\s+		|	# пропускаем пробелы
-		(?<sym> . )	(?{ \$self->error(sprintf(\$self->{error}{sym}, \$+{sym})) })
+		(?<nosym> . )	(?{ \$self->error(sprintf(\$self->{error}{nosym}, \$+{nosym})) })
 	}sx";
 	
 	my $lexx = eval $lex;
@@ -586,5 +604,28 @@ sub eval {
 	die $@ if $@;
 	wantarray? @ret: $ret[0]
 }
+
+# проверяет параметры на верхушке стека скобок и выбрасывает ошибку, если они не совпадают
+sub check {
+	my $self = shift;
+	for(my $i=0; $i<@_; $i+=2) {
+		my ($k, $v) = @_[$i, $i+1];
+		next if $k == 1;
+		if( $_->{$k} ne $v ) {
+			my %check = @_;
+			$self->error(exists($check{1})? $check{1}: "$check{stmt}: не совпадает $k в стеке. Оно $_->{$k}, а должно быть $v");
+		}
+	}
+	$self
+}
+
+# просматривает вершину стека
+sub top {
+	my ($self) = @_;
+	my $stack = $self->{stack};
+	$self->error("нет элементов в стеке скобок") if @$stack == 0;
+	$stack->[-1]
+}
+
 
 1;
