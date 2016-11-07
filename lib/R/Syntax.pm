@@ -23,7 +23,7 @@ sub new {
 		LEX => undef,			# лексический анализатор
 		
 		show_morf => 0,			# отражать ли преобразование в лог
-		#trace => "«eval»",		# файл трейс которого показать
+		trace => "«eval»",		# файл трейс которого показать
 		file => "",				# путь к текущему файлу
 		lineno => 1,			# номер строки в текущем файле
 		
@@ -207,7 +207,7 @@ sub x {
 # формирует список имён операторов
 sub operators {
 	my ($self) = @_;
-	keys %{ +{ keys %{$self->{INFIX}}, keys %{$self->{PREFIX}}, keys %{$self->{POSTFIX}} } };
+	nsort { -length $_ } keys %{ $app->perl->setref( keys( %{$self->{INFIX}} ), keys( %{$self->{PREFIX}} ), keys( %{$self->{POSTFIX}} ) ) };
 }
 
 # формирует лексемы
@@ -227,7 +227,7 @@ sub _lex {
 	
 	} nsort { -length $_->{re} } map {
 		$_->{re} //= do {
-			my $x = quotemeta($_->{fix} && $_->{name} =~ /^\w+\s+/? $': $_->{name});
+			my $x = quotemeta(($_->{fix} || $_->{cr} || exists $_->{tag}) && $_->{name} =~ /^\w+\s+/? $': $_->{name});
 			$x = "\\b$x" if $x =~ /^\w/;
 			$x = "$x\\b" if $x =~ /\w$/;
 			$x
@@ -253,6 +253,8 @@ sub lex {
 		\\s+		|	# пропускаем пробелы
 		(?<nosym> . )	(?{ \$self->error(sprintf(\$self->{error}{nosym}, \$+{nosym})) })
 	}sx";
+	
+	#msg1 $lex;
 	
 	my $lexx = eval $lex;
 	die $@ if $@;
@@ -323,7 +325,7 @@ sub pop {
 	my $PREFIX =  $self->{PREFIX};
 	my $INFIX =  $self->{INFIX};
 	my $POSTFIX =  $self->{POSTFIX};
-	
+
 	my @T;
 	my @S;
 	my $front = 1;
@@ -336,7 +338,9 @@ sub pop {
 
 		while(@S &&
 			(($x = ($s = $S[-1])->{prio}) < $prio || 
-			$x==$prio && $s->{fix} & $leftassoc)
+			$x==$prio && ($s->{fix} & $nonassoc || $meta->{fix} & $nonassoc? 
+				$self->error("неассоциативный оператор " . ($s->{fix} & $nonassoc? $s->{name}: $meta->{name})):
+			$s->{fix} & $leftassoc))
 		) {
 			my $r = pop @S;
 			if($r->{fix} & $infix) {
@@ -349,10 +353,22 @@ sub pop {
 				$self->trace(">", $r);
 			}
 			else {	# x--
-				$self->error("нет операнда для оператора $r->{stmt}") if !defined( $r->{left} = pop @T );
-				$self->trace("<", $r);
+				$self->error("нет операнда для оператора $r->{stmt}") if !defined( my $prev = pop @T );
+
+				if( $prev->{fix} & $postfix && $prev->{prio} < $r->{prio} ) {
+					$r->{left} = $prev->{left};
+					$prev->{left} = $r;
+					$r = $prev;
+					$self->trace("<", $prev);
+				}
+				else {
+					$r->{left} = $prev;
+					$self->trace("<", $r);
+				}
+				
+				
 			}
-			push @T, $r;
+			push @T, $r;			
 		}
 		
 		if(my $op = $_[0]) {
@@ -373,7 +389,7 @@ sub pop {
 	for my $op (@$A) {
 	
 		my $stmt = $op->{stmt};
-	
+		
 		if($front and $meta = $PREFIX->{$stmt}) {
 			$popop->($op);
 		}
@@ -476,6 +492,15 @@ sub masking {
 	$self
 }
 
+# устанавливает модификаторы языка
+sub modifiers {
+	my $self = shift;
+	
+	%{ $self->{lang}{modifiers} } = ( %{$self->{lang}{modifiers}}, @_ );
+	
+	$self
+}
+
 # устанавливает шаблоны языка
 sub templates {
 	my $self = shift;
@@ -484,6 +509,9 @@ sub templates {
 	
 	for(my $i=0; $i<@_; $i+=2) {
 		my ($k, $v) = @_[$i, $i+1];
+		
+		$c->{$k} = $v, next if ref $v eq "CODE";
+		
 		$v =~ s/'/\\'/g;
 		$v =~ s/\{\{\s*(\w+)\s*\}\}/', \$_->{$1} ,'/g;
 		$k =~ s/\s+/ /g;
@@ -552,7 +580,7 @@ sub expirience {
 			#$_->{code} = join "", @$code if $code;
 			
 			my $template = $templates->{ $_->{stmt} };
-			die "нет шаблона `$_->{stmt}` в языке " . ($self->{lang}{name} // "«язык Батькович»") . " для " . $app->perl->dump($_) . " со стеком " . $app->perl->inline_dump(\@path) if !$template;
+			die "нет шаблона `$_->{stmt}` в языке " . ($self->{lang}{name} // "«язык Батькович»") . " для " . $app->perl->inline_dump($_) . " со стеком " . $app->perl->inline_dump(\@path) if !$template;
 			
 			if(@path) {
 				my $parent = $path[-1];
@@ -571,29 +599,47 @@ sub expirience {
 	$out
 }
 
+my $rootsk = $app->perl->qq("¥");
 
-
-# морфирует в другой язык
-sub morf {
-	my ($self, $s, $file) = @_;
+# приготовления для трансляции в другой язык
+sub premorf {
+	my ($self, $file) = @_;
 	$self->{file} = $file // "«eval»";
 	$self->{lineno} = 1;
 	$self->{charlineno} = 0;
 	
-	my $S = $self->{stack} = [my $root = {stmt=>$app->perl->mq("root")}];
+	$self->{stack} = [{stmt=>$app->perl->qq("root")}];
 	
-	$self->push("¥")->masking($s)->pop("¥");
+	$self->push($rootsk);
+	
+	$self
+}
+
+# разбор дерева и трансляция по нему в другой язык
+sub postmorf {
+	my ($self) = @_;
+
+	$self->pop($rootsk);
+	
+	my $S = $self->{stack};
 	
 	$self->error("конец: стек должен содержать 1-н элемент") if @$S != 1;
+	my $root = pop @$S;
 	
 	my $A = $root->{"A+"};
 	$self->error("конец: пустой код") if !defined $A;
 	
 	$self->error("конец: рут должен содержать 1-н элемент") if @$A != 1;
-	
+
 	my $ret = $self->expirience($A->[0]{right});
-	msg1 ":space cyan", "code:", $s, ":reset", , ":red", "->", ":reset", $ret if $self->{show_morf};
+	#msg1 ":space cyan", "code:", $s, ":reset", , ":red", "->", ":reset", $ret if $self->{show_morf};
 	$ret
+}
+
+# морфирует в другой язык
+sub morf {
+	my ($self, $s, $file) = @_;
+	$self->premorf($file)->masking($s)->postmorf;
 }
 
 # вычисляет выражение

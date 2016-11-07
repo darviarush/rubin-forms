@@ -23,6 +23,8 @@ my $OPERATORTABLE = __PACKAGE__->new;
 sub new {
 	my ($cls) = @_;
 	$cls->SUPER::new(
+		%$OPERATORTABLE,
+	
 		dir => "view",
 		compile_dir => "var/c_view",
 		scenario_dir => "var/c_scenario",
@@ -36,6 +38,7 @@ sub new {
 		
 		
 		INHERITS => undef,		# вспомогательная для шаблонов
+		langs => {},				# кэш языков
 		lang => undef,			# драйвер текущего языка
 		metafilter => $app->ini->{design}{metafilter},	# наименования дефолтных метафильтров
 		metafilters => [],		# метафильтры
@@ -54,9 +57,14 @@ sub lang {
 	} else {
 		my ($self, $lang) = @_;
 	
-		if($lang eq "js") { $self->{lang} = $app->use("R::View::Javascript") }
-		elsif($lang eq "perl") { $self->{lang} = $app->use("R::View::Perl") }
-		else { die "неизвестный язык $lang" }
+		$self->{lang} = $self->{langs}{$lang} //= do {
+			require "R/View/Morf/" . ucfirst($lang) . ".pm";
+			my $class = "R::View::Morf::" . ucfirst($lang);
+			$self->{lang} = bless { name => $lang }, $class;
+			$self->modifiers( %{"${class}::modifiers"} );
+			$self->templates( %{"${class}::templates"} );
+			$self->{lang}
+		};
 
 		$self
 	}
@@ -352,10 +360,12 @@ $s->tr("xfy", qw{		CAT						});			# операция конкантенации 
 
 my @set_operators = $OPERATORTABLE->operators;
 
-my $re_operators = join "|", map { quotemeta $_ } grep { /^\W/ && /\W$/ } @set_operators;
-my $re_prewordoperators = join "|", map { quotemeta $_ } grep { /^\w/ && /\W$/ } @set_operators;
-my $re_postwordoperators = join "|",  grep { /^\W/ && /\w$/ } @set_operators;
-my $re_wordoperators = join "|",  grep { /^\w/ && /\w$/ } @set_operators;
+die "нет новордоператоров" unless my $re_operators = join "|", map { quotemeta $_ } grep { /^\W/ && /\W$/ } @set_operators;
+die "нет превордоператоров" unless my $re_prewordoperators = join "|", map { quotemeta $_ } grep { /^\w/ && /\W$/ } @set_operators;
+die "есть поствордоператоры. Раскомментарьте в lex-е" if my $re_postwordoperators = join "|",  grep { /^\W/ && /\w$/ } @set_operators;
+die "нет вордоператоров" unless my $re_wordoperators = join "|",  grep { /^\w/ && /\w$/ } @set_operators;
+
+
 
 my %CloseTag = qw/ ( ) { } [ ] /;
 my %OpenNameVar = qw/ ( var_go { var_of [ var_at /;
@@ -367,8 +377,6 @@ my %RefNameOp = (
 	':' => {qw/ ( colon_go { colon_of [ colon_at /},
 );
 
-
-
 sub masking {
 	my ($self, $s) = @_;
 	local ($&, $_, $`, $');
@@ -376,7 +384,7 @@ sub masking {
 	#my $IN = 1;
 	my $re_endlines = qr/ (\s* $re_rem $re_endline (?{ $self->{lineno}++ }) )+ /x;
 	
-	my $lex = $self->lex;
+	#my $lex = $self->lex;
 	
 	
 	while($s =~ m{
@@ -412,7 +420,6 @@ sub masking {
 	
 	(?<of> \.\$ | \. | : ) (?<var>$re_id)		(?{ $self->op($RefName{$+{of}}) }) |
 	
-	
 	(?<var>$re_id)(?<sk>$re_sk)		(?{ $self->push($OpenNameVar{$+{sk}}, tag=>$CloseTag{$+{sk}}) }) |
 	
 	\b SUPER (?<sk>$re_sk)			(?{ $self->push($OpenNameSuper{$+{sk}}, tag=>$CloseTag{$+{sk}} ) }) |
@@ -445,16 +452,9 @@ sub masking {
 		(?<paramarray> paramarray | arguments ) 		(?{ $self->code('paramarray') })  |
 		BEGIN		(?{ $self->push('begin') }) |
 		
-		
-		(?<operator> cmp|mod|xor|or|and|not|eq|ne|le|ge|lt|gt )  		(?{ $self->op($+{operator}) })  |
-		
 		SUPER			(?{ $self->code('super') })  |
 		
 		(?<word> undef|next|last|redo|return|use|wantarray ) 		(?{ $self->atom('word', word=>lc $+{word}) }) |
-		
-		(?<name> $re_wordoperators )		(?{ $self->op($+{name}) }) |
-
-		
 		
 		(?<nothing> null | nothing) 		(?{ $self->atom('null') }) |
 		TRUE		 						(?{ $self->atom('true') }) |
@@ -464,10 +464,10 @@ sub masking {
 
 	=		(?{ $_[2] = 1; $self->op('=') })  |
 	
-	\b (?<op> $re_wordoperators) \b			(?{ $self->push($+{op}) }) |
-	\b (?<op> $re_prewordoperators)			(?{ $self->push($+{op}) }) |
-	   (?<op> $re_postwordoperators) \b		(?{ $self->push($+{op}) }) |
-	   (?<op> $re_operators)				(?{ $self->push($+{op}) }) |
+	\b (?<op> $re_wordoperators) \b			(?{ $self->op($+{op}) }) |
+	\b (?<op> $re_prewordoperators)			(?{ $self->op($+{op}) }) |
+	#   (?<op> $re_postwordoperators) \b		(?{ $self->op($+{op}) }) |
+	   (?<op> $re_operators)				(?{ $self->op($+{op}) }) |
 	 
 	
 	\b (?<try> TRY ) \b		(?{ $self->push('try') })  |
@@ -686,15 +686,13 @@ sub replace_dollar {
 sub parse {
 	my ($self, $buf, $name) = @_;
 	
-	$name //= "EXAMPLE";
 	%{$self->{meta}} = ();
-	
-	$self->{stack} = [];
-	$self->{terms} = [];
-	$self->{space} = [];
-	$self->{front} = 1;
-	$self->{lineno} = 1;
 	$self->{INHERITS} = undef;
+	
+	$self->lang("perl") if !$self->{lang};
+	
+	$self->premorf($name);
+	$name //= $self->{file};
 	
 	my $class = $self->get_name($name);
 	
@@ -757,14 +755,13 @@ sub parse {
 	
 	#$self->error("стек не пуст: нет <% end " . $self->top(1)->{stmt} . " %>") if @{$self->{stack}}>1;
 	
-	my $T = $self->{terms};
-	my $top = $T->[0];
+	my $top = $self->{stack}[-1];
 	
-	# # код, который выполниться при загрузке скрипта
+	# код, который выполниться при загрузке скрипта
 	my $begin = $self->{begin};
 	$top->{begin} = @$begin? do { my $ret = " " . join "", @$begin; @$begin = (); $ret }: "";
 	
-	my $out = $self->expirience;
+	my $out = $self->postmorf;
 	
 	%{$self->{meta}} = ();
 	
@@ -1117,22 +1114,16 @@ sub renderis {
 
 # вычисляет выражение на языке шаблона
 sub eval {
-	my ($self, $code, $data) = @_;
+	my ($self, $text, $data) = @_;
 	
 	local($self->{stack}, $self->{lineno}, $self->{INHERITS}, $self->{file});
 
-	my $path = "EXAMPLE";
-	$self->{file} = $path;	
-	$self->{stack} = [];
-	$self->{terms} = [];
-	$self->{space} = [];
-	$self->{front} = 1;
-	$self->{lineno} = 1;
 	$self->{INHERITS} = undef;
-
-	my $name = $self->get_name($path);
 	
-	$code = $self->masking($code);
+	my $rootsk = $app->perl->qq("¥");
+	
+	my $code = $self->premorf->push($rootsk)->masking($text)->pop($rootsk)->postmorf;
+	
 	$code = $self->lang->can("foreval")->($self, $code);
 	
 	my $from = $self->lang->can("len_classes")->($self);
@@ -1161,7 +1152,7 @@ sub _show_error {
 # создаёт отображение из текста и вычисляет его
 sub create {
 	my ($self, $view, $data, $path) = @_;
-	$self->{file} = $path //= "EXAMPLE";
+	$self->{file} = $path //= $app->perl->q("eval");
 	my $code = $self->parse($view, $path);
 	my $from = $self->{lang}->len_classes;
 
@@ -1185,7 +1176,7 @@ sub createlog {
 	my $self = shift;
 	my ($view, $data, $path) = @_;
 	my $trace = $self->{trace};
-	$self->{trace} = $path // "EXAMPLE";
+	$self->{trace} = $path //= $app->perl->q("eval");
 	my $res = $self->create($view, $data, $path, my $code);
 	$self->{trace} = $trace;
 	

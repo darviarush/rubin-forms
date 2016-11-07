@@ -122,7 +122,7 @@ args "";
 desc "удаляет 13-й символ";
 sub del13 {
 	# "etc", "lib", "view", "migrate", "model", "html", "man", $0
-	$app->file(".")->encode(undef)->find("*.{pm|pl|man|human|*htm*|js|css|coffee|yml|ini|*php*|twig|tmpl}")->replace(sub { print $_[0]->path . "\n" if s/\r//g })
+	$app->file(".")->encode(undef)->find("*/.gitignore|*.{pm|pl|man|human|%htm%|js|css|coffee|yml|ini|%php%|twig|tmpl|txt}")->replace(sub { print $_[0]->path . "\n" if s/\r//g })
 	
 }
 

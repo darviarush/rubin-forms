@@ -1,5 +1,5 @@
-package R::View::Perl;
-# драйвер для перевода языка lukull в язык perl
+package R::View::Morf::Perl;
+# драйвер для перевода языка Argentum в язык perl
 
 use common::sense;
 use R::App;
@@ -13,13 +13,6 @@ my $esc = "', R::View::Views::escapeHTML(scalar do { "; my $_esc = " }), '";
 ### шаблоны
 our %templates = (
 
-"+" => '({{ left }} + {{ right }})',
-"-" => '({{ left }} - {{ right }})',
-"*" => '({{ left }} * {{ right }})',
-"/" => '({{ left }} / {{ right }})',
-
-"+u" => 'int({{ right }})',
-"-u" => '-({{ right }})',
 
 
 endline => ";\n",
@@ -67,14 +60,28 @@ regexp => 'qr({{ QR }}){{ qr_args }}',
 '=>' => '({{ left }} => {{ right }})',
 gosub => '->( {{ right }} )',
 
+# арифметические операторы
+"xfy +" => '({{ left }}) + ({{ right }})',
+"xfy -" => '({{ left }}) - ({{ right }})',
+"xfy *" => '({{ left }}) * ({{ right }})',
+"xfy /" => '({{ left }}) / ({{ right }})',
+
+"fy +" => '0+({{ right }})',
+"fy -" => '-({{ right }})',
+
+
 # операторы распределения данных
-";" => '{{ left }}; {{ right }}',
-"," => '{{ left }}, {{ right }}',
-"=" => '({{ left }} = {{ right }})',
-"as" => '({{ right }} = {{ left }})',
+"xfy \n" => '{{ left }};\n{{ right }}',
+"xfy ;" => '{{ left }}; {{ right }}',
+"xfy ," => '{{ left }}, {{ right }}',
+"yf ," => '{{ left }},',
+
+# операторы присваивания
+"yfx =" => '({{ left }}) = ({{ right }})',
+"yfx as" => '({{ right }}) = ({{ left }})',
 
 HTML => "{{ html }}",
-CAT => "{{ left }}{{ right }}",
+'xfy CAT' => "{{ left }}{{ right }}",
 GET => "{{ html }}" . $esc . '{{ right }}' . $_esc,
 RAW => "{{ html }}" . $raw . '{{ right }}' . $_raw,
 LET => "{{ html }}" . $in . '{{ right }}' . $_in,
