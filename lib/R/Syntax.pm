@@ -316,11 +316,11 @@ sub pop {
 	
 	my $sk = pop @$stack;
 
-	my $tag;
-	$self->error("закрывающая скобка $stag конфликтует со скобкой $tag") if defined $stag and ($tag = $sk->{tag} // $sk->{stmt}) ne $stag;
+	my $tag = $sk->{tag} // $sk->{stmt};
+	$self->error("закрывающая скобка $stag конфликтует со скобкой $tag") if defined $stag and $tag ne $stag;
 	
 	my $A = $sk->{'A+'};
-	$self->error("скобки ".($stag eq $tag? $tag: $tag." ".$stag)." не могут быть пусты") if !$A;
+	$self->error("скобки ".($stag eq $sk->{stmt}? $stag: $sk->{stmt}." ".$stag)." не могут быть пусты") if !$A;
 	
 	my $PREFIX =  $self->{PREFIX};
 	my $INFIX =  $self->{INFIX};
@@ -346,11 +346,11 @@ sub pop {
 			if($r->{fix} & $infix) {
 				$self->error("нет операндов для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
 				$self->error("нет левого операнда для оператора $r->{stmt}") if !defined( $r->{left} = pop @T );
-				$self->trace("%", $r);
+				$self->trace("%", $r, [A=>$A, S=>\@S, T=>\@T]);
 			}
 			elsif($r->{fix} & $prefix) {	# -x
 				$self->error("нет операнда для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
-				$self->trace(">", $r);
+				$self->trace(">", $r, [A=>$A, S=>\@S, T=>\@T]);
 			}
 			else {	# x--
 				$self->error("нет операнда для оператора $r->{stmt}") if !defined( my $prev = pop @T );
@@ -359,11 +359,11 @@ sub pop {
 					$r->{left} = $prev->{left};
 					$prev->{left} = $r;
 					$r = $prev;
-					$self->trace("<", $prev);
+					$self->trace("<", $prev, [A=>$A, S=>\@S, T=>\@T]);
 				}
 				else {
 					$r->{left} = $prev;
-					$self->trace("<", $r);
+					$self->trace("<", $r, [A=>$A, S=>\@S, T=>\@T]);
 				}
 				
 				
@@ -374,7 +374,7 @@ sub pop {
 		if(my $op = $_[0]) {
 			@$op{qw/stmt fix prio/} = @$meta{qw/name fix prio/};
 			push @S, $op;
-			$self->trace("^", $op);
+			$self->trace("^", $op, [A=>$A, S=>\@S, T=>\@T]);
 		}
 	};
 	
@@ -437,15 +437,15 @@ my %COLOR = (
 
 # возвращает колоризированный массив стеков для trace и error
 sub color_stacks {
-	my ($self) = @_;
-	local $_;
+	my $self = shift;
+	local($a, $b);
 	return ":space",
-		":dark white", "\tS:", ":reset", map({ $_->{stmt} } @{$self->{stack}})
+		pairmap { ":dark white", "\t$a:", ":reset", map({ $_->{stmt} } @$b) } @_
 }
 
 # отображает операции со стеком в лог
 sub trace {
-	my ($self, $op, $top) = @_;
+	my ($self, $op, $top, $stacks) = @_;
 	
 	my $trace = $self->{trace};
 	if( defined($trace) && $self->{file} eq $trace ) {
@@ -460,10 +460,12 @@ sub trace {
 			delete @$after{qw/stmt e left right/};
 			@after = pairmap { "$a=$b" } %$after;
 		}
+
+		#push @after, $self->color_stacks(@$stacks) if $stacks;
 		
-		if(1) {
-			push @after, $self->color_stacks;
-		}
+		# if($op eq "+" || $op eq "-") {
+			# push @after, $self->color_stacks("S", $self->{stack});
+		# }
 		
 		$app->log->info( ":space", "$self->{lineno}:", $COLOR{$op} // ":dark white", $op, $stmt . (exists $top->{$stmt}? "<$top->{$stmt}>": ""), ":reset", @after );
 	}

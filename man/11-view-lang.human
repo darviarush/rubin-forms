@@ -86,9 +86,9 @@
 	
 Вызов методов:
 	
-	#$res = $app->view->create(q{<% GET x={a=>{b=>5}}; "$x:a:b" %>});
+	$res = $app->view->create(q{<% GET "$app.ini:site:name" %>});
 
-	#$res;	# 5
+	$res;	# Rubin Forms
 	
 == Массивы
 
@@ -98,8 +98,8 @@
 			2,
 		]
 		push @a, 10, @c, 11
-		a[] = 15, 12
-		join ",", @a 
+		@a ,= 15, 12
+		join ",", @a	
 	%>});
 	
 	$res;	# 10,1,2,11,15,12
