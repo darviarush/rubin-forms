@@ -580,7 +580,7 @@ sub expirience {
 			#$_->{code} = join "", @$code if $code;
 			
 			my $template = $templates->{ $_->{stmt} };
-			die "нет шаблона `$_->{stmt}` в языке " . ($self->{lang}{name} // "«язык Батькович»") . " для " . $app->perl->inline_dump($_) . " со стеком " . $app->perl->inline_dump(\@path) if !$template;
+			die "нет шаблона `$_->{stmt}` в языке " . ($self->{lang}{name} // "«язык Батькович»") if !$template;
 			
 			if(@path) {
 				my $parent = $path[-1];

@@ -17,23 +17,23 @@ our %templates = (
 
 endline => ";\n",
 
-dotref => '{{ left }}->${$DATA->{{{ var }}}}',
-dot => '{{ left }}->{{ var }}',
-colon => '{{ left }}->{{{ var }}}',
+'yf .$word' => '{{ left }}->${$DATA->{{{ var }}}}',
+'yf .word' => '{{ left }}->{{ var }}',
+'yf :word' => '{{ left }}->{{{ var }}}',
 
-dotref_go => '{{ left }}->${$DATA->{{{ var }}}}({{ right }})',
-dotref_of => '{{ left }}->${$DATA->{{{ var }}}}{{{ right }}}',
-dotref_at => '{{ left }}->${$DATA->{{{ var }}}}[{{ right }}]',
+'xfy .$word()' => '{{ left }}->${$DATA->{{{ var }}}}({{ right }})',
+'xfy .$word{}' => '{{ left }}->${$DATA->{{{ var }}}}{{{ right }}}',
+'xfy .$word[]' => '{{ left }}->${$DATA->{{{ var }}}}[{{ right }}]',
 
-dot_go => '{{ left }}->{{ var }}({{ right }})',
-dot_of => '{{ left }}->{{ var }}{{{ right }}}',
-dot_at => '{{ left }}->{{ var }}[{{ right }}]',
+'xfy .word()' => '{{ left }}->{{ var }}({{ right }})',
+'xfy .word{}' => '{{ left }}->{{ var }}{{{ right }}}',
+'xfy .word[]' => '{{ left }}->{{ var }}[{{ right }}]',
 
-colon_go => '{{ left }}->{{{ var }}}({{ right }})',
-colon_of => '{{ left }}->{{{ var }}}{{{ right }}}',
-colon_at => '{{ left }}->{{{ var }}}[{{ right }}]',
+'xfy :word()' => '{{ left }}->{{{ var }}}({{ right }})',
+'xfy :word{}' => '{{ left }}->{{{ var }}}{{{ right }}}',
+'xfy :word[]' => '{{ left }}->{{{ var }}}[{{ right }}]',
 
-colon_sk => '{{ right }}',
+'.word.br' => '{{ right }}',
 
 # строки
 string => '"{{ right }}"',
@@ -54,10 +54,12 @@ regexp => 'qr({{ QR }}){{ qr_args }}',
 '{' => '{ {{ right }} }',
 '(' => '( {{ right }} )',
 
+'xf @' => '@{{{ left }}}',
+'xf %' => '%{{{ left }}}',
+
+
 # операторы 
 '[]=' => 'push(@{{{ left }}}, {{ right }})',
-
-'=>' => '({{ left }} => {{ right }})',
 gosub => '->( {{ right }} )',
 
 # арифметические операторы
@@ -75,6 +77,7 @@ gosub => '->( {{ right }} )',
 "xfy ;" => '{{ left }}; {{ right }}',
 "xfy ," => '{{ left }}, {{ right }}',
 "yf ," => '{{ left }},',
+"xfy =>" => '{{ left }} => {{ right }}',
 
 # операторы присваивания
 "yfx =" => '({{ left }}) = ({{ right }})',

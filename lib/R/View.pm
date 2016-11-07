@@ -320,7 +320,9 @@ my $re_for = qr!
 {
 my $s = $OPERATORTABLE;
 	
-$s->tr("yf",  qw{		dotref dot colon		})->td("yfx", qw{		dotref_go dot_go colon_go	dotref_at dot_at colon_at	dotref_of dot_of colon_of	});
+$s->tr("yf",  qw{		.$word .word :word 	})->td("xfy", qw{ 
+						.$word() .word() :word()	.$word[] .word[] :word[]	.$word{} .word{} :word{}	});
+$s->tr("xf",  qw{		@	%		});
 $s->tr("fy",  qw{ ref pairs scalar defined length exists });
 $s->tr("yf",  qw{		++ --			})->td("fy", qw{ ++ -- });
 $s->tr("yfx", qw{		^				});
@@ -339,7 +341,7 @@ $s->tr("xfy", qw{		|| //				});
 $s->tr("xfx", qw{		..  to				});
 #$s->tr("yfx", qw{		?:					});
 $s->tr("yfx", qw{		= += -= *= /= &&= ||= //=  and= or= xor= ,= =, <<=	});				# goto last next redo dump
-$s->tr("xfy", qw{		, =>					});
+$s->tr("xfy", qw{		, =>					})->td("yf", qw{	,	});
 #$s->tr("xfx", qw{	list operators (rightward)});
 $s->tr("yfx", qw{		not						});
 $s->tr("xfy", qw{		and						});
@@ -356,9 +358,8 @@ $s->tr("xfy", qw{		CAT						});			# операция конкантенации 
 
 #//= | // | \|\|= | \|\| | &&= | && | <<= | >>= | << | >> | <=> | => | =~ | !~ | \+\+ | -- | ~~ | \*= | \+= | -= | /= | == | != | <= | >= | < | > | ! | - | \+ | \* | / | \^ | ~ | % | \.\.\. | \.\. | \.= | \. | \? | : | , | \@ | %
 
-#my $named_unary_operators = join "|", @named_unary_operators;
 
-my @set_operators = $OPERATORTABLE->operators;
+my @set_operators = grep { !/word|super/ } $OPERATORTABLE->operators;
 
 die "нет новордоператоров" unless my $re_operators = join "|", map { quotemeta $_ } grep { /^\W/ && /\W$/ } @set_operators;
 die "нет превордоператоров" unless my $re_prewordoperators = join "|", map { quotemeta $_ } grep { /^\w/ && /\W$/ } @set_operators;
@@ -368,13 +369,13 @@ die "нет вордоператоров" unless my $re_wordoperators = join "|"
 
 
 my %CloseTag = qw/ ( ) { } [ ] /;
-my %OpenNameVar = qw/ ( var_go { var_of [ var_at /;
-my %OpenNameSuper = qw/ ( super_go { super_of [ super_at /;
-my %RefName = qw/ .$ dotref . dot : colon /;
+my %OpenNameVar = qw/ ( word() { word{} [ word[] /;
+my %OpenNameSuper = qw/ ( super() { super{} [ super[] /;
+my %RefName = qw/ .$ .$word . .word : :word /;
 my %RefNameOp = (
-	'.$' => {qw/ ( dotref_go { dotref_of [ dotref_at /},
-	'.' => {qw/ ( dot_go { dot_of [ dot_at /},
-	':' => {qw/ ( colon_go { colon_of [ colon_at /},
+	'.$' => {qw/ ( .$word() { .$word{} [ .$word[] /},
+	'.' => {qw/ ( .word() { .word{} [ .word[] /},
+	':' => {qw/ ( :word() { :word{} [ :word[] /},
 );
 
 sub masking {
@@ -416,7 +417,7 @@ sub masking {
 	(?<str>$re_id) $re_space_ask => 		(?{ $self->push('string')->atom('str', str=>$+{str})->pop('string')->op('=>') })  |
 	
 
-	(?<of> \.\$ | \. | : ) (?<var>$re_id) (?<sk>$re_sk)		(?{ $self->op($RefNameOp{$+{of}}{$+{sk}})->push('colon_sk', tag=>$CloseTag{$+{sk}}) }) |
+	(?<of> \.\$ | \. | : ) (?<var>$re_id) (?<sk>$re_sk)		(?{ $self->op($RefNameOp{$+{of}}{$+{sk}})->push('.word.br', tag=>$CloseTag{$+{sk}}) }) |
 	
 	(?<of> \.\$ | \. | : ) (?<var>$re_id)		(?{ $self->op($RefName{$+{of}}) }) |
 	
