@@ -313,14 +313,14 @@ my $re_for = qr!
 # describe context it Given
 
 # ключевые слова:
-# super null extends action of block process include raw wrapper eq ne le ge lt gt keys values use sort scenario pairmap map grep reduce from repeat self this me                 ucfirst lcfirst uc lc ref cmp push pop undef next last redo return pairs or and not eq ne le ge lt gt scalar msg msg1 keys values exists closure length use push pop shift unshift splice delete defined wantarray
+# super null extends action of block process include raw wrapper eq ne le ge lt gt keys values use sort scenario pairmap map grep reduce from repeat self this me ucfirst lcfirst uc lc ref cmp push pop undef next last redo return pairs or and not eq ne le ge lt gt scalar msg msg1 keys values exists closure length use push pop shift unshift splice delete defined wantarray
 
 
 
 {
 my $s = $OPERATORTABLE;
-	
-$s->tr("yf",  qw{		.$word .word :word 	})->td("xfy", qw{ 
+
+$s->tr("yf",  qw{		.$word .word :word 	})->td("xfy", qw{
 						.$word() .word() :word()	.$word[] .word[] :word[]	.$word{} .word{} :word{}	});
 $s->tr("xf",  qw{		@	%		});
 $s->tr("fy",  qw{ ref pairs scalar defined length exists });
@@ -401,7 +401,7 @@ sub masking {
 	; 				(?{ $self->endgosub->op(';') }) |
 	
 	" (?<QR> (?:[^"]|\\")* ) "! (?<qr_args> \w+ )?  (?{ $self->atom('regexp') }) |
-		
+
 	\[ $re_space_ask \]							(?{ $self->atom('[]') }) |
 	\{ $re_space_ask \}							(?{ $self->atom('{}') }) |
 	\( $re_space_ask \)							(?{ $self->atom('()') }) |
@@ -414,6 +414,7 @@ sub masking {
 	
 	(?<string>$re_string) 			(?{ $self->replace_dollar($+{string}) })  |
 	(?<var> $re_id ) \( 			(?{ $self->push('gosub', tag=>')') })  |
+	
 	(?<str>$re_id) $re_space_ask => 		(?{ $self->push('string')->atom('str', str=>$+{str})->pop('string')->op('=>') })  |
 	
 
