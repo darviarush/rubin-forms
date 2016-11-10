@@ -246,7 +246,7 @@ sub run {
 
 		my @argv = @ARGV;
 		local $_;
-		
+
 		utf8::decode($_) for @argv;
 
 		make $name, @argv;

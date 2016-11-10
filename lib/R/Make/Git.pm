@@ -18,13 +18,17 @@ args "";
 desc "";
 task {
     my ($comment) = @_;
-    $comment = s!"!\\"!g;
+
+    $comment =~ s!"!\\"!g;
+    
     my $cmd = "git commit -am \"$comment\" && git pull --no-edit && git push";
-    
+   
     $app->tty->raw;
-    
-    print `$cmd`
-}
+   
+    print "$cmd\n";
+   
+    print `$cmd`;
+};
 
 name "commit";
 desc "добавляет все файлы и делает комит";
