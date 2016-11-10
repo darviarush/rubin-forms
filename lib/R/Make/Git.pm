@@ -13,6 +13,18 @@ sub new {
 
 category "GIT";
 
+name "push";
+args "";
+desc "";
+task {
+    my ($comment) = @_;
+    $comment = s!"!\\"!g;
+    my $cmd = "git commit -am \"$comment\" && git pull --no-edit && git push";
+    
+    $app->tty->raw;
+    
+    print `$cmd`
+}
 
 name "commit";
 desc "добавляет все файлы и делает комит";
