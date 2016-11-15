@@ -7,6 +7,8 @@ use R::Make;
 
 category "ЭКСПЕРИМЕНТ";
 
+
+
 name "replace_view";
 desc "заменяет текст в директории view";
 sub replace_view {

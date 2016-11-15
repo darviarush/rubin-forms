@@ -92,6 +92,14 @@ sub to {
 	
 }
 
+name "branch";
+args "";
+desc "переключиться на ветку";
+sub branch {
+    $app->tty->raw;
+    $app->tty->select([ grep { length $_ } split /\n/, `git branch` ], "выберите ветку");
+}
+
 name "dist";
 args "";
 desc "пушит все из этого каталога и всех каталогов в каталоге выше";

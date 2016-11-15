@@ -172,22 +172,41 @@ args "";
 desc "изменяет права файлов на 0600, а директорий на 0744";
 sub chmod {
 
-	if( $app->file(".git")->isdir ) {
+    my $mod = 0600;
+    my $grep_chmod = sub { $app->file($_)->mod != $mod };
+    my $print_dir = sub { printf "-d %o\t%s", $mod, $_->path . "\n" };
+    my $print_file = sub { printf "-f %o\t%s", $mod, $_->path . "\n" };
+
+	if( 0 && $app->file(".git")->isdir ) {
 
 		my @hide = qw/lib migrate model man var view etc ex .gitignore Makefile/;
 		my @front = qw/html/;
 		
-		$app->file(@hide)->find("-f")->mod(0600);
-		$app->file((@hide, @front))->find("-d")->mod(0744);
+        $mod = 0600;
+		$app->file(@hide)->find("-f", $grep_chmod)->mod($mod)->then($print_file);
+        $mod = 0744;
+		$app->file(@hide, @front)->find("-d", $grep_chmod)->mod($mod)->then($print_dir);
 		
-		$app->file(@front)->find("-f")->mod(0622);
-		$app->file($app->project_name)->mod(0700);
+        $mod = 0622;
+		$app->file(@front)->find("-f", $grep_chmod)->mod($mod)->then($print_file);
+        $mod = 0700;
+		$app->file($app->project_name)->find("-f", $grep_chmod)->mod($mod)->then($print_file);
 		
 		$app->log->info("изменены права файлов на стандартные");
 	}
 	else {
-		$app->file(".")->find("-f", sub { $_->mod!=0622 })->mod(0622)->then(sub { print "-f 0622\t" . $_->path . "\n" });
-		$app->file(".")->find("-d", sub { $_->mod!=0744 })->mod(0744)->then(sub { print "-d 0744 " . $_->path . "\n" });
+        
+        my @any = $app->file("*")->glob->grep(sub { !/^\.git$/ });
+        
+        $mod = 0644;
+		$app->file(@any)->find("-f", $grep_chmod)->mod($mod)->then($print_file);
+        $mod = 0755;
+		$app->file(@any)->find("-d", $grep_chmod)->mod($mod)->then($print_dir);
+        
+        $mod = 0764;
+		$app->file(".git")->find("-f", $grep_chmod)->mod($mod)->then($print_file);
+        $mod = 0775;
+		$app->file(".git")->find("-d", $grep_chmod)->mod($mod)->then($print_dir);
 	}
 	
 	
@@ -324,5 +343,18 @@ $app->make->run;
 }
 
 
+name "check.comments";
+args "";
+desc "чекер комментов в cxx, php, js";
+task {
+    $app->file(".")->find("*.%php%|*.js", "-f", sub {
+        my $x = $app->file($_)->encode(undef)->read;
+        if($x =~ m!/\*.*?$!sg) {
+            print "$_\n" if $& !~ m!\*/!;
+        }
+        
+        0;
+    });
+};
 
 1;

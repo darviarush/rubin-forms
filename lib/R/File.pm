@@ -323,7 +323,7 @@ sub mtime {
 	my $self = shift;
 	#my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,$blksize,$blocks) = stat $self->{files}[0];
 	my $mtime = (stat $self->{files}[0])[9];
-	$! = undef;
+	#$! = undef;
 	$mtime
 }
 
@@ -333,7 +333,7 @@ sub _mtime { (stat $_[0])[9] }
 sub device {
 	my $self = shift;
 	my $dev = (stat $self->{files}[0])[0];
-	$! = undef;
+	#$! = undef;
 	$dev
 }
 
@@ -341,7 +341,7 @@ sub device {
 sub inode {
 	my $self = shift;
 	my $inode = (stat $self->{files}[0])[1];
-	$! = undef;
+	#$! = undef;
 	$inode
 }
 
@@ -349,16 +349,17 @@ sub inode {
 sub mod {
 	my $self = shift;
 	if(@_) {
-		my ($mode) = @_;
+		my ($mod) = @_;
+        $mod = oct($mod) if !Num $mod;
 		for my $path (@{$self->{files}}) {
-			chmod $mode, $path;
+			chmod $mod, $path;
 		}
-		$! = undef;
+		#$! = undef;
 		$self
 	}
 	else {
 		my $mod = (stat $self->{files}[0])[2];
-		$! = undef;
+		#$! = undef;
 		$mod
 	}
 }
@@ -372,13 +373,13 @@ sub writable {
 # файл можно читать
 sub readable {
 	my ($self) = @_;
-	-f $self->{files}[0]
+	-r $self->{files}[0]
 }
 
 # файл можно выполнять
 sub executable {
 	my ($self) = @_;
-	-f $self->{files}[0]
+	-x $self->{files}[0]
 }
 
 
@@ -433,7 +434,7 @@ sub ischar {
 	-c $self->{files}[0];
 }
 
-# это символьное устройство
+# это блочное устройство
 sub isblock {
 	my ($self) = @_;
 	-b $self->{files}[0];
@@ -452,6 +453,7 @@ sub istext {
 }
 
 # это бинарный файл
+*isbin = \&isbinary;
 sub isbinary {
 	my ($self) = @_;
 	-B $self->{files}[0]
