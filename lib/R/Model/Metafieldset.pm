@@ -221,7 +221,7 @@ sub load_all_models {
 	$self->{default_fieldsets} = 1;
 	
 	$base //= $self->{base};
-	
+    
 	# если нечего загружать
 	return $self if !defined $base;
 	

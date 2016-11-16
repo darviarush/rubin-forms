@@ -93,11 +93,44 @@ sub to {
 }
 
 name "branch";
-args "";
+args "[-r]";
 desc "переключиться на ветку";
 sub branch {
+    my ($remote) = @_;
+
     $app->tty->raw;
-    $app->tty->select([ grep { length $_ } split /\n/, `git branch` ], "выберите ветку");
+
+    my $current;
+    my @branch = grep { length $_ } split /\n/, `git branch`;
+    push @branch, $app->perl->qq("добавить");
+    
+    my $nbranch = $app->tty->select(\@branch, "выберите ветку")-1;
+    
+    my $branch = $branch[$nbranch];
+    
+    print("вы остаётесь на ветке $branch"), return if $branch =~ /^\s*\* /;
+    
+    my $s = `git status -s`;
+    if($s) {
+        print "git status -s\n$s\n";
+        if($app->tty->confirm("есть изменения. комитим?")) {
+            print "введите комментарий к комиту (save) ";
+            my $comment = <> || "save";
+            print `git commit -am "$comment"` if $comment !~ /^\s*$/;
+        }
+    }
+    
+    if($nbranch == $#branch) {  # добавляем
+        print "Введите название новой ветки (пусто - отмена): ";
+        $branch = <>;
+        chop $branch;
+        return if $branch =~ /^\s*$/;
+        print `git checkout -b "$branch"`;
+    }
+    else {
+        print `git checkout "$branch"`;
+    }
+    
 }
 
 name "dist";

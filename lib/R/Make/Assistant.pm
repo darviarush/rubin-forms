@@ -343,18 +343,6 @@ $app->make->run;
 }
 
 
-name "check.comments";
-args "";
-desc "чекер комментов в cxx, php, js";
-task {
-    $app->file(".")->find("*.%php%|*.js", "-f", sub {
-        my $x = $app->file($_)->encode(undef)->read;
-        if($x =~ m!/\*.*?$!sg) {
-            print "$_\n" if $& !~ m!\*/!;
-        }
-        
-        0;
-    });
-};
+
 
 1;

@@ -12,47 +12,62 @@ sub ON_UPDATE {"ON UPDATE RESTRICT"}
 sub ON_DELETE {"ON DELETE RESTRICT"}
 
 # зарезервированные слова sql
-our %SQL_WORD = (
-mysql => $app->perl->setref(qw/ACCESSIBLE	 ADD	 ALL	 ALTER	 ANALYZE	 AND	 AS	 ASC	 ASENSITIVE	 BEFORE	 BETWEEN	 BIGINT	 BINARY	 BLOB	 BOTH	 BY	 CALL	 CASCADE	 CASE	 CHANGE	 CHAR	 CHARACTER	 CHECK	 COLLATE	 COLUMN	 CONDITION	 CONSTRAINT	 CONTINUE	 CONVERT	 CREATE	 CROSS	 CURRENT_DATE	 CURRENT_TIME	 CURRENT_TIMESTAMP	 CURRENT_USER	 CURSOR	 DATABASE	 DATABASES	 DAY_HOUR	 DAY_MICROSECOND	 DAY_MINUTE	 DAY_SECOND	 DEC	 DECIMAL	 DECLARE	 DEFAULT	 DELAYED	 DELETE	 DESC	 DESCRIBE	 DETERMINISTIC	 DISTINCT	 DISTINCTROW	 DIV	 DOUBLE	 DROP	 DUAL	 EACH	 ELSE	 ELSEIF	 ENCLOSED ESCAPED	 EXISTS	 EXIT	 EXPLAIN	 FALSE	 FETCH	 FLOAT	 FLOAT4	 FLOAT8	 FOR	 FORCE	 FOREIGN	 FROM FULLTEXT	 GENERAL GRANT	 GROUP	 HAVING	 HIGH_PRIORITY	 HOUR_MICROSECOND	 HOUR_MINUTE	 HOUR_SECOND	 IF	 IGNORE	 IGNORE_SERVER_IDS IN	 INDEX	 INFILE	 INNER	 INOUT	 INSENSITIVE	 INSERT	 INT	 INT1	 INT2	 INT3	 INT4	 INT8	 INTEGER	 INTERVAL	 INTO	 IS	 ITERATE	 JOIN	 KEY	 KEYS	 KILL	 LEADING	 LEAVE	 LEFT	 LIKE	 LIMIT	 LINEAR	 LINES	 LOAD	 LOCALTIME	 LOCALTIMESTAMP	 LOCK	 LONG	 LONGBLOB	 LONGTEXT	 LOOP	 LOW_PRIORITY	 MASTER_HEARTBEAT_PERIOD MASTER_SSL_VERIFY_SERVER_CERT	 MATCH	 MAXVALUE MEDIUMBLOB	 MEDIUMINT	 MEDIUMTEXT	 MIDDLEINT	 MINUTE_MICROSECOND	 MINUTE_SECOND	 MOD	 MODIFIES	 NATURAL	 NOT	 NO_WRITE_TO_BINLOG	 NULL	 NUMERIC	 ON	 OPTIMIZE	 OPTION	 OPTIONALLY	 OR	 ORDER	 OUT	 OUTER	 OUTFILE	 PARTITION PRECISION	 PRIMARY	 PROCEDURE	 PURGE	 RANGE	 READ	 READS	 READ_WRITE	 REAL REFERENCES	 REGEXP	 RELEASE	 RENAME	 REPEAT	 REPLACE	 REQUIRE	 RESIGNAL RESTRICT	 RETURN	 REVOKE	 RIGHT	 RLIKE	 SCHEMA	 SCHEMAS	 SECOND_MICROSECOND	 SELECT	 SENSITIVE	 SEPARATOR	 SET	 SHOW	 SIGNAL SLOW SMALLINT	 SPATIAL	 SPECIFIC	 SQL	 SQLEXCEPTION	 SQLSTATE	 SQLWARNING	 SQL_BIG_RESULT	 SQL_CALC_FOUND_ROWS	 SQL_SMALL_RESULT	 SSL	 STARTING	 STRAIGHT_JOIN	 TABLE	 TERMINATED	 THEN	 TINYBLOB	 TINYINT	 TINYTEXT	 TO	 TRAILING	 TRIGGER	 TRUE	 UNDO	 UNION	 UNIQUE	 UNLOCK	 UNSIGNED	 UPDATE	 USAGE	 USE	 USING	 UTC_DATE	 UTC_TIME	 UTC_TIMESTAMP	 VALUES	 VARBINARY	 VARCHAR	 VARCHARACTER	 VARYING	 WHEN	 WHERE	 WHILE	 WITH	 WRITE	 XOR	 YEAR_MONTH	 ZEROFILL
-GENERATED	GET	IO_AFTER_GTIDS	IO_BEFORE_GTIDS MASTER_BIND OPTIMIZER_COSTS PARSE_GCOL_EXPR STORED VIRTUAL/),
-);
+my $SQL_WORD = $app->perl->setref(qw/ACCESSIBLE	 ADD	 ALL	 ALTER	 ANALYZE	 AND	 AS	 ASC	 ASENSITIVE	 BEFORE	 BETWEEN	 BIGINT	 BINARY	 BLOB	 BOTH	 BY	 CALL	 CASCADE	 CASE	 CHANGE	 CHAR	 CHARACTER	 CHECK	 COLLATE	 COLUMN	 CONDITION	 CONSTRAINT	 CONTINUE	 CONVERT	 CREATE	 CROSS	 CURRENT_DATE	 CURRENT_TIME	 CURRENT_TIMESTAMP	 CURRENT_USER	 CURSOR	 DATABASE	 DATABASES	 DAY_HOUR	 DAY_MICROSECOND	 DAY_MINUTE	 DAY_SECOND	 DEC	 DECIMAL	 DECLARE	 DEFAULT	 DELAYED	 DELETE	 DESC	 DESCRIBE	 DETERMINISTIC	 DISTINCT	 DISTINCTROW	 DIV	 DOUBLE	 DROP	 DUAL	 EACH	 ELSE	 ELSEIF	 ENCLOSED ESCAPED	 EXISTS	 EXIT	 EXPLAIN	 FALSE	 FETCH	 FLOAT	 FLOAT4	 FLOAT8	 FOR	 FORCE	 FOREIGN	 FROM FULLTEXT	 GENERAL GRANT	 GROUP	 HAVING	 HIGH_PRIORITY	 HOUR_MICROSECOND	 HOUR_MINUTE	 HOUR_SECOND	 IF	 IGNORE	 IGNORE_SERVER_IDS IN	 INDEX	 INFILE	 INNER	 INOUT	 INSENSITIVE	 INSERT	 INT	 INT1	 INT2	 INT3	 INT4	 INT8	 INTEGER	 INTERVAL	 INTO	 IS	 ITERATE	 JOIN	 KEY	 KEYS	 KILL	 LEADING	 LEAVE	 LEFT	 LIKE	 LIMIT	 LINEAR	 LINES	 LOAD	 LOCALTIME	 LOCALTIMESTAMP	 LOCK	 LONG	 LONGBLOB	 LONGTEXT	 LOOP	 LOW_PRIORITY	 MASTER_HEARTBEAT_PERIOD MASTER_SSL_VERIFY_SERVER_CERT	 MATCH	 MAXVALUE MEDIUMBLOB	 MEDIUMINT	 MEDIUMTEXT	 MIDDLEINT	 MINUTE_MICROSECOND	 MINUTE_SECOND	 MOD	 MODIFIES	 NATURAL	 NOT	 NO_WRITE_TO_BINLOG	 NULL	 NUMERIC	 ON	 OPTIMIZE	 OPTION	 OPTIONALLY	 OR	 ORDER	 OUT	 OUTER	 OUTFILE	 PARTITION PRECISION	 PRIMARY	 PROCEDURE	 PURGE	 RANGE	 READ	 READS	 READ_WRITE	 REAL REFERENCES	 REGEXP	 RELEASE	 RENAME	 REPEAT	 REPLACE	 REQUIRE	 RESIGNAL RESTRICT	 RETURN	 REVOKE	 RIGHT	 RLIKE	 SCHEMA	 SCHEMAS	 SECOND_MICROSECOND	 SELECT	 SENSITIVE	 SEPARATOR	 SET	 SHOW	 SIGNAL SLOW SMALLINT	 SPATIAL	 SPECIFIC	 SQL	 SQLEXCEPTION	 SQLSTATE	 SQLWARNING	 SQL_BIG_RESULT	 SQL_CALC_FOUND_ROWS	 SQL_SMALL_RESULT	 SSL	 STARTING	 STRAIGHT_JOIN	 TABLE	 TERMINATED	 THEN	 TINYBLOB	 TINYINT	 TINYTEXT	 TO	 TRAILING	 TRIGGER	 TRUE	 UNDO	 UNION	 UNIQUE	 UNLOCK	 UNSIGNED	 UPDATE	 USAGE	 USE	 USING	 UTC_DATE	 UTC_TIME	 UTC_TIMESTAMP	 VALUES	 VARBINARY	 VARCHAR	 VARCHARACTER	 VARYING	 WHEN	 WHERE	 WHILE	 WITH	 WRITE	 XOR	 YEAR_MONTH	 ZEROFILL
+GENERATED	GET	IO_AFTER_GTIDS	IO_BEFORE_GTIDS MASTER_BIND OPTIMIZER_COSTS PARSE_GCOL_EXPR STORED VIRTUAL/);
+
+sub SQL_WORD {
+    $SQL_WORD
+}
 
 
 
-our %COLUMN_TYPE = ( # типы столбцов для alter table
-"mysql" => {
-	"int(11)" => "int",
-	"int(10) unsigned" => "int unsigned",
-	"tinyint(4)" => "tinyint",
-	"tinyint(3) unsigned" => "tinyint unsigned",
-	"bigint(21)" => "bigint",
-	"bigint(20) unsigned" => "bigint unsigned",
-	"smallint(5) unsigned" => "smallint unsigned",
-	"smallint(6)" => "smallint",
-});
+# типы столбцов для alter table
+my $COLUMN_TYPE = {
+    "int(11)" => "int",
+    "int(10) unsigned" => "int unsigned",
+    "tinyint(4)" => "tinyint",
+    "tinyint(3) unsigned" => "tinyint unsigned",
+    "bigint(21)" => "bigint",
+    "bigint(20) unsigned" => "bigint unsigned",
+    "smallint(5) unsigned" => "smallint unsigned",
+    "smallint(6)" => "smallint",
+};
 
-has qw/user password DNS basename charset/;
+sub COLUMN_TYPE {
+    $COLUMN_TYPE
+}
+
+has qw/user password DNS basename charset collate/;
 
 sub new {
 	my $cls = shift;
 	my %ini = @_;
 	my $DNS = delete($ini{DNS});
 	die "main.ini[connect]DNS не указан. См. main.sample.ini" unless defined $DNS;
-	my ($sql_word) = $DNS =~ /^dbi:(\w+)/i;
+	my ($sql_word) = $DNS =~ /^(?:dbi:)?(\w+)/i;
 	$sql_word = lc $sql_word;
 	die "main.ini[connect]DNS повреждён" unless $sql_word;
-	bless {
-		sql_word => $SQL_WORD{$sql_word},
-		column_type => $COLUMN_TYPE{$sql_word},
+    
+    my $self = $sql_word eq "mysql"? bless({}, ref $cls || $cls): do {
+        my $name="connect" . ucfirst $sql_word;
+        $app->$name->new
+    };
+    
+    %$self = (%$self,
+		sql_word => $self->SQL_WORD,
+		column_type => $self->COLUMN_TYPE,
 		DNS => $DNS,
 		user => delete($ini{user}),
 		password => delete($ini{password}),
 		basename => delete($ini{database}) // ($DNS =~ /database=(\w+)/ and $1),
 		charset => delete($ini{charset}),
+		collate => delete($ini{collate}),
 		log => scalar(delete($ini{'log'}) =~ /^yes$/i),
 		options => {%ini},
 		log_prefix => '',
-	}, ref $cls || $cls;
+	);
+    
+    $self
 }
 
 
@@ -67,22 +82,17 @@ sub connect {
 	my ($self) = @_;
 	
 	$self->close if $self->{dbh};
-	my $dbh = DBI->connect($self->{DNS}, $self->{user}, $self->{password},
-		{RaiseError => 1, PrintError => 0, PrintWarn => 0, mysql_enable_utf8 => 1, %{$self->{options}}});
 	
-	if($app->{coro}) {
-		require Coro::Mysql;
-		$dbh = $dbh->Coro::Mysql::unblock;
-		#msg1 "coro dbh!!!";
-	}
+    my $dbh = $self->make_connect;
 	
 	$self->{dbh} = $dbh;
 	my $currsql = $self->{CURR_SQL};
-	my $collate = $self->{charset} // "utf8_unicode_ci";
-	my ($charset) = $collate =~ /^([^_]+)/;
-	$self->do("SET NAMES " . $dbh->quote($charset) . ($collate =~ /_/? " COLLATE " . $dbh->quote($collate): ""));
 	
-	eval { $self->do("USE " . $self->word($self->{basename})) }, $@ = undef if $self->{basename};
+    my $charset = $self->{charset};
+    my $collate = $self->{collate};
+	$self->setnames($charset, $collate) if $charset;
+	
+	eval { $self->use($self->{basename}) }, $@ = undef if $self->{basename};
 	
 	$self->pool;	# connect всегда возвращает dbh, а do всегда делает release
 	$self->{CURR_SQL} = $currsql;
@@ -110,6 +120,22 @@ sub reconnect {
 	$self
 }
 
+# создаёт и возвращает подключение
+sub make_connect {
+	my ($self) = @_;
+    
+	my $dbh = DBI->connect($self->{DNS}, $self->{user}, $self->{password},
+		{RaiseError => 1, PrintError => 0, PrintWarn => 0, mysql_enable_utf8 => 1, %{$self->{options}}});
+	
+	if($app->{coro}) {
+		require Coro::Mysql;
+		$dbh = $dbh->Coro::Mysql::unblock;
+		#msg1 "coro dbh!!!";
+	}
+    
+    $dbh
+}
+
 # возвращает dbh
 sub dbh { $_[0]->{dbh} }
 
@@ -119,6 +145,14 @@ sub use {
 	my ($self, $basename) = @_;
 	$self->basename($basename);
 	$self->do("USE " . $self->word($basename));
+	$self
+}
+
+# устанавливает кодировку сессии
+sub setnames {
+	my ($self, $charset, $collate) = @_;
+    my $dbh = $self->{dbh};
+    $self->do("SET NAMES " . $dbh->quote($charset) . ($collate? " COLLATE " . $dbh->quote($collate): ""));
 	$self
 }
 
@@ -144,13 +178,19 @@ sub tab_info {
 	$self->{tab_info} //= $self->get_tab_info;
 }
 
+# возвращает sql для get_tab_info
+sub sql_tab_info {
+	my ($self) = @_;
+	"select table_name as name, engine, table_collation as charset, table_comment as remark, create_options as options, table_type as type
+		from information_schema.tables
+		where table_schema=".$self->quote($self->basename);
+}
+
 # возвращает информацию о таблицах
 sub get_tab_info {
 	my ($self) = @_;
 	
-	my $sql = "select table_name as name, engine, table_collation as charset, table_comment as remark, create_options as options, table_type as type
-		from information_schema.tables
-		where table_schema=".$self->quote($self->basename);
+	my $sql = $self->sql_tab_info;
 	my $rows = $self->nolog(sub { $self->query_all($sql); });
 	
 	my $info = {};
@@ -167,12 +207,18 @@ sub info {
 	$self->{info} //= $self->get_info;
 }
 
+# возвращает sql для get_info
+sub sql_info {
+	my ($self) = @_;
+	"select table_name, column_name, data_type, column_type, column_default, is_nullable, character_maximum_length, extra, column_key, ordinal_position, column_comment, character_set_name, collation_name
+		from information_schema.columns
+		where table_schema=".$self->quote($self->basename);
+}
+
 # возвращает информацию о столбцах таблиц
 sub get_info {
 	my ($self) = @_;
-	my $sql = "select table_name, column_name, data_type, column_type, column_default, is_nullable, character_maximum_length, extra, column_key, ordinal_position, column_comment, character_set_name, collation_name
-		from information_schema.columns
-		where table_schema=".$self->quote($self->basename);
+	my $sql = $self->sql_info;
 	my $rows = $self->nolog(sub { $self->query_all($sql); });
 	my $info = {};
 	
@@ -188,9 +234,26 @@ sub index_info {
 	$self->{index_info} //= $self->get_index_info
 }
 
+# возвращает sql для get_index_info. Если пусто - то используется mysql схема
+sub sql_index_info {}
+
 # без кеширования
 sub get_index_info {
 	my ($self) = @_;
+    
+    my $sql = $self->sql_index_info;
+    
+    if($sql) {
+        my $rows = $self->nolog(sub { $self->query_all($sql) });
+        my $info = {};
+	
+        for my $row (@$rows) {	# создаём info
+            push @{ $info->{$row->{tab}}{$row->{name}} }, $row;
+        }
+        
+        return $info;
+    }
+    
 	my %rename = qw(Table tab Non_unique non_uniq Key_name name Seq_in_index pos Column_name col Comment comment Index_comment index_comment Null null Index_type type Packed packed Cardinality cardinality Sub_part part Collation charset);
 	my $tab_info = $self->tab_info;
 	my $fk_info = $self->fk_info;
@@ -210,23 +273,6 @@ sub get_index_info {
 	}
 	return $info;
 }
-
-# без кеширования
-# sub get_index_info {
-	# my ($self) = @_;
-	# my $sql = "SELECT table_name as tab,column_name as col,constraint_name as name,ordinal_position as pos
-# FROM information_schema.KEY_COLUMN_USAGE
-# WHERE TABLE_SCHEMA=" . $self->quote($self->basename) . "
-# AND referenced_column_name IS null";
-	# my $rows = $self->dbh->selectall_arrayref($sql, {Slice=>{}});
-	# my $info = {};
-	# for my $row (@$rows) {
-		# my $idx = $info->{$row->{tab}}{$row->{name}} //= [];
-		# push @$idx, $row;
-	# }
-	# return $info;
-# }
-
 
 # кеширует информацию о внешних ключах таблиц
 sub fk_info {
@@ -248,15 +294,21 @@ sub get_fk_info_backward {
 	$self->{fk_info_backward}
 }
 
-# возвращает информацию о внешних ключах таблиц
-sub get_fk_info {
+# sql для get_fk_info
+sub sql_fk_info {
 	my ($self) = @_;
-	my $sql = "SELECT table_name as tab,column_name as col,constraint_name as name,
+	"SELECT table_name as tab,column_name as col,constraint_name as name,
 referenced_table_name as ref_tab,referenced_column_name as ref_col,
 ordinal_position as pos, position_in_unique_constraint as ref_pos
 FROM information_schema.KEY_COLUMN_USAGE
 WHERE TABLE_SCHEMA=" . $self->quote($self->basename) . "
-AND referenced_column_name IS not null";
+AND referenced_column_name IS not null"
+}
+
+# возвращает информацию о внешних ключах таблиц
+sub get_fk_info {
+	my ($self) = @_;
+	my $sql = $self->sql_fk_info;
 	my $rows = $self->nolog(sub { $self->query_all($sql); });
 	my $info = {};
 	my $bk = $self->{fk_info_backward} = {};
