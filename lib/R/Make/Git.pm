@@ -45,21 +45,21 @@ sub commit {
 }
 
 
-name "merge";
-desc "сливает текущую ветку в master";
-rels "commit";
-sub merge {
+# name "merge";
+# desc "сливает текущую ветку в master";
+# rels "commit";
+# sub merge {
 	
-	$app->tty->raw;
+	# $app->tty->raw;
 
-	my $s = `git branch`;
-	my ($branch) = $s =~ /^\*\s+([\w-]+)/;
+	# my $s = `git branch`;
+	# my ($branch) = $s =~ /^\*\s+([\w-]+)/;
 
-	print qq{git checkout master && git merge --no-edit --no-ff "$branch" && git branch -D "$branch"};
+	# print qq{git checkout master && git merge --no-edit --no-ff "$branch" && git branch -D "$branch"};
 
-	print `git checkout master && git merge --no-edit --no-ff "$branch" && git branch -D "$branch"`
+	# print `git checkout master && git merge --no-edit --no-ff "$branch" && git branch -D "$branch"`
 
-}
+# }
 
 name "new";
 args "ветка [сообщение]";
@@ -123,11 +123,12 @@ sub branch {
     if($nbranch == $#branch) {  # добавляем
         print "Введите название новой ветки (пусто - отмена): ";
         $branch = <>;
-        chop $branch;
+        $branch = $app->perl->trim($branch);
         return if $branch =~ /^\s*$/;
         print `git checkout -b "$branch"`;
     }
     else {
+        $branch = $app->perl->trim($branch);
         print `git checkout "$branch"`;
     }
     

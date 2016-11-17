@@ -48,7 +48,10 @@ sub new {
 	$sql_word = lc $sql_word;
 	die "main.ini[connect]DNS повреждён" unless $sql_word;
     
-    my $self = $sql_word eq "mysql"? bless({}, ref $cls || $cls): do {
+    my $self = $sql_word eq "mysql"? do {
+        $ini{mysql_enable_utf8} = 1 if !exists $ini{mysql_enable_utf8};
+        bless {}, ref $cls || $cls;
+    }: do {
         my $name="connect" . ucfirst $sql_word;
         $app->$name->new
     };
@@ -125,7 +128,7 @@ sub make_connect {
 	my ($self) = @_;
     
 	my $dbh = DBI->connect($self->{DNS}, $self->{user}, $self->{password},
-		{RaiseError => 1, PrintError => 0, PrintWarn => 0, mysql_enable_utf8 => 1, %{$self->{options}}});
+		{RaiseError => 1, PrintError => 0, PrintWarn => 0, %{$self->{options}}});
 	
 	if($app->{coro}) {
 		require Coro::Mysql;
@@ -186,15 +189,16 @@ sub sql_tab_info {
 		where table_schema=".$self->quote($self->basename);
 }
 
-# возвращает информацию о таблицах
+# возвращает информацию о таблицах: {tab} => [row]
 sub get_tab_info {
 	my ($self) = @_;
 	
-	my $sql = $self->sql_tab_info;
+	my ($sql, $rename) = $self->sql_tab_info;
 	my $rows = $self->nolog(sub { $self->query_all($sql); });
 	
 	my $info = {};
 	for my $row (@$rows) {	# создаём info
+        %$row = pairmap {(($rename{$a} // $a) => $b)} %$row;
 		$info->{$row->{name}} = $row;
 	}
 	return $info;
@@ -215,16 +219,31 @@ sub sql_info {
 		where table_schema=".$self->quote($self->basename);
 }
 
-# возвращает информацию о столбцах таблиц
+# для одной строки
+sub sql_info_row {
+}
+
+# возвращает информацию о столбцах таблиц: tab:name => {row}
 sub get_info {
 	my ($self) = @_;
-	my $sql = $self->sql_info;
-	my $rows = $self->nolog(sub { $self->query_all($sql); });
-	my $info = {};
-	
-	for my $row (@$rows) {	# создаём info
-		$info->{$row->{table_name}}{$row->{column_name}} = $row;
-	}
+    my $info = {};
+	if(my $sql = $self->sql_info) {
+        my $rows = $self->nolog(sub { $self->query_all($sql); });
+        
+        for my $row (@$rows) {	# создаём info
+            %$row = pairmap {(($rename{$a} // $a) => $b)} %$row;
+            $info->{$row->{table_name}}{$row->{column_name}} = $row;
+        }
+    } else {    # для каждой из таблиц
+        my $tab_info = $self->tab_info;
+        for my $tab (keys %$tab_info) {
+            my $sql = $self->sql_info_row($tab);
+            my $rows = $self->nolog(sub { $self->query_all($sql); });
+            for my $row (@$rows) {	# создаём info
+                $info->{$row->{table_name}}{$row->{column_name}} = $row;
+            }
+        }
+    }
 	return $info;
 }
 

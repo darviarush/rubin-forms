@@ -39,6 +39,25 @@ sub SQL_WORD {
 
 
 #pragma table_info(\"B\")
+# [
+          # {
+            # 'notnull' => 0,
+            # 'type' => 'integer',
+            # 'name' => 'i',
+            # 'pk' => 1,
+            # 'dflt_value' => undef,
+            # 'cid' => 0
+          # },
+          # {
+            # 'pk' => 0,
+            # 'cid' => 1,
+            # 'dflt_value' => '"xyz"',
+            # 'name' => 'b',
+            # 'type' => 'varchar(600)',
+            # 'notnull' => 0
+          # }
+        # ]
+
 
 # возвращает sql для get_tab_info
 sub sql_tab_info {
