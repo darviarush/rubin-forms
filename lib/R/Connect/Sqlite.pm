@@ -58,39 +58,48 @@ sub SQL_WORD {
           # }
         # ]
 
+        
+# [
+          # {
+            # 'tbl_name' => 'A',
+            # 'type' => 'table',
+            # 'sql' => 'CREATE TABLE A(i int, b int not null)',
+            # 'rootpage' => 2,
+            # 'name' => 'A'
+          # },
+          # {
+            # 'tbl_name' => 'B',
+            # 'type' => 'table',
+            # 'sql' => 'CREATE TABLE B(i integer primary key autoincrement, b varc
+# har(600) default "xyz")',
+            # 'rootpage' => 3,
+            # 'name' => 'B'
+          # },
+          # {
+            # 'name' => 'sqlite_sequence',
+            # 'rootpage' => 4,
+            # 'sql' => 'CREATE TABLE sqlite_sequence(name,seq)',
+            # 'tbl_name' => 'sqlite_sequence',
+            # 'type' => 'table'
+          # }
+        # ]
 
-# возвращает sql для get_tab_info
-sub sql_tab_info {
+# возвращает информацию о таблицах
+sub get_tab_info {
 	my ($self) = @_;
-	"select table_name as name, engine, table_collation as charset, table_comment as remark, create_options as options, table_type as type
-		from information_schema.tables
-		where table_schema=".$self->quote($self->basename);
-}
-
-# возвращает sql для get_info
-sub sql_info {
-	my ($self) = @_;
-	"select table_name, column_name, data_type, column_type, column_default, is_nullable, character_maximum_length, extra, column_key, ordinal_position, column_comment, character_set_name, collation_name
-		from information_schema.columns
-		where table_schema=".$self->quote($self->basename);
-}
-
-# возвращает sql для get_index_info. Если пусто - то используется mysql схема
-sub sql_index_info {
-    my ($self) = @_;
-    ""
+	
+    #name, engine, charset, remark, options, type
+	my $sql = "select *	from sqlite_master where type='table'";
+	my $rows = $self->nolog(sub { $self->query_all($sql); });
+	
+	my $info = {};
+	for my $row (@$rows) {	# создаём info
+		$info->{$row->{name}} = $row;
+	}
+	return $info;
 }
 
 
-# sql для get_fk_info
-sub sql_fk_info {
-	my ($self) = @_;
-	"SELECT table_name as tab,column_name as col,constraint_name as name,
-referenced_table_name as ref_tab,referenced_column_name as ref_col,
-ordinal_position as pos, position_in_unique_constraint as ref_pos
-FROM information_schema.KEY_COLUMN_USAGE
-WHERE TABLE_SCHEMA=" . $self->quote($self->basename) . "
-AND referenced_column_name IS not null"
-}
+# PRAGMA foreign_key_list('table')
 
 1;

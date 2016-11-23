@@ -181,24 +181,17 @@ sub tab_info {
 	$self->{tab_info} //= $self->get_tab_info;
 }
 
-# возвращает sql для get_tab_info
-sub sql_tab_info {
-	my ($self) = @_;
-	"select table_name as name, engine, table_collation as charset, table_comment as remark, create_options as options, table_type as type
-		from information_schema.tables
-		where table_schema=".$self->quote($self->basename);
-}
-
-# возвращает информацию о таблицах: {tab} => [row]
+# возвращает информацию о таблицах
 sub get_tab_info {
 	my ($self) = @_;
 	
-	my ($sql, $rename) = $self->sql_tab_info;
+	my $sql = "select table_name as name, engine, table_collation as charset, table_comment as remark, create_options as options, table_type as type
+		from information_schema.tables
+		where table_schema=".$self->quote($self->basename);
 	my $rows = $self->nolog(sub { $self->query_all($sql); });
 	
 	my $info = {};
 	for my $row (@$rows) {	# создаём info
-        %$row = pairmap {(($rename{$a} // $a) => $b)} %$row;
 		$info->{$row->{name}} = $row;
 	}
 	return $info;
@@ -211,39 +204,18 @@ sub info {
 	$self->{info} //= $self->get_info;
 }
 
-# возвращает sql для get_info
-sub sql_info {
-	my ($self) = @_;
-	"select table_name, column_name, data_type, column_type, column_default, is_nullable, character_maximum_length, extra, column_key, ordinal_position, column_comment, character_set_name, collation_name
-		from information_schema.columns
-		where table_schema=".$self->quote($self->basename);
-}
-
-# для одной строки
-sub sql_info_row {
-}
-
-# возвращает информацию о столбцах таблиц: tab:name => {row}
+# возвращает информацию о столбцах таблиц
 sub get_info {
 	my ($self) = @_;
-    my $info = {};
-	if(my $sql = $self->sql_info) {
-        my $rows = $self->nolog(sub { $self->query_all($sql); });
-        
-        for my $row (@$rows) {	# создаём info
-            %$row = pairmap {(($rename{$a} // $a) => $b)} %$row;
-            $info->{$row->{table_name}}{$row->{column_name}} = $row;
-        }
-    } else {    # для каждой из таблиц
-        my $tab_info = $self->tab_info;
-        for my $tab (keys %$tab_info) {
-            my $sql = $self->sql_info_row($tab);
-            my $rows = $self->nolog(sub { $self->query_all($sql); });
-            for my $row (@$rows) {	# создаём info
-                $info->{$row->{table_name}}{$row->{column_name}} = $row;
-            }
-        }
-    }
+	my $sql = "select table_name, column_name, data_type, column_type, column_default, is_nullable, character_maximum_length, extra, column_key, ordinal_position, column_comment, character_set_name, collation_name
+		from information_schema.columns
+		where table_schema=".$self->quote($self->basename);
+	my $rows = $self->nolog(sub { $self->query_all($sql); });
+	my $info = {};
+	
+	for my $row (@$rows) {	# создаём info
+		$info->{$row->{table_name}}{$row->{column_name}} = $row;
+	}
 	return $info;
 }
 
@@ -253,26 +225,9 @@ sub index_info {
 	$self->{index_info} //= $self->get_index_info
 }
 
-# возвращает sql для get_index_info. Если пусто - то используется mysql схема
-sub sql_index_info {}
-
 # без кеширования
 sub get_index_info {
 	my ($self) = @_;
-    
-    my $sql = $self->sql_index_info;
-    
-    if($sql) {
-        my $rows = $self->nolog(sub { $self->query_all($sql) });
-        my $info = {};
-	
-        for my $row (@$rows) {	# создаём info
-            push @{ $info->{$row->{tab}}{$row->{name}} }, $row;
-        }
-        
-        return $info;
-    }
-    
 	my %rename = qw(Table tab Non_unique non_uniq Key_name name Seq_in_index pos Column_name col Comment comment Index_comment index_comment Null null Index_type type Packed packed Cardinality cardinality Sub_part part Collation charset);
 	my $tab_info = $self->tab_info;
 	my $fk_info = $self->fk_info;
@@ -313,21 +268,15 @@ sub get_fk_info_backward {
 	$self->{fk_info_backward}
 }
 
-# sql для get_fk_info
-sub sql_fk_info {
+# возвращает информацию о внешних ключах таблиц
+sub get_fk_info {
 	my ($self) = @_;
-	"SELECT table_name as tab,column_name as col,constraint_name as name,
+	my $sql = "SELECT table_name as tab,column_name as col,constraint_name as name,
 referenced_table_name as ref_tab,referenced_column_name as ref_col,
 ordinal_position as pos, position_in_unique_constraint as ref_pos
 FROM information_schema.KEY_COLUMN_USAGE
 WHERE TABLE_SCHEMA=" . $self->quote($self->basename) . "
-AND referenced_column_name IS not null"
-}
-
-# возвращает информацию о внешних ключах таблиц
-sub get_fk_info {
-	my ($self) = @_;
-	my $sql = $self->sql_fk_info;
+AND referenced_column_name IS not null";
 	my $rows = $self->nolog(sub { $self->query_all($sql); });
 	my $info = {};
 	my $bk = $self->{fk_info_backward} = {};

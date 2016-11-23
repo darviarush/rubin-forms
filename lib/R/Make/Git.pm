@@ -11,6 +11,17 @@ sub new {
 	bless {}, ref $cls || $cls;
 }
 
+
+# возвращает текущую ветку
+sub current_branch {
+	my ($self) = @_;
+    
+    my $branch = `git branch`;
+    ($branch) = $branch =~ /^\s*\*\s+(\S+)/m;
+    
+	$app->perl->trim($branch)
+}
+
 category "GIT";
 
 name "push";
@@ -31,66 +42,49 @@ task {
 };
 
 name "commit";
-desc "добавляет все файлы и делает комит";
+desc "делает комит, если есть что комитить";
 sub commit {
 
 	$app->tty->raw;
 
-	my $save = join(" ", @_) || "save";
-
-	print `git add .`;
-	my $s = `git commit -am "$save" 2>&1`;
-	print $s if $? == 0;
+	my $s = `git status -s`;
+    if($s) {
+        print "git status -s\n$s\n";
+        if($app->tty->confirm("есть изменения. комитим?")) {
+            print "введите комментарий к комиту (save) ";
+            my $comment = <> || "save";
+            print `git commit -am "$comment"` if $comment !~ /^\s*$/;
+        }
+    }
 
 }
-
-
-# name "merge";
-# desc "сливает текущую ветку в master";
-# rels "commit";
-# sub merge {
-	
-	# $app->tty->raw;
-
-	# my $s = `git branch`;
-	# my ($branch) = $s =~ /^\*\s+([\w-]+)/;
-
-	# print qq{git checkout master && git merge --no-edit --no-ff "$branch" && git branch -D "$branch"};
-
-	# print `git checkout master && git merge --no-edit --no-ff "$branch" && git branch -D "$branch"`
-
-# }
 
 name "new";
-args "ветка [сообщение]";
-desc "создаёт новую ветку";
-task {
-	my ($name, $message) = @_;
-	
-	quit "введите название ветки\n" if @_ < 1;
-	
-	$app->tty->raw;
-	make "commit", $message;
-	print `git checkout -b "$name"`;
-};
-
-
-
-name "to";
 args "ветка";
-desc "переключается на ветку";
-sub to {
-	my ($name, $message) = @_;
-
-	quit "введите название ветки\n" if @_ < 1;
+desc "создаёт новую ветку";
+spec "клонирует ветку master";
+task {
+	my ($name) = @_;
 	
-	$app->tty->raw;
-
-	make "commit", $message;
+    $app->tty->raw;
+    
+	@_ < 1 && $app->tty->input("введите название ветки", $name);
 	
-	print `git checkout "$name"`;
-	
-}
+	make "commit";
+    
+    my $branch = current_branch();
+    if($branch ne "master") {
+        my $push = "git checkout master";
+        print "$push\n";
+        print `$push`;
+    }
+    
+    my $push = "git checkout -b $name";
+    print "$push\n";
+	print `$push`;
+    
+    
+};
 
 name "branch";
 args "[-r]";
@@ -110,15 +104,7 @@ sub branch {
     
     print("вы остаётесь на ветке $branch"), return if $branch =~ /^\s*\* /;
     
-    my $s = `git status -s`;
-    if($s) {
-        print "git status -s\n$s\n";
-        if($app->tty->confirm("есть изменения. комитим?")) {
-            print "введите комментарий к комиту (save) ";
-            my $comment = <> || "save";
-            print `git commit -am "$comment"` if $comment !~ /^\s*$/;
-        }
-    }
+    make("commit");
     
     if($nbranch == $#branch) {  # добавляем
         print "Введите название новой ветки (пусто - отмена): ";
@@ -133,6 +119,48 @@ sub branch {
     }
     
 }
+
+name "mm";
+args "";
+desc "сливает с мастером и пушит, но остаётся на ветке";
+sub mm {
+    $app->tty->raw;
+   
+    make("commit");
+    
+    my $branch = current_branch();
+    
+    my $push = "git pull --no-edit origin $branch";
+    print "$push\n";
+    print `$push`;
+    
+    my $push = "git push origin $branch";
+    print "$push\n";
+    print `$push`;
+    
+    my $push = "git checkout master";
+    print "$push\n";
+    print `$push`;
+    
+    my $push = "git merge --no-ff --no-edit $branch";
+    print "$push\n";
+    print `$push`;
+    
+    my $push = "git pull --no-edit";
+    print "$push\n";
+    print `$push`;
+    
+    
+    my $push = "git push";
+    print "$push\n";
+    print `$push`;
+    
+    my $push = "git checkout $branch";
+    print "$push\n";
+    print `$push`;
+}
+
+
 
 name "dist";
 args "";

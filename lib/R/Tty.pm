@@ -18,6 +18,24 @@ sub confirm {
 	return $yes =~ /yes/;
 }
 
+# вводит строку
+sub input {
+	my ($self, $prompt) = @_;
+    
+    print "$prompt: ";
+    $_[2] = scalar <>;
+    $self
+}
+
+# перемещает курсор в $x, $y
+sub locate {
+	my ($self, $x, $y) = @_;
+    
+    
+    
+	$self
+}
+
 # предлагает пользователю выбрать вариант через stdin
 sub select {
 	my ($self, $data, $confirm) = @_;
