@@ -15,7 +15,7 @@ our %templates = (
 
 
 
-endline => ";\n",
+"\n" => ";\n",
 
 'yf .$word' => '{{ left }}->${$DATA->{{{ var }}}}',
 'yf .word' => '{{ left }}->{{ var }}',
@@ -74,15 +74,27 @@ gosub => '->( {{ right }} )',
 
 
 # операторы распределения данных
-"xfy \n" => '{{ left }};\n{{ right }}',
+'xfy \n' => "{{ left }};\n{{ right }}",
+'fy \n' => "\n{{ right }}",
+'yf \n' => "{{ left }}\n",
+
 "xfy ;" => '{{ left }}; {{ right }}',
 "xfy ," => '{{ left }}, {{ right }}',
-"yf ," => '{{ left }},',
+"yf ," => '{{ left }}',
 "xfy =>" => '{{ left }} => {{ right }}',
 
 # операторы присваивания
 "yfx =" => '({{ left }}) = ({{ right }})',
 "yfx as" => '({{ right }}) = ({{ left }})',
+
+# операторы смысловых конструкций
+"xfy then" => sub {
+	given($b->{then}) {
+		#when ("") {}
+		default { die "нет такого THEN: $_" }
+	}
+	
+},
 
 HTML => "{{ html }}",
 'xfy CAT' => "{{ left }}{{ right }}",
