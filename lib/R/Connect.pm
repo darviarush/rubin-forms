@@ -66,8 +66,9 @@ sub new {
 		charset => delete($ini{charset}),
 		collate => delete($ini{collate}),
 		log => scalar(delete($ini{'log'}) =~ /^yes$/i),
+        log_prefix => '',
+        sql_save => undef,            # собирает sql, вместо выполнения, если []
 		options => {%ini},
-		log_prefix => '',
 	);
     
     $self
@@ -626,6 +627,9 @@ sub pack_rows {
 sub query_rows {
 	my ($self, $tab, $view, @args) = @_;
 	my ($sql, $fields, $real_fields) = $self->sel_join(@_);
+    
+    push(@{$self->{sql_save}}, $sql), return if $self->{sql_save};
+    
 	$self->{CURR_SQL} = $sql;
 	$self->pool;
 	my $sth = $self->{dbh}->prepare($sql);
@@ -724,9 +728,13 @@ sub closeall {
 # запрашивает первую строку в виде массива
 sub query {
 	my ($self) = @_;
-	$self->{CURR_SQL} = sel @_;
+	my $sql = sel @_;
+    
+    push(@{$self->{sql_save}}, $sql), return if $self->{sql_save};
+    
+    $self->{CURR_SQL} = $sql;
 	$self->pool;
-	my @row = $self->{dbh}->selectrow_array($self->{CURR_SQL});
+	my @row = $self->{dbh}->selectrow_array($sql);
 	$self->release(wantarray? \@row: $row[0]);
 	$self->{CURR_SQL} = undef;
 	return wantarray? @row: $row[0];
@@ -735,7 +743,11 @@ sub query {
 # запрашивает строку в виде массивов
 sub query_array {
 	my ($self) = @_;
-	$self->{CURR_SQL} = sel @_;
+	my $sql = sel @_;
+    
+    push(@{$self->{sql_save}}, $sql), return if $self->{sql_save};
+    
+    $self->{CURR_SQL} = $sql;
 	$self->pool;
 	my $row = $self->{dbh}->selectall_arrayref($self->{CURR_SQL});
 	$self->release($row);
@@ -746,7 +758,11 @@ sub query_array {
 # запрашивает строки в виде хешей
 sub query_all {
 	my ($self) = @_;
-	$self->{CURR_SQL} = sel @_;
+	my $sql = sel @_;
+    
+    push(@{$self->{sql_save}}, $sql), return if $self->{sql_save};
+    
+    $self->{CURR_SQL} = $sql;
 	$self->pool;
 	my $row = $self->{dbh}->selectall_arrayref($self->{CURR_SQL}, {Slice=>{}});
 	$self->release($row);
@@ -757,7 +773,11 @@ sub query_all {
 # массив значений столбца
 sub query_col {
 	my ($self) = @_;
-	$self->{CURR_SQL} = sel @_;
+	my $sql = sel @_;
+    
+    push(@{$self->{sql_save}}, $sql), return if $self->{sql_save};
+    
+    $self->{CURR_SQL} = $sql;
 	$self->pool;
 	my $row = $self->{dbh}->selectcol_arrayref($self->{CURR_SQL});
 	$self->release($row);
@@ -814,6 +834,9 @@ sub effected_rows { $_[0]->{last_count} }
 # выполняет sql-запрос
 sub do {
 	my ($self, $sql) = @_;
+    
+    push(@{$self->{sql_save}}, $sql), return if $self->{sql_save};
+    
 	$self->{CURR_SQL} = $sql;
 	$self->pool($COLOR_DO);
 	my $dbh = $self->{dbh};

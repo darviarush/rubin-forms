@@ -48,6 +48,46 @@ sub man {
 	require "/bin/miu";
 }
 
+name "men";
+args "[mask]";
+desc "распечатывает тесты";
+sub men {
+    my ($file_mask) = @_;
+
+    $file_mask ||= "*";
+    
+    $app->file("man")->find("man/$file_mask", "*.man,*.human", sub {
+        $app->log->info( $app->file($_)->subdir("man/") );
+        0;
+    });
+}
+
+name "sec";
+args "[mask]";
+desc "распечатывает тесты c регуляркой по главам";
+sub sec {
+    my ($glava_mask) = @_;
+
+    $glava_mask ||= "*";
+    
+    $glava_mask = $app->perl->like("(=; )$glava_mask");
+    
+    $app->file("man")->find("*.man,*.human", sub {
+        my $file = $app->file($_);
+        my $man = $file->read;
+        
+        my $once;
+        
+        while($man =~ /^=+.*/gm) {
+            my $g = $&;
+            if($g =~ $glava_mask) {
+                $once = 1, $app->log->info(":empty", "\n", ":yellow on_red", $app->file($_)->subdir("man/") ) if !$once;
+                $app->log->info($g);
+            }
+        }
+        0;
+    });
+}
 
 
 name "t";
@@ -147,6 +187,8 @@ sub sc {
 	# exit( $app->run ? 0 : 1 );
 
 }
+
+
 
 
 
