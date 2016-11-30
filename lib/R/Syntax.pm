@@ -215,7 +215,7 @@ sub opt {
 	
 	pairmap {
 		die "свойство $a в $stmt уже есть" if exists $x->{$a};
-		die "можно добавлять только re, sub или order в $stmt" if $a !~ /^(?:re|sub|order)$/;
+		die "можно добавлять только re, sub или order в $stmt" if $a !~ /^(?:re|sub|order|nolex)$/;
 		$x->{$a} = $b;
 	} @_;
 	
@@ -336,7 +336,7 @@ sub _lex {
 			$x
 		};
 		$_
-	} @_
+	} grep { !$_->{nolex} } @_
 }
 
 # формирует лексический анализатор из таблиц операторов, скобок и операндов
