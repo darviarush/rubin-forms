@@ -12,47 +12,66 @@ sub ON_UPDATE {"ON UPDATE RESTRICT"}
 sub ON_DELETE {"ON DELETE RESTRICT"}
 
 # зарезервированные слова sql
-our %SQL_WORD = (
-mysql => $app->perl->setref(qw/ACCESSIBLE	 ADD	 ALL	 ALTER	 ANALYZE	 AND	 AS	 ASC	 ASENSITIVE	 BEFORE	 BETWEEN	 BIGINT	 BINARY	 BLOB	 BOTH	 BY	 CALL	 CASCADE	 CASE	 CHANGE	 CHAR	 CHARACTER	 CHECK	 COLLATE	 COLUMN	 CONDITION	 CONSTRAINT	 CONTINUE	 CONVERT	 CREATE	 CROSS	 CURRENT_DATE	 CURRENT_TIME	 CURRENT_TIMESTAMP	 CURRENT_USER	 CURSOR	 DATABASE	 DATABASES	 DAY_HOUR	 DAY_MICROSECOND	 DAY_MINUTE	 DAY_SECOND	 DEC	 DECIMAL	 DECLARE	 DEFAULT	 DELAYED	 DELETE	 DESC	 DESCRIBE	 DETERMINISTIC	 DISTINCT	 DISTINCTROW	 DIV	 DOUBLE	 DROP	 DUAL	 EACH	 ELSE	 ELSEIF	 ENCLOSED ESCAPED	 EXISTS	 EXIT	 EXPLAIN	 FALSE	 FETCH	 FLOAT	 FLOAT4	 FLOAT8	 FOR	 FORCE	 FOREIGN	 FROM FULLTEXT	 GENERAL GRANT	 GROUP	 HAVING	 HIGH_PRIORITY	 HOUR_MICROSECOND	 HOUR_MINUTE	 HOUR_SECOND	 IF	 IGNORE	 IGNORE_SERVER_IDS IN	 INDEX	 INFILE	 INNER	 INOUT	 INSENSITIVE	 INSERT	 INT	 INT1	 INT2	 INT3	 INT4	 INT8	 INTEGER	 INTERVAL	 INTO	 IS	 ITERATE	 JOIN	 KEY	 KEYS	 KILL	 LEADING	 LEAVE	 LEFT	 LIKE	 LIMIT	 LINEAR	 LINES	 LOAD	 LOCALTIME	 LOCALTIMESTAMP	 LOCK	 LONG	 LONGBLOB	 LONGTEXT	 LOOP	 LOW_PRIORITY	 MASTER_HEARTBEAT_PERIOD MASTER_SSL_VERIFY_SERVER_CERT	 MATCH	 MAXVALUE MEDIUMBLOB	 MEDIUMINT	 MEDIUMTEXT	 MIDDLEINT	 MINUTE_MICROSECOND	 MINUTE_SECOND	 MOD	 MODIFIES	 NATURAL	 NOT	 NO_WRITE_TO_BINLOG	 NULL	 NUMERIC	 ON	 OPTIMIZE	 OPTION	 OPTIONALLY	 OR	 ORDER	 OUT	 OUTER	 OUTFILE	 PARTITION PRECISION	 PRIMARY	 PROCEDURE	 PURGE	 RANGE	 READ	 READS	 READ_WRITE	 REAL REFERENCES	 REGEXP	 RELEASE	 RENAME	 REPEAT	 REPLACE	 REQUIRE	 RESIGNAL RESTRICT	 RETURN	 REVOKE	 RIGHT	 RLIKE	 SCHEMA	 SCHEMAS	 SECOND_MICROSECOND	 SELECT	 SENSITIVE	 SEPARATOR	 SET	 SHOW	 SIGNAL SLOW SMALLINT	 SPATIAL	 SPECIFIC	 SQL	 SQLEXCEPTION	 SQLSTATE	 SQLWARNING	 SQL_BIG_RESULT	 SQL_CALC_FOUND_ROWS	 SQL_SMALL_RESULT	 SSL	 STARTING	 STRAIGHT_JOIN	 TABLE	 TERMINATED	 THEN	 TINYBLOB	 TINYINT	 TINYTEXT	 TO	 TRAILING	 TRIGGER	 TRUE	 UNDO	 UNION	 UNIQUE	 UNLOCK	 UNSIGNED	 UPDATE	 USAGE	 USE	 USING	 UTC_DATE	 UTC_TIME	 UTC_TIMESTAMP	 VALUES	 VARBINARY	 VARCHAR	 VARCHARACTER	 VARYING	 WHEN	 WHERE	 WHILE	 WITH	 WRITE	 XOR	 YEAR_MONTH	 ZEROFILL
-GENERATED	GET	IO_AFTER_GTIDS	IO_BEFORE_GTIDS MASTER_BIND OPTIMIZER_COSTS PARSE_GCOL_EXPR STORED VIRTUAL/),
-);
+my $SQL_WORD = $app->perl->setref(qw/ACCESSIBLE	 ADD	 ALL	 ALTER	 ANALYZE	 AND	 AS	 ASC	 ASENSITIVE	 BEFORE	 BETWEEN	 BIGINT	 BINARY	 BLOB	 BOTH	 BY	 CALL	 CASCADE	 CASE	 CHANGE	 CHAR	 CHARACTER	 CHECK	 COLLATE	 COLUMN	 CONDITION	 CONSTRAINT	 CONTINUE	 CONVERT	 CREATE	 CROSS	 CURRENT_DATE	 CURRENT_TIME	 CURRENT_TIMESTAMP	 CURRENT_USER	 CURSOR	 DATABASE	 DATABASES	 DAY_HOUR	 DAY_MICROSECOND	 DAY_MINUTE	 DAY_SECOND	 DEC	 DECIMAL	 DECLARE	 DEFAULT	 DELAYED	 DELETE	 DESC	 DESCRIBE	 DETERMINISTIC	 DISTINCT	 DISTINCTROW	 DIV	 DOUBLE	 DROP	 DUAL	 EACH	 ELSE	 ELSEIF	 ENCLOSED ESCAPED	 EXISTS	 EXIT	 EXPLAIN	 FALSE	 FETCH	 FLOAT	 FLOAT4	 FLOAT8	 FOR	 FORCE	 FOREIGN	 FROM FULLTEXT	 GENERAL GRANT	 GROUP	 HAVING	 HIGH_PRIORITY	 HOUR_MICROSECOND	 HOUR_MINUTE	 HOUR_SECOND	 IF	 IGNORE	 IGNORE_SERVER_IDS IN	 INDEX	 INFILE	 INNER	 INOUT	 INSENSITIVE	 INSERT	 INT	 INT1	 INT2	 INT3	 INT4	 INT8	 INTEGER	 INTERVAL	 INTO	 IS	 ITERATE	 JOIN	 KEY	 KEYS	 KILL	 LEADING	 LEAVE	 LEFT	 LIKE	 LIMIT	 LINEAR	 LINES	 LOAD	 LOCALTIME	 LOCALTIMESTAMP	 LOCK	 LONG	 LONGBLOB	 LONGTEXT	 LOOP	 LOW_PRIORITY	 MASTER_HEARTBEAT_PERIOD MASTER_SSL_VERIFY_SERVER_CERT	 MATCH	 MAXVALUE MEDIUMBLOB	 MEDIUMINT	 MEDIUMTEXT	 MIDDLEINT	 MINUTE_MICROSECOND	 MINUTE_SECOND	 MOD	 MODIFIES	 NATURAL	 NOT	 NO_WRITE_TO_BINLOG	 NULL	 NUMERIC	 ON	 OPTIMIZE	 OPTION	 OPTIONALLY	 OR	 ORDER	 OUT	 OUTER	 OUTFILE	 PARTITION PRECISION	 PRIMARY	 PROCEDURE	 PURGE	 RANGE	 READ	 READS	 READ_WRITE	 REAL REFERENCES	 REGEXP	 RELEASE	 RENAME	 REPEAT	 REPLACE	 REQUIRE	 RESIGNAL RESTRICT	 RETURN	 REVOKE	 RIGHT	 RLIKE	 SCHEMA	 SCHEMAS	 SECOND_MICROSECOND	 SELECT	 SENSITIVE	 SEPARATOR	 SET	 SHOW	 SIGNAL SLOW SMALLINT	 SPATIAL	 SPECIFIC	 SQL	 SQLEXCEPTION	 SQLSTATE	 SQLWARNING	 SQL_BIG_RESULT	 SQL_CALC_FOUND_ROWS	 SQL_SMALL_RESULT	 SSL	 STARTING	 STRAIGHT_JOIN	 TABLE	 TERMINATED	 THEN	 TINYBLOB	 TINYINT	 TINYTEXT	 TO	 TRAILING	 TRIGGER	 TRUE	 UNDO	 UNION	 UNIQUE	 UNLOCK	 UNSIGNED	 UPDATE	 USAGE	 USE	 USING	 UTC_DATE	 UTC_TIME	 UTC_TIMESTAMP	 VALUES	 VARBINARY	 VARCHAR	 VARCHARACTER	 VARYING	 WHEN	 WHERE	 WHILE	 WITH	 WRITE	 XOR	 YEAR_MONTH	 ZEROFILL
+GENERATED	GET	IO_AFTER_GTIDS	IO_BEFORE_GTIDS MASTER_BIND OPTIMIZER_COSTS PARSE_GCOL_EXPR STORED VIRTUAL/);
+
+sub SQL_WORD {
+    $SQL_WORD
+}
 
 
 
-our %COLUMN_TYPE = ( # типы столбцов для alter table
-"mysql" => {
-	"int(11)" => "int",
-	"int(10) unsigned" => "int unsigned",
-	"tinyint(4)" => "tinyint",
-	"tinyint(3) unsigned" => "tinyint unsigned",
-	"bigint(21)" => "bigint",
-	"bigint(20) unsigned" => "bigint unsigned",
-	"smallint(5) unsigned" => "smallint unsigned",
-	"smallint(6)" => "smallint",
-});
+# типы столбцов для alter table
+my $COLUMN_TYPE = {
+    "int(11)" => "int",
+    "int(10) unsigned" => "int unsigned",
+    "tinyint(4)" => "tinyint",
+    "tinyint(3) unsigned" => "tinyint unsigned",
+    "bigint(21)" => "bigint",
+    "bigint(20) unsigned" => "bigint unsigned",
+    "smallint(5) unsigned" => "smallint unsigned",
+    "smallint(6)" => "smallint",
+};
 
-has qw/user password DNS basename charset/;
+sub COLUMN_TYPE {
+    $COLUMN_TYPE
+}
+
+has qw/user password DNS basename charset collate/;
 
 sub new {
 	my $cls = shift;
 	my %ini = @_;
 	my $DNS = delete($ini{DNS});
 	die "main.ini[connect]DNS не указан. См. main.sample.ini" unless defined $DNS;
-	my ($sql_word) = $DNS =~ /^dbi:(\w+)/i;
+	my ($sql_word) = $DNS =~ /^(?:dbi:)?(\w+)/i;
 	$sql_word = lc $sql_word;
 	die "main.ini[connect]DNS повреждён" unless $sql_word;
-	bless {
-		sql_word => $SQL_WORD{$sql_word},
-		column_type => $COLUMN_TYPE{$sql_word},
+    
+    my $self = $sql_word eq "mysql"? do {
+        $ini{mysql_enable_utf8} = 1 if !exists $ini{mysql_enable_utf8};
+        bless {}, ref $cls || $cls;
+    }: do {
+        my $name="connect" . ucfirst $sql_word;
+        $app->$name->new
+    };
+    
+    %$self = (%$self,
+		sql_word => $self->SQL_WORD,
+		column_type => $self->COLUMN_TYPE,
 		DNS => $DNS,
 		user => delete($ini{user}),
 		password => delete($ini{password}),
 		basename => delete($ini{database}) // ($DNS =~ /database=(\w+)/ and $1),
 		charset => delete($ini{charset}),
+		collate => delete($ini{collate}),
 		log => scalar(delete($ini{'log'}) =~ /^yes$/i),
+        log_prefix => '',
+        sql_save => undef,            # собирает sql, вместо выполнения, если []
 		options => {%ini},
-		log_prefix => '',
-	}, ref $cls || $cls;
+	);
+    
+    $self
 }
 
 
@@ -67,22 +86,17 @@ sub connect {
 	my ($self) = @_;
 	
 	$self->close if $self->{dbh};
-	my $dbh = DBI->connect($self->{DNS}, $self->{user}, $self->{password},
-		{RaiseError => 1, PrintError => 0, PrintWarn => 0, mysql_enable_utf8 => 1, %{$self->{options}}});
 	
-	if($app->{coro}) {
-		require Coro::Mysql;
-		$dbh = $dbh->Coro::Mysql::unblock;
-		#msg1 "coro dbh!!!";
-	}
+    my $dbh = $self->make_connect;
 	
 	$self->{dbh} = $dbh;
 	my $currsql = $self->{CURR_SQL};
-	my $collate = $self->{charset} // "utf8_unicode_ci";
-	my ($charset) = $collate =~ /^([^_]+)/;
-	$self->do("SET NAMES " . $dbh->quote($charset) . ($collate =~ /_/? " COLLATE " . $dbh->quote($collate): ""));
 	
-	eval { $self->do("USE " . $self->word($self->{basename})) }, $@ = undef if $self->{basename};
+    my $charset = $self->{charset};
+    my $collate = $self->{collate};
+	$self->setnames($charset, $collate) if $charset;
+	
+	eval { $self->use($self->{basename}) }, $@ = undef if $self->{basename};
 	
 	$self->pool;	# connect всегда возвращает dbh, а do всегда делает release
 	$self->{CURR_SQL} = $currsql;
@@ -110,6 +124,22 @@ sub reconnect {
 	$self
 }
 
+# создаёт и возвращает подключение
+sub make_connect {
+	my ($self) = @_;
+    
+	my $dbh = DBI->connect($self->{DNS}, $self->{user}, $self->{password},
+		{RaiseError => 1, PrintError => 0, PrintWarn => 0, %{$self->{options}}});
+	
+	if($app->{coro}) {
+		require Coro::Mysql;
+		$dbh = $dbh->Coro::Mysql::unblock;
+		#msg1 "coro dbh!!!";
+	}
+    
+    $dbh
+}
+
 # возвращает dbh
 sub dbh { $_[0]->{dbh} }
 
@@ -119,6 +149,14 @@ sub use {
 	my ($self, $basename) = @_;
 	$self->basename($basename);
 	$self->do("USE " . $self->word($basename));
+	$self
+}
+
+# устанавливает кодировку сессии
+sub setnames {
+	my ($self, $charset, $collate) = @_;
+    my $dbh = $self->{dbh};
+    $self->do("SET NAMES " . $dbh->quote($charset) . ($collate? " COLLATE " . $dbh->quote($collate): ""));
 	$self
 }
 
@@ -210,23 +248,6 @@ sub get_index_info {
 	}
 	return $info;
 }
-
-# без кеширования
-# sub get_index_info {
-	# my ($self) = @_;
-	# my $sql = "SELECT table_name as tab,column_name as col,constraint_name as name,ordinal_position as pos
-# FROM information_schema.KEY_COLUMN_USAGE
-# WHERE TABLE_SCHEMA=" . $self->quote($self->basename) . "
-# AND referenced_column_name IS null";
-	# my $rows = $self->dbh->selectall_arrayref($sql, {Slice=>{}});
-	# my $info = {};
-	# for my $row (@$rows) {
-		# my $idx = $info->{$row->{tab}}{$row->{name}} //= [];
-		# push @$idx, $row;
-	# }
-	# return $info;
-# }
-
 
 # кеширует информацию о внешних ключах таблиц
 sub fk_info {
@@ -606,6 +627,9 @@ sub pack_rows {
 sub query_rows {
 	my ($self, $tab, $view, @args) = @_;
 	my ($sql, $fields, $real_fields) = $self->sel_join(@_);
+    
+    push(@{$self->{sql_save}}, $sql), return if $self->{sql_save};
+    
 	$self->{CURR_SQL} = $sql;
 	$self->pool;
 	my $sth = $self->{dbh}->prepare($sql);
@@ -704,9 +728,13 @@ sub closeall {
 # запрашивает первую строку в виде массива
 sub query {
 	my ($self) = @_;
-	$self->{CURR_SQL} = sel @_;
+	my $sql = sel @_;
+    
+    push(@{$self->{sql_save}}, $sql), return if $self->{sql_save};
+    
+    $self->{CURR_SQL} = $sql;
 	$self->pool;
-	my @row = $self->{dbh}->selectrow_array($self->{CURR_SQL});
+	my @row = $self->{dbh}->selectrow_array($sql);
 	$self->release(wantarray? \@row: $row[0]);
 	$self->{CURR_SQL} = undef;
 	return wantarray? @row: $row[0];
@@ -715,7 +743,11 @@ sub query {
 # запрашивает строку в виде массивов
 sub query_array {
 	my ($self) = @_;
-	$self->{CURR_SQL} = sel @_;
+	my $sql = sel @_;
+    
+    push(@{$self->{sql_save}}, $sql), return if $self->{sql_save};
+    
+    $self->{CURR_SQL} = $sql;
 	$self->pool;
 	my $row = $self->{dbh}->selectall_arrayref($self->{CURR_SQL});
 	$self->release($row);
@@ -726,7 +758,11 @@ sub query_array {
 # запрашивает строки в виде хешей
 sub query_all {
 	my ($self) = @_;
-	$self->{CURR_SQL} = sel @_;
+	my $sql = sel @_;
+    
+    push(@{$self->{sql_save}}, $sql), return if $self->{sql_save};
+    
+    $self->{CURR_SQL} = $sql;
 	$self->pool;
 	my $row = $self->{dbh}->selectall_arrayref($self->{CURR_SQL}, {Slice=>{}});
 	$self->release($row);
@@ -737,7 +773,11 @@ sub query_all {
 # массив значений столбца
 sub query_col {
 	my ($self) = @_;
-	$self->{CURR_SQL} = sel @_;
+	my $sql = sel @_;
+    
+    push(@{$self->{sql_save}}, $sql), return if $self->{sql_save};
+    
+    $self->{CURR_SQL} = $sql;
 	$self->pool;
 	my $row = $self->{dbh}->selectcol_arrayref($self->{CURR_SQL});
 	$self->release($row);
@@ -794,6 +834,9 @@ sub effected_rows { $_[0]->{last_count} }
 # выполняет sql-запрос
 sub do {
 	my ($self, $sql) = @_;
+    
+    push(@{$self->{sql_save}}, $sql), return if $self->{sql_save};
+    
 	$self->{CURR_SQL} = $sql;
 	$self->pool($COLOR_DO);
 	my $dbh = $self->{dbh};

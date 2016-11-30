@@ -38,6 +38,7 @@ sub new {
 }
 
 our $CATEGORY = "";
+our $NAMESPACE = "";
 our @CATEGORY;
 our %TASK;
 our $LAST;
@@ -48,6 +49,15 @@ sub category ($) {
 	($CATEGORY) = @_;
 	push @CATEGORY, {category => $CATEGORY, tasks => []};
 	$LAST = undef;
+    $NAMESPACE = "";
+	return;
+}
+
+
+# пространство имён
+sub namespace ($) {
+	($NAMESPACE) = @_;
+	category $NAMESPACE =~ /:$/? $`: $NAMESPACE;
 	return;
 }
 
@@ -236,7 +246,7 @@ sub run {
 
 		my @argv = @ARGV;
 		local $_;
-		
+
 		utf8::decode($_) for @argv;
 
 		make $name, @argv;

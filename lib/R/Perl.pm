@@ -173,7 +173,7 @@ sub canall {
 # сортирует по свойству
 sub order_by {
 	my ($self, $sort, $arr, $desc) = @_;
-	local ($a, $b);
+	#local ($a, $b);
 	if($desc) {	sort { $b->{$sort} <=> $a->{$sort} } values %$arr }
 	else { sort { $a->{$sort} <=> $b->{$sort} } values %$arr }
 }
@@ -422,6 +422,54 @@ sub _md5 {
 	utf8::encode($bytes);
 	Digest::MD5::md5($bytes);
 }
+
+# хелпер для превращения глоба в регулярку
+# % - несколько символов исклбчая /
+# * - несколько символов включая /
+# ? - один символ
+# {...} - 0+
+# (...) - 1+
+# [...] - 0|1
+# <...> - один из указанных символов, - - через 
+# <^...> - кроме указанных символов
+# | или , или ; - или
+# \ - экранировать следующий символ
+# возвращает регулярку по like
+sub like {
+	my ($self, $like) = @_;
+    
+    my @st;
+    
+	$like =~ s!
+        (?<many>            \*  ) |
+        (?<manyany>         %   ) |
+        (?<one>             \?  ) |
+        (?<or>               [;\|,]     )     |
+        (?<open_several>   [\{\[\(]  )            |
+        (?<close_zseveral>  \}  )            |
+        (?<close_oseveral>  \)  )            |
+        (?<close_qseveral>  \]  )            |
+        < (?<set>        (?:\\.|[^<>])+   ) >           |
+        (?<escape>        \\. )          |
+        (?<esc>          [\.\+\^\$\@]     )
+    !
+		exists $+{many}? ".*":
+		exists $+{manyany}? "[^/]*":
+		exists $+{one}? ".":
+		exists $+{or}? "|":
+		exists $+{open_several}? do { push @st, $+{open_several}; "(" }:
+		exists $+{close_zseveral}? do { die "нет скобки `{`" if "{" ne pop @st; ")*"}:
+		exists $+{close_oseveral}? do { die "нет скобки `(`" if "(" ne pop @st; ")+"}:
+		exists $+{close_qseveral}? do { die "нет скобки `[`" if "[" ne pop @st; ")?"}:
+        exists $+{set}? "[$+{set}]":
+		exists $+{escape}? $+{escape}:
+        exists $+{esc}? "\\$+{esc}":
+        die "неучтённая группа"
+	!xges;
+	
+	qr!^(?:$like)$!s;
+}
+
 
 # подсчитывает строки
 sub lines {

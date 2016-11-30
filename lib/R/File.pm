@@ -78,33 +78,6 @@ sub get {
 	$self->one($self->{files}[$n]);
 }
 
-# хелпер для превращения глоба в регулярку
-# % - несколько символов включая /
-# * - несколько символов исклбчая /
-# ? - один символ
-# [...] - любой из указанных символов
-# [^...] - кроме указанных символов
-# | или , или ; - или
-# { ... } - скобки
-# \ - экранировать следующий символ
-sub _glob_to_regex {
-	my ($glob) = @_;
-
-	$glob =~ s!\\(.)|(\*)|(\?)|([;\|,])|(\{)|(\})|(\[\^)|(%)|([\.\(\)\|\+\^\$\@])!
-		defined($1)? $1:
-		$2? ".*":
-		$3? ".":
-		$4? "|":
-		$5? "(":
-		$6? ")":
-		$7? $7:
-		$8? "[^/]*":
-		"\\$9"
-	!ges;
-	
-	qr!^(?:$glob)$!s;
-}
-
 # возвращает функцию для сравнения файлов или регулярку. Она используется в find для отсечения ненужных файлов
 sub _filters {
 	
@@ -117,7 +90,7 @@ sub _filters {
 			die $@ if $@;
 		}
 		elsif(!ref $filter) {
-			$fn = _glob_to_regex($filter);
+			$fn = $app->perl->like($filter);
 			$fn = closure($fn, sub { scalar $_ =~ $_[0] });
 		}
 		elsif(ref $filter eq "Regexp") {
@@ -323,7 +296,7 @@ sub mtime {
 	my $self = shift;
 	#my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,$blksize,$blocks) = stat $self->{files}[0];
 	my $mtime = (stat $self->{files}[0])[9];
-	$! = undef;
+	#$! = undef;
 	$mtime
 }
 
@@ -333,7 +306,7 @@ sub _mtime { (stat $_[0])[9] }
 sub device {
 	my $self = shift;
 	my $dev = (stat $self->{files}[0])[0];
-	$! = undef;
+	#$! = undef;
 	$dev
 }
 
@@ -341,7 +314,7 @@ sub device {
 sub inode {
 	my $self = shift;
 	my $inode = (stat $self->{files}[0])[1];
-	$! = undef;
+	#$! = undef;
 	$inode
 }
 
@@ -349,16 +322,17 @@ sub inode {
 sub mod {
 	my $self = shift;
 	if(@_) {
-		my ($mode) = @_;
+		my ($mod) = @_;
+        $mod = oct($mod) if !Num $mod;
 		for my $path (@{$self->{files}}) {
-			chmod $mode, $path;
+			chmod $mod, $path;
 		}
-		$! = undef;
+		#$! = undef;
 		$self
 	}
 	else {
 		my $mod = (stat $self->{files}[0])[2];
-		$! = undef;
+		#$! = undef;
 		$mod
 	}
 }
@@ -372,13 +346,13 @@ sub writable {
 # файл можно читать
 sub readable {
 	my ($self) = @_;
-	-f $self->{files}[0]
+	-r $self->{files}[0]
 }
 
 # файл можно выполнять
 sub executable {
 	my ($self) = @_;
-	-f $self->{files}[0]
+	-x $self->{files}[0]
 }
 
 
@@ -433,7 +407,7 @@ sub ischar {
 	-c $self->{files}[0];
 }
 
-# это символьное устройство
+# это блочное устройство
 sub isblock {
 	my ($self) = @_;
 	-b $self->{files}[0];
@@ -452,6 +426,7 @@ sub istext {
 }
 
 # это бинарный файл
+*isbin = \&isbinary;
 sub isbinary {
 	my ($self) = @_;
 	-B $self->{files}[0]
@@ -718,7 +693,7 @@ sub files {
 	@{$self->{files}}
 }
 
-# удаляет начальную директорию у всех файлов. Ошибка, если хоть у одного нет такой директории
+# меняет начальную директорию на dir2 у всех файлов. Ошибка, если хоть у одного нет такой директории
 sub subdir {
 	my ($self, $dir, $dir2) = @_;
 	local ($', $');

@@ -11,70 +11,156 @@ sub new {
 	bless {}, ref $cls || $cls;
 }
 
+
+# возвращает текущую ветку
+sub current_branch {
+	my ($self) = @_;
+    
+    my $branch = `git branch`;
+    ($branch) = $branch =~ /^\s*\*\s+(\S+)/m;
+    
+	$app->perl->trim($branch)
+}
+
 category "GIT";
 
+name "push";
+args "";
+desc "";
+task {
+    my ($comment) = @_;
+
+    $comment =~ s!"!\\"!g;
+    
+    my $cmd = "git commit -am \"$comment\" && git pull --no-edit && git push";
+   
+    $app->tty->raw;
+   
+    print "$cmd\n";
+   
+    print `$cmd`;
+};
 
 name "commit";
-desc "добавляет все файлы и делает комит";
+desc "делает комит, если есть что комитить";
 sub commit {
 
 	$app->tty->raw;
 
-	my $save = join(" ", @_) || "save";
-
-	print `git add .`;
-	my $s = `git commit -am "$save" 2>&1`;
-	print $s if $? == 0;
-
-}
-
-
-name "merge";
-desc "сливает текущую ветку в master";
-rels "commit";
-sub merge {
-	
-	$app->tty->raw;
-
-	my $s = `git branch`;
-	my ($branch) = $s =~ /^\*\s+([\w-]+)/;
-
-	print qq{git checkout master && git merge --no-edit --no-ff "$branch" && git branch -D "$branch"};
-
-	print `git checkout master && git merge --no-edit --no-ff "$branch" && git branch -D "$branch"`
+	my $s = `git status -s`;
+    if($s) {
+        print "git status -s\n$s\n";
+        if($app->tty->confirm("есть изменения. комитим?")) {
+            print "введите комментарий к комиту (save) ";
+            my $comment = <> || "save";
+            print `git commit -am "$comment"` if $comment !~ /^\s*$/;
+        }
+    }
 
 }
 
 name "new";
-args "ветка [сообщение]";
+args "ветка";
 desc "создаёт новую ветку";
+spec "клонирует ветку master";
 task {
-	my ($name, $message) = @_;
+	my ($name) = @_;
 	
-	quit "введите название ветки\n" if @_ < 1;
+    $app->tty->raw;
+    
+	@_ < 1 && $app->tty->input("введите название ветки", $name);
 	
-	$app->tty->raw;
-	make "commit", $message;
-	print `git checkout -b "$name"`;
+	make "commit";
+    
+    my $branch = current_branch();
+    if($branch ne "master") {
+        my $push = "git checkout master";
+        print "$push\n";
+        print `$push`;
+    }
+    
+    my $push = "git checkout -b $name";
+    print "$push\n";
+	print `$push`;
+    
+    
 };
 
+name "branch";
+args "[-r]";
+desc "переключиться на ветку";
+sub branch {
+    my ($remote) = @_;
 
+    $app->tty->raw;
 
-name "to";
-args "ветка";
-desc "переключается на ветку";
-sub to {
-	my ($name, $message) = @_;
-
-	quit "введите название ветки\n" if @_ < 1;
-	
-	$app->tty->raw;
-
-	make "commit", $message;
-	
-	print `git checkout "$name"`;
-	
+    my $current;
+    my @branch = grep { length $_ } split /\n/, `git branch`;
+    push @branch, $app->perl->qq("добавить");
+    
+    my $nbranch = $app->tty->select(\@branch, "выберите ветку")-1;
+    
+    my $branch = $branch[$nbranch];
+    
+    print("вы остаётесь на ветке $branch"), return if $branch =~ /^\s*\* /;
+    
+    make("commit");
+    
+    if($nbranch == $#branch) {  # добавляем
+        print "Введите название новой ветки (пусто - отмена): ";
+        $branch = <>;
+        $branch = $app->perl->trim($branch);
+        return if $branch =~ /^\s*$/;
+        print `git checkout -b "$branch"`;
+    }
+    else {
+        $branch = $app->perl->trim($branch);
+        print `git checkout "$branch"`;
+    }
+    
 }
+
+name "mm";
+args "";
+desc "сливает с мастером и пушит, но остаётся на ветке";
+sub mm {
+    $app->tty->raw;
+   
+    make("commit");
+    
+    my $branch = current_branch();
+    
+    my $push = "git pull --no-edit origin $branch";
+    print "$push\n";
+    print `$push`;
+    
+    my $push = "git push origin $branch";
+    print "$push\n";
+    print `$push`;
+    
+    my $push = "git checkout master";
+    print "$push\n";
+    print `$push`;
+    
+    my $push = "git merge --no-ff --no-edit $branch";
+    print "$push\n";
+    print `$push`;
+    
+    my $push = "git pull --no-edit";
+    print "$push\n";
+    print `$push`;
+    
+    
+    my $push = "git push";
+    print "$push\n";
+    print `$push`;
+    
+    my $push = "git checkout $branch";
+    print "$push\n";
+    print `$push`;
+}
+
+
 
 name "dist";
 args "";

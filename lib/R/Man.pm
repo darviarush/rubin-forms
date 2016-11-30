@@ -14,8 +14,12 @@ sub new {
 sub conf {
 	my ($self) = @_;
 	
+    # узнаём имя проекта
+    # $app->file(".")->abs->path =~ //;
+    # $app->project_name();
+    
 	# укажем конфигурационный файл, иначе он будет зависить от имени скрипта
-	$app->ini( $app->ini->parse("etc/unicorn.ini") );
+	$app->ini( $app->ini->parse("etc/rubin-forms.ini") );
 	
 	$self
 }

@@ -133,6 +133,9 @@ sub _log {
 	#&setdie;
 }
 
+# возвращает пустую строку
+sub empty { "" }
+
 # превращает в строку
 sub stringify {
 	my $self = shift;
@@ -149,7 +152,11 @@ sub stringify {
 	
 	my $color = $self->{who} eq "bingo"? "cyan": $self->{who} eq "warning"? "yellow": "red";
 	
-	my $who = color($color) . $self->{who} . ": " . color("reset");
+    #R::App::msg1(-t STDERR);
+    # -t STDERR;
+    my $cc = 1? \&color: \&empty;
+    
+	my $who = $cc->($color) . $self->{who} . ": " . $cc->("reset");
 	
 	for(@lines) {
 		s{^\t?(.*?)(?: called)? at (.*?) line (\d+)}{
@@ -160,8 +167,11 @@ sub stringify {
 				$y =~ s!::!/!g; $y =~ s!/$!!;
 				$f =~ m!\b$y\.pm$! ? "": $tmp
 			}e;
-			$x=~s![:\(\)]+!color("cyan") . $& . color("reset")!ge;
-			"$f:".color("green")."$l".color("reset").": $who$x"
+			$x=~s![:\(\)]+!$cc->("cyan") . $& . $cc->("reset")!ge;
+            
+            $f =~ s!/cygdrive/(\w)!$1:!, $f =~ s!/!\\!g if $cc == \&empty;
+            
+			"$f:".$cc->("green")."$l".$cc->("reset").": $who$x"
 		}e;
 		
 		$who = "";
