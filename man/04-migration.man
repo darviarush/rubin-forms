@@ -24,14 +24,23 @@
 Создаётся файл миграции, куда записываются команды, которые приведут структуру базы в соответствие с моделью.
 Разработчик, затем, вписывает код между ними для изменения данных.
 
-Создаём новую миграцию:
+Создаём модель:
 
 	my $mig = $app->meta->new("Testbase");
 	
-    $mig->fieldset("tab1")->
-        col()->
+    $mig->fieldset("kipsta")->
+        col("a" => "int")->
+        col("b" => "int")->
     end;
 	
+Создаём новую миграцию:
+    
+    my $migration_dir = "var/test/migration";
+    
+    $mig->create_migration($migration_dir);
+    
+    my $migration_file = $app->file()->read;
+    
 	$mig->fieldset("kipsta")->sync;
 	
 	$mig->existsTab("kipsta");		# 1

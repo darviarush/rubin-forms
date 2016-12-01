@@ -130,13 +130,13 @@ sub mm {
     
     my $branch = current_branch();
     
-    my $push = "git pull --no-edit origin $branch";
-    print "$push\n";
-    print `$push`;
+    # my $push = "git pull --no-edit origin $branch";
+    # print "$push\n";
+    # print `$push`;
     
-    my $push = "git push origin $branch";
-    print "$push\n";
-    print `$push`;
+    # my $push = "git push origin $branch";
+    # print "$push\n";
+    # print `$push`;
     
     my $push = "git checkout master";
     print "$push\n";
