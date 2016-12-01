@@ -30,6 +30,7 @@
 
 	$res;	# 53
 	
+	
 	$res = $app->view->create(q{<% GET (5 + (6)) * 10 %>});
 
 	$res;	# 110
@@ -89,6 +90,18 @@
 	$res = $app->view->create(q{<% GET "$app.ini:site:name" %>});
 
 	$res;	# Rubin Forms
+	exit;
+== Методы
+
+	$res = $app->view->create(q{<% GET
+		sub plus a, b then a + b
+		sub minus a, b
+			a - b
+		end
+		plus 10, minus 10, 5
+	%>});
+
+	$res;	# 15
 	
 == Массивы
 
@@ -97,9 +110,9 @@
 			1,
 			2,
 		]
-		push @a, 10, @c, 11
+		@a = 10, @c, 11
 		@a ,= 15, 12
-		join ",", @a	
+		"," join @a
 	%>});
 	
 	$res;	# 10,1,2,11,15,12
@@ -110,7 +123,7 @@
 		@c = (
 			1=>2
 		)
-		%x = (10, @c, 11); join ", ", sort a cmp b from pairmap "$a=>$b" from %x
+		%x = (10, @c, 11); ", " join sort a cmp b from pairmap "$a=>$b" from %x
 	%>});
 
 	$res;	# 10=>1, 2=>11

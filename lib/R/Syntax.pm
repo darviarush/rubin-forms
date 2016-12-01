@@ -3,7 +3,7 @@ package R::Syntax;
 # просматривает на один оператор вперёд, благодаря чему может определить арность оператора
 
 use common::sense;
-use R::App;
+use R::App qw/msg1 $app todo nsort qsort pairmap/;
 
 # конструктор
 sub new {
@@ -14,13 +14,16 @@ sub new {
 		INFIX => {},			# инфикс-операторы 
 		POSTFIX => {},			# постфикс-операторы
 		
+		OP => {},				# лексемы операторов
+		
 		BR => {},				# скобки
 		CR => {},				# закрывающие скобки (для формирования лексики)
 		X => {},				# терминалы
 		
 		PRIO => 0,				# инкремент приоритета
+		ORDER => 1000,				# позиция в лексическом анализаторе
 		
-		LEX => undef,			# лексический анализатор
+		POP_A => {},			# обработчики соытий при выбрасывании закрывающей скобки из стека
 		
 		show_morf => 0,			# отражать ли преобразование в лог
 		trace => "«eval»",		# файл трейс которого показать
@@ -102,7 +105,8 @@ sub td {
 		}
 		else {
 			die "оператор `$type $x` уже объявлен" if exists $self->{$key}{$x};
-			$op = $self->{$key}{$x} = {%p, name=>"$type $x"};
+			$self->{$key}{$x} = {%p, name=>"$type $x", alias=>$x};
+			$op = $self->{OP}{$x} //= { name=>$x, alias=>$x, order => length $x };
 		}
 	}
 
@@ -142,14 +146,14 @@ sub br {
 		}
 		elsif($close) {	# открывающая скобка, т.к. предыдущая - закрывающая
 			die "скобка `$a` уже есть" if exists $br->{ $a };
-			$br->{ $a } = $open = { name => "br $a" };
+			$br->{ $a } = $open = { name => "br $a", alias => $a, order=>$self->{ORDER}++ };
 			undef $close;
 		}
 		else {	# закрывающая скобка
 			if(exists $closest->{ $a }) {
 				$close = $closest->{ $a };
 			} else {
-				$closest->{ $a } = $close = { name => "cr $a", cr=>1 };
+				$closest->{ $a } = $close = { name => "cr $a", cr=>1, alias => $a, order=>$self->{ORDER}++ };
 			}
 			$open->{tag} = $a;
 		}
@@ -159,10 +163,11 @@ sub br {
 }
 
 # операнды (терминалы)
+# @return добавленные терминалы
 sub x {
 	my $self = shift;
 	
-	#die "формирование таблицы символов уже завершено" if $self->{LEX};
+	#die "формирование таблицы символов уже завершено" if $self->{lex};
 	
 	my $x = $self->{X};
 	my $prev;
@@ -181,7 +186,7 @@ sub x {
 		}
 		else {
 			die "терминал `$a` уже есть" if exists $x->{ $a };
-			$x->{ $a } = $prev = { name => $a };
+			$x->{ $a } = $prev = { name => $a, alias => $a, order=>$self->{ORDER}++ };
 			push @term, $prev;
 		}
 	}
@@ -192,12 +197,48 @@ sub x {
 		#use charnames;
 		#$name =~ s/\W/charnames::viacode(ord $&)/ge;
 		if($a->{re}) {
-			$a->{re} = "(?<$a->{name}>$a->{re})";
+			$a->{re} = "(?<$a->{name}>$a->{re})" if "$a->{re}" !~ /\(\?P?</;
 		}
 		else {
 			$a->{re} = quotemeta $a->{name};
 		}
 	}
+	
+	return @term;
+}
+
+# добавляет к сущности свойства
+sub opt {
+	my ($self, $stmt) = splice @_, 0, 2;
+	
+	die "нет $stmt" unless my $x = ($self->{OP}{$stmt} // $self->{BR}{$stmt} // $self->{CR}{$stmt} // $self->{X}{$stmt});
+	
+	pairmap {
+		die "свойство $a в $stmt уже есть" if exists $x->{$a};
+		die "можно добавлять только re, sub или order в $stmt" if $a !~ /^(?:re|sub|order|nolex)$/;
+		$x->{$a} = $b;
+	} @_;
+	
+	$self
+}
+
+# указывает, что операторы могут быть только в указанной скобке
+sub in {
+	my $self = shift;
+	my $br = shift;
+	
+	for my $x (@_) {
+		$self->{IN}{$x} = $br;
+	}
+	
+	$self
+}
+
+# устанавливат обработчик на разбор лексем в pop
+sub pull {
+	my $self = shift;
+	
+	pairmap { $self->{POP_A}{$_} = $b for split /\s+/, $a  } @_;
 	
 	$self
 }
@@ -207,12 +248,74 @@ sub x {
 # формирует список имён операторов
 sub operators {
 	my ($self) = @_;
-	nsort { -length $_ } keys %{ $app->perl->setref( keys( %{$self->{INFIX}} ), keys( %{$self->{PREFIX}} ), keys( %{$self->{POSTFIX}} ) ) };
+	local $_;
+	nsort { -length $_ } keys %{$self->{INFIX}}, keys %{$self->{PREFIX}}, keys %{$self->{POSTFIX}};
+}
+
+
+# # формирует регулярку по переданным лексемам
+# sub flex {
+	# my $self = shift;
+	# #my $fmt = shift;
+	# local $_;
+	# my %exists;
+	
+	# my $reg = join "\t|\n", map {
+		# my $x=quotemeta $_->{alias};
+		# my $re = $_->{re} // do {
+			# my $re = $x;
+			# $re .= '\b' if $re=~/\w$/;
+			# $re = '\b' . $re if $re=~/^\w/;
+			# $re
+		# };
+		# !$_->{re} && exists $exists{$_->{alias}}? (): do {
+			# $exists{$_->{alias}} = 1;
+			# #my $code = sprintf($fmt, $x);
+			# my $corse = "_";
+			# while( $_->{alias} =~ /./gs) {
+				# $corse .= ord $&;
+			# }
+			# $self->{MAP}{$corse} = $_->{alias};
+			# "(?<$corse> $re )"
+		# }
+	# } nsort { $_->{order} // -length( $_->{alias} ) } @_;
+
+	# #my $ret = eval "qr{$reg}xi";
+	# #die $@ if $@;
+	# $reg
+# }
+
+# формирует регулярку по переданным лексемам
+sub flex {
+	my $self = shift;
+	my $fmt = shift;
+	local $_;
+	my %exists;
+	
+	my $reg = join "\t|\n", map {
+		my $x=quotemeta $_->{alias};
+		my $re = $_->{re} // do {
+			my $re = $x;
+			$re .= '\b' if $re=~/\w$/;
+			$re = '\b' . $re if $re=~/^\w/;
+			$re
+		};
+		!$_->{re} && exists $exists{$_->{alias}}? (): do {
+			$exists{$_->{alias}}=1;
+			my $code = sprintf($fmt, $x);
+			"$re (?{ $code })"
+		}
+	} nsort { $_->{order} // -length( $_->{alias} ) } @_;
+
+	my $ret = eval "qr{$reg}xi";
+	die $@ if $@;
+	$ret
 }
 
 # формирует лексемы
 sub _lex {
 	my $self = shift;
+	local $_;
 	join "", map {
 	
 		my $name = $_->{name};
@@ -225,15 +328,15 @@ sub _lex {
 		
 		"\t\t$_->{re}		(?{ $ret }) |\n"
 	
-	} nsort { -length $_->{re} } map {
+	} nsort { $_->{order} } map {
 		$_->{re} //= do {
-			my $x = quotemeta(($_->{fix} || $_->{cr} || exists $_->{tag}) && $_->{name} =~ /^\w+\s+/? $': $_->{name});
+			my $x = quotemeta $_->{alias};
 			$x = "\\b$x" if $x =~ /^\w/;
 			$x = "$x\\b" if $x =~ /\w$/;
 			$x
 		};
 		$_
-	} @_
+	} grep { !$_->{nolex} } @_
 }
 
 # формирует лексический анализатор из таблиц операторов, скобок и операндов
@@ -244,7 +347,7 @@ sub lex {
 	
 	my $BR = $self->{BR};
 	
-	my $re = $self->_lex( values %{$self->{INFIX}}, values %{$self->{PREFIX}}, values %{$self->{POSTFIX}}, values %$BR, values %{$self->{CR}}, values %{$self->{X}} );
+	my $re = $self->_lex( values %{$self->{OP}}, values %$BR, values %{$self->{CR}}, values %{$self->{X}} );
 		
 	$re = "\n$re" if $re ne "";
 		
@@ -270,21 +373,33 @@ sub lex {
 
 # пришёл оператор
 sub op {
-	my $self = shift;
-	my $push = {%+, 'stmt', @_};
+	$a = shift;
+	$b = {%+, 'stmt', @_};
 	
-	push @{$self->{stack}[-1]{'A+'}}, $push;
+	my $stmt = $_[0];
+
+	# выполняем подпрограмму
+	if(my $x = $a->{X}{$stmt}) {
+		if(exists $x->{sub}) {
+			{local %+;
+				$x->{sub}->();
+			};
+		}
+	}
+	# проверяем скобки
+	my $br = $a->{IN}{$stmt};
+	$a->check(stmt => $br) if $br;
+	
+	push @{ $a->{stack}[-1]{'A+'} }, $b;
 	#$self->trace("_", $push);
-	$self
+	$a
 }
 
 
 # пришёл терм
 sub atom {
 	my $self = shift;
-	my $push = {%+, 'stmt', @_};
-	
-	push @{$self->{stack}[-1]{'A+'}}, $push;
+	$self->op(@_);
 	#$self->trace(",", $push);
 	$self
 }
@@ -294,18 +409,36 @@ sub atom {
 # добавляет открывающую скобку
 # все операторы и атомы добавляются в неё
 sub push {
-	my $self = shift; 
-	my $push = {%+, 'stmt', @_};
+	$a = shift;
+	$b = {%+, 'stmt', @_};
 	
-	push @{$self->{stack}}, $push;
-	$self->trace("+", $push);
-	$self
+	if(my $x = $a->{BR}{$_[0]}) {
+		if(exists $x->{sub}) {
+			{local %+;
+				$x->{sub}->();
+			};
+		}
+	}
+	
+	push @{$a->{stack}}, $b;
+	$a->trace("+", $b);
+	$a
 }
 
 # закрывающая скобка
 # происходит разбор операторов и термов, попавших меж скобок
 sub pop {
 	my ($self, $stag) = @_;
+	
+	local %+;
+	
+	my $x = $self->{CR}{$stag};
+	if($x && exists $x->{sub}) {
+		$a=$self;
+		$b=$stag;
+		$x->{sub}->();
+	}
+	
 	
 	$self->{front} = 0;
 	
@@ -314,7 +447,7 @@ sub pop {
 	# выбрасываем скобки
 	$self->error("нет открывающей скобки ".(defined($stag)? "к $stag ": "")."- стек S пуст") if !@$stack;
 	
-	my $sk = pop @$stack;
+	my $sk = $stack->[-1];
 
 	my $tag = $sk->{tag} // $sk->{stmt};
 	$self->error("закрывающая скобка $stag конфликтует со скобкой $tag") if defined $stag and $tag ne $stag;
@@ -377,6 +510,20 @@ sub pop {
 			$self->trace("^", $op, [A=>$A, S=>\@S, T=>\@T]);
 		}
 	};
+	
+	# срабатывают обработчики для грамматического разбора
+	if(my $POP_A = $self->{POP_A}) {
+		for($b=0; $b<@$A; $b++) {
+			my $op = $A->[$b];
+			my $sub;
+			$sub = $POP_A->{$op} and do {
+				$a = $self;
+				$sub->();
+			}
+		}
+	}
+	
+	pop @$stack;	# сбрасываем скобку с вершины стека
 	
 	# определяем с конца сколько постфиксных операторов
 	my $n;
@@ -515,7 +662,7 @@ sub templates {
 		$c->{$k} = $v, next if ref $v eq "CODE";
 		
 		$v =~ s/'/\\'/g;
-		$v =~ s/\{\{\s*(\w+)\s*\}\}/', \$_->{$1} ,'/g;
+		$v =~ s/\{\{\s*(\w+)\s*\}\}/', \$b->{$1} ,'/g;
 		$k =~ s/\s+/ /g;
 		
 		$c->{$k} = eval "sub { join '', '$v' }";
@@ -560,6 +707,7 @@ sub expirience {
 	}
 	
 	# формирование кода из шаблонов
+	$a = $self;	# используется в функциях-шаблонах
 	my $templates = $self->{lang}{templates};
 	my $out;
 	my @path = $root;
@@ -576,13 +724,13 @@ sub expirience {
 		}
 		else {
 			
-			# $_ используется в функциях-шаблонах. Так передаётся параметр
-			$_ = pop @path;		# удаляем элемент
+			# $b используется в функциях-шаблонах. Так передаётся параметр
+			$b = pop @path;		# удаляем элемент
 			
 			#$_->{code} = join "", @$code if $code;
 			
-			my $template = $templates->{ $_->{stmt} };
-			die "нет шаблона `$_->{stmt}` в языке " . ($self->{lang}{name} // "«язык Батькович»") if !$template;
+			my $template = $templates->{ $b->{stmt} };
+			die "нет шаблона `$b->{stmt}` в языке " . ($self->{lang}{name} // "«язык Батькович»") if !$template;
 			
 			if(@path) {
 				my $parent = $path[-1];
@@ -656,12 +804,13 @@ sub eval {
 # проверяет параметры на верхушке стека скобок и выбрасывает ошибку, если они не совпадают
 sub check {
 	my $self = shift;
+	my $s = $self->{stack}[-1];
 	for(my $i=0; $i<@_; $i+=2) {
 		my ($k, $v) = @_[$i, $i+1];
-		next if $k == 1;
-		if( $_->{$k} ne $v ) {
+		next if $k eq "e";
+		if( $s->{$k} ne $v ) {
 			my %check = @_;
-			$self->error(exists($check{1})? $check{1}: "$check{stmt}: не совпадает $k в стеке. Оно $_->{$k}, а должно быть $v");
+			$self->error(exists($check{e})? $check{e}: "$check{stmt}: не совпадает $k в стеке. Оно $s->{$k}, а должно быть $v");
 		}
 	}
 	$self
