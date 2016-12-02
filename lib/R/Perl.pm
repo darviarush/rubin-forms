@@ -456,6 +456,7 @@ sub likes {
 		<(?<name>[a-z_]\w*):							|
 		(?<open_name> <:? )								|
 		(?<close_name> > )								|
+		& (?<call>[a-z_]\w*) | &\{ (?<call>[a-z_]\w*) \}|
 		(?<escape>		\\. )		 					|
 		(?<esc>		  [\.\+\^\$\@]	 )
 	!
@@ -472,6 +473,7 @@ sub likes {
 		exists $+{close_name}? do { die "нет скобки `<name:`" if "<" ne pop @st; ")"}:
 		exists $+{set}? do { my $x=$+{set}; $x=~s/[\[\]\$\.]/\\$&/g; "[$x]" }:
 		exists $+{unset}? do { my $x=$+{unset}; $x=~s/[\[\]\$\.]/\\$&/g; "[^$x]" }:
+		exists $+{call}? "(?&$+{call})":
 		exists $+{escape}? $+{escape}:
 		exists $+{esc}? "\\$+{esc}":
 		die "неучтённая группа"
