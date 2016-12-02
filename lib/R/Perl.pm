@@ -424,50 +424,66 @@ sub _md5 {
 }
 
 # хелпер для превращения глоба в регулярку
-# % - несколько символов исклбчая /
+# % - несколько символов исключая /
 # * - несколько символов включая /
 # ? - один символ
 # {...} - 0+
 # (...) - 1+
 # [...] - 0|1
-# <...> - один из указанных символов, - - через 
-# <^...> - кроме указанных символов
-# | или , или ; - или
+# |...| - один из указанных символов, .-. - символьный интервал
+# ||...|| - кроме указанных символов
+# , или ; - или
 # \ - экранировать следующий символ
+# <name:...> - именованная группа
+# <...> или <:...>- скобки
 # возвращает регулярку по like
-sub like {
-	my ($self, $like) = @_;
-    
-    my @st;
-    
+sub likes {
+	my ($self, $like, $args) = @_;
+	
+	my @st;
+	
 	$like =~ s!
-        (?<many>            \*  ) |
-        (?<manyany>         %   ) |
-        (?<one>             \?  ) |
-        (?<or>               [;\|,]     )     |
-        (?<open_several>   [\{\[\(]  )            |
-        (?<close_zseveral>  \}  )            |
-        (?<close_oseveral>  \)  )            |
-        (?<close_qseveral>  \]  )            |
-        < (?<set>        (?:\\.|[^<>])+   ) >           |
-        (?<escape>        \\. )          |
-        (?<esc>          [\.\+\^\$\@]     )
-    !
+		(?<many>			\*  ) 			|
+		(?<manyany>		 %   ) 				|
+		(?<one>			 \?  ) 				|
+		(?<or>			   [;,]	 )			|
+		(?<open_several>   [\{\[\(]  )		|
+		(?<close_zseveral>  \}  )			|
+		(?<close_oseveral>  \)  )			|
+		(?<close_qseveral>  \]  )			|
+		\|\| (?<unset>		(?:\\\||[^\|])+   ) \|\|	|
+		\| (?<set>		(?:\\\||[^\|])+   ) \|			|
+		<(?<name>[a-z_]\w*):							|
+		(?<open_name> <:? )								|
+		(?<close_name> > )								|
+		(?<escape>		\\. )		 					|
+		(?<esc>		  [\.\+\^\$\@]	 )
+	!
 		exists $+{many}? ".*":
 		exists $+{manyany}? "[^/]*":
 		exists $+{one}? ".":
 		exists $+{or}? "|":
-		exists $+{open_several}? do { push @st, $+{open_several}; "(" }:
+		exists $+{open_several}? do { push @st, $+{open_several}; "(?:" }:
 		exists $+{close_zseveral}? do { die "нет скобки `{`" if "{" ne pop @st; ")*"}:
 		exists $+{close_oseveral}? do { die "нет скобки `(`" if "(" ne pop @st; ")+"}:
 		exists $+{close_qseveral}? do { die "нет скобки `[`" if "[" ne pop @st; ")?"}:
-        exists $+{set}? "[$+{set}]":
+		exists $+{name}? do { push @st, "<"; $+{name}? "(?<$+{name}>": "(?:" }:
+		exists $+{open_name}? do { push @st, "<"; "(?:" }:
+		exists $+{close_name}? do { die "нет скобки `<name:`" if "<" ne pop @st; ")"}:
+		exists $+{set}? do { my $x=$+{set}; $x=~s/[\[\]\$\.]/\\$&/g; "[$x]" }:
+		exists $+{unset}? do { my $x=$+{unset}; $x=~s/[\[\]\$\.]/\\$&/g; "[^$x]" }:
 		exists $+{escape}? $+{escape}:
-        exists $+{esc}? "\\$+{esc}":
-        die "неучтённая группа"
+		exists $+{esc}? "\\$+{esc}":
+		die "неучтённая группа"
 	!xges;
 	
-	qr!^(?:$like)$!s;
+	"(?s$args:^(?:$like)\$)";
+}
+
+sub like {
+	my ($self, $like, $args) = @_;
+	my $res = $self->likes($like, $args);
+	qr{$res};
 }
 
 
