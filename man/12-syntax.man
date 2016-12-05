@@ -153,23 +153,27 @@
 	my $string = $app->syntax->new;
 	my $s = $app->syntax->new;
 	
-	$string->tr("xfy", qw/CAT/);
+	# отключаем добавление лексем
+	$string->addspacelex(0);
+	
+	$string->tr("yfx", qw/CAT/)->tr("yf", qw/CAT/);
+	
 	$string->opt("CAT", nolex => 1);
-	
-	$string->x(exec => qr/ \$ (?<exec> \S+ ) /x => sub {
-		$a->$+{exec}
+	$string->x(exec => qr/ (?<str> .*? ) \$ (?<exec> \S+ ) /xs => sub {
+		my ($self, $push) = @_;
+		$self->checkout->push("exec1")->masking($push->{exec})->pop("exec1")->checkout($self->{LA_STRING})->op("CAT");
 	});
+	$string->x("str" => qr/ (?<str> .* ) \z /xs => sub { shift->op("CAT") });
 	
-	$string->x("q" => qr/ \\" /x);
-	$string->x("str" => qr/ .*? /xs);
-	
+	$s->{LA_STRING} = $string;
 	
 	$s->tr("xfy", qw/ + /);
 	$s->tr("yf", qw/ * /);
 	
 	$s->x("num" => qr{ \d+|\d*\.\d+ }x);
 	$s->x("string" => qr{ "(?: \\"|[^\\"] )*" }x => sub {
-		$a->push("string1")->masking($+{string})->pop("string1")->op("CAT");
+		my ($self, $push) = @_;
+		$self->checkout($self->{LA_STRING})->push("string1")->masking($push->{string})->pop("string1")->checkout->op("CAT");
 	});
 	
 	$s->templates(
@@ -177,7 +181,11 @@
 		"yf +" => "({{ left }})+1",
 		"yf *" => "({{ left }})*-1",
 		"num" => "{{ num }}",
+		"CAT" => "{{ left }}{{ right }}",
+		"str" => "{{ str }}",
+		"string1" => '"{{ right }}"',
+		"exec1" => '{{ str }}${\({{ right }})}"',
 	);
 
-	$s->eval("5+6*");		# -11
+	$s->eval('"_ $5+6* _"');		# _ -11 _
 

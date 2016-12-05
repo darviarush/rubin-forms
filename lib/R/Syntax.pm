@@ -3,7 +3,9 @@ package R::Syntax;
 # просматривает на один оператор вперёд, благодаря чему может определить арность оператора
 
 use common::sense;
-use R::App qw/msg1 $app todo nsort qsort pairmap/;
+use R::App qw/msg1 $app todo nsort qsort pairmap has/;
+
+has qw/addspacelex/;
 
 # конструктор
 sub new {
@@ -21,7 +23,7 @@ sub new {
 		X => {},				# терминалы
 		
 		PRIO => 0,				# инкремент приоритета
-		ORDER => 1000,				# позиция в лексическом анализаторе
+		ORDER => 1000,			# позиция в лексическом анализаторе
 		
 		POP_A => {},			# обработчики соытий при выбрасывании закрывающей скобки из стека
 		
@@ -33,12 +35,35 @@ sub new {
 		stack => undef,			# стек скобок
 		lex => undef,			# кэш - лексический анализатор
 		
+		addspacelex => 1,		# добавляет обязательные лекемы
+		
 		error => {				# ошибки
 			nosym => "неизвестный науке символ `%s`",
 		},
 		
 		@_
 	}, ref $cls || $cls;
+}
+
+
+# переключает на другой лексический анализатор
+# чтобы вернуться - без параметров
+sub checkout {
+	my ($self, $LA) = @_;
+	
+	local $_;
+	
+	$LA //= $self->{LA};
+	
+	my $fields = [qw/ PREFIX INFIX POSTFIX OP BR CR X PRIO ORDER POP_A lex addspacelex /];
+	
+	# сохраняем текущий в LA
+	$self->{LA}{$_} = $self->{$_} for @$fields;
+	
+	# переходим
+	$self->{$_} = $LA->{$_} for @$fields;
+	
+	$self
 }
 
 ###############################  формирование таблицы ###############################
@@ -316,7 +341,7 @@ sub flex {
 sub _lex {
 	my $self = shift;
 	local $_;
-	join "", map {
+	join " |\n", map {
 	
 		my $name = $_->{name};
 		$name =~ s/^\w+\s+// if $_->{fix} || $_->{cr} || exists $_->{tag};
@@ -326,7 +351,7 @@ sub _lex {
 		$_->{cr}? "\$self->pop(\"$name\")":
 		"\$self->op(\"$name\")";
 		
-		"\t\t$_->{re}		(?{ $ret }) |\n"
+		"\t\t$_->{re}		(?{ $ret })"
 	
 	} nsort { $_->{order} } map {
 		$_->{re} //= do {
@@ -343,21 +368,25 @@ sub _lex {
 sub lex {
 	my ($self) = @_;
 	
-	return $self->{lex} if defined $self->{lex};
-	
 	my $BR = $self->{BR};
 	
 	my $re = $self->_lex( values %{$self->{OP}}, values %$BR, values %{$self->{CR}}, values %{$self->{X}} );
 		
 	$re = "\n$re" if $re ne "";
-		
+	
+	
+	
+	my $adder = $self->{addspacelex}? ($re ne ""? " |\n": "") . "\\n		(?{ \$self->{lineno}++; \$self->{charlineno}=length \$` })  |
+		\\s+		|
+		(?<nosym> . )	(?{ \$self->error(sprintf(\$self->{error}{nosym}, \$+{nosym})) })": "";
+	
 	my $lex = "qr{$re
-		\\n		(?{ \$self->{lineno}++; \$self->{charlineno}=length \$` })  |
-		\\s+		|	# пропускаем пробелы
-		(?<nosym> . )	(?{ \$self->error(sprintf(\$self->{error}{nosym}, \$+{nosym})) })
+		$adder
 	}sx";
 	
-	#msg1 $lex;
+	
+	
+	msg1 $lex;
 	
 	my $lexx = eval $lex;
 	die $@ if $@;
@@ -373,26 +402,22 @@ sub lex {
 
 # пришёл оператор
 sub op {
-	$a = shift;
-	$b = {%+, 'stmt', @_};
+	my $self = shift;
+	my $push = {%+, 'stmt', @_};
 	
 	my $stmt = $_[0];
 
 	# выполняем подпрограмму
-	if(my $x = $a->{X}{$stmt}) {
-		if(exists $x->{sub}) {
-			{local %+;
-				$x->{sub}->();
-			};
-		}
+	if(my $x = $self->{X}{$stmt}) {
+		$x->{sub}->($self, $push) if exists $x->{sub};
 	}
 	# проверяем скобки
-	my $br = $a->{IN}{$stmt};
-	$a->check(stmt => $br) if $br;
+	my $br = $self->{IN}{$stmt};
+	$self->check(stmt => $br) if $br;
 	
-	push @{ $a->{stack}[-1]{'A+'} }, $b;
+	push @{ $self->{stack}[-1]{'A+'} }, $push;
 	#$self->trace("_", $push);
-	$a
+	$self
 }
 
 
@@ -409,20 +434,16 @@ sub atom {
 # добавляет открывающую скобку
 # все операторы и атомы добавляются в неё
 sub push {
-	$a = shift;
-	$b = {%+, 'stmt', @_};
+	my $self = shift;
+	my $push = {%+, 'stmt', @_};
 	
-	if(my $x = $a->{BR}{$_[0]}) {
-		if(exists $x->{sub}) {
-			{local %+;
-				$x->{sub}->();
-			};
-		}
+	if(my $x = $self->{BR}{$_[0]}) {
+		$x->{sub}->($self, $push) if exists $x->{sub};
 	}
 	
-	push @{$a->{stack}}, $b;
-	$a->trace("+", $b);
-	$a
+	push @{$self->{stack}}, $push;
+	$self->trace("+", $push);
+	$self
 }
 
 # закрывающая скобка
@@ -430,13 +451,8 @@ sub push {
 sub pop {
 	my ($self, $stag) = @_;
 	
-	local %+;
-	
-	my $x = $self->{CR}{$stag};
-	if($x && exists $x->{sub}) {
-		$a=$self;
-		$b=$stag;
-		$x->{sub}->();
+	if(my $x = $self->{CR}{$stag}) {
+		$x->{sub}->($self) if exists $x->{sub};
 	}
 	
 	
@@ -634,7 +650,7 @@ sub error {
 sub masking {
 	my ($self, $s) = @_;
 	
-	my $lex = $self->lex;
+	my $lex = $self->{lex} //= $self->lex;
 	
 	while($s =~ /$lex/g) {}			# формируем дерево
 	
