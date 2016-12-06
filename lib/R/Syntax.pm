@@ -53,14 +53,19 @@ sub checkout {
 	
 	local $_;
 	
-	$LA //= $self->{LA};
+	$LA //= "master";
+	
+	$LA = uc $LA;
 	
 	my $fields = [qw/ PREFIX INFIX POSTFIX OP BR CR X PRIO ORDER POP_A lex addspacelex /];
 	
-	# сохраняем текущий в LA
-	$self->{LA}{$_} = $self->{$_} for @$fields;
+	# сохраняем текущий в LA_MASTER
+	if(!$self->{LA_MASTER}) {
+		$self->{LA_MASTER}{$_} = $self->{$_} for @$fields;
+	}
 	
 	# переходим
+	$LA = $self->{"LA_$LA"};
 	$self->{$_} = $LA->{$_} for @$fields;
 	
 	$self
@@ -382,7 +387,7 @@ sub lex {
 	
 	my $lex = "qr{$re
 		$adder
-	}sx";
+	}sxn";
 	
 	
 	
@@ -408,7 +413,7 @@ sub op {
 	my $stmt = $_[0];
 
 	# выполняем подпрограмму
-	if(my $x = $self->{X}{$stmt}) {
+	if(my $x = $self->{X}{$stmt} // $self->{OP}{$stmt}) {
 		$x->{sub}->($self, $push) if exists $x->{sub};
 	}
 	# проверяем скобки
@@ -589,6 +594,16 @@ sub pop {
 	$self
 }
 
+
+# снимает последний элемент стека и заменяет $push
+sub assign {
+	my ($self, $push) = @_;
+	
+	%$push = (%$push, %{ pop @{$self->{stack}[-1]{"A+"}} });
+	
+	$self
+}
+
 my %COLOR = (
 	"+" => ":red",
 	"-" => ":bold blue",
@@ -694,7 +709,7 @@ sub expirience {
 	my ($self, $root) = @_;
 	
 
-	#msg1 ":size10000", $self->top;
+	msg1 "hi!";
 	
 	# обход в глубину - модификации дерева
 	if(defined(my $modifiers = $self->{lang}{modifiers})) {
