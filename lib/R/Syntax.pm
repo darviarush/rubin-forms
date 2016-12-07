@@ -12,6 +12,8 @@ sub new {
 	my $cls = shift;
 	bless {
 		
+		name => (ref $cls || $cls),	# имя языка
+		
 		PREFIX => {},			# префикс-операторы
 		INFIX => {},			# инфикс-операторы 
 		POSTFIX => {},			# постфикс-операторы
@@ -41,6 +43,9 @@ sub new {
 			nosym => "неизвестный науке символ `%s`",
 		},
 		
+		morf => undef,			# язык в который морфировать
+		morfs => {},			# кэш языков
+		
 		@_
 	}, ref $cls || $cls;
 }
@@ -57,7 +62,7 @@ sub checkout {
 	
 	$LA = uc $LA;
 	
-	my $fields = [qw/ PREFIX INFIX POSTFIX OP BR CR X PRIO ORDER POP_A lex addspacelex /];
+	my $fields = [qw/ name PREFIX INFIX POSTFIX OP BR CR X POP_A lex addspacelex /];
 	
 	# сохраняем текущий в LA_MASTER
 	if(!$self->{LA_MASTER}) {
@@ -69,6 +74,27 @@ sub checkout {
 	$self->{$_} = $LA->{$_} for @$fields;
 	
 	$self
+}
+
+# устанавливает язык
+sub lang {
+	if(@_ == 1) {
+		my $self = shift;
+		$self->{lang} // $self->lang("perl")->{lang}
+	} else {
+		my ($self, $lang) = @_;
+	
+		$self->{lang} = $self->{langs}{$lang} //= do {
+			require "R/Syntax/Morf/" . ucfirst($lang) . ".pm";
+			my $class = "R::Syntax::Morf::" . ucfirst($lang);
+			$self->{lang} = bless { name => $lang }, $class;
+			$self->modifiers( %{"${class}::modifiers"} );
+			$self->templates( %{"${class}::templates"} );
+			$self->{lang}
+		};
+
+		$self
+	}
 }
 
 ###############################  формирование таблицы ###############################
@@ -370,7 +396,7 @@ sub _lex {
 }
 
 # формирует лексический анализатор из таблиц операторов, скобок и операндов
-sub lex {
+sub lex1 {
 	my ($self) = @_;
 	
 	my $BR = $self->{BR};
@@ -393,12 +419,46 @@ sub lex {
 	
 	msg1 $lex;
 	
+	use re 'eval';
+	
 	my $lexx = eval $lex;
 	die $@ if $@;
 	
 	$self->{lex} = $lexx;
 	
 	$lexx
+}
+
+# формирует функцию лексического разбора
+sub lex {
+	my ($self) = @_;
+	
+	my $lex = join " |\n", map {
+		my $x = quotemeta $_->{alias};
+		"$_->{re}		(?{ \"$x\" })"
+	}
+	nsort { $_->{order} } map {
+		$_->{re} //= do {
+			my $x = quotemeta $_->{alias};
+			$x = "\\b$x" if $x =~ /^\w/;
+			$x = "$x\\b" if $x =~ /\w$/;
+			$x
+		};
+		$_
+	}
+	grep { !$_->{nolex} }
+	values %{$self->{OP}}, values  %{$self->{BR}}, values %{$self->{CR}}, values %{$self->{X}};
+	
+	if($self->{addspacelex}) {
+		$lex .= ($lex ne ""? " |\n": "") . "
+		(?<newline> \\n	)			|
+		(?<spacer>[^\\S\\n]+ )					|
+		(?<error_nosym> . )	"
+	}
+	
+	use re 'eval';
+	
+	qr{$lex}xni
 }
 
 ###############################  синтаксический разбор  ###############################
@@ -534,13 +594,10 @@ sub pop {
 	
 	# срабатывают обработчики для грамматического разбора
 	if(my $POP_A = $self->{POP_A}) {
-		for($b=0; $b<@$A; $b++) {
-			my $op = $A->[$b];
-			my $sub;
-			$sub = $POP_A->{$op} and do {
-				$a = $self;
-				$sub->();
-			}
+		for(my $i=0; $i<@$A; $i++) {
+			my $op = $A->[$i];
+			my $sub = $POP_A->{$op};
+			$sub->($self, $i) if defined $sub;
 		}
 	}
 	
@@ -667,10 +724,31 @@ sub masking {
 	
 	my $lex = $self->{lex} //= $self->lex;
 	
-	while($s =~ /$lex/g) {}			# формируем дерево
+	my $OP = $self->{OP};
+	my $BR = $self->{BR};
+	my $CR = $self->{CR};
+	my $X = $self->{X};
+	
+	while($s =~ /$lex/g) {			# формируем дерево
+		exists $+{newline}? $self->{lineno}++:
+		exists $+{error_nosym}? $self->error(sprintf($self->{error}{nosym}, $+{error_nosym})):
+		exists $+{spacer}? ():
+		do { if(defined $^R) {
+			exists $OP->{$^R}? $self->op($^R):
+			exists $BR->{$^R}? do {
+				my $tag = $BR->{$^R}{tag};
+				$self->push($^R, defined($tag)? (tag=>$tag): ());
+			}:
+			exists $CR->{$^R}? $self->pop($^R):
+			exists $X->{$^R}? $self->atom($^R):
+			$self->error("лексема ". $app->perl->q("$^R") ." не существует в языке " . $self->{name})
+		}};
+		
+	}
 	
 	$self
 }
+
 
 # устанавливает модификаторы языка
 sub modifiers {
@@ -707,9 +785,6 @@ sub templates {
 # осуществляет два прохода по дереву кода и формирует код
 sub expirience {
 	my ($self, $root) = @_;
-	
-
-	msg1 "hi!";
 	
 	# обход в глубину - модификации дерева
 	if(defined(my $modifiers = $self->{lang}{modifiers})) {

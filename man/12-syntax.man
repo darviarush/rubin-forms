@@ -161,9 +161,9 @@
 	
 	$string->opt("CAT", re => qr/ (?<str> [^\$]* ) (?: \$ (?<exec> \S+ ) | $ ) /xs, sub => sub {
 		my ($self, $push) = @_;
-		msg1 "xxx", $push;
 		if(exists $push->{exec}) {
 			$self->checkout("master")->push("exec1")->masking($push->{exec})->pop("exec1")->checkout("string");
+			delete $push->{str};
 		}
 	});
 	
@@ -183,14 +183,9 @@
 		"num" => "{{ num }}",
 		"yfx CAT" => "{{ left }}{{ str }}{{ right }}",
 		"yf CAT" => "{{ left }}{{ str }}",
-		#"str" => "{{ str }}",
 		"string" => '"{{ right }}"',
 		"exec1" => '{{ str }}${\({{ right }})}',
-		"CAT" => '{{ str }}',
 	);
-
-	msg1 "morf", $s->morf('"_ $5+6* _"');
 	
 	
 	$s->eval('"_ $5+6* _"');		# _ -11 _
-

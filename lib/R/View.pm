@@ -1,6 +1,7 @@
 package R::View;
 # шаблонизатор
 
+
 use common::sense;
 use R::App;
 use R::Re;
@@ -16,14 +17,11 @@ my $re_endline = $R::Re::endline;
 my $re_number = $R::Re::number;
 
 my $BASICSYNTAX = $app->syntax->new;
-my $STRNGSYNTAX = $app->syntax->new;
-my $REGEXSYNTAX = $app->syntax->new;
-my $VIEWSSYNTAX = $app->syntax->new;
 
 # конструктор
 sub new {
 	my ($cls) = @_;
-	$cls->SUPER::new(
+	bless {
 	
 		dir => "view",
 		compile_dir => "var/c_view",
@@ -36,6 +34,7 @@ sub new {
 		
 		route => {},			# все роутеры route->{key} = [1-<% ACTION %>|2-on|0-cls, cls, sub|sub_name]
 		
+		syntax => $app->syntaxBasic,		# синтаксический анализатор
 		
 		INHERITS => undef,		# вспомогательная для шаблонов
 		langs => {},			# кэш языков
@@ -46,28 +45,7 @@ sub new {
 		INC => {},				# подключённые шаблоны и файлы кода => класс
 		inc => ["."],			# пути в которых искать шаблоны и файлы кода
 		class => {},			# скомпилированный класс
-	);
-}
-
-# устанавливает язык
-sub lang {
-	if(@_ == 1) {
-		my $self = shift;
-		$self->{lang} // $self->lang("perl")->{lang}
-	} else {
-		my ($self, $lang) = @_;
-	
-		$self->{lang} = $self->{langs}{$lang} //= do {
-			require "R/View/Morf/" . ucfirst($lang) . ".pm";
-			my $class = "R::View::Morf::" . ucfirst($lang);
-			$self->{lang} = bless { name => $lang }, $class;
-			$self->modifiers( %{"${class}::modifiers"} );
-			$self->templates( %{"${class}::templates"} );
-			$self->{lang}
-		};
-
-		$self
-	}
+	}, ref $cls || $cls;
 }
 
 # добавляет код к begin
@@ -280,292 +258,7 @@ sub parsefile {
 }
 
 
-# маскирование переменных
-my $re_space = qr/[\ \t]+/;
-my $re_space_ask = qr/[\ \t]*/;
-my $re_rem = qr/[\ \t]*(?:(?:\#|\brem\b)(?<rem>[^\n\r]*))?/i;
-my $re_sk = qr/[\[\{\(]/;
-my $re_arg = qr/(?:$re_id|\*)/o;
-my $re_class = qr/$re_id(?:::$re_id)*/o;
-my $re_extends = qr!$re_class(?:$re_space_ask,$re_space_ask$re_class)*!;
-my $re_class_stmt = qr!
-(?<class>$re_class)
-(?: [\ \t]+ (?:EXTENDS|INHERITS) [\ \t]+ (?<extends>$re_extends))?
-(?<with> [\t\ ]+ with [\t\ ]+ (?<with_args> [^\r\n]+) )?
-!xismo;				
-my $re_args = qr!
-(?: [\ \t]* (?<sub_args>$re_arg (?:$re_space_ask , $re_space_ask $re_arg)*))?
-!xismo;
-my $re_sub = qr!
-	(?<sub>$re_id|"\w+"|[[:punct:]]+|0\+)
-	$re_args
-	(?: [\ \t]+ CLASS [\ \t]+ (?<sub_in>(?<sub_self>::)?$re_class) )?
-!xismo;
-my $re_sub_then = qr!
-$re_space $re_sub (?: (?<sub_then> [\ \t]+ THEN \b) | $re_rem $re_endline) 
-!xismo;
-my $re_for = qr!
-(?<for_k>$re_id) (?: $re_space_ask,$re_space_ask (?<for_v>$re_id) (?: $re_space_ask,$re_space_ask (?<for_i>$re_id) )? )? (?: $re_space (?<for_in>IN) \b | $re_space (?<for_of>OF) \b | $re_space_ask = )
-!xismo;
-# my $re_gosub_after = qr{
-# \b [\ \t]* (?! [ !\+\-\*/<>=  \)\}\] \|& \? .:,; \r\n ] | %\s |  (?:or|and|not|eq|ne|le|ge|lt|gt|then|else|end|cmp|from) \b | $ )
-# }xismo;
 
-#\p{Uppercase}
-
-# describe context it Given
-
-# ключевые слова:
-# super null extends action of block process include raw wrapper eq ne le ge lt gt keys values use sort scenario pairmap map grep reduce from repeat self this me ucfirst lcfirst uc lc ref cmp push pop undef next last redo return pairs or and not eq ne le ge lt gt scalar msg msg1 keys values exists closure length use push pop shift unshift splice delete defined wantarray
-
-
-
-{
-my $s = $BASICSYNTAX;
-
-$s->tr("yf",  qw{		.$word .word :word 	});
-$s->td("xfy", qw{		.$word() .word() :word()	.$word[] .word[] :word[]	.$word{} .word{} :word{}	});
-$s->td("xfy", qw{		word() word[] word{}	});
-$s->tr("xf",  qw{		@	%		});
-$s->tr("fy",  qw{ ref pairs scalar defined length exists });
-$s->tr("yf",  qw{		++ --			})->td("fy", qw{ ++ -- });
-$s->tr("yfx", qw{		^				});
-$s->tr("yfx", qw{		! +~ \			})->td("fy", qw{ + - });
-$s->tr("xfy", qw{		=~ !~	~		});
-$s->tr("xfy", qw{		* / % mod **		});
-$s->tr("xfy", qw{		+ - .				});
-$s->tr("xfy", qw{		<< >>				});
-# in perl in this: named unary operators
-$s->tr("xfx", qw{	< > <= >= lt gt le ge		});
-$s->tr("xfx", qw{	== != <=> eq ne cmp ~~		});
-$s->tr("xfy", qw{		+&					});
-$s->tr("xfy", qw{		+|  +^				});
-$s->tr("xfy", qw{		&&					});
-$s->tr("xfy", qw{		|| //				});
-$s->tr("xfx", qw{		..  to				});
-#$s->tr("yfx", qw{		?:					});
-$s->tr("yfx", qw{		= += -= *= /= &&= ||= //=  and= or= xor= ,= =, 	});				# goto last next redo dump
-$s->tr("xfy", qw{		, =>					})->td("yf", qw{	,	});
-#$s->tr("xfx", qw{	list operators (rightward)});
-$s->tr("yfx", qw{		not						});
-$s->tr("xfy", qw{		and						});
-$s->tr("xfy", qw{		or	xor					});
-$s->tr("yfx", qw{		as						});
-$s->tr("fx",  qw{		return					});
-
-$s->tr("xfy", qw{		;						});
-$s->tr("xfy", qw{	\n	})->td("yf", qw{	\n	})->td("fy", qw{	\n	});
-$s->tr("xfy", qw{		THEN	ELSEIF	ELSE	UNTIL	FROM	CATCH	ADDHANDLER	});
-
-
-$s->tr("xfy", qw{		CAT						});			# операция конкантенации в шаблонах
-
-
-### дополнительные опции операторов
-
-
-
-$s->opt("word()", 		re => qr{		(?<var>$re_id) \(			}x);
-$s->opt("word[]", 		re => qr{		(?<var>$re_id) \[			}x);
-$s->opt("word{}", 		re => qr{		(?<var>$re_id) \{			}x);
-
-
-$s->opt(":word",		re => qr{		: (?<var>$re_id)			}x);
-$s->opt(":word()",		re => qr{		: (?<var>$re_id) \(			}x);
-$s->opt(":word[]",		re => qr{		: (?<var>$re_id) \[			}x);
-$s->opt(":word{}",		re => qr{		: (?<var>$re_id) \{			}x);
-
-$s->opt(".word",		re => qr{		\. (?<var>$re_id)			}x);
-$s->opt(".word()",		re => qr{		\. (?<var>$re_id) \(		}x);
-$s->opt(".word[]",		re => qr{		\. (?<var>$re_id) \[		}x);
-$s->opt(".word{}",		re => qr{		\. (?<var>$re_id) \{		}x);
-
-$s->opt(".\$word",		re => qr{		\.\$ (?<var>$re_id)			}x);
-$s->opt(".\$word()",	re => qr{		\.\$ (?<var>$re_id) \(		}x);
-$s->opt(".\$word[]",	re => qr{		\.\$ (?<var>$re_id) \[		}x);
-$s->opt(".\$word{}",	re => qr{		\.\$ (?<var>$re_id) \{		}x);
-
-
-$s->opt("=", sub => sub {	$a->{assign} = 1 });
-$s->opt('\n',
-	re => "$re_rem $re_endline (?{ \$self->{lineno}++ })",
-	sub => sub { $b->{then} = delete $a->endline->top->{then} },
-);
-
-$s->opt("THEN", sub => sub { my $br = $a->{stack}[-1]; $br->{endline}=1; $b->{stmt} = delete $br->{then} });
-$s->opt("ELSEIF", sub => sub { $a->check(stmt=>"IF", else=>"", then=>"")->top->{then} = "elseif_then" });
-$s->opt("ELSE", sub => sub { $a->check(stmt=>"IF", else=>"", then=>"")->top->{else} = 1 });
-$s->opt("UNTIL", sub => sub { $a->check(stmt=>"REPEAT")->top->{endline} = 1 });
-$s->opt("FROM", sub => sub { my $top = $a->endline->top; $a->error("FROM должен использоваться после MAP, PAIRMAP, GREP, SORT, NSORT, QSORT или REDUCE") if $top->{stmt} !~ /^(?:map|grep|[nq]sort|reduce|pairmap)$/; $b->{endline} = $b->{gosub} = 1 });
-
-
-
-### скобки
-
-$s->br(qw{			(	)			});
-$s->br(qw{			[	]			});
-$s->br(qw{			{	}			});
-
-$s->br(qw{			FOR		} => sub {$b->{then}="for_then"},	qw{		END		});
-$s->br(qw{			WHILE	} => sub {$b->{then}="while_then"},	qw{		END		});
-$s->br(qw{			IF		} => sub {$b->{then}="if_then"},	qw{		END		});
-$s->br(qw{			TRY			END		});
-$s->br(qw{			BEGIN		END		});
-$s->br(qw{			ON	} => qr{ \b ON $re_space (?<route>$re_string) }x => sub { $b->{route}=$app->perl->unstring($b->{route})  }  , qw{		END		});
-
-$s->opt("END", sub => sub {	my $top = $a->top; $a->error("$top->{stmt}: end встречен до then") if $top->{then}	});
-
-$s->br(qw/			REPEAT				/);
-$s->br(qw/			MAP					/);
-$s->br(qw/			PAIRMAP				/);
-$s->br(qw/			GREP				/);
-$s->br(qw/			REDUCE				/);
-$s->br(qw/			SORT				/);
-$s->br(qw/			QSORT				/);
-$s->br(qw/			NSORT				/);
-
-$s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => "END");
-$s->br("OBJECT" => qr{ \b OBJECT $re_space $re_class_stmt }ix => "END");
-$s->br("MODULE" => qr{ \b MODULE $re_space $re_class_stmt }ix => "END");
-
-$s->br("SUB" => qr{ \b SUB $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
-#$s->br("DEF" => qr{ \b DEF $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
-#$s->br("LET" => qr{ \b LET $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
-$s->br("DO" => qr{ \b DO $re_args (?<endline> $re_space_ask THEN \b)? }ix => "END");
-
-### операнды
-
-$s->x("()");
-$s->x("[]");
-$s->x("{}");
-
-$s->x("self"		=> qr{ 	\b	(?:	self | this | me	)	\b 	}x);
-$s->x("app");
-$s->x("q");
-$s->x("user");
-$s->x("super");
-$s->x("null" => qr/\b(?: null | nothing | undef) \b/x);
-$s->x("true");
-$s->x("false");
-$s->x("paramarray" => qr/\b(?:paramarray | arguments)\b/x);
-$s->x("throw" => qr/ \b (?: die | throw | raise ) \b /x => sub { $b->{gosub} = $b->{endline} = 1 });
-$s->x("next");
-$s->x("last");
-$s->x("redo");
-$s->x("wantarray");
-
-$s->x("new"		=> qr{ 	\b NEW $re_space (?<new>$re_id(?:::$re_id)*) 	}x);
-$s->x("var"		=> qr{ 	(?<var>$re_id) 									}x);
-$s->x("num"		=> qr{ 	(?<num> -? (?: [\d_]+(\.[\d_]+)? | \.[\d_]+ )	(?: E[\+\-][\d_]+ )?	)			}ix);
-$s->x("regexp"	=> qr{ 	" (?<QR> (?:[^"]|\\")* ) "! (?<qr_args> \w+ )? 	}x);
-
-
-### какие операторы в каких скобках могут существовать
-$s->in("on"		=> qw{		addhandler		});
-$s->in("try"	=> qw{		catch			});
-$s->in("if"		=> qw{		else elseif		});
-$s->in("repeat"	=> qw{		until			});
-
-# устанавливаем обработчик на начало pop
-my %STOPOP = $app->perl->set("\n", qw/ ; THEN ELSE ELSEIF UNTIL FROM | /);
-my %PULLOP = qw(	:word :word()	.$word .$word()		.word .word()	var word()	);
-
-$s->pull(join(" ", keys %PULLOP) => sub {
-	my $A = $a->{stack}[-1]{"A+"};
-	$#$A == $b && return;
-	my $me = $A->[$b];
-	$me->{space} || return;	# нужен space
-	my $op = $A->[$b+1];
-	my $op_stmt = $op->{stmt};
-	
-	# следующий кроме оператора
-	if( !$a->{PREFIX}{$op_stmt} && !$a->{INFIX}{$op_stmt} ||
-	
-	# следующий prefix оператор и нет такого infix
-	$a->{PREFIX}{$op_stmt} && !$a->{INFIX}{$op_stmt} ||
-	
-	# следующий prefix и infix, но у me есть space, а у оператора - нет
-	$a->{PREFIX}{$op_stmt} && $a->{INFIX}{$op_stmt} && length($op->{space})
-	) {
-		# тогда взять в скобки до \n|;|конца
-		msg1 "sk!";
-		my $j;
-		for($j=$b+1; $j<@$A && !exists $STOPOP{ $A->[$j]{stmt} }; $j++) {}
-		return if $j==$b+1;
-		my $push = {stmt=>".word.br"};
-		$push->{"A+"} = [ splice @$A, $b+1, $j, $push ];
-		push @{$a->{stack}}, $push;
-		# а потом сделать pop
-		$a->pop(".word.br");
-		
-		# поменять stmt оператора
-		$me->{stmt} = $PULLOP{ $me->{stmt} };
-	}
-	
-});
-
-};
-
-
-# выбрасывает endline
-# у всех gosub есть ещё и endline
-sub endline {
-	my ($self) = @_;
-	my $S = $self->{stack};
-	while(@$S && $S->[-1]{endline}) {	# если есть endline - сбрасываем
-		$self->pop;
-	}
-	$self
-}
-
-
-# заменяет переменные в строке
-#my $re_id = $R::Re::id;
-sub replace_dollar {
-	my ($self) = @_;
-	
-	#local($_, $a, $b, $`, $', $&);
-	
-	my $is_string = "\"" eq substr $_[1], 0, 1;
-	
-	if($is_string) {
-		$self->push('string');
-
-		while($_[1] =~ m{
-			^ "			|
-			(?<str> .*? )
-			(?:
-				\$(?<id> $re_id(?:[\.:]$re_id)* )		(?{
-					$self->push('interpolation')->masking($+{id})->pop('interpolation')->op("CAT") }) |
-				(?: \\" | "" )		(?{ $self->atom('kav')->op("CAT") })  |
-				
-				" $			(?{ $self->atom('str') })
-			)
-			
-		}gxs) {}
-		
-		$self->pop('string');
-		
-		return $self;
-	}
-	
-	todo;
-	
-	# $self->push($stmt);
-	
-	# while($_[1] =~ m{
-		# ^ ['"] |
-		# (?<str> .*? )		(?{ $self->code($str) }) 
-		# (?:
-			# \$(?<id> $re_id(?:[\.:]$re_id)* )		(?{ $self->push($interpolation)->masking($+{id})->pop($interpolation) }) | 
-			# ['"] $ 
-		# )
-	# }gxs) {}
-	
-	# $self->pop($stmt);
-	
-	$self
-}
 
 # # аналог parse для кода, а не шаблона
 # sub mask {
