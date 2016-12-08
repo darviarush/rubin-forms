@@ -150,9 +150,9 @@
 
 Создаём синтаксический анализатор для строк и для выражений.
 
-	my $string = $app->syntax->new;
-	my $s = $app->syntax->new;
-	$s->{LA_STRING} = $string;
+	my $string = $app->syntax->new(name => "string");
+	my $s = $app->syntax->new(name => "master");
+	$s->bar( $string );
 	
 	# отключаем добавление дефолтных лексем
 	$string->addspacelex(0);
@@ -186,6 +186,5 @@
 		"string" => '"{{ right }}"',
 		"exec1" => '{{ str }}${\({{ right }})}',
 	);
-	
 	
 	$s->eval('"_ $5+6* _"');		# _ -11 _

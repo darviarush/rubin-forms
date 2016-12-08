@@ -1,7 +1,6 @@
 package R::View;
 # шаблонизатор
 
-
 use common::sense;
 use R::App;
 use R::Re;
@@ -9,14 +8,13 @@ use R::Re;
 use R::View::Metafilter;
 
 
-has qw/compile_dir scenario_dir dir file outfile before begin/;
+has qw/compile_dir scenario_dir dir file outfile before begin ag/;
 
 my $re_string = $R::Re::string;
 my $re_id = $R::Re::id;
 my $re_endline = $R::Re::endline;
 my $re_number = $R::Re::number;
 
-my $BASICSYNTAX = $app->syntax->new;
 
 # конструктор
 sub new {
@@ -34,7 +32,7 @@ sub new {
 		
 		route => {},			# все роутеры route->{key} = [1-<% ACTION %>|2-on|0-cls, cls, sub|sub_name]
 		
-		syntax => $app->syntaxBasic,		# синтаксический анализатор
+		ag => $app->syntaxAg,		# синтаксический анализатор
 		
 		INHERITS => undef,		# вспомогательная для шаблонов
 		langs => {},			# кэш языков
@@ -222,7 +220,7 @@ sub load {
 # инициализирует классы
 sub init_classes {
 	my ($self, $from) = @_;
-	$self->{lang}->init_classes($from // 0);
+	$self->{ag}{lang}->init_classes($from // 0);
 	$self
 }
 
@@ -278,14 +276,16 @@ sub parse {
 	%{$self->{meta}} = ();
 	$self->{INHERITS} = undef;
 	
-	$self->lang("perl") if !$self->{lang};
+	$self->ag( $app->syntaxAg->new );
 	
-	$self->premorf($name);
+	#$self->ag->lang("perl") if !$self->{lang};
+	
+	$self->ag->premorf($name);
 	$name //= $self->{file};
 	
 	my $class = $self->get_name($name);
 	
-	$self->push("TEMPLATE", class=>$class, block => "__RENDER__");
+	$self->ag->push("TEMPLATE", class=>$class, block => "__RENDER__");
 	
 	# если указаны метафильтры - фильтруем
 	my $metafilter = $self->{metafilters};
@@ -320,37 +320,40 @@ sub parse {
 
 	(?:
 	
-		<% $re_space_ask GET \b (?<A>.*?) %>	(?{ $self->push('GET', html=>&$html)->masking($+{A})->pop('GET')->op('CAT') })   |
+		<% $re_space_ask (?: (?<comment> \#) | (?<word> \w+ ) $re_space_ask )? (?<expression> .*? ) %>  |
 		
-		<% $re_space_ask RAW \b (?<A>.*?) %>	(?{ $self->push('RAW', html=>&$html)->masking($+{A})->pop('RAW')->op('CAT') })   |
+		\$(?<id>$re_id([\.:]$re_id)*) 		 |
 		
-		<% $re_space_ask (?: LET | CALL ) \b (?<A>.*?) %>	(?{ $self->push('LET', html=>&$html)->masking($+{A})->pop('LET')->op('CAT') })   |
+		<\*\*\* (?<comment>.*?) \*\*\*>		 |
 		
-		
-		
-		\$(?<id>$re_id([\.:]$re_id)*) 		(?{ $self->push('GET', html=>&$html)->masking($+{id})->pop('GET')->op('CAT') }) |
-		
-		<\*\*\* (?<comment>.*?) \*\*\*>		(?{ my $h=&$html; $self->{lineno} += my $i = $app->perl->lines($+{comment}); $self->atom('COMMENT', html=>$h, lines=>("\n" x $i))->op('CAT') }) |
-		
-		$		(?{ $HTML = &$html if length $+{html} })
+		$
 	)
 	
-	}isgx ) {}
+	}isgnx ) {
+		my $h=&$html;
+		
+		exists $+{comment}? do {
+			$self->{lineno} += my $i = $app->perl->lines($+{expression} // $+{comment});
+			#$self->atom('COMMENT', html=>$h, lines=>("\n" x $i))->op('CAT')
+		}:
+		exists $+{id}? $self->expression($+{id}):
+		exists $+{expression}? $self->expression($+{expression}, $+{word}):
+		"";
 	
-	$self->atom('HTML', html=>$HTML);
+	}
 	
 	# у темплейта не должно быть завершающего end
-	$self->pop("TEMPLATE");
+	$self->ag->pop("TEMPLATE");
 	
 	#$self->error("стек не пуст: нет <% end " . $self->top(1)->{stmt} . " %>") if @{$self->{stack}}>1;
 	
-	my $top = $self->{stack}[-1];
+	my $top = $self->{ag}{stack}[-1];
 	
 	# код, который выполнится при загрузке скрипта
 	my $begin = $self->{begin};
 	$top->{begin} = @$begin? do { my $ret = " " . join "", @$begin; @$begin = (); $ret }: "";
 	
-	my $out = $self->postmorf;
+	my $out = $self->ag->postmorf;
 	
 	%{$self->{meta}} = ();
 	
@@ -360,17 +363,14 @@ sub parse {
 
 # выражение в <% %>
 sub expression {
-	my ($self, $expression) = @_;
+	my ($self, $expression, $word) = @_;
 	local ($&, $_, $`, $');
 	
-	return "" if $expression =~ /^#/;	# комментарий
-	
-	my $word = "";
 	my $WORD = "";
 	
-	$WORD = $&, $word = lc $1 if $expression =~ s/^([a-z_]\w*)$re_space_ask//io;
+	#$WORD = $&, $word = lc $1 if $expression =~ s/^([a-z_]\w*)$re_space_ask//io;
 	
-	my $top = $self->etop;
+	my $top = $self->top;
 	
 	my $in = 1;
 	
@@ -715,11 +715,11 @@ sub eval {
 	
 	$code = $self->lang->can("foreval")->($self, $code);
 	
-	my $from = $self->lang->can("len_classes")->($self);
+	my $from = $self->ag->lang->can("len_classes")->($self);
 
 	#msg1 ":empty", "\n\n", $code, "\n";
 	
-	my @res = $self->lang->can("eval")->( $self, $code );
+	my @res = $self->ag->lang->can("eval")->( $self, $code );
 	die $@ if $@;
 	
 	$self->init_classes($from);

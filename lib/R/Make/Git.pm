@@ -86,21 +86,33 @@ task {
     
 };
 
-name "branch";
-args "[-r]";
+name "co";
+#args "[-r]";
 desc "переключиться на ветку";
-sub branch {
+sub co {
     my ($remote) = @_;
 
     $app->tty->raw;
 
     my $current;
-    my @branch = grep { length $_ } split /\n/, `git branch`;
+    my @real = my @branch = grep { length $_ } split /\n/, `git branch`;
+	
+	use Term::ANSIColor qw/color/;
+	
+	# если встречается слово 2-ды, то - выделить его
+	my %word;
+	@branch = map { while(m/[a-z]{3,}/gi) { $word{$&}++ } $_ } @branch;
+	
+	#delete $word{ED};
+	
+	# и подсвечиваем цыфры
+	@branch = map { s/[a-z]{3,}|\d+/ !exists $word{$&}? color("cyan").$&.color("reset"): $word{$&}>1? color("red").$&.color("reset"): $& /gie; $_ } @branch;
+
     push @branch, $app->perl->qq("добавить");
     
     my $nbranch = $app->tty->select(\@branch, "выберите ветку")-1;
     
-    my $branch = $branch[$nbranch];
+    my $branch = $real[$nbranch];
     
     print("вы остаётесь на ветке $branch"), return if $branch =~ /^\s*\* /;
     

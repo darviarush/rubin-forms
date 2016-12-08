@@ -30,7 +30,8 @@ sub new {
 		POP_A => {},			# обработчики соытий при выбрасывании закрывающей скобки из стека
 		
 		show_morf => 0,			# отражать ли преобразование в лог
-		trace => "«eval»",		# файл трейс которого показать
+		#trace => "«eval»",		# файл трейс которого показать
+		trace => undef,			# файл трейс которого показать
 		file => "",				# путь к текущему файлу
 		lineno => 1,			# номер строки в текущем файле
 		
@@ -42,6 +43,8 @@ sub new {
 		error => {				# ошибки
 			nosym => "неизвестный науке символ `%s`",
 		},
+		
+		LA => {},				# лексические анализаторы встроенных языков
 		
 		morf => undef,			# язык в который морфировать
 		morfs => {},			# кэш языков
@@ -58,20 +61,26 @@ sub checkout {
 	
 	local $_;
 	
-	$LA //= "master";
-	
-	$LA = uc $LA;
-	
 	my $fields = [qw/ name PREFIX INFIX POSTFIX OP BR CR X POP_A lex addspacelex /];
 	
 	# сохраняем текущий в LA_MASTER
-	if(!$self->{LA_MASTER}) {
-		$self->{LA_MASTER}{$_} = $self->{$_} for @$fields;
+	my $name = $self->{name};
+	if(!$self->{LA}{$name}) {
+		$self->{LA}{$name}{$_} = $self->{$_} for @$fields;
 	}
 	
 	# переходим
-	$LA = $self->{"LA_$LA"};
+	$LA = $self->{LA}{$LA};
 	$self->{$_} = $LA->{$_} for @$fields;
+	
+	$self
+}
+
+# добавляет ветку
+sub bar {
+	my ($self, $syntax) = @_;
+	
+	$self->{LA}{$syntax->{name}} = $syntax;
 	
 	$self
 }
@@ -301,133 +310,7 @@ sub pull {
 
 ###############################  лексический анализатор ###############################
 
-# формирует список имён операторов
-sub operators {
-	my ($self) = @_;
-	local $_;
-	nsort { -length $_ } keys %{$self->{INFIX}}, keys %{$self->{PREFIX}}, keys %{$self->{POSTFIX}};
-}
 
-
-# # формирует регулярку по переданным лексемам
-# sub flex {
-	# my $self = shift;
-	# #my $fmt = shift;
-	# local $_;
-	# my %exists;
-	
-	# my $reg = join "\t|\n", map {
-		# my $x=quotemeta $_->{alias};
-		# my $re = $_->{re} // do {
-			# my $re = $x;
-			# $re .= '\b' if $re=~/\w$/;
-			# $re = '\b' . $re if $re=~/^\w/;
-			# $re
-		# };
-		# !$_->{re} && exists $exists{$_->{alias}}? (): do {
-			# $exists{$_->{alias}} = 1;
-			# #my $code = sprintf($fmt, $x);
-			# my $corse = "_";
-			# while( $_->{alias} =~ /./gs) {
-				# $corse .= ord $&;
-			# }
-			# $self->{MAP}{$corse} = $_->{alias};
-			# "(?<$corse> $re )"
-		# }
-	# } nsort { $_->{order} // -length( $_->{alias} ) } @_;
-
-	# #my $ret = eval "qr{$reg}xi";
-	# #die $@ if $@;
-	# $reg
-# }
-
-# формирует регулярку по переданным лексемам
-sub flex {
-	my $self = shift;
-	my $fmt = shift;
-	local $_;
-	my %exists;
-	
-	my $reg = join "\t|\n", map {
-		my $x=quotemeta $_->{alias};
-		my $re = $_->{re} // do {
-			my $re = $x;
-			$re .= '\b' if $re=~/\w$/;
-			$re = '\b' . $re if $re=~/^\w/;
-			$re
-		};
-		!$_->{re} && exists $exists{$_->{alias}}? (): do {
-			$exists{$_->{alias}}=1;
-			my $code = sprintf($fmt, $x);
-			"$re (?{ $code })"
-		}
-	} nsort { $_->{order} // -length( $_->{alias} ) } @_;
-
-	my $ret = eval "qr{$reg}xi";
-	die $@ if $@;
-	$ret
-}
-
-# формирует лексемы
-sub _lex {
-	my $self = shift;
-	local $_;
-	join " |\n", map {
-	
-		my $name = $_->{name};
-		$name =~ s/^\w+\s+// if $_->{fix} || $_->{cr} || exists $_->{tag};
-		$name = quotemeta $name;
-		
-		my $ret = exists $_->{tag}? "\$self->push(\"$name\", tag=>\"".quotemeta($_->{tag})."\")":
-		$_->{cr}? "\$self->pop(\"$name\")":
-		"\$self->op(\"$name\")";
-		
-		"\t\t$_->{re}		(?{ $ret })"
-	
-	} nsort { $_->{order} } map {
-		$_->{re} //= do {
-			my $x = quotemeta $_->{alias};
-			$x = "\\b$x" if $x =~ /^\w/;
-			$x = "$x\\b" if $x =~ /\w$/;
-			$x
-		};
-		$_
-	} grep { !$_->{nolex} } @_
-}
-
-# формирует лексический анализатор из таблиц операторов, скобок и операндов
-sub lex1 {
-	my ($self) = @_;
-	
-	my $BR = $self->{BR};
-	
-	my $re = $self->_lex( values %{$self->{OP}}, values %$BR, values %{$self->{CR}}, values %{$self->{X}} );
-		
-	$re = "\n$re" if $re ne "";
-	
-	
-	
-	my $adder = $self->{addspacelex}? ($re ne ""? " |\n": "") . "\\n		(?{ \$self->{lineno}++; \$self->{charlineno}=length \$` })  |
-		\\s+		|
-		(?<nosym> . )	(?{ \$self->error(sprintf(\$self->{error}{nosym}, \$+{nosym})) })": "";
-	
-	my $lex = "qr{$re
-		$adder
-	}sxn";
-	
-	
-	
-	msg1 $lex;
-	
-	use re 'eval';
-	
-	my $lexx = eval $lex;
-	die $@ if $@;
-	
-	$self->{lex} = $lexx;
-	
-	$lexx
-}
 
 # формирует функцию лексического разбора
 sub lex {
@@ -451,12 +334,13 @@ sub lex {
 	
 	if($self->{addspacelex}) {
 		$lex .= ($lex ne ""? " |\n": "") . "
-		(?<newline> \\n	)			|
+		(?<newline> \\n	)						|
 		(?<spacer>[^\\S\\n]+ )					|
 		(?<error_nosym> . )	"
 	}
 	
 	use re 'eval';
+	msg1 $lex;
 	
 	qr{$lex}xni
 }

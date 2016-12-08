@@ -1,4 +1,4 @@
-package R::View::Morf::Perl;
+package R::Syntax::Morf::Perl;
 # драйвер для перевода языка Argentum в язык perl
 
 use common::sense;

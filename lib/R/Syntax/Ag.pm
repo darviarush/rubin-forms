@@ -6,16 +6,24 @@ use base R::Syntax;
 use common::sense;
 use R::App;
 
-my $BASICSYNTAX = R::Syntax::Basic->new;
+my $BASICSYNTAX = R::Syntax::Ag->new(name => 'ag');
+my $STRINGSYNTAX = $app->syntax->new(name => 'ag.string');
+
+$BASICSYNTAX->bar($STRINGSYNTAX);
 
 # конструктор
 sub new {
 	my ($cls) = @_;
-	bless { %$BASICSYNTAX }, ref $cls || $cls;
+	bless { %$BASICSYNTAX, LA_STRING => $STRINGSYNTAX }, ref $cls || $cls;
 }
 
 
 # маскирование переменных
+my $re_string = $R::Re::string;
+my $re_id = $R::Re::id;
+my $re_endline = $R::Re::endline;
+my $re_number = $R::Re::number;
+
 my $re_space = qr/[\ \t]+/;
 my $re_space_ask = qr/[\ \t]*/;
 my $re_rem = qr/[\ \t]*(?:(?:\#|\brem\b)(?<rem>[^\n\r]*))?/i;
@@ -194,6 +202,10 @@ $s->x("var"		=> qr{ 	(?<var>$re_id) 									}x);
 $s->x("num"		=> qr{ 	(?<num> -? (?: [\d_]+(\.[\d_]+)? | \.[\d_]+ )	(?: E[\+\-][\d_]+ )?	)			}ix);
 $s->x("regexp"	=> qr{ 	" (?<QR> (?:[^"]|\\")* ) "! (?<qr_args> \w+ )? 	}x);
 
+$s->x("string"	=> qr{	" (?<string> (?:\\"|""|[^"])* ) "	 }x => sub {
+	my ($self, $push) = @_;
+	$self->checkout("ag.string")->push("string")->masking($push->{string})->pop("string")->checkout("ag")->assign($push);
+});
 
 ### какие операторы в каких скобках могут существовать
 $s->in("on"		=> qw{		addhandler		});
@@ -294,20 +306,26 @@ sub replace_dollar {
 	
 	todo;
 	
-	# $self->push($stmt);
 	
-	# while($_[1] =~ m{
-		# ^ ['"] |
-		# (?<str> .*? )		(?{ $self->code($str) }) 
-		# (?:
-			# \$(?<id> $re_id(?:[\.:]$re_id)* )		(?{ $self->push($interpolation)->masking($+{id})->pop($interpolation) }) | 
-			# ['"] $ 
-		# )
-	# }gxs) {}
-	
-	# $self->pop($stmt);
 	
 	$self
+}
+
+########################################### строки ########################################### 
+{
+my $string = $STRINGSYNTAX;
+# отключаем добавление дефолтных лексем
+$string->addspacelex(0);
+
+$string->tr("yfx", qw/CAT/)->tr("yf", qw/CAT/);
+
+$string->opt("CAT", re => qr/ (?<str> [^\$]* ) (?: \$ (?<exec> $re_id(?:[\.:]$re_id)* ) | $ ) /xs, sub => sub {
+	my ($self, $push) = @_;
+	if(exists $push->{exec}) {
+		$self->checkout("ag")->push("exec1")->masking($push->{exec})->pop("exec1")->checkout("ag.string");
+		delete $push->{str};
+	}
+});
 }
 
 

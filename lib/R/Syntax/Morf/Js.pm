@@ -1,4 +1,4 @@
-package R::View::Javascript;
+package R::Syntax::Morf::Javascript;
 # транслятор на js c языка программиррвания lukull
 
 use common::sense;
