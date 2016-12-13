@@ -79,6 +79,10 @@ gosub => '->( {{ right }} )',
 'yf \n' => "{{ left }}\n",
 
 "xfy ;" => '{{ left }}; {{ right }}',
+'fy ;' => "{{ right }}",
+'yf ;' => "{{ left }}; ",
+
+
 "xfy ," => '{{ left }}, {{ right }}',
 "yf ," => '{{ left }}',
 "xfy =>" => '{{ left }} => {{ right }}',
@@ -96,6 +100,15 @@ gosub => '->( {{ right }} )',
 	
 },
 
+
+
+
+
+# терминалы
+
+
+
+
 HTML => "{{ html }}",
 'xfy CAT' => "{{ left }}{{ right }}",
 GET => "{{ html }}" . $esc . '{{ right }}' . $_esc,
@@ -107,6 +120,71 @@ INHERITS => '',
 
 );
 
+# формирует аргументы функции
+sub _args {
+	my ($args) = @_;
+	local $_;
+	my $AST=0;
+	$args = join ", ", map { $_ eq "*"? do { $AST++; "my \$_AST$AST"}: "\$DATA->{'$_'}"} @$args;
+	$args = "($args) = \@_; " if $args;
+	$args .= "%\$DATA = (".join(", ", map { "\%\$_AST$_" } 1..$AST).", %\$DATA); " if $AST;
+	$args
+}
+
+# формирует заголовок функции
+sub _sub {
+	my ($name, $args) = @_;
+	my $sub = "my \$self=shift; ";
+	$sub .= _args($args);
+	$sub .= "\$self = bless {}, ref \$self || \$self; " if $name eq "new";
+	$sub
+}
+
+
+# # объявление функции
+# sub sub {
+	# my ($self, $name, $args, $class_in, $class, $endline) = @_;
+	
+	# my $sub = _sub($name, $args, $class);
+	
+	# return ($class_in? "package $class_in {": "") . "sub $name { my \$DATA = {}; $sub$endline(); ", ($class_in? "}}": "}");
+# }
+
+
+# # перегрузка оператора
+# sub overload {
+	# my ($self, $name, $args, $class_in, $class, $endline) = @_;
+	
+	# my $sub = _sub($name, $args, $class);
+	
+	# return ($class_in? "package $class_in {": "") . "use overload '$name' => sub { my \$DATA = {}; $sub$endline(); ", ($class_in? "}}": "};");
+# }
+
+
+# хелпер для расширения класса
+sub _extends {
+	my ($extends) = @_;
+	if(defined $extends) {
+		my $x = $extends =~ s/,/ /g;
+		$extends = " use parent -norequire, qw/$extends/;";
+		$extends .= " use mro 'c3';" if $x;
+	}
+	$extends
+}
+
+# # декларация модуля
+# sub module {
+	# my ($self, $name, $extends) = @_;
+	# $extends = _extends($extends);
+	# return "(do { BEGIN { \$R::View::Perl::Classes{'$name'}++; push \@R::View::Perl::Classes, '$name'; } package $name; $extends use common::sense; use R::App; sub __INIT__CLASS__ { my \$DATA; my \$self = shift; ", "} __PACKAGE__ })";
+# }
+
+# # декларация класса
+# sub class {
+	# my ($self, $name, $extends) = @_;
+	# $extends = _extends($extends);
+	# return "(do { BEGIN { \$R::View::Perl::Classes{'$name'}++; push \@R::View::Perl::Classes, '$name'; } package $name; $extends use common::sense; use R::App; sub __INIT__CLASS__ { my \$DATA; my \$self = shift; ", "} __PACKAGE__ })";
+# }
 
 ### модификаторы
 our %modifiers = (
@@ -125,16 +203,16 @@ INHERITS => sub  {
 ### конец модификаторов
 );
 
-# заменяет спецсимволы в строке
-sub escape_string {
-	my ($self, $string, $kav) = @_;
-	if($kav eq "'") {
-		$string =~ s/'/\\'/g;
-	} else {
-		$string =~ s/[\$\@]/\\$&/g;
-	}
-	$string
-}
+# # заменяет спецсимволы в строке
+# sub escape_string {
+	# my ($self, $string, $kav) = @_;
+	# if($kav eq "'") {
+		# $string =~ s/'/\\'/g;
+	# } else {
+		# $string =~ s/[\$\@]/\\$&/g;
+	# }
+	# $string
+# }
 
 # # заменяет выражение в строке
 # sub replace_dollar {
@@ -458,45 +536,7 @@ sub escape_string {
 	# ","
 # }
 
-# # формирует аргументы функции
-# sub _args {
-	# my ($args) = @_;
-	# local $_;
-	# my $AST=0;
-	# $args = join ", ", map { $_ eq "*"? do { $AST++; "my \$_AST$AST"}: "\$DATA->{'$_'}"} @$args;
-	# $args = "($args) = \@_; " if $args;
-	# $args .= "%\$DATA = (".join(", ", map { "\%\$_AST$_" } 1..$AST).", %\$DATA); " if $AST;
-	# $args
-# }
 
-# # формирует заголовок функции
-# sub _sub {
-	# my ($name, $args, $class) = @_;
-	# my $sub = $class? "my \$self=shift; ": "";
-	# $sub .= _args($args);
-	# $sub .= "\$self = bless {}, ref \$self || \$self; " if $name eq "new";
-	# $sub
-# }
-
-
-# # объявление функции
-# sub sub {
-	# my ($self, $name, $args, $class_in, $class, $endline) = @_;
-	
-	# my $sub = _sub($name, $args, $class);
-	
-	# return ($class_in? "package $class_in {": "") . "sub $name { my \$DATA = {}; $sub$endline(); ", ($class_in? "}}": "}");
-# }
-
-
-# # перегрузка оператора
-# sub overload {
-	# my ($self, $name, $args, $class_in, $class, $endline) = @_;
-	
-	# my $sub = _sub($name, $args, $class);
-	
-	# return ($class_in? "package $class_in {": "") . "use overload '$name' => sub { my \$DATA = {}; $sub$endline(); ", ($class_in? "}}": "};");
-# }
 
 
 # # блок do

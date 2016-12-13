@@ -5,8 +5,9 @@ use base R::Syntax;
 
 use common::sense;
 use R::App;
+use R::Re;
 
-my $BASICSYNTAX = R::Syntax::Ag->new(name => 'ag');
+my $BASICSYNTAX = $app->syntax->new(name => 'ag')->lang("perl");
 my $STRINGSYNTAX = $app->syntax->new(name => 'ag.string');
 
 $BASICSYNTAX->bar($STRINGSYNTAX);
@@ -14,7 +15,16 @@ $BASICSYNTAX->bar($STRINGSYNTAX);
 # конструктор
 sub new {
 	my ($cls) = @_;
-	bless { %$BASICSYNTAX, LA_STRING => $STRINGSYNTAX }, ref $cls || $cls;
+	my $self = bless {
+		%$BASICSYNTAX,
+		trace => "«eval»",
+	}, ref $cls || $cls;
+	
+	#$self->trace_help if defined $self->{trace};
+	
+	#msg1 $app->raise->tracex;
+	
+	$self
 }
 
 
@@ -26,7 +36,7 @@ my $re_number = $R::Re::number;
 
 my $re_space = qr/[\ \t]+/;
 my $re_space_ask = qr/[\ \t]*/;
-my $re_rem = qr/[\ \t]*(?:(?:\#|\brem\b)(?<rem>[^\n\r]*))?/i;
+my $re_rem = qr/(?:(?:\#|\brem\b)(?<rem>[^\n\r]*))?/i;
 my $re_sk = qr/[\[\{\(]/;
 my $re_arg = qr/(?:$re_id|\*)/o;
 my $re_class = qr/$re_id(?:::$re_id)*/o;
@@ -37,13 +47,14 @@ my $re_class_stmt = qr!
 (?<with> [\t\ ]+ with [\t\ ]+ (?<with_args> [^\r\n]+) )?
 !xismo;				
 my $re_args = qr!
-(?: [\ \t]* (?<sub_args>$re_arg (?:$re_space_ask , $re_space_ask $re_arg)*))?
+[\ \t]* (?<sub_args>$re_arg (?:$re_space_ask , $re_space_ask $re_arg)*)
 !xismo;
 my $re_sub = qr!
 	(?<sub>$re_id|"\w+"|[[:punct:]]+|0\+)
-	$re_args
-	(?: [\ \t]+ CLASS [\ \t]+ (?<sub_in>(?<sub_self>::)?$re_class) )?
 !xismo;
+my $re_sub_in = qr/ [\ \t]+ CLASS [\ \t]+ (?<sub_in>(?<sub_self>::)?$re_class) /xn;
+my $re_args_then = qr/\b THEN \b | $re_args \b THEN \b | $re_args /ixno;
+my $re_then = qr/ (?<re_endline> $re_space_ask \b THEN \b) | $re_rem $re_endline /xn;
 my $re_sub_then = qr!
 $re_space $re_sub (?: (?<sub_then> [\ \t]+ THEN \b) | $re_rem $re_endline) 
 !xismo;
@@ -96,7 +107,7 @@ $s->tr("xfy", qw{		or	xor					});
 $s->tr("yfx", qw{		as						});
 $s->tr("fx",  qw{		return					});
 
-$s->tr("xfy", qw{		;						});
+$s->tr("xfy", qw{	;	})->td("yf", qw{	;	})->td("fy", qw{	;	});
 $s->tr("xfy", qw{	\n	})->td("yf", qw{	\n	})->td("fy", qw{	\n	});
 $s->tr("xfy", qw{		THEN	ELSEIF	ELSE	UNTIL	FROM	CATCH	ADDHANDLER	});
 
@@ -130,10 +141,11 @@ $s->opt(".\$word{}",	re => qr{		\.\$ (?<var>$re_id) \{		}x);
 
 
 $s->opt("=", sub => sub {	$a->{assign} = 1 });
-$s->opt('\n',
-	re => "$re_rem $re_endline",
-	sub => sub { my ($self, $push) = @_; $self->{lineno}++; $push->{then} = delete $self->endline->top->{then} },
-);
+$s->opt('\n', re => "$re_rem $re_endline", sub => sub {
+	my ($self, $push) = @_;
+	$self->{lineno}++;
+	$push->{then} = delete $self->endline->top->{then}
+});
 
 $s->opt("THEN", sub => sub { my ($self, $push) = @_; my $br = $self->{stack}[-1]; $br->{endline}=1; $push->{stmt} = delete $br->{then} });
 $s->opt("ELSEIF", sub => sub { my ($self, $push) = @_; $self->check(stmt=>"IF", else=>"", then=>"")->top->{then} = "elseif_then" });
@@ -154,9 +166,17 @@ $s->br(qw{			WHILE	} => sub { my ($self, $push) = @_; $push->{then}="while_then"
 $s->br(qw{			IF		} => sub { my ($self, $push) = @_; $push->{then}="if_then"},	qw{		END		});
 $s->br(qw{			TRY			END		});
 $s->br(qw{			BEGIN		END		});
-$s->br(qw{			ON	} => qr{ \b ON $re_space (?<route>$re_string) }x => sub { my ($self, $push) = @_;  $push->{route}=$selfpp->perl->unstring($push->{route})  }  , qw{		END		});
+$s->br(qw{			ON	} => qr{ \b ON $re_space (?<route>$re_string) }x => sub {
+	my ($self, $push) = @_; 
+	$push->{route}=$self;
+	$app->perl->unstring($push->{route});
+}, "END");
 
-$s->opt("END", sub => sub { my ($self, $push) = @_; my $top = $self->top; $self->error("$top->{stmt}: end встречен до then") if $top->{then}	});
+$s->opt("END", sub => sub {
+	my ($self, $push) = @_;
+	my $top = $self->top;
+	$self->error("$top->{stmt}: end встречен до then") if $top->{then};
+});
 
 $s->br(qw/			REPEAT				/);
 $s->br(qw/			MAP					/);
@@ -171,10 +191,10 @@ $s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => "END");
 $s->br("OBJECT" => qr{ \b OBJECT $re_space $re_class_stmt }ix => "END");
 $s->br("MODULE" => qr{ \b MODULE $re_space $re_class_stmt }ix => "END");
 
-$s->br("SUB" => qr{ \b SUB $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
+$s->br("SUB" => qr{ \b SUB $re_space $re_sub $re_args_then }ix => "END");
 #$s->br("DEF" => qr{ \b DEF $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
 #$s->br("LET" => qr{ \b LET $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
-$s->br("DO" => qr{ \b DO $re_args (?<endline> $re_space_ask THEN \b)? }ix => "END");
+$s->br("DO" => qr{ \b DO $re_args  }ix => "END");
 
 ### операнды
 
@@ -217,7 +237,9 @@ $s->in("repeat"	=> qw{		until			});
 my %STOPOP = $app->perl->set("\n", qw/ ; THEN ELSE ELSEIF UNTIL FROM | /);
 my %PULLOP = qw(	:word :word()	.$word .$word()		.word .word()	var word()	);
 
-$s->pull(join(" ", keys %PULLOP) => sub {
+#$s->pull(join(" ", keys %PULLOP) => \&onpull);
+
+sub onpull {
 	my ($self, $i) = @_; 
 	my $A = $self->{stack}[-1]{"A+"};
 	$#$A == $i && return;
@@ -250,7 +272,7 @@ $s->pull(join(" ", keys %PULLOP) => sub {
 		$me->{stmt} = $PULLOP{ $me->{stmt} };
 	}
 	
-});
+}
 
 };
 
@@ -329,8 +351,13 @@ $string->opt("CAT", re => qr/ (?<str> [^\$]* ) (?: \$ (?<exec> $re_id(?:[\.:]$re
 }
 
 
-########################################### шаблоны ###########################################
+########################################### require ###########################################
 
-
+# переопределяем eval
+sub eval {
+	my ($self, $code) = @_;
+	$self->{lineno} = -2;
+	$self->SUPER::eval("class EVAL\nsub render\n$code\nend\nend");
+}
 
 1;

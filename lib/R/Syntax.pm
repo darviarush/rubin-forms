@@ -3,7 +3,7 @@ package R::Syntax;
 # просматривает на один оператор вперёд, благодаря чему может определить арность оператора
 
 use common::sense;
-use R::App qw/msg1 $app todo nsort qsort pairmap has/;
+use R::App qw/msg msg1 $app todo nsort qsort pairmap has/;
 
 has qw/addspacelex/;
 
@@ -46,8 +46,8 @@ sub new {
 		
 		LA => {},				# лексические анализаторы встроенных языков
 		
-		morf => undef,			# язык в который морфировать
-		morfs => {},			# кэш языков
+		lang => undef,			# язык в который морфировать
+		langs => {},			# кэш языков
 		
 		@_
 	}, ref $cls || $cls;
@@ -276,11 +276,13 @@ sub x {
 sub opt {
 	my ($self, $stmt) = splice @_, 0, 2;
 	
-	die "нет $stmt" unless my $x = ($self->{OP}{$stmt} // $self->{BR}{$stmt} // $self->{CR}{$stmt} // $self->{X}{$stmt});
+	my $x;
+	
+	die "нет opt($stmt)" unless $x = ($self->{OP}{$stmt} // $self->{BR}{$stmt} // $self->{CR}{$stmt} // $self->{X}{$stmt});
 	
 	pairmap {
 		die "свойство $a в $stmt уже есть" if exists $x->{$a};
-		die "можно добавлять только re, sub или order в $stmt" if $a !~ /^(?:re|sub|order|nolex)$/;
+		die "можно добавлять только re, sub, order, или nolex в $stmt" if $a !~ /^(?:re|sub|order|nolex)$/;
 		$x->{$a} = $b;
 	} @_;
 	
@@ -316,9 +318,11 @@ sub pull {
 sub lex {
 	my ($self) = @_;
 	
+	#use re 'eval';
+	
 	my $lex = join " |\n", map {
 		my $x = quotemeta $_->{alias};
-		"$_->{re}		(?{ \"$x\" })"
+		"$_->{re}		(?{ \"$x\" })";
 	}
 	nsort { $_->{order} } map {
 		$_->{re} //= do {
@@ -339,10 +343,12 @@ sub lex {
 		(?<error_nosym> . )	"
 	}
 	
-	use re 'eval';
-	msg1 $lex;
 	
-	qr{$lex}xni
+	#msg1 $lex;
+	
+	my $re = eval "qr{$lex}xni";
+	die $@ if $@;
+	$re
 }
 
 ###############################  синтаксический разбор  ###############################
@@ -552,7 +558,24 @@ my %COLOR = (
 	">" => ":cyan",
 	"%" => ":cyan",
 	"^" => ":magenta",
+	"¤" => ":dark white",
 );
+
+# выводит помощь по обозначениям trace
+sub trace_help {
+	my ($self) = @_;
+	
+	msg ":space", $self->{name},
+	"\n", $COLOR{"+"}, "+", ":reset", "открывающая скобка",
+	"\n", $COLOR{"-"}, "-", ":reset", "закрывающая скобка",
+	"\n", $COLOR{"<"}, "<", ":reset", "левосторонний оператор - связывает одно значение",
+	"\n", $COLOR{">"}, ">", ":reset", "правосторонний оператор - связывает одно значение",
+	"\n", $COLOR{"%"}, "%", ":reset", "бинарный оператор - связывает два занчения",
+	"\n", $COLOR{"^"}, "^", ":reset", "оператор, выбросивший из стека предыдущие",
+	"\n", $COLOR{"¤"}, "¤", ":reset", "терминал";
+	
+	$self
+}
 
 # возвращает колоризированный массив стеков для trace и error
 sub color_stacks {
