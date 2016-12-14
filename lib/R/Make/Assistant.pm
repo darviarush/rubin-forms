@@ -305,9 +305,11 @@ BEGIN { push @INC, \''.$path.'\' }
 use common::sense;
 use R::App;
 
-$app->view->require($_) for @ARGV;
-$app->view->init_classes;
+my $file = @ARGV? shift( @ARGV ): "Aquafile";
 
+$app->syntaxAg->ag($file, @ARGV);
+
+1
 ')->mod(0744);
 
 	# выполнить выражение с командной строки
@@ -316,7 +318,7 @@ BEGIN { push @INC, \''.$path.'\' }
 use common::sense;
 use R::App;
 
-$app->log->info( $app->view->eval(@ARGV) );
+$app->log->info( $app->syntaxAg->eval($ARGV[0]) );
 ')->mod(0744);
 
 	# Assetfile, Rubinfile, Alfile, Aquafile, Asfile, Accfile, Aliasfile

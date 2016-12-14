@@ -171,7 +171,7 @@ sub td {
 		else {
 			die "оператор `$type $x` уже объявлен" if exists $self->{$key}{$x};
 			$self->{$key}{$x} = {%p, name=>"$type $x", alias=>$x};
-			$op = $self->{OP}{$x} //= { name=>$x, alias=>$x, order => length $x };
+			$op = $self->{OP}{$x} //= { name=>$x, alias=>$x, order => -length $x };
 		}
 	}
 
@@ -679,9 +679,16 @@ sub templates {
 		
 		$v =~ s/'/\\'/g;
 		$v =~ s/\{\{\s*(\w+)\s*\}\}/', \$b->{$1} ,'/g;
-		$k =~ s/\s+/ /g;
+		$v =~ s/\{\{\s*(?<id>\w+)\s+(?<args>\w+(\s*,\s*\w+)*)\s*\}\}/
+			my $args = $+{args};
+			my $id = $+{id};
+			$args =~ s!\w+!\$b->{$&}!g; 
+			"', \$a->{lang}->$id($args) ,'"
+		/gen;
 		
+		$k =~ s/\s+/ /g;
 		$c->{$k} = eval "sub { join '', '$v' }";
+		die $@ if $@;
 	}
 	
 	$self

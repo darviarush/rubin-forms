@@ -85,7 +85,8 @@ gosub => '->( {{ right }} )',
 
 "xfy ," => '{{ left }}, {{ right }}',
 "yf ," => '{{ left }}',
-"xfy =>" => '{{ left }} => {{ right }}',
+"xfy =>" => '{{ left }}{{ id }} => {{ right }}',
+"fy =>" => '{{ id }} => {{ right }}',
 
 # операторы присваивания
 "yfx =" => '({{ left }}) = ({{ right }})',
@@ -101,28 +102,37 @@ gosub => '->( {{ right }} )',
 },
 
 
+# скобки
+CLASS => '(do { BEGIN { $R::Classes{{{ class }}}++; push @R::Classes, "{{ class }}" } package {{ class }}; {{ _extends extends }} use common::sense; sub render { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
 
+SUB => 'sub {{ id }} { my $DATA = { me => shift }; {{ _args args }} {{ right }}}',
 
 
 # терминалы
 
+self => '$DATA->{me}',
 
+# строки
+CAT => '{{ str }}',
+"yfx CAT" => "{{ left }}{{ str }}{{ right }}",
+"yf CAT" => "{{ left }}{{ str }}",
+"string" => '"{{ right }}"',
+"exec1" => '{{ str }}${\({{ right }})}',
 
-
-HTML => "{{ html }}",
-'xfy CAT' => "{{ left }}{{ right }}",
-GET => "{{ html }}" . $esc . '{{ right }}' . $_esc,
-RAW => "{{ html }}" . $raw . '{{ right }}' . $_raw,
-LET => "{{ html }}" . $in . '{{ right }}' . $_in,
-COMMENT => "{{ html }}" . $in . '{{ lines }}' . $_in,
-TEMPLATE => 'package {{ class }};{{ extends }} use common::sense; use R::App; use List::Util;{{ begin }} sub {{ block }} { my $DATA = shift; '.$_in.'{{ right }}'.$in.' return; } 1;',
-INHERITS => '',
+# HTML => "{{ html }}",
+# 'xfy CAT' => "{{ left }}{{ right }}",
+# GET => "{{ html }}" . $esc . '{{ right }}' . $_esc,
+# RAW => "{{ html }}" . $raw . '{{ right }}' . $_raw,
+# LET => "{{ html }}" . $in . '{{ right }}' . $_in,
+# COMMENT => "{{ html }}" . $in . '{{ lines }}' . $_in,
+# TEMPLATE => 'package {{ class }};{{ extends }} use common::sense; use R::App; use List::Util;{{ begin }} sub {{ block }} { my $DATA = shift; '.$_in.'{{ right }}'.$in.' return; } 1;',
+# INHERITS => '',
 
 );
 
 # формирует аргументы функции
 sub _args {
-	my ($args) = @_;
+	my ($self, $args) = @_;
 	local $_;
 	my $AST=0;
 	$args = join ", ", map { $_ eq "*"? do { $AST++; "my \$_AST$AST"}: "\$DATA->{'$_'}"} @$args;
@@ -131,14 +141,26 @@ sub _args {
 	$args
 }
 
-# формирует заголовок функции
-sub _sub {
-	my ($name, $args) = @_;
-	my $sub = "my \$self=shift; ";
-	$sub .= _args($args);
-	$sub .= "\$self = bless {}, ref \$self || \$self; " if $name eq "new";
-	$sub
+# хелпер для расширения класса
+sub _extends {
+	my ($extends) = @_;
+	if(defined $extends) {
+		my $x = $extends =~ s/,/ /g;
+		$extends = " use parent -norequire, qw/$extends/;";
+		$extends .= " use mro 'c3';" if $x;
+	}
+	$extends
 }
+
+
+# # формирует заголовок функции
+# sub _sub {
+	# my ($name, $args) = @_;
+	# my $sub = "my \$self=shift; ";
+	# $sub .= _args($args);
+	# $sub .= "\$self = bless {}, ref \$self || \$self; " if $name eq "new";
+	# $sub
+# }
 
 
 # # объявление функции
@@ -161,16 +183,6 @@ sub _sub {
 # }
 
 
-# хелпер для расширения класса
-sub _extends {
-	my ($extends) = @_;
-	if(defined $extends) {
-		my $x = $extends =~ s/,/ /g;
-		$extends = " use parent -norequire, qw/$extends/;";
-		$extends .= " use mro 'c3';" if $x;
-	}
-	$extends
-}
 
 # # декларация модуля
 # sub module {

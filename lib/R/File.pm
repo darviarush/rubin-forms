@@ -73,7 +73,7 @@ sub one {
 }
 
 # возвращает n-й файл. Счёт с нуля. -1 - последний
-sub get {
+sub eq {
 	my ($self, $n) = @_;
 	$self->one($self->{files}[$n]);
 }
@@ -192,6 +192,12 @@ sub filemap {
 	my ($self, $sub) = @_;
 	local $_;
 	$self->clone(files => [map { my $save=$_; $_ = $self->one($_); my $ret=$sub->(); $_=$save; $ret } $self->files]);
+}
+
+# переворачивает коллекцию
+sub reverse {
+	my ($self) = @_;
+	$self->clone(files => [reverse @{$self->{files}}])
 }
 
 # объединяет
@@ -908,11 +914,25 @@ sub pwd {
 # переводит в абсолютные все пути
 sub abs {
 	my ($self) = @_;
-	require "Cwd.pm";
+	my $pwd = $self->pwd;
+	my $files = [];
 	for my $path (@{$self->{files}}) {
-		$path = Cwd::abs_path($path);
+		$path = "$pwd/$path" if "/" ne substr $path, 0, 1;
+		my @path = split m!/+!, $path;
+		for(my $i=0; $i<@path; $i++) {
+			if($path[$i] eq "..") {
+				die "выход за пределы рутовой директории (/) `$path`" if $i == 1;
+				splice @path, $i-1, 2;
+				$i-=2;
+			} elsif($path[$i] eq ".") {
+				splice @path, $i, 1;
+				$i--;
+			}
+		}
+		$path = @path == 1? "/": join "/", @path;
+		push @$files, $path;
 	}
-	$self
+	$self->clone(files => $files);
 }
 
 # создаёт каталоги в пути для всех файлов
@@ -924,6 +944,20 @@ sub mkpath {
 	}
 	$! = undef;
 	$self
+}
+
+# возвращает коллекцию путей файла
+sub paths {
+	my ($self) = @_;
+	local ($_, $`, $');
+	
+	my $files = [];
+	
+	if(defined( $_ = $self->{files}[0] )) {
+		push @$files, $` while /\//g;
+	}
+	
+	$self->clone(files => $files);
 }
 
 # создаёт директорию для всех файлов
@@ -951,9 +985,11 @@ sub rmpath {
 }
 
 # переходит в 1-й каталог
+*cd = \&chdir;
 sub chdir {
 	my ($self) = @_;
 	chdir $self->{files}[0];
+	die( ($!+0) . ": $!" ) if $! && $! != 17;	# 17 - file exists
 	$self
 }
 

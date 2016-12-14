@@ -78,6 +78,21 @@
 	
 	$file1->path(0);		# mm1
 	
+=== pwd и cwd
+
+Возвращают текущий каталог.
+
+	$app->file->pwd;		#~ rubin-forms
+	
+=== abs
+
+Превращает все пути в коллекции в абсолютные.
+
+	$app->file("/./abc/./x")->abs->path;			# /abc/x
+	$app->file("/./abc/../x")->abs->path;			# /x
+	$app->file("/abc/y/../../x/..")->abs->path;		# /
+	$app->file(".")->abs->path;							## $app->file->pwd
+	$app->file("x/y")->abs->path;							## $app->file->pwd . "/x/y"
 	
 == Изменения
 	
@@ -229,7 +244,13 @@
 	$f->grep("-s")->length;					## $f->length
 	$f->grep(sub {-f $_})->length;			## $f->length
 
+=== reverse
 
+Переворачивает файлы в коллекции
+	
+	$app->file("1", "2")->reverse->path;	# 2
+
+	
 
 == Ввод-вывод
 
@@ -253,4 +274,5 @@
 	});
 	
 	$file->read;				# 0man153
-	$file->get(1)->read;		# 1man223
+	$file->eq(1)->read;		# 1man223
+	

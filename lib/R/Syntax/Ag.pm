@@ -38,8 +38,8 @@ my $re_space = qr/[\ \t]+/;
 my $re_space_ask = qr/[\ \t]*/;
 my $re_rem = qr/(?:(?:\#|\brem\b)(?<rem>[^\n\r]*))?/i;
 my $re_sk = qr/[\[\{\(]/;
-my $re_arg = qr/(?:$re_id|\*)/o;
-my $re_class = qr/$re_id(?:::$re_id)*/o;
+my $re_arg = qr/$re_id|\*/on;
+my $re_class = qr/(::)?$re_id(::$re_id)*/on;
 my $re_extends = qr!$re_class(?:$re_space_ask,$re_space_ask$re_class)*!;
 my $re_class_stmt = qr!
 (?<class>$re_class)
@@ -47,17 +47,14 @@ my $re_class_stmt = qr!
 (?<with> [\t\ ]+ with [\t\ ]+ (?<with_args> [^\r\n]+) )?
 !xismo;				
 my $re_args = qr!
-[\ \t]* (?<sub_args>$re_arg (?:$re_space_ask , $re_space_ask $re_arg)*)
+[\ \t]* (?<args>$re_arg (?:$re_space_ask , $re_space_ask $re_arg)*)
 !xismo;
-my $re_sub = qr!
-	(?<sub>$re_id|"\w+"|[[:punct:]]+|0\+)
+my $re_overload_id = qr!
+	(?<id>"\w+"|[[:punct:]]+|0\+)
 !xismo;
 my $re_sub_in = qr/ [\ \t]+ CLASS [\ \t]+ (?<sub_in>(?<sub_self>::)?$re_class) /xn;
-my $re_args_then = qr/\b THEN \b | $re_args \b THEN \b | $re_args /ixno;
+my $re_args_then = qr/ (?<then> \b THEN \b ) | $re_args (?<then> \b THEN \b ) | ( $re_args )? $re_rem $re_endline /ixno;
 my $re_then = qr/ (?<re_endline> $re_space_ask \b THEN \b) | $re_rem $re_endline /xn;
-my $re_sub_then = qr!
-$re_space $re_sub (?: (?<sub_then> [\ \t]+ THEN \b) | $re_rem $re_endline) 
-!xismo;
 my $re_for = qr!
 (?<for_k>$re_id) (?: $re_space_ask,$re_space_ask (?<for_v>$re_id) (?: $re_space_ask,$re_space_ask (?<for_i>$re_id) )? )? (?: $re_space (?<for_in>IN) \b | $re_space (?<for_of>OF) \b | $re_space_ask = )
 !xismo;
@@ -99,7 +96,7 @@ $s->tr("xfy", qw{		|| //				});
 $s->tr("xfx", qw{		..  to				});
 #$s->tr("yfx", qw{		?:					});
 $s->tr("yfx", qw{		= += -= *= /= &&= ||= //=  and= or= xor= ,= =, 	});				# goto last next redo dump
-$s->tr("xfy", qw{		, =>					})->td("yf", qw{	,	});
+$s->tr("xfy", qw{		, =>					})->td("yf", qw{ , })->td("fy", qw{ => });
 #$s->tr("xfx", qw{	list operators (rightward)});
 $s->tr("yfx", qw{		not						});
 $s->tr("xfy", qw{		and						});
@@ -140,7 +137,10 @@ $s->opt(".\$word[]",	re => qr{		\.\$ (?<var>$re_id) \[		}x);
 $s->opt(".\$word{}",	re => qr{		\.\$ (?<var>$re_id) \{		}x);
 
 
-$s->opt("=", sub => sub {	$a->{assign} = 1 });
+
+$s->opt("=>", re => qr{ (?<id>$re_id)? \s* => }xn );
+$s->opt("=", sub => sub {	$_[0]->{assign} = 1 });
+
 $s->opt('\n', re => "$re_rem $re_endline", sub => sub {
 	my ($self, $push) = @_;
 	$self->{lineno}++;
@@ -188,10 +188,12 @@ $s->br(qw/			QSORT				/);
 $s->br(qw/			NSORT				/);
 
 $s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => "END");
-$s->br("OBJECT" => qr{ \b OBJECT $re_space $re_class_stmt }ix => "END");
-$s->br("MODULE" => qr{ \b MODULE $re_space $re_class_stmt }ix => "END");
+#$s->br("OBJECT" => qr{ \b OBJECT $re_space $re_class_stmt }ix => "END");
+#$s->br("MODULE" => qr{ \b MODULE $re_space $re_class_stmt }ix => "END");
 
-$s->br("SUB" => qr{ \b SUB $re_space $re_sub $re_args_then }ix => "END");
+$s->br("SUB" => qr{ \b SUB $re_space $re_id $re_args_then }ix => "END");
+#$s->br("SUB_CLASS" => qr{ \b SUB $re_space $re_id $re_args_then }ix => "END");
+
 #$s->br("DEF" => qr{ \b DEF $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
 #$s->br("LET" => qr{ \b LET $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
 $s->br("DO" => qr{ \b DO $re_args  }ix => "END");
@@ -341,7 +343,7 @@ $string->addspacelex(0);
 
 $string->tr("yfx", qw/CAT/)->tr("yf", qw/CAT/);
 
-$string->opt("CAT", re => qr/ (?<str> [^\$]* ) (?: \$ (?<exec> $re_id(?:[\.:]$re_id)* ) | $ ) /xs, sub => sub {
+$string->opt("CAT", re => qr/ (?<str> [^\$]* ) (?: \$ (?<exec> $re_id([\.:]$re_id)* ) | $ ) /nxs, sub => sub {
 	my ($self, $push) = @_;
 	if(exists $push->{exec}) {
 		$self->checkout("ag")->push("exec1")->masking($push->{exec})->pop("exec1")->checkout("ag.string");
@@ -353,11 +355,114 @@ $string->opt("CAT", re => qr/ (?<str> [^\$]* ) (?: \$ (?<exec> $re_id(?:[\.:]$re
 
 ########################################### require ###########################################
 
+# класс по-умолчанию
+sub classByDefault {
+	my ($self, $name, $code) = @_;
+	$self->{lineno} = -1;
+	"class $name\n$code\nend";
+}
+
 # переопределяем eval
 sub eval {
-	my ($self, $code) = @_;
-	$self->{lineno} = -2;
-	$self->SUPER::eval("class EVAL\nsub render\n$code\nend\nend");
+	my ($self, $code) = splice @_, 0, 2;
+	$self->SUPER::eval( $self->classByDefault('EVAL', $code) . ".render" );
+}
+
+# возвращает рутовую директорию проекта
+sub root {
+	my ($self, $path) = @_;
+	
+	my $file = $app->file($path)->abs;
+	
+	# находим корень проекта
+	my $root;
+	my $Aquafile;
+	for my $dir ($file->paths->reverse->files) {
+		$Aquafile = $file->new("$dir/Aquafile");
+		$root = $dir, last if $Aquafile->exists;
+	}
+	
+	die "файл находится не в проекте: создайте Aquafile" if !$root;
+	
+	$root;
+}
+
+# определяет откуда вызывали и загружает Aquafile
+sub ag {
+	my ($self, $path, @args) = @_;
+	
+	my $root = $self->root($path);
+	
+	push @{ $app->{syntaxAg}{INC} }, $root;
+	
+	$self->require("Aquafile");
+	
+	my $class = $self->require( $app->file($path)->abs->subdir($root, "")->path );
+	
+	$class->new->render(@args);
+}
+
+# превращает путь в класс
+sub path2class {
+	my ($self, $path) = @_;
+	
+	my $class = $app->file($path)->exts("")->path;
+	$class =~ s!/!::!g;
+	$class
+}
+
+# компилирует файл
+sub compile {
+	my ($self, $path, $to) = @_;
+	
+	my $text = $app->file($path)->read;
+	my $cc = $self->new(file => $to);
+	my $code = $cc->morf( $cc->classByDefault($text) );
+	$app->file($to)->write($code);
+
+	$self
+}
+
+# подключает файл как класс или шаблон
+# получает рутовую директорию
+# если Aquafile ещё не загружен - загружает
+sub require {
+	my ($self, $path, $INC) = @_;
+	
+	return if exists $app->{syntaxAg}{require}{$path};
+	
+	$INC //= $app->{syntaxAg}{inc};
+	my $file = $app->file($path);
+	
+	for my $inc (@$INC) {
+		my $f = $file->frontdir($inc);
+		if($f->exists) {
+			my $to = $app->file("$inc/.Aqua/$path.pm");
+			
+			if(!$to->exists || $to->mtime < $f->mtime) {
+				$self->compile($f->path, $to->path);
+			}
+			require $to->path;
+			$app->{syntaxAg}{require}{$path} = 1;
+			return $self->path2class($path);
+		}
+	}
+	
+	die "файл ".$app->perl->qq($path)." не найден";
+}
+
+# подключает класс Ag, Au или Perl
+sub include {
+	my ($self, $class, $INC) = @_;
+	$INC //= $app->{INC};
+	
+	$class =~ s!::!/!g;
+	#$file =
+	
+	for my $inc (@$INC) {
+	}
+	
+	$self
 }
 
 1;
