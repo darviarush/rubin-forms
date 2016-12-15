@@ -358,7 +358,7 @@ $string->opt("CAT", re => qr/ (?<str> [^\$]* ) (?: \$ (?<exec> $re_id([\.:]$re_i
 # класс по-умолчанию
 sub classByDefault {
 	my ($self, $name, $code) = @_;
-	$self->{lineno} = -1;
+	$self->{lineno} = 0;
 	"class $name\n$code\nend";
 }
 
@@ -415,9 +415,23 @@ sub path2class {
 sub compile {
 	my ($self, $path, $to) = @_;
 	
-	my $text = $app->file($path)->read;
-	my $cc = $self->new(file => $to);
-	my $code = $cc->morf( $cc->classByDefault($text) );
+	my $file = $app->file($path);
+	my $name = $file->nik;
+	my $text = $file->read;
+	
+	my $cc = $self->new(file => $path);
+	
+	if($text !~ /^($re_space_ask $re_rem $re_endline)* $re_space_ask (?i: class ) $re_space_ask \Q$name\E/xn) {
+		if($text =~ s/^(?<first>($re_space_ask $re_rem $re_endline)* $re_space_ask) (?<last>extends|inherits) \b /$+{first}class $name $+{last}/xin) {
+			$cc->{lineno} = 1;
+			$text = "$text\nend";
+		} else {
+			$cc->{lineno} = 0;
+			$text = "class $name\n$text\nend";
+		}
+	}
+	
+	my $code = $cc->morf( $text );
 	$app->file($to)->write($code);
 
 	$self
@@ -431,7 +445,7 @@ sub require {
 	
 	return if exists $app->{syntaxAg}{require}{$path};
 	
-	$INC //= $app->{syntaxAg}{inc};
+	$INC //= $app->{syntaxAg}{INC};
 	my $file = $app->file($path);
 	
 	for my $inc (@$INC) {

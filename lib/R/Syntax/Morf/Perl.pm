@@ -77,6 +77,7 @@ gosub => '->( {{ right }} )',
 'xfy \n' => "{{ left }};\n{{ right }}",
 'fy \n' => "\n{{ right }}",
 'yf \n' => "{{ left }}\n",
+'\n' => "\n",
 
 "xfy ;" => '{{ left }}; {{ right }}',
 'fy ;' => "{{ right }}",

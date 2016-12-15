@@ -43,16 +43,16 @@
 * _ .Aqua
 * _ Aquafile
 
-	my $dir = $app->file("var/_test_13_ag")->mkdir->cd;
+	my $dir = $app->file("var/_test_13_ag")->rm->mkdir;
 	my $file = $dir->sub("/tess.ag");
 	
-	$app->syntaxAg->ag($file);		#@ ~ файл находится не в проекте: создайте Aquafile
+	$app->syntaxAg->ag($file->path);		#@ ~ файл находится не в проекте.* создайте Aquafile
 	
 Создадим *Aquafile*:
 	
-	my $Aquafile = $app->file("$dir/Aquafile")->write("");
+	my $Aquafile = $dir->sub("/Aquafile")->write("");
 	
-	$app->syntaxAg->ag($file);		#@ нет var/_test_13_ag/tess.ag
+	$app->syntaxAg->ag($file->path);		#@ ~ нет var/_test_13_ag/tess.ag
 
 Компиляция исходников происходит в поддиректорию `.Aqua`.
 

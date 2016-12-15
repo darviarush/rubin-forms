@@ -429,12 +429,17 @@ sub pop {
 	my $PREFIX =  $self->{PREFIX};
 	my $INFIX =  $self->{INFIX};
 	my $POSTFIX =  $self->{POSTFIX};
+	#my $X = $self->{X};
+	#my $BR = $self->{BR};
 
 	my @T;
 	my @S;
-	my $front = 1;
+	my $front = 1;	# после открывающей скобки - только префиксный оператор или терминал
 	my $meta;
 	
+	# входит оператор и выбрасывает c более низким приоритетом из стека @S (если такие есть)
+	# выброшенные попадают в @T
+	# новый в @S
 	my $popop = sub {
 		my $prio = $meta->{prio};
 		my $s;
@@ -469,12 +474,13 @@ sub pop {
 					$r->{left} = $prev;
 					$self->trace("<", $r, [A=>$A, S=>\@S, T=>\@T]);
 				}
-				
-				
 			}
+			
+			
 			push @T, $r;			
 		}
 		
+		# входящий оператор
 		if(my $op = $_[0]) {
 			@$op{qw/stmt fix prio/} = @$meta{qw/name fix prio/};
 			push @S, $op;
@@ -499,13 +505,17 @@ sub pop {
 		last if !exists $POSTFIX->{$A->[$n-1]{stmt}};
 	}
 	
+	# ( \n \n ) - обычная ситуация prefix prefix
+	# есть "xfy \n", "fy \n", "yf \n"
+	# последний становится терминалом
+	
 	# определяем операторы
 	my $i = 0;
 	for my $op (@$A) {
 	
 		my $stmt = $op->{stmt};
 		
-		if($front and $meta = $PREFIX->{$stmt}) {
+		if($front and $meta = $PREFIX->{$stmt} and $i != $#$A) {
 			$popop->($op);
 		}
 		elsif(!$front and $meta = $INFIX->{$stmt} and $i<$n) {
@@ -516,10 +526,11 @@ sub pop {
 			$popop->($op);
 		}
 		else {	# терминал
-			$front = 0;
+			$front = 0;			# после терминала - постфиксный или инфиксный оператор
 			push @T, $op;
 			$self->trace("¤", $op);
 		}
+		
 	}
 	continue {
 		$i++;
