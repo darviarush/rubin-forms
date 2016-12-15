@@ -44,7 +44,7 @@
 * _ Aquafile
 
 	my $dir = $app->file("var/_test_13_ag")->rm->mkdir;
-	my $file = $dir->sub("/tess.ag");
+	my $file = $dir->sub("/Tess.ag");
 	
 	$app->syntaxAg->ag($file->path);		#@ ~ файл находится не в проекте.* создайте Aquafile
 	
@@ -52,13 +52,26 @@
 	
 	my $Aquafile = $dir->sub("/Aquafile")->write("");
 	
-	$app->syntaxAg->ag($file->path);		#@ ~ нет var/_test_13_ag/tess.ag
+	$app->syntaxAg->ag($file->path);		#@ ~ нет “Tess.ag”
 
-Компиляция исходников происходит в поддиректорию `.Aqua`.
+Компиляция исходников происходит в поддиректорию `.Aqua`. Причём первым компилируется *Aquafile*.
+
+	$app->file("var/_test_13_ag/.Aqua/Aquafile.pm")->exists;		# 1
 
 Если файл не начинается на `class name`, где `name` - имя файла, то `class name` добавляется по умолчанию.
 
+	$app->file("var/_test_13_ag/Tess.ag")->write("123");
+	$app->syntaxAg->ag("var/_test_13_ag/Tess.ag");		# 123
+	
+	$app->file("var/_test_13_ag/Tess.ag")->write("class Tess \n 777 \n end");
+	$app->syntaxAg->ag("var/_test_13_ag/Tess.ag");		# 777
+
 Так же файл может начинаться на `extends` или `inherits`.
+	
+	$app->file("var/_test_13_ag/Tess.ag")->write("inherits Tour\n 911 \n end \n class Tour ");
+	$app->syntaxAg->ag("var/_test_13_ag/Tess.ag");		# 911
+	
+Любой класс без `inherits` по умолчанию наследует `R::Object`.
 
 Код который не входит в объявление какого-то метода будет входить в неявный метод `render`. При попытке создать такой метод будет сгенерирована ошибка.
 Команда `ag` подгружает `Aquafile` и указанный класс, создаёт экземпляр и запускает метод `render`.

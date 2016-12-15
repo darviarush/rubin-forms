@@ -14,9 +14,6 @@ my $esc = "', R::View::Views::escapeHTML(scalar do { "; my $_esc = " }), '";
 our %templates = (
 
 
-
-"\n" => ";\n",
-
 'yf .$word' => '{{ left }}->${$DATA->{{{ var }}}}',
 'yf .word' => '{{ left }}->{{ var }}',
 'yf :word' => '{{ left }}->{{{ var }}}',
@@ -112,6 +109,7 @@ SUB => 'sub {{ id }} { my $DATA = { me => shift }; {{ _args args }} {{ right }}}
 # терминалы
 
 self => '$DATA->{me}',
+app => '$R::App::app',
 
 # строки
 CAT => '{{ str }}',
@@ -145,11 +143,11 @@ sub _args {
 # хелпер для расширения класса
 sub _extends {
 	my ($extends) = @_;
-	if(defined $extends) {
-		my $x = $extends =~ s/,/ /g;
-		$extends = " use parent -norequire, qw/$extends/;";
-		$extends .= " use mro 'c3';" if $x;
-	}
+	$extends //= "R::Object";
+	my $x = $extends =~ s/,/ /g;
+	$extends = " \$R::App::app->syntaxAg->include( \@ISA = qw/$extends/ );";
+	$extends .= " use mro 'c3';" if $x;
+
 	$extends
 }
 
@@ -202,16 +200,16 @@ sub _extends {
 ### модификаторы
 our %modifiers = (
 
-# наследование шаблона
-INHERITS => sub  {
-	my ($self, $node, $path) = @_;
-	$node->{block} = "__UNUSED__";
-	my $inherits = map { $self->get_name($_) } split /\s*,\s*/, $node->{inherits};	
-	my $mro = @$inherits>1? " use mro 'c3';": "";
-	$inherits = join " ", @$inherits;
-	$node->{extends} = $inherits? " use parent -norequire, qw/$inherits/;$mro": "";
-	$self
-},
+# # наследование шаблона
+# INHERITS => sub  {
+	# my ($self, $node, $path) = @_;
+	# $node->{block} = "__UNUSED__";
+	# my $inherits = map { $self->get_name($_) } split /\s*,\s*/, $node->{inherits};	
+	# my $mro = @$inherits>1? " use mro 'c3';": "";
+	# $inherits = join " ", @$inherits;
+	# $node->{extends} = $inherits? " use parent -norequire, qw/$inherits/;$mro": "";
+	# $self
+# },
 
 ### конец модификаторов
 );

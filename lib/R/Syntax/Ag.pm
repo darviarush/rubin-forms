@@ -432,7 +432,7 @@ sub compile {
 	}
 	
 	my $code = $cc->morf( $text );
-	$app->file($to)->write($code);
+	$app->file($to)->mkpath->write($code);
 
 	$self
 }
@@ -462,18 +462,33 @@ sub require {
 		}
 	}
 	
-	die "файл ".$app->perl->qq($path)." не найден";
+	die "нет ".$app->perl->qq($path);
 }
 
-# подключает класс Ag, Au или Perl
+# подключает классы Ag, Au или Perl
 sub include {
-	my ($self, $class, $INC) = @_;
-	$INC //= $app->{INC};
+	my $self = shift;
 	
-	$class =~ s!::!/!g;
-	#$file =
 	
-	for my $inc (@$INC) {
+	for my $class (@_) {
+	
+		next if ;
+	
+		my $path = $class;
+		$path =~ s!::!/!g;
+		
+		msg1 $class;
+	
+		my $INC = $app->{syntaxAg}{INC};
+	
+		for my $inc (@$INC) {
+			$self->require("$path.ag", [$inc]), last if -e "$inc/$path.ag";
+			$self->parse("$path.au", [$inc]), last if -e "$inc/$path.au";
+		}
+		
+		require "$path.pm";
+		
+		die "" if $app->perl->;
 	}
 	
 	$self
