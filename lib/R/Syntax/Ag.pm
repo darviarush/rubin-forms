@@ -78,30 +78,31 @@ $s->tr("yf",  qw{		.$word .word :word 	});
 $s->td("xfy", qw{		.$word() .word() :word()	.$word[] .word[] :word[]	.$word{} .word{} :word{}	});
 $s->td("xfy", qw{		word() word[] word{}	});
 $s->tr("xf",  qw{		@	%		});
-$s->tr("fy",  qw{ ref pairs scalar defined length exists });
+$s->tr("fy",  qw{ ref pairs scalar defined length exists delete })->td("xf", qw{  ? ?! });
 $s->tr("yf",  qw{		++ --			})->td("fy", qw{ ++ -- });
 $s->tr("yfx", qw{		^				});
-$s->tr("yfx", qw{		! +~ \			})->td("fy", qw{ + - });
+$s->tr("fy",  qw{ 		+ - ! +~		});
 $s->tr("xfy", qw{		=~ !~	~		});
 $s->tr("xfy", qw{		* / % mod **		});
 $s->tr("xfy", qw{		+ - .				});
-$s->tr("xfy", qw{		<< >>				});
+$s->tr("xfy", qw{		+< +>				});
 # in perl in this: named unary operators
-$s->tr("xfx", qw{	< > <= >= lt gt le ge		});
-$s->tr("xfx", qw{	== != <=> eq ne cmp ~~		});
 $s->tr("xfy", qw{		+&					});
 $s->tr("xfy", qw{		+|  +^				});
+$s->tr("xfx", qw{		< > <= >= lt gt le ge		});
+$s->tr("xfx", qw{		== != eq ne  <=> cmp ~~		});
+$s->tr("xfy", qw{		in of 			})->td("yfx", qw{		join		});
 $s->tr("xfy", qw{		&&					});
-$s->tr("xfy", qw{		|| //				});
-$s->tr("xfx", qw{		..  to				});
+$s->tr("xfy", qw{		|| ^^ ?				});
+$s->tr("xfx", qw{		..  to  step		});
 #$s->tr("yfx", qw{		?:					});
-$s->tr("yfx", qw{		= += -= *= /= &&= ||= //=  and= or= xor= ,= =, 	});				# goto last next redo dump
+$s->tr("yfx", qw{		-> = += -= *= /= ^= &&= ||= ^^=   and= or= xor=  ,= =, 	}); # goto last next redo dump
 $s->tr("xfy", qw{		, =>					})->td("yf", qw{ , })->td("fy", qw{ => });
 #$s->tr("xfx", qw{	list operators (rightward)});
-$s->tr("yfx", qw{		not						});
+$s->tr("fy", qw{		not						});
 $s->tr("xfy", qw{		and						});
 $s->tr("xfy", qw{		or	xor					});
-$s->tr("yfx", qw{		as						});
+$s->tr("yfx", qw{		as	is					});
 $s->tr("fx",  qw{		return					});
 
 $s->tr("xfy", qw{	;	})->td("yf", qw{	;	})->td("fy", qw{	;	});
@@ -164,7 +165,6 @@ $s->br(qw{			{	}			});
 $s->br(qw{			FOR		} => sub { my ($self, $push) = @_; $push->{then}="for_then"},	qw{		END		});
 $s->br(qw{			WHILE	} => sub { my ($self, $push) = @_; $push->{then}="while_then"},	qw{		END		});
 $s->br(qw{			IF		} => sub { my ($self, $push) = @_; $push->{then}="if_then"},	qw{		END		});
-$s->br(qw{			TRY			END		});
 $s->br(qw{			BEGIN		END		});
 $s->br(qw{			ON	} => qr{ \b ON $re_space (?<route>$re_string) }x => sub {
 	my ($self, $push) = @_; 
@@ -209,7 +209,7 @@ $s->x("app");
 $s->x("q");
 $s->x("user");
 $s->x("super");
-$s->x("null" => qr/\b(?: null | nothing | undef) \b/x);
+$s->x("nothing" => qr/\b(?: null | nothing | undef | nil) \b/x);
 $s->x("true");
 $s->x("false");
 $s->x("paramarray" => qr/\b(?:paramarray | arguments)\b/x);
@@ -224,7 +224,7 @@ $s->x("var"		=> qr{ 	(?<var>$re_id) 									}x);
 $s->x("num"		=> qr{ 	(?<num> -? (?: [\d_]+(\.[\d_]+)? | \.[\d_]+ )	(?: E[\+\-][\d_]+ )?	)			}ix);
 $s->x("regexp"	=> qr{ 	" (?<QR> (?:[^"]|\\")* ) "! (?<qr_args> \w+ )? 	}x);
 
-$s->x("string"	=> qr{	" (?<string> (?:\\"|""|[^"])* ) "	 }x => sub {
+$s->x("string"	=> qr{	" (?<string> (?:\\"|""|[^"])* ) " | ' (?<string> (?:\\'|''|[^'])* ) '	 }x => sub {
 	my ($self, $push) = @_;
 	$self->checkout("ag.string")->push("string")->masking($push->{string})->pop("string")->checkout("ag")->assign($push);
 });
@@ -291,50 +291,6 @@ sub endline {
 }
 
 
-# заменяет переменные в строке
-#my $re_id = $R::Re::id;
-sub replace_dollar {
-	my ($self, $s) = @_;
-	
-	#local($_, $a, $b, $`, $', $&);
-	
-	my $is_string = "\"" eq substr $s, 0, 1;
-	
-	if($is_string) {
-		$self->push('string');
-
-		while($s =~ m{
-			^ "			|
-			(?<str> .*? )
-			(?:
-				\$(?<id> $re_id(?:[\.:]$re_id)* )	(?{ 1 }) |
-				(?: \\" | "" )						(?{ 2 })  |
-				" $									(?{ 3 })
-			)
-			
-		}gxs) {
-		
-			$^R==1? do {
-				my $id = $+{id};
-				$self->push('interpolation')->masking($id)->pop('interpolation')->op("CAT");
-			}:
-			$^R==2? $self->atom('kav')->op("CAT"):
-			$^R==3? $self->atom('str'):
-			$self->error("неверная часть строки");
-		}
-		
-		$self->pop('string');
-		
-		return $self;
-	}
-	
-	todo;
-	
-	
-	
-	$self
-}
-
 ########################################### строки ########################################### 
 {
 my $string = $STRINGSYNTAX;
@@ -345,6 +301,7 @@ $string->tr("yfx", qw/CAT/)->tr("yf", qw/CAT/);
 
 $string->opt("CAT", re => qr/ (?<str> [^\$]* ) (?: \$ (?<exec> $re_id([\.:]$re_id)* ) | $ ) /nxs, sub => sub {
 	my ($self, $push) = @_;
+	$push->{str} =~ s/""|''|\\["']/\\"/g;
 	if(exists $push->{exec}) {
 		$self->checkout("ag")->push("exec1")->masking($push->{exec})->pop("exec1")->checkout("ag.string");
 		delete $push->{str};
@@ -415,6 +372,8 @@ sub path2class {
 sub compile {
 	my ($self, $path, $to) = @_;
 	
+	#msg1 "compile", $path, $to;
+	
 	my $file = $app->file($path);
 	my $name = $file->nik;
 	my $text = $file->read;
@@ -443,7 +402,7 @@ sub compile {
 sub require {
 	my ($self, $path, $INC) = @_;
 	
-	return if exists $app->{syntaxAg}{require}{$path};
+	return $app->{syntaxAg}{require}{$path} if exists $app->{syntaxAg}{require}{$path};
 	
 	$INC //= $app->{syntaxAg}{INC};
 	my $file = $app->file($path);
@@ -457,41 +416,46 @@ sub require {
 				$self->compile($f->path, $to->path);
 			}
 			require $to->path;
-			$app->{syntaxAg}{require}{$path} = 1;
-			return $self->path2class($path);
+			return $app->{syntaxAg}{require}{$path} = $self->path2class($path);
 		}
 	}
 	
-	die "нет ".$app->perl->qq($path);
+	die "нет " . $app->perl->qq($path);
 }
 
 # подключает классы Ag, Au или Perl
-sub include {
+sub includes {
 	my $self = shift;
 	
-	
+	my @class;
 	for my $class (@_) {
-	
-		next if ;
-	
-		my $path = $class;
-		$path =~ s!::!/!g;
-		
-		msg1 $class;
-	
-		my $INC = $app->{syntaxAg}{INC};
-	
-		for my $inc (@$INC) {
-			$self->require("$path.ag", [$inc]), last if -e "$inc/$path.ag";
-			$self->parse("$path.au", [$inc]), last if -e "$inc/$path.au";
-		}
-		
-		require "$path.pm";
-		
-		die "" if $app->perl->;
+		push @class, $self->include($class);
 	}
 	
-	$self
+	@class
+}
+
+# подключает класс
+sub include {
+	my ($self, $class) = @_;
+	
+	return $class if exists $R::Classes{$class};
+	
+	my $path = $class;
+	$path =~ s!::!/!g;
+
+	my $INC = $app->{syntaxAg}{INC};
+
+	for my $inc (@$INC) {
+		return $self->require("$path.ag", [$inc]) if -e "$inc/$path.ag";
+		return $self->parse("$path.au", [$inc]) if -e "$inc/$path.au";
+	}
+	
+	require "$path.pm";
+	
+	die "нет new у " . $app->perl->qq($class) if !$class->can("new");
+	
+	return $class;
 }
 
 1;

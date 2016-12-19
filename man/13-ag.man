@@ -63,13 +63,13 @@
 	$app->file("var/_test_13_ag/Tess.ag")->write("123");
 	$app->syntaxAg->ag("var/_test_13_ag/Tess.ag");		# 123
 	
-	$app->file("var/_test_13_ag/Tess.ag")->write("class Tess \n 777 \n end");
-	$app->syntaxAg->ag("var/_test_13_ag/Tess.ag");		# 777
+	$app->file("var/_test_13_ag/Aes.ag")->write("class Aes \n 777 \n end");
+	$app->syntaxAg->ag("var/_test_13_ag/Aes.ag");		# 777
 
 Так же файл может начинаться на `extends` или `inherits`.
 	
-	$app->file("var/_test_13_ag/Tess.ag")->write("inherits Tour\n 911 \n end \n class Tour ");
-	$app->syntaxAg->ag("var/_test_13_ag/Tess.ag");		# 911
+	$app->file("var/_test_13_ag/Ress.ag")->write("inherits Tour\n 911 \n end \n class Tour ");
+	$app->syntaxAg->ag("var/_test_13_ag/Ress.ag");		# 911
 	
 Любой класс без `inherits` по умолчанию наследует `R::Object`.
 
@@ -78,9 +78,11 @@
 
 `Aquafilе` содержит конфигурацию проекта. Поэтому он назван *Акваторией*.
 
-Классы подгружаются оператором `new`, если класс ещё не был загружен. При этом по путям `app.inc` ищется файл с расширением *.ag* или *.au* (именно в таком порядке).
+Классы подгружаются оператором `new`, если класс ещё не был загружен. При этом по путям `app.syntaxAg:INC` ищется файл с расширением *.ag* или *.au* (именно в таком порядке).
 
-
+	#$app->file("var/_test_13_ag/Ress.au")->write("{{ hi }}");
+	
+	
 === Методы
 
 Все переменные в *Серебрянке* - локальные.
@@ -93,12 +95,111 @@
 	
 == Контролы - условия, циклы и исключения
 
+=== `if`
+
+	# $app->syntaxAg->eval("if 0 then 10");				## undef
+	# $app->syntaxAg->eval("if 0 then 10 else 20");		# 20
+	# $app->syntaxAg->eval("if 0 then 10 elseif  then 20");		# 20
 
 
 == Операторы
 
-	$app->syntaxAg->new->eval("b=a=10; a+b");						# 20
+	
 
+=== Присваивания
+
+Оператор `=` присваивает значение и возвращает его.
+
+	$app->syntaxAg->new->eval("b=a=10; a+b");						# 20
+	
+Он имеет меньший приоритет, чем операторы `and`, `or`, `xor` и `not`:
+	
+	$app->syntaxAg->new->eval("a = 10 and 20; a");	# 10
+	$app->syntaxAg->new->eval("a = 10 && 20; a");	# 20
+
+Оператор `is` аналогичен `=`, но имеет больший приоритет:
+
+	$app->syntaxAg->new->eval("a is 10 and 20; a");	# 20
+	
+Правосторонние операторы присваивания с низким и высоким приоритетом, соответственно:
+
+	$app->syntaxAg->new->eval("20 and 10 as a; a");	# 10
+	$app->syntaxAg->new->eval("20  && 10 -> a; a");	# 10
+
+=== Логические
+
+И:
+	$app->syntaxAg->new->eval("20 and 10");	# 10
+	$app->syntaxAg->new->eval("20  && 10");	# 10
+
+Или:
+
+	$app->syntaxAg->new->eval("20 or 10");	# 20
+	$app->syntaxAg->new->eval("20 || 10");	# 20
+
+Исключающее или:
+
+	$app->syntaxAg->new->eval("20 xor 10");	## ""
+	$app->syntaxAg->new->eval("20  ^^ 10");	## ""
+
+Не:
+
+	$app->syntaxAg->new->eval("not 0");		# 1
+	$app->syntaxAg->new->eval("!0");		# 1
+
+Надо заметить, что `not`, `xor`, `or` и `and` имеют более высокий приоритет и работают с потоками данных:
+
+	$app->syntaxAg->new->eval("(20, 30) and (10, 20, 30) join ','");		# 10,20,30
+	$app->syntaxAg->new->eval("(20, 30)  && (10, 20, 30) join ','");		# 3
+	
+=== Сравнения
+
+Сравнения строк (переводят скаляр в строку перед сравнением):
+
+	$app->syntaxAg->new->eval("11 lt 100");		# 1
+	$app->syntaxAg->new->eval("11 gt 100");		# 1
+	$app->syntaxAg->new->eval("11 le 100");		# 1
+	$app->syntaxAg->new->eval("11 ge 100");		# 1
+	$app->syntaxAg->new->eval("11 ne 100");		# 1
+	$app->syntaxAg->new->eval("11 eq 100");		# 
+	
+Сравнение чисел:
+	
+	$app->syntaxAg->new->eval("11 < 100");		# 1
+	$app->syntaxAg->new->eval("11 > 100");		# 1
+	$app->syntaxAg->new->eval("11 <= 100");		# 1
+	$app->syntaxAg->new->eval("11 >= 100");		# 1
+	$app->syntaxAg->new->eval("11 != 100");		# 1
+	$app->syntaxAg->new->eval("11 == 100");		# 
+	
+Проверка на `nothing`:
+
+	$app->syntaxAg->new->eval("11?");			# 1
+	$app->syntaxAg->new->eval("nothing?");		# 
+	
+
+	
+=== Арифметические
+
+	$app->syntaxAg->new->eval("+'34px'");		# 34
+	$app->syntaxAg->new->eval("-'35px'");		# -35
+
+	$app->syntaxAg->new->eval("1+1");		# 2
+	$app->syntaxAg->new->eval("1-1");		# 0
+	$app->syntaxAg->new->eval("4*5");		# 20
+	$app->syntaxAg->new->eval("5/4");		# 1.25
+	$app->syntaxAg->new->eval("3^3");		# 9
+
+=== Побитовые
+
+	$app->syntaxAg->new->eval("0b0111 +& 0b0010");		## 0b0010
+	$app->syntaxAg->new->eval("0b0001 +| 0b0010");		## 0b0011
+	$app->syntaxAg->new->eval("0b1001 +^ 0b1010");		## 0b0011
+	$app->syntaxAg->new->eval("+~ -1");		# 0
+	
+=== Для строк и массивов
+
+	$app->syntaxAg->new->eval("10, 20 join ', '");		# 10, 20
 
 == ООП
 

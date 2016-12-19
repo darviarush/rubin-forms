@@ -88,7 +88,57 @@ gosub => '->( {{ right }} )',
 
 # операторы присваивания
 "yfx =" => '({{ left }}) = ({{ right }})',
+"yfx is" => '({{ left }}) = ({{ right }})',
+"yfx ->" => '({{ right }}) = ({{ left }})',
 "yfx as" => '({{ right }}) = ({{ left }})',
+
+
+# логические
+"xfy and" => '(({{ left }}) and ({{ right }}))',
+"xfy or" => '(({{ left }}) or ({{ right }}))',
+"xfy xor" => '(({{ left }}) xor ({{ right }}))',
+"fy not" => '(not ({{ right }}))',
+
+"xfy &&" => '(({{ left }}) && ({{ right }}))',
+"xfy ||" => '(({{ left }}) || ({{ right }}))',
+"xfy ^^" => '(scalar({{ left }}) xor scalar({{ right }}))',
+"fy !" => '(! ({{ right }}))',
+
+# побитовые
+"xfy +&" => '(({{ left }}) & ({{ right }}))',
+"xfy +|" => '(({{ left }}) | ({{ right }}))',
+"xfy +^" => '(({{ left }}) ^ ({{ right }}))',
+"fy  +~" => '(~ ({{ right }}))',
+"xfy +<" => '(({{ left }}) << ({{ right }}))',
+"xfy +>" => '(({{ left }}) >> ({{ right }}))',
+
+# сравнения
+"xfx lt" => '(({{ left }}) lt ({{ right }}))',
+"xfx gt" => '(({{ left }}) gt ({{ right }}))',
+"xfx le" => '(({{ left }}) le ({{ right }}))',
+"xfx ge" => '(({{ left }}) ge ({{ right }}))',
+"xfx ne" => '(({{ left }}) ne ({{ right }}))',
+"xfx eq" => '(({{ left }}) eq ({{ right }}))',
+"xfx <" => '(({{ left }}) < ({{ right }}))',
+"xfx >" => '(({{ left }}) > ({{ right }}))',
+"xfx <=" => '(({{ left }}) <= ({{ right }}))',
+"xfx >=" => '(({{ left }}) >= ({{ right }}))',
+"xfx !=" => '(({{ left }}) != ({{ right }}))',
+"xfx ==" => '(({{ left }}) == ({{ right }}))',
+"xfx <=>" => '(({{ left }}) <=> ({{ right }}))',
+"xfx cmp" => '(({{ left }}) cmp ({{ right }}))',
+
+# проверки
+"xf ?" => 'defined({{ left }})',
+
+
+# массивов
+"yfx join" => 'join({{ left }}, {{ right }})',
+#"xfy in" => '(grep { {{ left }} }, {{ right }})',
+
+# хешей
+"fx delete" => 'delete({{ right }})',
+"xfx of" => 'exists {{ left }}->{{{ right }}}',
 
 # операторы смысловых конструкций
 "xfy then" => sub {
@@ -110,6 +160,10 @@ SUB => 'sub {{ id }} { my $DATA = { me => shift }; {{ _args args }} {{ right }}}
 
 self => '$DATA->{me}',
 app => '$R::App::app',
+nothing => '(undef)',
+inf => '(0+"inf")',
+nan => '(0+"nan")',
+pi => '(0+"nan")',
 
 # строки
 CAT => '{{ str }}',
@@ -142,10 +196,10 @@ sub _args {
 
 # хелпер для расширения класса
 sub _extends {
-	my ($extends) = @_;
+	my ($self, $extends) = @_;
 	$extends //= "R::Object";
 	my $x = $extends =~ s/,/ /g;
-	$extends = " \$R::App::app->syntaxAg->include( \@ISA = qw/$extends/ );";
+	$extends = " \$R::App::app->syntaxAg->include( our \@ISA = qw/$extends/ );";
 	$extends .= " use mro 'c3';" if $x;
 
 	$extends
