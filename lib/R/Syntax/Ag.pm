@@ -7,6 +7,9 @@ use common::sense;
 use R::App;
 use R::Re;
 
+$Nil::INC = [$app->file(__FILE__)->file( "/../../../ag" )->abs->path];
+#%Nil::REQUIRE;
+
 my $BASICSYNTAX = $app->syntax->new(name => 'ag')->lang("perl");
 my $STRINGSYNTAX = $app->syntax->new(name => 'ag.string');
 
@@ -40,9 +43,10 @@ my $re_rem = qr/(?:(?:\#|\brem\b)(?<rem>[^\n\r]*))?/i;
 my $re_sk = qr/[\[\{\(]/;
 my $re_arg = qr/$re_id|\*/on;
 my $re_class = qr/(::)?$re_id(::$re_id)*/on;
+my $re_class_abs = qr/$re_id(::$re_id)*/on;
 my $re_extends = qr!$re_class(?:$re_space_ask,$re_space_ask$re_class)*!;
 my $re_class_stmt = qr!
-(?<class>$re_class)
+(?<class>$re_class_abs)
 (?: [\ \t]+ (?:EXTENDS|INHERITS) [\ \t]+ (?<extends>$re_extends))?
 (?<with> [\t\ ]+ with [\t\ ]+ (?<with_args> [^\r\n]+) )?
 !xismo;				
@@ -53,7 +57,7 @@ my $re_overload_id = qr!
 	(?<id>"\w+"|[[:punct:]]+|0\+)
 !xismo;
 my $re_sub_in = qr/ [\ \t]+ CLASS [\ \t]+ (?<sub_in>(?<sub_self>::)?$re_class) /xn;
-my $re_args_then = qr/ (?<then> \b THEN \b ) | $re_args (?<then> \b THEN \b ) | ( $re_args )? $re_rem $re_endline /ixno;
+my $re_args_then = qr/ $re_space (?<then> \b THEN \b ) | $re_args (?<then> \b THEN \b ) | ( $re_args )? /ixno;
 my $re_then = qr/ (?<re_endline> $re_space_ask \b THEN \b) | $re_rem $re_endline /xn;
 my $re_for = qr!
 (?<for_k>$re_id) (?: $re_space_ask,$re_space_ask (?<for_v>$re_id) (?: $re_space_ask,$re_space_ask (?<for_i>$re_id) )? )? (?: $re_space (?<for_in>IN) \b | $re_space (?<for_of>OF) \b | $re_space_ask = )
@@ -77,8 +81,8 @@ my $s = $BASICSYNTAX;
 $s->tr("yf",  qw{		.$word .word :word 	});
 $s->td("xfy", qw{		.$word() .word() :word()	.$word[] .word[] :word[]	.$word{} .word{} :word{}	});
 $s->td("xfy", qw{		word() word[] word{}	});
-$s->tr("xf",  qw{		@	%		});
-$s->tr("fy",  qw{ ref pairs scalar defined length exists delete })->td("xf", qw{  ? ?! });
+$s->tr("fx",  qw{		@	%		});
+$s->tr("fy",  qw{ ref pairs scalar defined length exists delete })->td("xf", qw{  ? ?! instanceof });
 $s->tr("yf",  qw{		++ --			})->td("fy", qw{ ++ -- });
 $s->tr("yfx", qw{		^				});
 $s->tr("fy",  qw{ 		+ - ! +~		});
@@ -95,7 +99,6 @@ $s->tr("xfy", qw{		in of 			})->td("yfx", qw{		join		});
 $s->tr("xfy", qw{		&&					});
 $s->tr("xfy", qw{		|| ^^ ?				});
 $s->tr("xfx", qw{		..  to  step		});
-#$s->tr("yfx", qw{		?:					});
 $s->tr("yfx", qw{		-> = += -= *= /= ^= &&= ||= ^^=   and= or= xor=  ,= =, 	}); # goto last next redo dump
 $s->tr("xfy", qw{		, =>					})->td("yf", qw{ , })->td("fy", qw{ => });
 #$s->tr("xfx", qw{	list operators (rightward)});
@@ -142,10 +145,12 @@ $s->opt(".\$word{}",	re => qr{		\.\$ (?<var>$re_id) \{		}x);
 $s->opt("=>", re => qr{ (?<id>$re_id)? \s* => }xn );
 $s->opt("=", sub => sub {	$_[0]->{assign} = 1 });
 
+$s->opt("instanceof", re => qr{ \b instanceof $re_space (?<class> $re_class_abs ) }xin);
+
 $s->opt('\n', re => "$re_rem $re_endline", sub => sub {
 	my ($self, $push) = @_;
 	$self->{lineno}++;
-	$push->{then} = delete $self->endline->top->{then}
+	$push->{then} = delete $self->endline->top->{then};
 });
 
 $s->opt("THEN", sub => sub { my ($self, $push) = @_; my $br = $self->{stack}[-1]; $br->{endline}=1; $push->{stmt} = delete $br->{then} });
@@ -187,16 +192,38 @@ $s->br(qw/			SORT				/);
 $s->br(qw/			QSORT				/);
 $s->br(qw/			NSORT				/);
 
-$s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => "END");
+$s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => sub {
+	my ($self, $push) = @_;
+	my $S = $self->{stack};
+	my $class;
+	for(my $i=$#$S; $i>=0; $i--) {
+		$class = $S->[$i]{class}, last if $S->[$i]{stmt} eq "CLASS";
+	}
+	$push->{class} = "${class}::$push->{class}" if defined $class;
+	if($push->{extends}) {
+		$push->{extends} = [ map { /^:/? "$push->{class}$_": $_ } split /\s*,\s*/, $push->{extends} ];
+	}
+	else {
+		$push->{extends} = ["Nil"] if $push->{class} ne "Nil";
+	}
+} => "END");
 #$s->br("OBJECT" => qr{ \b OBJECT $re_space $re_class_stmt }ix => "END");
 #$s->br("MODULE" => qr{ \b MODULE $re_space $re_class_stmt }ix => "END");
 
-$s->br("SUB" => qr{ \b SUB $re_space $re_id $re_args_then }ix => "END");
+$s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_id ) $re_args_then }ix => sub {
+	my ($self, $push) = @_;
+	if($push->{then}) {
+		$push->{endline}=1; 
+		delete $push->{then};
+	}
+} => "END");
 #$s->br("SUB_CLASS" => qr{ \b SUB $re_space $re_id $re_args_then }ix => "END");
 
 #$s->br("DEF" => qr{ \b DEF $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
 #$s->br("LET" => qr{ \b LET $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
 $s->br("DO" => qr{ \b DO $re_args  }ix => "END");
+
+$s->br("new_apply" => qr{ 	\b NEW $re_space (?<new>$re_class) \(	}ix => ")");
 
 ### операнды
 
@@ -210,6 +237,9 @@ $s->x("q");
 $s->x("user");
 $s->x("super");
 $s->x("nothing" => qr/\b(?: null | nothing | undef | nil) \b/x);
+$s->x("pi");
+$s->x("nan");
+$s->x("inf");
 $s->x("true");
 $s->x("false");
 $s->x("paramarray" => qr/\b(?:paramarray | arguments)\b/x);
@@ -219,14 +249,15 @@ $s->x("last");
 $s->x("redo");
 $s->x("wantarray");
 
-$s->x("new"		=> qr{ 	\b NEW $re_space (?<new>$re_id(?:::$re_id)*) 	}x);
+$s->x("new"		=> qr{ 	\b NEW $re_space (?<new>$re_class) 	}ix);
 $s->x("var"		=> qr{ 	(?<var>$re_id) 									}x);
 $s->x("num"		=> qr{ 	(?<num> -? (?: [\d_]+(\.[\d_]+)? | \.[\d_]+ )	(?: E[\+\-][\d_]+ )?	)			}ix);
-$s->x("regexp"	=> qr{ 	" (?<QR> (?:[^"]|\\")* ) "! (?<qr_args> \w+ )? 	}x);
+#$s->x("regexp"	=> qr{ 	" (?<QR> (?:[^"]|\\")* ) "! (?<qr_args> \w+ )? 	}x);
 
-$s->x("string"	=> qr{	" (?<string> (?:\\"|""|[^"])* ) " | ' (?<string> (?:\\'|''|[^'])* ) '	 }x => sub {
+$s->x("string"	=> qr{	( " (?<string> (?:\\"|""|[^"])* ) " | ' (?<string> (?:\\'|''|[^'])* ) ' ) (?<qr>! (?<qr_args> \w*))?	 }xn => sub {
 	my ($self, $push) = @_;
-	$self->checkout("ag.string")->push("string")->masking($push->{string})->pop("string")->checkout("ag")->assign($push);
+	my $sk = $push->{qr}? "qr": "string";
+	$self->checkout("ag.string")->push($sk)->masking($push->{string})->pop($sk)->checkout("ag")->assign($push);
 });
 
 ### какие операторы в каких скобках могут существовать
@@ -350,7 +381,7 @@ sub ag {
 	
 	my $root = $self->root($path);
 	
-	push @{ $app->{syntaxAg}{INC} }, $root;
+	unshift @$Nil::INC, $root if $Nil::INC->[0] ne $root;
 	
 	$self->require("Aquafile");
 	
@@ -402,21 +433,23 @@ sub compile {
 sub require {
 	my ($self, $path, $INC) = @_;
 	
-	return $app->{syntaxAg}{require}{$path} if exists $app->{syntaxAg}{require}{$path};
+	return $Nil::REQUIRE{$path} if exists $Nil::REQUIRE{$path};
 	
-	$INC //= $app->{syntaxAg}{INC};
+	$INC //= $Nil::INC;
+	
+	#my $to_dir = $Nil::INC->[0];
+	
 	my $file = $app->file($path);
 	
 	for my $inc (@$INC) {
 		my $f = $file->frontdir($inc);
 		if($f->exists) {
 			my $to = $app->file("$inc/.Aqua/$path.pm");
-			
 			if(!$to->exists || $to->mtime < $f->mtime) {
 				$self->compile($f->path, $to->path);
 			}
 			require $to->path;
-			return $app->{syntaxAg}{require}{$path} = $self->path2class($path);
+			return $Nil::REQUIRE{$path} = $self->path2class($path);
 		}
 	}
 	
@@ -439,12 +472,12 @@ sub includes {
 sub include {
 	my ($self, $class) = @_;
 	
-	return $class if exists $R::Classes{$class};
+	return $class if $class->can("new");
 	
 	my $path = $class;
 	$path =~ s!::!/!g;
 
-	my $INC = $app->{syntaxAg}{INC};
+	my $INC = $Nil::INC;
 
 	for my $inc (@$INC) {
 		return $self->require("$path.ag", [$inc]) if -e "$inc/$path.ag";

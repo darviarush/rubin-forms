@@ -38,15 +38,6 @@ str => '{{ str }}',
 kav => '{{ str }}\"',
 interpolation => '{{ str }}${\( {{ right }} )}',
 
-# атомы
-var => '$DATA->{{{ var }}}',
-num => '{{ num }}',
-regexp => 'qr({{ QR }}){{ qr_args }}',
-'[]' => '[]',
-'()' => '()',
-'{}' => '{}',
-app => '$app',
-
 # массивы
 '[' => '[ {{ right }} ]',
 '{' => '{ {{ right }} }',
@@ -57,17 +48,8 @@ app => '$app',
 
 
 # операторы 
-'[]=' => 'push(@{{{ left }}}, {{ right }})',
-gosub => '->( {{ right }} )',
-
-# арифметические операторы
-"xfy +" => '({{ left }}) + ({{ right }})',
-"xfy -" => '({{ left }}) - ({{ right }})',
-"xfy *" => '({{ left }}) * ({{ right }})',
-"xfy /" => '({{ left }}) / ({{ right }})',
-
-"fy +" => '0+({{ right }})',
-"fy -" => '-({{ right }})',
+#'[]=' => 'push(@{{{ left }}}, {{ right }})',
+#gosub => '->( {{ right }} )',
 
 
 # операторы распределения данных
@@ -92,6 +74,19 @@ gosub => '->( {{ right }} )',
 "yfx ->" => '({{ right }}) = ({{ left }})',
 "yfx as" => '({{ right }}) = ({{ left }})',
 
+# арифметические операторы
+"xfy +" => '({{ left }}) + ({{ right }})',
+"xfy -" => '({{ left }}) - ({{ right }})',
+"xfy *" => '({{ left }}) * ({{ right }})',
+"xfy /" => '({{ left }}) / ({{ right }})',
+"xfy ^" => '({{ left }}) ** ({{ right }})',
+
+"fy +" => '0+({{ right }})',
+"fy -" => '-({{ right }})',
+
+# строковые
+"xfy **" => '({{ left }}) x ({{ right }})',
+"xfy ." => '({{ left }}) . ({{ right }})',
 
 # логические
 "xfy and" => '(({{ left }}) and ({{ right }}))',
@@ -130,6 +125,7 @@ gosub => '->( {{ right }} )',
 
 # проверки
 "xf ?" => 'defined({{ left }})',
+"xf instanceof" => 'Isa({{ left }}, "{{ class }}")',
 
 
 # массивов
@@ -151,26 +147,37 @@ gosub => '->( {{ right }} )',
 
 
 # скобки
-CLASS => '(do { BEGIN { $R::Classes{{{ class }}}++; push @R::Classes, "{{ class }}" } package {{ class }}; {{ _extends extends }} use common::sense; sub render { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
+# BEGIN { $R::Classes{"{{ class }}"}++; push @R::Classes, "{{ class }}" }
+CLASS => '(do { package {{ class }};{{ _extends class, extends }} sub render { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
 
-SUB => 'sub {{ id }} { my $DATA = { me => shift }; {{ _args args }} {{ right }}}',
+SUB => 'sub {{ SUB }} { my $DATA = { me => {{ _shift SUB }} }; {{ _args args }} {{ right }}{{ _ifnewend SUB }}}',
 
 
-# терминалы
-
+# атомы
 self => '$DATA->{me}',
 app => '$R::App::app',
-nothing => '(undef)',
+q => '$R::App::app->{q}',
+nothing => 'undef()',
 inf => '(0+"inf")',
 nan => '(0+"nan")',
-pi => '(0+"nan")',
+pi => '(atan2(1,1)*4)',
+true => '$R::App::app->json->true',
+false => '$R::App::app->json->false',
+
+var => '$DATA->{{{ var }}}',
+num => '{{ num }}',
+'[]' => '[]',
+'()' => '()',
+'{}' => '{}',
+new => '{{ new }}->new',
+new_apply => '{{ new }}->new({{ right }})',
 
 # строки
 CAT => '{{ str }}',
 "yfx CAT" => "{{ left }}{{ str }}{{ right }}",
 "yf CAT" => "{{ left }}{{ str }}",
-"string" => '"{{ right }}"',
-"exec1" => '{{ str }}${\({{ right }})}',
+exec1 => '{{ str }}${\({{ right }})}',
+string => '"{{ right }}"',
 
 # HTML => "{{ html }}",
 # 'xfy CAT' => "{{ left }}{{ right }}",
@@ -196,15 +203,31 @@ sub _args {
 
 # хелпер для расширения класса
 sub _extends {
-	my ($self, $extends) = @_;
-	$extends //= "R::Object";
-	my $x = $extends =~ s/,/ /g;
-	$extends = " \$R::App::app->syntaxAg->include( our \@ISA = qw/$extends/ );";
-	$extends .= " use mro 'c3';" if $x;
-
-	$extends
+	my ($self, $class, $extends) = @_;
+	my $ext = "";
+	$ext .= " BEGIN { \@${class}::ISA = qw/".join(" ", @$extends)."/ } \$R::App::app->syntaxAg->includes( \@ISA );" if @$extends;
+	$ext .= " use mro 'c3';" if @$extends>1;
+	$ext
 }
 
+# если имя функции == new
+sub _shift {
+	my ($self, $name) = @_;
+	if($name eq "new") {
+		'bless({}, do { my $cls=shift; ref $cls || $cls })'
+	}
+	else {
+		'shift'
+	}
+}
+
+# вернуть self, если это конструктор
+sub _ifnewend {
+	my ($self, $name) = @_;
+	if($name eq "new") {
+		'$DATA->{me}'
+	}
+}
 
 # # формирует заголовок функции
 # sub _sub {

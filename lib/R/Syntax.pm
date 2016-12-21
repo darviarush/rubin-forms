@@ -455,11 +455,11 @@ sub pop {
 			if($r->{fix} & $infix) {
 				$self->error("нет операндов для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
 				$self->error("нет левого операнда для оператора $r->{stmt}") if !defined( $r->{left} = pop @T );
-				$self->trace("%", $r, [A=>$A, S=>\@S, T=>\@T]);
+				$self->trace("%", $r);
 			}
 			elsif($r->{fix} & $prefix) {	# -x
 				$self->error("нет операнда для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
-				$self->trace(">", $r, [A=>$A, S=>\@S, T=>\@T]);
+				$self->trace(">", $r);
 			}
 			else {	# x--
 				$self->error("нет операнда для оператора $r->{stmt}") if !defined( my $prev = pop @T );
@@ -468,11 +468,11 @@ sub pop {
 					$r->{left} = $prev->{left};
 					$prev->{left} = $r;
 					$r = $prev;
-					$self->trace("<", $prev, [A=>$A, S=>\@S, T=>\@T]);
+					$self->trace("<", $prev);
 				}
 				else {
 					$r->{left} = $prev;
-					$self->trace("<", $r, [A=>$A, S=>\@S, T=>\@T]);
+					$self->trace("<", $r);
 				}
 			}
 			
@@ -484,7 +484,7 @@ sub pop {
 		if(my $op = $_[0]) {
 			@$op{qw/stmt fix prio/} = @$meta{qw/name fix prio/};
 			push @S, $op;
-			$self->trace("^", $op, [A=>$A, S=>\@S, T=>\@T]);
+			$self->trace("^", $op);
 		}
 	};
 	
@@ -596,31 +596,46 @@ sub color_stacks {
 		pairmap { ":dark white", "\t$a:", ":reset", map({ $_->{stmt} } @$b) } @_
 }
 
+# # отображает операции со стеком в лог
+# sub trace {
+	# my ($self, $op, $top, $stacks) = @_;
+	
+	# my $trace = $self->{trace};
+	# if( defined($trace) && $self->{file} eq $trace ) {
+	
+		# local($+, $`, $', $&, $_, $a, $b);
+
+		# my $stmt = $top->{stmt};
+	
+		# my @after;
+		# if(0) {
+			# my $after = {%$top};
+			# delete @$after{qw/stmt e left right/};
+			# @after = pairmap { "$a=$b" } %$after;
+		# }
+
+		# #push @after, $self->color_stacks(@$stacks) if $stacks;
+		
+		# # if($op eq "+" || $op eq "-") {
+			# # push @after, $self->color_stacks("S", $self->{stack});
+		# # }
+		
+		# $app->log->info( ":space", "$self->{lineno}:", $COLOR{$op} // ":dark white", $op, $stmt . (exists $top->{$stmt}? "<$top->{$stmt}>": ""), ":reset", @after );
+	# }
+	
+	# $self
+# }
+
 # отображает операции со стеком в лог
 sub trace {
-	my ($self, $op, $top, $stacks) = @_;
+	my ($self, $op, $top) = @_;
 	
 	my $trace = $self->{trace};
 	if( defined($trace) && $self->{file} eq $trace ) {
 	
-		local($+, $`, $', $&, $_, $a, $b);
-
 		my $stmt = $top->{stmt};
-	
-		my @after;
-		if(0) {
-			my $after = {%$top};
-			delete @$after{qw/stmt e left right/};
-			@after = pairmap { "$a=$b" } %$after;
-		}
-
-		#push @after, $self->color_stacks(@$stacks) if $stacks;
+		$app->log->info(":space nonewline", $COLOR{$op} // ":dark white", " $op", $stmt . (exists $top->{$stmt}? "<$top->{$stmt}> ": " "));
 		
-		# if($op eq "+" || $op eq "-") {
-			# push @after, $self->color_stacks("S", $self->{stack});
-		# }
-		
-		$app->log->info( ":space", "$self->{lineno}:", $COLOR{$op} // ":dark white", $op, $stmt . (exists $top->{$stmt}? "<$top->{$stmt}>": ""), ":reset", @after );
 	}
 	
 	$self
@@ -647,7 +662,17 @@ sub masking {
 	my $CR = $self->{CR};
 	my $X = $self->{X};
 	
+	my $trace = defined($self->{trace}) && $self->{file} eq $self->{trace};
+	my $endline;
+	
 	while($s =~ /$lex/g) {			# формируем дерево
+	
+		if($trace) {
+			$endline = index($&, "\n")!=-1;
+			$app->log->info(":nonewline", "$&") if !$endline;
+			$endline = $& if $endline;
+		}
+	
 		exists $+{newline}? $self->{lineno}++:
 		exists $+{error_nosym}? $self->error(sprintf($self->{error}{nosym}, $+{error_nosym})):
 		exists $+{spacer}? ():
@@ -662,6 +687,10 @@ sub masking {
 			$self->error("лексема ". $app->perl->q("$^R") ." не существует в языке " . $self->{name})
 		}};
 		
+		if($endline) {
+			$app->log->info(":nonewline empty", $endline);
+			#":cyan", $self->{lineno} . ": "
+		}
 	}
 	
 	$self
@@ -820,6 +849,8 @@ sub postmorf {
 # морфирует в другой язык
 sub morf {
 	my ($self, $s, $file) = @_;
+	my $trace = defined($self->{trace}) && $self->{file} eq $self->{trace};
+	$app->log->info("") if $trace;
 	$self->premorf($file)->masking($s)->postmorf;
 }
 

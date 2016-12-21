@@ -68,10 +68,18 @@
 
 Так же файл может начинаться на `extends` или `inherits`.
 	
-	$app->file("var/_test_13_ag/Ress.ag")->write("inherits Tour\n 911 \n end \n class Tour ");
+	$app->file("var/_test_13_ag/Ress.ag")->write("
+	inherits ::Tour
+		class Tour
+		end
+	911
+	");
 	$app->syntaxAg->ag("var/_test_13_ag/Ress.ag");		# 911
 	
 Любой класс без `inherits` по умолчанию наследует `R::Object`.
+
+	$app->file("var/_test_13_ag/Inherits.ag")->write("me instanceof R::Object");
+	$app->syntaxAg->ag("var/_test_13_ag/Inherits.ag");		# 1
 
 Код который не входит в объявление какого-то метода будет входить в неявный метод `render`. При попытке создать такой метод будет сгенерирована ошибка.
 Команда `ag` подгружает `Aquafile` и указанный класс, создаёт экземпляр и запускает метод `render`.
@@ -82,10 +90,37 @@
 
 	#$app->file("var/_test_13_ag/Ress.au")->write("{{ hi }}");
 	
-	
-=== Методы
+=== Тесты
 
-Все переменные в *Серебрянке* - локальные.
+	# $app->file("var/_test_13_ag/Test.ag")->write("
+		# sub plus a,b then a+b
+		# scenario
+			# me.plus(10, 16)		# 26
+		# end
+		# 6
+	# ");
+	# $app->syntaxAg->ag("var/_test_13_ag/Test.ag");		# 6
+
+	
+=== Методы и свойства
+
+Все переменные в *Серебрянке* - локальные. 
+
+
+Свойства объектов доступны через `me` и его синонимы `self` и `this`:
+	
+	$app->syntaxAg->eval("
+		class TestProperty
+			sub new then self:a = 10
+		end
+	");
+	$app->syntaxAg->eval("new EVAL::TestProperty:a");			# 10
+
+	
+=== Декораторы
+
+
+=== Контрактное программирование
 
 
 == Конвееры
@@ -97,10 +132,11 @@
 
 === `if`
 
-	# $app->syntaxAg->eval("if 0 then 10");				## undef
-	# $app->syntaxAg->eval("if 0 then 10 else 20");		# 20
-	# $app->syntaxAg->eval("if 0 then 10 elseif  then 20");		# 20
-
+	$app->syntaxAg->eval("if 0 then 10");						## undef
+	$app->syntaxAg->eval("if 0 then 10 else 20");				# 20
+	$app->syntaxAg->eval("if 0 then 10 elseif -1 then 20");		# 20
+	$app->syntaxAg->eval("if 0 \n 10 \n end");					## undef
+	$app->syntaxAg->eval("if 0 \n 10 \n else \n 20 \n end");	# 20
 
 == Операторы
 
@@ -189,17 +225,29 @@
 	$app->syntaxAg->new->eval("4*5");		# 20
 	$app->syntaxAg->new->eval("5/4");		# 1.25
 	$app->syntaxAg->new->eval("3^3");		# 9
-
+	
+=== Инкремент и декремент
+	
+	$app->syntaxAg->new->eval("a=10; a++");			# 10
+	$app->syntaxAg->new->eval("a=10; ++a");			# 11
+	$app->syntaxAg->new->eval("a=10; a--");			# 10
+	$app->syntaxAg->new->eval("a=10; --a");			# 9
+	$app->syntaxAg->new->eval("a=10; a++; a");		# 11
+	$app->syntaxAg->new->eval("a=10; a--; a");		# 9
+	
 === Побитовые
 
 	$app->syntaxAg->new->eval("0b0111 +& 0b0010");		## 0b0010
 	$app->syntaxAg->new->eval("0b0001 +| 0b0010");		## 0b0011
 	$app->syntaxAg->new->eval("0b1001 +^ 0b1010");		## 0b0011
-	$app->syntaxAg->new->eval("+~ -1");		# 0
+	$app->syntaxAg->new->eval("+~ -1");					## 0
+	$app->syntaxAg->new->eval("0b0001 +< 3");			## 0b0100
+	$app->syntaxAg->new->eval("0b0100 +> 3");			## 0b0001
 	
 === Для строк и массивов
 
 	$app->syntaxAg->new->eval("10, 20 join ', '");		# 10, 20
+	$app->syntaxAg->new->eval("10 . 20.2");				# 1020.2
 
 == ООП
 
