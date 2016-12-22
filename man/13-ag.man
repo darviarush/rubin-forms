@@ -38,6 +38,7 @@
 Файлы с расширением `.au` - шаблоны.
 
 Файлы в подпапках - это классы.
+Компилляция просходит в подпапку `.Aqua` проекта.
 
 */myproject*
 * _ .Aqua
@@ -76,9 +77,9 @@
 	");
 	$app->syntaxAg->ag("var/_test_13_ag/Ress.ag");		# 911
 	
-Любой класс без `inherits` по умолчанию наследует `R::Object`.
+Любой класс без `inherits` по умолчанию наследует класс `Nil`.
 
-	$app->file("var/_test_13_ag/Inherits.ag")->write("me instanceof R::Object");
+	$app->file("var/_test_13_ag/Inherits.ag")->write("me instanceof Nil");
 	$app->syntaxAg->ag("var/_test_13_ag/Inherits.ag");		# 1
 
 Код который не входит в объявление какого-то метода будет входить в неявный метод `render`. При попытке создать такой метод будет сгенерирована ошибка.
@@ -114,7 +115,8 @@
 			sub new then self:a = 10
 		end
 	");
-	$app->syntaxAg->eval("new EVAL::TestProperty:a");			# 10
+	
+	$app->syntaxAg->eval("new TestProperty:a");			# 10
 
 	
 === Декораторы
@@ -139,8 +141,6 @@
 	$app->syntaxAg->eval("if 0 \n 10 \n else \n 20 \n end");	# 20
 
 == Операторы
-
-	
 
 === Присваивания
 

@@ -3,7 +3,7 @@ package R::Syntax;
 # просматривает на один оператор вперёд, благодаря чему может определить арность оператора
 
 use common::sense;
-use R::App qw/msg msg1 $app todo nsort qsort pairmap has/;
+use R::App qw/msg msg1 $app todo nsort qsort pairmap has Can Isa/;
 
 has qw/addspacelex/;
 
@@ -23,6 +23,8 @@ sub new {
 		BR => {},				# скобки
 		CR => {},				# закрывающие скобки (для формирования лексики)
 		X => {},				# терминалы
+		
+		LEX => {},				# все лекемы
 		
 		PRIO => 0,				# инкремент приоритета
 		ORDER => 1000,			# позиция в лексическом анализаторе
@@ -140,6 +142,24 @@ our %FIX = (
 	fy => $fy,
 );
 
+# добавляет лексему
+sub newlex {
+	my ($self, $alias) = splice @_, 0, 2;
+	
+	my $OP = $self->{LEX};
+	my $op = $OP->{$alias};
+	
+	if($op) {
+		%$op = (%$op, @_, alias => $alias, count => $op->{count} + 1);
+	}
+	else {
+		$OP->{$alias} = { @_, alias => $alias, count => 1 };
+	}
+	
+	$op->{order} = -length $alias if !$op->{order};
+	
+	$self
+}
 
 # ячейка таблицы операторов
 sub td {
@@ -172,6 +192,7 @@ sub td {
 			die "оператор `$type $x` уже объявлен" if exists $self->{$key}{$x};
 			$self->{$key}{$x} = {%p, name=>"$type $x", alias=>$x};
 			$op = $self->{OP}{$x} //= { name=>$x, alias=>$x, order => -length $x };
+			$self->addlex($x, $key => 1);
 		}
 	}
 
@@ -212,6 +233,7 @@ sub br {
 		elsif($close) {	# открывающая скобка, т.к. предыдущая - закрывающая
 			die "скобка `$a` уже есть" if exists $br->{ $a };
 			$br->{ $a } = $open = { name => "br $a", alias => $a, order=>$self->{ORDER}++ };
+			$self->addlex($a, "BR" => 1, %$open);
 			undef $close;
 		}
 		else {	# закрывающая скобка
@@ -219,6 +241,8 @@ sub br {
 				$close = $closest->{ $a };
 			} else {
 				$closest->{ $a } = $close = { name => "cr $a", cr=>1, alias => $a, order=>$self->{ORDER}++ };
+				$self->addlex($a, "CR" => 1, %$close);
+				
 			}
 			$open->{tag} = $a;
 		}
@@ -253,6 +277,8 @@ sub x {
 			die "терминал `$a` уже есть" if exists $x->{ $a };
 			$x->{ $a } = $prev = { name => $a, alias => $a, order=>$self->{ORDER}++ };
 			push @term, $prev;
+			
+			$self->addlex($a, "X" => 1, %$prev);
 		}
 	}
 	
@@ -334,7 +360,7 @@ sub lex {
 		$_
 	}
 	grep { !$_->{nolex} }
-	values %{$self->{OP}}, values  %{$self->{BR}}, values %{$self->{CR}}, values %{$self->{X}};
+	values %{$self->{LEX}};
 	
 	if($self->{addspacelex}) {
 		$lex .= ($lex ne ""? " |\n": "") . "
@@ -368,7 +394,7 @@ sub op {
 	}
 	# проверяем скобки
 	my $br = $self->{IN}{$stmt};
-	$self->check(stmt => $br) if $br;
+	$self->check($push->{stmt}, stmt => $br) if $br;
 	
 	push @{ $self->{stack}[-1]{'A+'} }, $push;
 	#$self->trace("_", $push);
@@ -429,8 +455,8 @@ sub pop {
 	my $PREFIX =  $self->{PREFIX};
 	my $INFIX =  $self->{INFIX};
 	my $POSTFIX =  $self->{POSTFIX};
-	#my $X = $self->{X};
-	#my $BR = $self->{BR};
+	my $X = $self->{X};
+	my $BR = $self->{BR};
 
 	my @T;
 	my @S;
@@ -499,42 +525,75 @@ sub pop {
 	
 	pop @$stack;	# сбрасываем скобку с вершины стека
 	
-	# определяем с конца сколько постфиксных операторов
-	my $n;
-	for($n=@$A; $n>0; $n--) {
-		last if !exists $POSTFIX->{$A->[$n-1]{stmt}};
-	}
+	# # определяем с конца сколько постфиксных операторов
+	# my $n;
+	# for($n=@$A; $n>0; $n--) {
+		# last if !exists $POSTFIX->{$A->[$n-1]{stmt}};
+	# }
 	
 	# ( \n \n ) - обычная ситуация prefix prefix
 	# есть "xfy \n", "fy \n", "yf \n"
 	# последний становится терминалом
 	
 	# определяем операторы
-	my $i = 0;
-	for my $op (@$A) {
+	# 1-й проход - выделяем неоднозначные операторы (X, INFIX, POSTFIX, PREFIX)
+	# 2-й проход по последовательностям неоднозначных операторов: с начала и конца такой последовательности
+	# 3-й - делаем popop на операторах, а в @T забрасываем терминалы и вложенные скобки
 	
+	# 1-й проход
+	my $i = 0;
+	my $begin = undef;	# начало последовательности неоднозначных операторов
+	my @meta;
+	my $resolve = sub {
+		for(my $k = $begin; $k<$i; $k++) {
+			
+		}
+	};
+	
+	for my $op (@$A) {
 		my $stmt = $op->{stmt};
-		
-		if($front and $meta = $PREFIX->{$stmt} and $i != $#$A) {
-			$popop->($op);
-		}
-		elsif(!$front and $meta = $INFIX->{$stmt} and $i<$n) {
-			$popop->($op);
-			$front = 1;
-		}
-		elsif(!$front and $meta = $POSTFIX->{$stmt}) {
-			$popop->($op);
-		}
-		else {	# терминал
-			$front = 0;			# после терминала - постфиксный или инфиксный оператор
-			push @T, $op;
-			$self->trace("¤", $op);
-		}
-		
+		my $lex = $LEX->{$stmt};
+		push @meta, $lex;
+		my $count = $lex->{count};
+		$begin = $i if $count > 1 && !defined $begin;
+		$resolve->(), $begin = undef if $LEX->{$stmt} == 1 && defined $begin;
 	}
 	continue {
-		$i++;
+		$i++
 	}
+	
+	$resolve->() if defined $begin;
+	
+	# my $i = 0;
+	# for my $op (@$A) {
+	
+		# my $stmt = $op->{stmt};
+		
+		# #msg1( ($front? 'префикс': 'пост/инфикс'), $stmt );
+		
+		# if($front and $meta = $PREFIX->{$stmt} and $i != $#$A) {
+			# $popop->($op);
+		# }
+		# elsif(!$front and $meta = $INFIX->{$stmt} and $i<$n) {
+			# $popop->($op);
+			# $front = 1;
+		# }
+		# elsif(!$front and $meta = $POSTFIX->{$stmt}) {
+			# $popop->($op);
+		# }
+		# elsif(exists $X->{$stmt} || exists $BR->{$stmt}) {	# терминал
+			# $front = 0;			# после терминала - постфиксный или инфиксный оператор
+			# push @T, $op;
+			# $self->trace("¤", $op);
+		# }
+		# else {
+			# $self->error("неопознанная лексема " . $app->perl->qq($stmt));
+		# }
+		
+	# }
+	# continue {
+		# $i++;
+	# }
 	
 	# выбрасываем всё
 	$meta = {prio => 1_000_000};
@@ -631,7 +690,8 @@ sub trace {
 	my ($self, $op, $top) = @_;
 	
 	my $trace = $self->{trace};
-	if( defined($trace) && $self->{file} eq $trace ) {
+	# && $self->{file} eq $trace
+	if( $trace ) {
 	
 		my $stmt = $top->{stmt};
 		$app->log->info(":space nonewline", $COLOR{$op} // ":dark white", " $op", $stmt . (exists $top->{$stmt}? "<$top->{$stmt}> ": " "));
@@ -662,7 +722,7 @@ sub masking {
 	my $CR = $self->{CR};
 	my $X = $self->{X};
 	
-	my $trace = defined($self->{trace}) && $self->{file} eq $self->{trace};
+	my $trace = $self->{trace};
 	my $endline;
 	
 	while($s =~ /$lex/g) {			# формируем дерево
@@ -788,7 +848,6 @@ sub expirience {
 			$b = pop @path;		# удаляем элемент
 			
 			#$_->{code} = join "", @$code if $code;
-			
 			my $template = $templates->{ $b->{stmt} };
 			die "нет шаблона `$b->{stmt}` в языке " . ($self->{lang}{name} // "«язык Батькович»") if !$template;
 			
@@ -814,7 +873,7 @@ my $rootsk = $app->perl->qq("¥");
 # приготовления для трансляции в другой язык
 sub premorf {
 	my ($self, $file) = @_;
-	$self->{file} = $file // "«eval»";
+	$self->{file} = $file // $self->{file} // "«eval»";
 	$self->{lineno} = 1;
 	$self->{charlineno} = 0;
 	
@@ -842,6 +901,8 @@ sub postmorf {
 	$self->error("конец: рут должен содержать 1-н элемент") if @$A != 1;
 
 	my $ret = $self->expirience($A->[0]{right});
+	
+	$ret = $self->{lang}->end($ret, $self) if Can $self->{lang}, "end";
 	#msg1 ":space cyan", "code:", $s, ":reset", , ":red", "->", ":reset", $ret if $self->{show_morf};
 	$ret
 }
@@ -849,8 +910,9 @@ sub postmorf {
 # морфирует в другой язык
 sub morf {
 	my ($self, $s, $file) = @_;
-	my $trace = defined($self->{trace}) && $self->{file} eq $self->{trace};
-	$app->log->info("") if $trace;
+	
+	$app->log->info("") if $self->{trace};
+	
 	$self->premorf($file)->masking($s)->postmorf;
 }
 
@@ -858,21 +920,27 @@ sub morf {
 sub eval {
 	my ($self, $code) = @_;
 	my $morf = $self->morf($code);
-	my @ret = wantarray? eval $morf: scalar eval $morf;
-	die $@ if $@;
+	my @ret;
+	my $lang = $self->{lang};
+	if(Can $lang, "eval") {
+		@ret = wantarray? $lang->eval($morf): scalar $lang->eval($morf);
+	}
+	else {
+		@ret = wantarray? eval $morf: scalar eval $morf;
+	}
+	msg(":empty black on_cyan", "eval morf", ":reset", "\n", $morf), die $@ if $@;
 	wantarray? @ret: $ret[0]
 }
 
 # проверяет параметры на верхушке стека скобок и выбрасывает ошибку, если они не совпадают
 sub check {
 	my $self = shift;
+	my $e = shift;
 	my $s = $self->{stack}[-1];
 	for(my $i=0; $i<@_; $i+=2) {
 		my ($k, $v) = @_[$i, $i+1];
-		next if $k eq "e";
 		if( $s->{$k} ne $v ) {
-			my %check = @_;
-			$self->error(exists($check{e})? $check{e}: "$check{stmt}: не совпадает $k в стеке. Оно $s->{$k}, а должно быть $v");
+			$self->error("проверка $e: не совпадает $k в стеке. Оно $s->{$k}, а должно быть $v");
 		}
 	}
 	$self

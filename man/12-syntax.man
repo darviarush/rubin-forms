@@ -158,6 +158,7 @@
 	$string->addspacelex(0);
 	
 	$string->tr("yfx", qw/CAT/)->tr("yf", qw/CAT/);
+	$string->br(qw/exec1 exec1/);
 	
 	$string->opt("CAT", re => qr/ (?<str> [^\$]* ) (?: \$ (?<exec> \S+ ) | $ ) /xs, sub => sub {
 		my ($self, $push) = @_;

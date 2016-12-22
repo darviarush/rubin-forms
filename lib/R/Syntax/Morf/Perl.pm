@@ -53,10 +53,10 @@ interpolation => '{{ str }}${\( {{ right }} )}',
 
 
 # операторы распределения данных
-'xfy \n' => "{{ left }};\n{{ right }}",
-'fy \n' => "\n{{ right }}",
-'yf \n' => "{{ left }}\n",
-'\n' => "\n",
+'xfy \n' => "{{ left }};{{ _rem rem }}\n{{ right }}",
+'fy \n' => "{{ _rem rem }}\n{{ right }}",
+'yf \n' => "{{ left }}{{ _rem rem }}\n",
+'\n' => "{{ _rem rem }}\n",
 
 "xfy ;" => '{{ left }}; {{ right }}',
 'fy ;' => "{{ right }}",
@@ -137,21 +137,16 @@ interpolation => '{{ str }}${\( {{ right }} )}',
 "xfx of" => 'exists {{ left }}->{{{ right }}}',
 
 # операторы смысловых конструкций
-"xfy then" => sub {
-	given($b->{then}) {
-		#when ("") {}
-		default { die "нет такого THEN: $_" }
-	}
-	
-},
-
+"xfy THEN" => '{{ left }}{{ _then then }}{{ right }}',
+"xfy ELSE" => '{{ left }} }: do { {{ right }}',
+"xfy ELSEIF" => '{{ left }} }: ({{ right }}',
 
 # скобки
-# BEGIN { $R::Classes{"{{ class }}"}++; push @R::Classes, "{{ class }}" }
-CLASS => '(do { package {{ class }};{{ _extends class, extends }} sub render { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
+CLASS => '(do { package {{ class }}; use common::sense; use R::App;{{ _extends class, extends }} sub render { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
 
 SUB => 'sub {{ SUB }} { my $DATA = { me => {{ _shift SUB }} }; {{ _args args }} {{ right }}{{ _ifnewend SUB }}}',
 
+IF => '(({{ right }}{{ _else else }})',
 
 # атомы
 self => '$DATA->{me}',
@@ -169,8 +164,8 @@ num => '{{ num }}',
 '[]' => '[]',
 '()' => '()',
 '{}' => '{}',
-new => '{{ new }}->new',
-new_apply => '{{ new }}->new({{ right }})',
+new => '(exists $Nil::CLASSES{"{{ new }}"}? "{{ new }}": $R::App::app->syntaxAg->include("{{ new }}"))->new',
+new_apply => '(exists $Nil::CLASSES{"{{ new }}"}? "{{ new }}": $R::App::app->syntaxAg->include("{{ new }}"))->new({{ right }})',
 
 # строки
 CAT => '{{ str }}',
@@ -190,6 +185,28 @@ string => '"{{ right }}"',
 
 );
 
+# если есть комментарий - выводит
+sub _rem {
+	my ($self, $rem) = @_;
+	defined($rem)? "# $rem": "";
+}
+
+# оператор then
+sub _then {
+	my ($self, $then) = @_;
+	local $_;
+	given($then) {
+		when ("IF") { ")? do { " }
+		default { die "нет такого THEN: $_" }
+	}
+}
+
+# какое окончание у if
+sub _else {
+	my ($self, $else) = @_;
+	$else? ' }': ' }: ()'
+}
+
 # формирует аргументы функции
 sub _args {
 	my ($self, $args) = @_;
@@ -204,8 +221,13 @@ sub _args {
 # хелпер для расширения класса
 sub _extends {
 	my ($self, $class, $extends) = @_;
+	
+	#push @Nil::CLASSES, "{{ class }}"$Nil::CLASSES{"{{ class }}"}++;
+	
+	$self->{BEGIN} .= "\$Nil::CLASSES{\"$class\"}++; ";
+	
 	my $ext = "";
-	$ext .= " BEGIN { \@${class}::ISA = qw/".join(" ", @$extends)."/ } \$R::App::app->syntaxAg->includes( \@ISA );" if @$extends;
+	$ext .= " BEGIN { \$R::App::app->syntaxAg->include( \@${class}::ISA = qw/".join(" ", @$extends)."/ ) }" if @$extends;
 	$ext .= " use mro 'c3';" if @$extends>1;
 	$ext
 }
@@ -225,29 +247,28 @@ sub _shift {
 sub _ifnewend {
 	my ($self, $name) = @_;
 	if($name eq "new") {
-		'$DATA->{me}'
+		'; $DATA->{me}'
 	}
 }
 
-# # формирует заголовок функции
-# sub _sub {
-	# my ($name, $args) = @_;
-	# my $sub = "my \$self=shift; ";
-	# $sub .= _args($args);
-	# $sub .= "\$self = bless {}, ref \$self || \$self; " if $name eq "new";
-	# $sub
-# }
-
-
-# # объявление функции
-# sub sub {
-	# my ($self, $name, $args, $class_in, $class, $endline) = @_;
+# вызывается после разбора файла
+# добавляет в начало
+sub end {
+	my ($self, $ret, $syntax) = @_;
 	
-	# my $sub = _sub($name, $args, $class);
+	if(defined $self->{BEGIN}) {
+		$ret = "BEGIN { $self->{BEGIN} } $ret";
+		delete $self->{BEGIN};
+	}
 	
-	# return ($class_in? "package $class_in {": "") . "sub $name { my \$DATA = {}; $sub$endline(); ", ($class_in? "}}": "}");
-# }
+	$ret
+}
 
+# вычисляет выражение на perl
+sub eval {
+	my ($self, $eval) = @_;
+	eval "my \$DATA={me => \$app->syntaxAg->include(\"Nil\")->new }; $eval";
+}
 
 # # перегрузка оператора
 # sub overload {
@@ -258,21 +279,6 @@ sub _ifnewend {
 	# return ($class_in? "package $class_in {": "") . "use overload '$name' => sub { my \$DATA = {}; $sub$endline(); ", ($class_in? "}}": "};");
 # }
 
-
-
-# # декларация модуля
-# sub module {
-	# my ($self, $name, $extends) = @_;
-	# $extends = _extends($extends);
-	# return "(do { BEGIN { \$R::View::Perl::Classes{'$name'}++; push \@R::View::Perl::Classes, '$name'; } package $name; $extends use common::sense; use R::App; sub __INIT__CLASS__ { my \$DATA; my \$self = shift; ", "} __PACKAGE__ })";
-# }
-
-# # декларация класса
-# sub class {
-	# my ($self, $name, $extends) = @_;
-	# $extends = _extends($extends);
-	# return "(do { BEGIN { \$R::View::Perl::Classes{'$name'}++; push \@R::View::Perl::Classes, '$name'; } package $name; $extends use common::sense; use R::App; sub __INIT__CLASS__ { my \$DATA; my \$self = shift; ", "} __PACKAGE__ })";
-# }
 
 ### модификаторы
 our %modifiers = (
@@ -801,91 +807,87 @@ our %modifiers = (
 	# $_[1]
 # }
 
-# рендерит
-sub render {
-	my ($self, $name, $data, $output) = @_;
+# # рендерит
+# sub render {
+	# my ($self, $name, $data, $output) = @_;
 	
-	my $class = $self->get_name($name);
+	# my $class = $self->get_name($name);
 	
-	$data //= {};
-	bless $data, $class;
+	# $data //= {};
+	# bless $data, $class;
 	
-	push @{$app->{q}{VIEW_FRAME}}, $app->{q}{echo};
+	# push @{$app->{q}{VIEW_FRAME}}, $app->{q}{echo};
 	
-	$app->{q}{echo} = $output;
+	# $app->{q}{echo} = $output;
 	
-	$data->__RENDER__;
+	# $data->__RENDER__;
 	
-	$app->{q}{echo} = pop $app->{q}{VIEW_FRAME};
+	# $app->{q}{echo} = pop $app->{q}{VIEW_FRAME};
 	
-	$self
-}
+	# $self
+# }
 
-# добавляет данные для вычисления
-sub foreval {
-	my ($self, $code) = @_;
-	"my \$DATA={}; $code"
-}
+# # добавляет данные для вычисления
+# sub foreval {
+	# my ($self, $code) = @_;
+	# "my \$DATA={}; $code"
+# }
 
-# вычисляет выражение на perl
-sub eval {
-	my ($self, $eval) = @_;
-	eval $eval;
-}
 
-our %Classes;
-our @Classes;
 
-# очищает классы
-sub clear_classes {
-	my ($self) = @_;
-	
-	%Classes = ();
-	@Classes = ();
-	
-	$self
-}
+# our %Classes;
+# our @Classes;
 
-# позиция в классах
-sub len_classes {
-	int @Classes
-}
+# # очищает классы
+# sub clear_classes {
+	# my ($self) = @_;
+	
+	# %Classes = ();
+	# @Classes = ();
+	
+	# $self
+# }
 
-# инициализирует классы
-sub init_classes {
-	my ($self, $from) = @_;
+# # позиция в классах
+# sub len_classes {
+	# int @Classes
+# }
+
+# # инициализирует классы
+# sub init_classes {
+	# my ($self, $from) = @_;
 	
-	return $self if $from == @Classes;
+	# return $self if $from == @Classes;
 	
-	my @cls = @Classes[$from .. $#Classes];
+	# my @cls = @Classes[$from .. $#Classes];
 	
-	# проверка на вшивость
-	for my $class (@cls) {
-		die "дважды объявлен класс $class" if $Classes{$class} > 1;
-		$Classes{$class} = 1;
-	}
+	# # проверка на вшивость
+	# for my $class (@cls) {
+		# die "дважды объявлен класс $class" if $Classes{$class} > 1;
+		# $Classes{$class} = 1;
+	# }
 	
-	# запускаем тело класса
-	for my $class (@cls) {
-		$class->__INIT__CLASS__;
-	}
+	# # запускаем тело класса
+	# for my $class (@cls) {
+		# $class->__INIT__CLASS__;
+	# }
 	
-	# инициализируем инпуты
-	for my $class (@cls) {
-		$class->create_meta if $class->isa("R::Form::Input");
-	}
+	# # инициализируем инпуты
+	# for my $class (@cls) {
+		# $class->create_meta if $class->isa("R::Form::Input");
+	# }
 	
-	# инициализируем формы
-	for my $class (@cls) {
-		$class->create_meta if $class->isa("R::Form::Form");
-	}	
+	# # инициализируем формы
+	# for my $class (@cls) {
+		# $class->create_meta if $class->isa("R::Form::Form");
+	# }	
 		
-	# запускаем конструктор класса
-	for my $class (@cls) {
-		$class->CLASS_INIT if $class->can("CLASS_INIT");
-	}
+	# # запускаем конструктор класса
+	# for my $class (@cls) {
+		# $class->CLASS_INIT if $class->can("CLASS_INIT");
+	# }
 	
-	$self
-}
+	# $self
+# }
 
 1;
