@@ -564,15 +564,51 @@ sub pop {
 		# после <	<, x
 		# после >	<>, >, )
 		
-		# >, x		перед )
-		# <>, <, (	перед x
-		# >, x		перед <>
-		# <, x, (	перед <
-		# >, x		перед >
+		# >, x			перед )
+		# <>, <, (		перед x
+		# >, x			перед <>
+		# <>, <, x, (	перед <
+		# >, x			перед >
 		
-		for(my $k = $begin, $n = $i; $k<$i; $k++) {
+		# проходимся по возможным комбинациям и выбираем 1-ю подходящую: которая начинается и заканчивается на требуемые операции
+		my @fix;			# комбинации fix-ов
+		my $prev = undef;	# предыдущий fix
+		my @comb = ();		# текущая комбинация, которая будет подставлена в @meta[$begin..$i-1]
+		for(;;) {
+		
+			for(my $k = $begin; $k<$i; $k++) {
+				
+				$meta = $meta[$k];
+				my $fix = $meta->{fix};
+				my $fixk = $fix[$k];
+				if($fix & $infix && !$fixk & $infix && ($prev & $postfix || $prev & $atom)) {
+					$fix[$k] &= $infix;
+					$comb[$k-$begin] = $meta->{INFIX};
+				}
+				elsif($fix & $prefix && !$fixk & $prefix && (!defined($prev) || $prev & $atom || $prev & $prefix || $prev & $infix)) {
+					$fix[$k] &= $prefix;
+					$comb[$k-$begin] = $meta->{PREFIX};
+				}
+				elsif($fix & $postfix && !$fixk & $postfix && ($prev & $postfix || $prev & $atom)) {
+					$fix[$k] &= $postfix;
+					$comb[$k-$begin] = $meta->{POSTFIX};
+				}
+				elsif($fix & $atom && !$fixk & $atom && (!defined($prev) || $prev & $infix || $prev & $prefix)) {
+					$fix[$k] &= $atom;
+					$comb[$k-$begin] = $meta->{X};
+				}
+				else {
+					$self->error("нет больше комбинаций для $meta->{alias}");
+				}
+				
+				$prev = $fix;
+			}
 			
+			# если $meta соответствует следующему операнду - выходим
+			last if ...;
 		}
+		
+		@meta[$begin..$i-1] = @comb;
 	};
 	
 	for my $op (@$A) {
