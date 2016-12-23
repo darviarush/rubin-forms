@@ -114,13 +114,17 @@ sub lang {
 # скобки
 # операторы
 
-our $nonassoc = 0b000001;				# неассоциативность
-our $leftassoc = 0b000010;				# левосторонняя ассоциативность
-our $rightassoc = 0b000100;				# правосторонняя ассоциативность
+our $nonassoc   = 0b000_001;				# неассоциативность
+our $leftassoc  = 0b000_010;				# левосторонняя ассоциативность
+our $rightassoc = 0b000_100;				# правосторонняя ассоциативность
 
-our $infix = 0b001000;					# инфиксный оператор
-our $prefix = 0b010000;					# префиксный оператор
-our $postfix = 0b100000;				# постфиксный оператор
+our $infix      = 0b001_000;				# инфиксный оператор
+our $prefix     = 0b010_000;				# префиксный оператор
+our $postfix    = 0b100_000;				# постфиксный оператор
+
+our $terminal = 0b101_000_000;				# терминал
+our $bracket  = 0b110_000_000;				# скобка
+our $atom	  = 0b100_000_000;				# или терминал или скобка
 
 our $xfy=$infix | $leftassoc;			# левоассоциативный инфиксный
 our $yfx=$infix | $rightassoc;			# правоассоциативный инфиксный
@@ -144,19 +148,22 @@ our %FIX = (
 
 # добавляет лексему
 sub newlex {
-	my ($self, $alias) = splice @_, 0, 2;
+	my ($self, $key, $val) = @_;
 	
-	my $OP = $self->{LEX};
-	my $op = $OP->{$alias};
+	my $alias = $val->{alias};
+	my $LEX = $self->{LEX};
+	my $op = $LEX->{$alias};
 	
 	if($op) {
-		%$op = (%$op, @_, alias => $alias, count => $op->{count} + 1);
+		die "лексема $key:$alias уже есть в лексемах" if exists $op->{$key};
+		die "скобка $alias не может сочетаться с $key:$alias" if exists $op->{BR} || exists $op->{CR};
+		%$op = (%$op, @_, alias => $alias, count => $op->{count} + 1, $key => $val);
 	}
 	else {
-		$OP->{$alias} = { @_, alias => $alias, count => 1 };
+		$LEX->{$alias} = { @_, alias => $alias, count => 1, $key => $val };
 	}
 	
-	$op->{order} = -length $alias if !$op->{order};
+	$op->{fix} |= $val->{fix};
 	
 	$self
 }
@@ -192,7 +199,8 @@ sub td {
 			die "оператор `$type $x` уже объявлен" if exists $self->{$key}{$x};
 			$self->{$key}{$x} = {%p, name=>"$type $x", alias=>$x};
 			$op = $self->{OP}{$x} //= { name=>$x, alias=>$x, order => -length $x };
-			$self->addlex($x, $key => 1);
+			$op->{fix} |= $fix;
+			$self->newlex($key => $op);
 		}
 	}
 
@@ -232,8 +240,8 @@ sub br {
 		}
 		elsif($close) {	# открывающая скобка, т.к. предыдущая - закрывающая
 			die "скобка `$a` уже есть" if exists $br->{ $a };
-			$br->{ $a } = $open = { name => "br $a", alias => $a, order=>$self->{ORDER}++ };
-			$self->addlex($a, "BR" => 1, %$open);
+			$br->{ $a } = $open = { name => "br $a", alias => $a, order=>$self->{ORDER}++, fix => $bracket };
+			$self->newlex(BR => $open);
 			undef $close;
 		}
 		else {	# закрывающая скобка
@@ -241,7 +249,7 @@ sub br {
 				$close = $closest->{ $a };
 			} else {
 				$closest->{ $a } = $close = { name => "cr $a", cr=>1, alias => $a, order=>$self->{ORDER}++ };
-				$self->addlex($a, "CR" => 1, %$close);
+				$self->newlex(CR => $close);
 				
 			}
 			$open->{tag} = $a;
@@ -275,10 +283,10 @@ sub x {
 		}
 		else {
 			die "терминал `$a` уже есть" if exists $x->{ $a };
-			$x->{ $a } = $prev = { name => $a, alias => $a, order=>$self->{ORDER}++ };
+			$x->{ $a } = $prev = { name => $a, alias => $a, order=>$self->{ORDER}++, fix => $terminal };
 			push @term, $prev;
 			
-			$self->addlex($a, "X" => 1, %$prev);
+			$self->newlex(X => $prev);
 		}
 	}
 	
@@ -544,8 +552,25 @@ sub pop {
 	my $i = 0;
 	my $begin = undef;	# начало последовательности неоднозначных операторов
 	my @meta;
-	my $resolve = sub {
-		for(my $k = $begin; $k<$i; $k++) {
+	my $resolve = sub {	# 2-й проход по последовательности
+		# определяем направленность операторов:
+		# должны ли все быть постфиксными, префиксными или начинаться на префиксные и заканчиваться постфиксными или наоборот?
+		
+		# prefix <, infix <>, postfix >, x
+		
+		# после (	<, x
+		# после x	<>, >, )
+		# после <>	<, x
+		# после <	<, x
+		# после >	<>, >, )
+		
+		# >, x		перед )
+		# <>, <, (	перед x
+		# >, x		перед <>
+		# <, x, (	перед <
+		# >, x		перед >
+		
+		for(my $k = $begin, $n = $i; $k<$i; $k++) {
 			
 		}
 	};
@@ -554,8 +579,7 @@ sub pop {
 		my $stmt = $op->{stmt};
 		my $lex = $LEX->{$stmt};
 		push @meta, $lex;
-		my $count = $lex->{count};
-		$begin = $i if $count > 1 && !defined $begin;
+		$begin = $i if $lex->{count} > 1 && !defined $begin;
 		$resolve->(), $begin = undef if $LEX->{$stmt} == 1 && defined $begin;
 	}
 	continue {
@@ -564,36 +588,37 @@ sub pop {
 	
 	$resolve->() if defined $begin;
 	
-	# my $i = 0;
-	# for my $op (@$A) {
+	# третий проход
+	$i = 0;
+	for $meta (@meta) {
 	
-		# my $stmt = $op->{stmt};
+		my $stmt = $op->{stmt};
 		
-		# #msg1( ($front? 'префикс': 'пост/инфикс'), $stmt );
+		#msg1( ($front? 'префикс': 'пост/инфикс'), $stmt );
 		
-		# if($front and $meta = $PREFIX->{$stmt} and $i != $#$A) {
-			# $popop->($op);
-		# }
-		# elsif(!$front and $meta = $INFIX->{$stmt} and $i<$n) {
-			# $popop->($op);
-			# $front = 1;
-		# }
-		# elsif(!$front and $meta = $POSTFIX->{$stmt}) {
-			# $popop->($op);
-		# }
-		# elsif(exists $X->{$stmt} || exists $BR->{$stmt}) {	# терминал
-			# $front = 0;			# после терминала - постфиксный или инфиксный оператор
-			# push @T, $op;
-			# $self->trace("¤", $op);
-		# }
-		# else {
-			# $self->error("неопознанная лексема " . $app->perl->qq($stmt));
-		# }
+		if($front and $meta = $PREFIX->{$stmt} and $i != $#$A) {
+			$popop->($op);
+		}
+		elsif(!$front and $meta = $INFIX->{$stmt} and $i<$n) {
+			$popop->($op);
+			$front = 1;
+		}
+		elsif(!$front and $meta = $POSTFIX->{$stmt}) {
+			$popop->($op);
+		}
+		elsif(exists $X->{$stmt} || exists $BR->{$stmt}) {	# терминал
+			$front = 0;			# после терминала - постфиксный или инфиксный оператор
+			push @T, $op;
+			$self->trace("¤", $op);
+		}
+		else {
+			$self->error("неопознанная лексема " . $app->perl->qq($stmt));
+		}
 		
-	# }
-	# continue {
-		# $i++;
-	# }
+	}
+	continue {
+		$i++;
+	}
 	
 	# выбрасываем всё
 	$meta = {prio => 1_000_000};
