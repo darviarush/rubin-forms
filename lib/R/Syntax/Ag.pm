@@ -20,7 +20,7 @@ sub new {
 	my ($cls) = @_;
 	my $self = bless {
 		%$BASICSYNTAX,
-		trace => "«eval»",
+		trace => 1,
 	}, ref $cls || $cls;
 	
 	#$self->trace_help if defined $self->{trace};
@@ -150,13 +150,27 @@ $s->opt("instanceof", re => qr{ \b instanceof $re_space (?<class> $re_class_abs 
 $s->opt('\n', re => "$re_rem $re_endline", sub => sub {
 	my ($self, $push) = @_;
 	$self->{lineno}++;
-	$push->{then} = delete $self->endline->top->{then};
+	my $br = $self->endline->top;
+	if($br->{then}) {
+		$self->op("THEN");
+		delete $br->{endline};
+	}
 });
 
-$s->opt("THEN", sub => sub { my ($self, $push) = @_; my $br = $self->{stack}[-1]; $br->{endline}=1; $push->{stmt} = delete $br->{then} });
-$s->opt("ELSEIF", sub => sub { my ($self, $push) = @_; $self->check(stmt=>"IF", else=>"", then=>"")->top->{then} = "elseif_then" });
-$s->opt("ELSE", sub => sub { my ($self, $push) = @_; $self->check(stmt=>"IF", else=>"", then=>"")->top->{else} = 1 });
-$s->opt("UNTIL", sub => sub { my ($self, $push) = @_; $self->check(stmt=>"REPEAT")->top->{endline} = 1 });
+$s->opt("THEN", sub => sub {
+	my ($self, $push) = @_;
+	my $br = $self->check("THEN", then=>1)->top;
+	$br->{endline} = 1;
+	delete $br->{then};
+	$push->{then} = $br->{stmt};
+});
+$s->opt("ELSEIF", sub => sub {
+	my ($self, $push) = @_;
+	my $br = $self->check("ELSEIF", stmt=>"IF", else=>"", then=>"")->top;
+	$br->{then} = 1;
+});
+$s->opt("ELSE", sub => sub { my ($self, $push) = @_; $self->check("ELSE", stmt=>"IF", else=>"", then=>"")->top->{else} = 1 });
+$s->opt("UNTIL", sub => sub { my ($self, $push) = @_; $self->check("UNTIL", stmt=>"REPEAT")->top->{endline} = 1 });
 $s->opt("FROM", sub => sub { my ($self, $push) = @_; my $top = $self->endline->top; $self->error("FROM должен использоваться после MAP, PAIRMAP, GREP, SORT, NSORT, QSORT или REDUCE") if $top->{stmt} !~ /^(?:map|grep|[nq]sort|reduce|pairmap)$/; $push->{endline} = $push->{gosub} = 1 });
 
 
@@ -167,9 +181,9 @@ $s->br(qw{			(	)			});
 $s->br(qw{			[	]			});
 $s->br(qw{			{	}			});
 
-$s->br(qw{			FOR		} => sub { my ($self, $push) = @_; $push->{then}="for_then"},	qw{		END		});
-$s->br(qw{			WHILE	} => sub { my ($self, $push) = @_; $push->{then}="while_then"},	qw{		END		});
-$s->br(qw{			IF		} => sub { my ($self, $push) = @_; $push->{then}="if_then"},	qw{		END		});
+$s->br(qw{			FOR		} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
+$s->br(qw{			WHILE	} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
+$s->br(qw{			IF		} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
 $s->br(qw{			BEGIN		END		});
 $s->br(qw{			ON	} => qr{ \b ON $re_space (?<route>$re_string) }x => sub {
 	my ($self, $push) = @_; 
@@ -343,17 +357,10 @@ $string->opt("CAT", re => qr/ (?<str> [^\$]* ) (?: \$ (?<exec> $re_id([\.:]$re_i
 
 ########################################### require ###########################################
 
-# класс по-умолчанию
-sub classByDefault {
-	my ($self, $name, $code) = @_;
-	$self->{lineno} = 0;
-	"class $name\n$code\nend";
-}
-
-# переопределяем eval
-sub eval {
-	my ($self, $code) = splice @_, 0, 2;
-	$self->SUPER::eval( $self->classByDefault('EVAL', $code) . ".render" );
+# добавляем \n
+sub morf {
+	my ($self, $text) = @_;
+	$self->SUPER::morf("$text\n");
 }
 
 # возвращает рутовую директорию проекта
@@ -399,14 +406,17 @@ sub path2class {
 	$class
 }
 
+
+
 # компилирует файл
 sub compile {
-	my ($self, $path, $to) = @_;
+	my ($self, $path, $to, $name) = @_;
 	
-	#msg1 "compile", $path, $to;
+	die "compile: не указан Класс" if !$name;
+	die "compile: не указан путь файла" if !$path;
+	die "compile: не указано куда компилировать" if !$to;
 	
 	my $file = $app->file($path);
-	my $name = $file->nik;
 	my $text = $file->read;
 	
 	my $cc = $self->new(file => $path);
@@ -420,6 +430,8 @@ sub compile {
 			$text = "class $name\n$text\nend";
 		}
 	}
+	
+	#msg1 $path, $to, $name, $text;
 	
 	my $code = $cc->morf( $text );
 	$app->file($to)->mkpath->write($code);
@@ -440,16 +452,20 @@ sub require {
 	#my $to_dir = $Nil::INC->[0];
 	
 	my $file = $app->file($path);
+	my $class = $self->path2class($path);
 	
 	for my $inc (@$INC) {
 		my $f = $file->frontdir($inc);
 		if($f->exists) {
 			my $to = $app->file("$inc/.Aqua/$path.pm");
+			
 			if(!$to->exists || $to->mtime < $f->mtime) {
-				$self->compile($f->path, $to->path);
+				$self->compile($f->path, $to->path, $class);
 			}
+			
+			$Nil::REQUIRE{$path} = $path;
 			require $to->path;
-			return $Nil::REQUIRE{$path} = $self->path2class($path);
+			return $class;
 		}
 	}
 	
@@ -457,38 +473,34 @@ sub require {
 }
 
 # подключает классы Ag, Au или Perl
-sub includes {
+sub include {
 	my $self = shift;
 	
-	my @class;
-	for my $class (@_) {
-		push @class, $self->include($class);
+
+	CLASSES: for my $class (@_) {
+	
+		next if exists $Nil::CLASSES{$class};
+		
+		my $path = $class;
+		$path =~ s!::!/!g;
+
+		my $INC = $Nil::INC;
+
+		for my $inc (@$INC) {
+			$self->require("$path.ag", [$inc]), next CLASSES if -e "$inc/$path.ag";
+			$self->parse("$path.au", [$inc]), next CLASSES if -e "$inc/$path.au";
+		}
+		
+		require "$path.pm";
+		
+		die "нет new у " . $app->perl->qq($class) if !$class->can("new");
+		
+		$Nil::CLASSES{$class}++;
 	}
 	
-	@class
+	@_==1? $_[0]: @_
 }
 
-# подключает класс
-sub include {
-	my ($self, $class) = @_;
-	
-	return $class if $class->can("new");
-	
-	my $path = $class;
-	$path =~ s!::!/!g;
 
-	my $INC = $Nil::INC;
-
-	for my $inc (@$INC) {
-		return $self->require("$path.ag", [$inc]) if -e "$inc/$path.ag";
-		return $self->parse("$path.au", [$inc]) if -e "$inc/$path.au";
-	}
-	
-	require "$path.pm";
-	
-	die "нет new у " . $app->perl->qq($class) if !$class->can("new");
-	
-	return $class;
-}
 
 1;
