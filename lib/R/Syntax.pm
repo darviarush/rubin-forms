@@ -444,7 +444,6 @@ sub pop {
 		$x->{sub}->($self) if exists $x->{sub};
 	}
 	
-	
 	$self->{front} = 0;
 	
 	my $stack = $self->{stack};		# стек скобок
@@ -617,27 +616,29 @@ sub pop {
 			for(my $k = $begin; $k<$i; $k++) {
 				
 				$meta = $meta[$k];
+				my $n = $k-$begin;
+				
 				
 				my $fix = $meta->{fix};
-				my $fixk = $fix[$k];
+				my $fixk = $fix[$n];
 				
-				#msg1 $self->namefix($prev), $check->($prev, $atom);
+				msg1 \@fix, $self->namefix($prev), $self->namefix($fix), $self->namefix($fixk);
 				
 				if($fix & $infix && !($fixk & $infix) && $check->($prev, $infix)) {
-					$fix[$k] |= $prev = $infix;
-					$comb[$k-$begin] = $meta->{INFIX};
+					$fix[$n] |= $prev = $infix;
+					$comb[$n] = $meta->{INFIX};
 				}
 				elsif($fix & $prefix && !($fixk & $prefix) && $check->($prev, $prefix)) {
-					$fix[$k] |= $prev = $prefix;
-					$comb[$k-$begin] = $meta->{PREFIX};
+					$fix[$n] |= $prev = $prefix;
+					$comb[$n] = $meta->{PREFIX};
 				}
 				elsif($fix & $postfix && !($fixk & $postfix) && $check->($prev, $postfix)) {
-					$fix[$k] |= $prev = $postfix;
-					$comb[$k-$begin] = $meta->{POSTFIX};
+					$fix[$n] |= $prev = $postfix;
+					$comb[$n] = $meta->{POSTFIX};
 				}
 				elsif($fix & $atom && !($fixk & $atom) && $check->($prev, $atom)) {
-					$fix[$k] |= $prev = $atom;
-					$comb[$k-$begin] = $meta->{X} // $meta->{BR};
+					$fix[$n] |= $prev = $atom;
+					$comb[$n] = $meta->{X} // $meta->{BR};
 				}
 				else {
 					$self->error("нет больше комбинаций для $meta->{alias}");
