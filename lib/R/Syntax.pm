@@ -14,15 +14,16 @@ sub new {
 		
 		name => (ref $cls || $cls),	# имя языка
 		
-		PREFIX => {},			# префикс-операторы
-		INFIX => {},			# инфикс-операторы 
-		POSTFIX => {},			# постфикс-операторы
+		# больше не используются
+		PREFIX => "no!",			# префикс-операторы
+		INFIX => "no!",			# инфикс-операторы 
+		POSTFIX => "no!",			# постфикс-операторы
 		
-		OP => {},				# лексемы операторов
+		OP => "no!",				# лексемы операторов
 		
-		BR => {},				# скобки
-		CR => {},				# закрывающие скобки (для формирования лексики)
-		X => {},				# терминалы
+		BR => "no!",				# скобки
+		CR => "no!",				# закрывающие скобки (для формирования лексики)
+		X => "no!",				# терминалы
 		
 		LEX => {},				# все лекемы
 		
@@ -64,7 +65,7 @@ sub checkout {
 	
 	local $_;
 	
-	my $fields = [qw/ name PREFIX INFIX POSTFIX OP BR CR X LEX POP_A lex addspacelex trace show /];
+	my $fields = [qw/ name LEX POP_A lex addspacelex trace show /];
 	
 	# сохраняем текущий в LA_MASTER
 	my $name = $self->{name};
@@ -123,9 +124,10 @@ our $infix      = 0b001_000;				# инфиксный оператор
 our $prefix     = 0b010_000;				# префиксный оператор
 our $postfix    = 0b100_000;				# постфиксный оператор
 
-our $terminal = 0b101_000_000;				# терминал
-our $bracket  = 0b110_000_000;				# скобка
+our $terminal = 0b001_000_000;				# терминал
+our $bracket  = 0b010_000_000;				# скобка
 our $atom	  = 0b100_000_000;				# или терминал или скобка
+our $crbracket= 0b001_000_000_000;			# закрывающая скобка
 
 our $xfy=$infix | $leftassoc;			# левоассоциативный инфиксный
 our $yfx=$infix | $rightassoc;			# правоассоциативный инфиксный
@@ -147,26 +149,6 @@ our %FIX = (
 	fy => $fy,
 );
 
-# добавляет лексему
-sub newlex {
-	my $self = shift;
-	my ($key, $val) = @_;
-	
-	my $alias = $val->{alias};
-	my $LEX = $self->{LEX};
-	my $op = $LEX->{$alias};
-	
-	if($op) {
-		die "лексема $key:$alias уже есть в лексемах" if exists $op->{$key};
-		die "скобка $alias не может сочетаться с $key:$alias" if exists $op->{BR} || exists $op->{CR};
-		%$op = (%$op, @_, count => $op->{count} + 1, $key => $val, fix => $op->{fix} | $val->{fix});
-	}
-	else {
-		$LEX->{$alias} = { @_, name => $alias, alias => $alias, count => 1, $key => $val, order => $val->{order}, fix => $val->{fix}, VAL => $val };
-	}
-	
-	$self
-}
 
 # ячейка таблицы операторов
 sub td {
@@ -181,7 +163,7 @@ sub td {
 		fix=>$fix,
 		type=>$type,
 	);
-	my $op;
+	my $op = "no val!";
 	
 	my $key = $fix & $infix? "INFIX": $fix & $prefix? "PREFIX": "POSTFIX";
 	for my $x (@_) {
@@ -197,10 +179,7 @@ sub td {
 		}
 		else {
 			die "оператор `$type $x` уже объявлен" if exists $self->{$key}{$x};
-			my $r = $self->{$key}{$x} = {%p, name=>"$type $x", alias=>$x};
-			$op = $self->{OP}{$x} //= { name=>$x, alias=>$x, order => -length $x };
-			$op->{fix} |= $fix;
-			$self->newlex($key => $r);
+			$op = $self->newlex($key => {%p, name=>"$type $x", alias=>$x, fix => $fix, order => -length $x});
 		}
 	}
 
@@ -219,8 +198,6 @@ sub tr {
 sub br {
 	my $self = shift;
 	
-	my $br = $self->{BR};
-	my $closest = $self->{CR};
 	my $open;				# открывающая скобка
 	my $close = 1;		# закрывающая скобка
 	
@@ -239,18 +216,15 @@ sub br {
 			$r->{sub} = $a;
 		}
 		elsif($close) {	# открывающая скобка, т.к. предыдущая - закрывающая
-			die "скобка `$a` уже есть" if exists $br->{ $a };
-			$br->{ $a } = $open = { name => "br $a", alias => $a, order=>$self->{ORDER}++, fix => $bracket };
-			$self->newlex(BR => $open);
+			die "скобка `$a` уже есть" if exists $self->{LEX}{ $a } and exists $self->{LEX}{ $a }{BR};
+			$open = $self->newlex(BR => { name => "br $a", alias => $a, order=>$self->{ORDER}++, fix => $bracket | $atom });
 			undef $close;
 		}
 		else {	# закрывающая скобка
-			if(exists $closest->{ $a }) {
-				$close = $closest->{ $a };
+			if(exists $self->{LEX}{ $a } and exists $self->{LEX}{ $a }{CR}) {
+				$close = $self->{LEX}{ $a };
 			} else {
-				$closest->{ $a } = $close = { name => "cr $a", cr=>1, alias => $a, order=>$self->{ORDER}++ };
-				$self->newlex(CR => $close);
-				
+				$close = $self->newlex(CR => { name => "cr $a", alias => $a, order=>$self->{ORDER}++, fix => $crbracket });
 			}
 			$open->{tag} = $a;
 		}
@@ -264,9 +238,6 @@ sub br {
 sub x {
 	my $self = shift;
 	
-	#die "формирование таблицы символов уже завершено" if $self->{lex};
-	
-	my $x = $self->{X};
 	my $prev;
 	my @term;
 	
@@ -282,28 +253,12 @@ sub x {
 			$prev->{sub} = $a;
 		}
 		else {
-			die "терминал `$a` уже есть" if exists $x->{ $a };
-			$x->{ $a } = $prev = { name => $a, alias => $a, order=>$self->{ORDER}++, fix => $terminal };
-			push @term, $prev;
-			
-			$self->newlex(X => $prev);
+			die "терминал `$a` уже есть" if exists $self->{LEX}{ $a } and exists $self->{LEX}{ $a }{X};
+			$prev = $self->newlex(X => { name => $a, alias => $a, order=>$self->{ORDER}++, fix => $atom | $terminal });
 		}
 	}
 	
-	for my $a (@term) {
-		#$a->{re} = quotemeta $a->{name} if !exists $a->{re};
-		#my $name = quotemeta $a->{name};
-		#use charnames;
-		#$name =~ s/\W/charnames::viacode(ord $&)/ge;
-		if($a->{re}) {
-			$a->{re} = "(?<$a->{name}>$a->{re})" if "$a->{re}" !~ /\(\?P?</;
-		}
-		else {
-			$a->{re} = quotemeta $a->{name};
-		}
-	}
-	
-	return @term;
+	$self
 }
 
 # добавляет к сущности свойства
@@ -312,7 +267,7 @@ sub opt {
 	
 	my $x;
 	
-	die "нет opt($stmt)" unless $x = ($self->{OP}{$stmt} // $self->{BR}{$stmt} // $self->{CR}{$stmt} // $self->{X}{$stmt});
+	die "нет opt($stmt)" unless $x = $self->{LEX}{$stmt};
 	
 	pairmap {
 		die "свойство $a в $stmt уже есть" if exists $x->{$a};
@@ -346,7 +301,26 @@ sub pull {
 
 ###############################  лексический анализатор ###############################
 
-
+# добавляет лексему
+sub newlex {
+	my $self = shift;
+	my ($key, $val) = @_;
+	
+	my $alias = $val->{alias};
+	my $LEX = $self->{LEX};
+	my $op = $LEX->{$alias};
+	
+	if($op) {
+		die "лексема $key:$alias уже есть в лексемах" if exists $op->{$key};
+		die "скобка $alias не может сочетаться с $key:$alias" if exists $op->{BR} || exists $op->{CR};
+		%$op = (%$op, @_, count => $op->{count} + 1, $key => $val, fix => $op->{fix} | $val->{fix});
+	}
+	else {
+		$op = $LEX->{$alias} = { @_, name => $alias, alias => $alias, count => 1, $key => $val, order => $val->{order}, fix => $val->{fix}, VAL => $val };
+	}
+	
+	$op
+}
 
 # формирует функцию лексического разбора
 sub lex {
@@ -355,20 +329,24 @@ sub lex {
 	#use re 'eval';
 	
 	my $lex = join " |\n", map {
-		my $x = quotemeta $_->{alias};
-		"$_->{re}		(?{ \"$x\" })";
-	}
-	nsort { $_->{order} } map {
+		my $alias = quotemeta $_->{alias};
+		
+		if($_->{fix} & $terminal && $_->{re} && $_->{name} =~ /^[a-z_]\w*$/i) {
+			$_->{re} = "(?<$_->{name}>$_->{re})" if "$_->{re}" !~ /\(\?P?</;
+		}
+		
 		$_->{re} //= do {
-			my $x = quotemeta $_->{alias};
+			my $x = $alias;
 			$x = "\\b$x" if $x =~ /^\w/;
 			$x = "$x\\b" if $x =~ /\w$/;
 			$x
 		};
-		$_
+	
+		"$_->{re}		(?{ \"$alias\" })";
 	}
+	nsort { $_->{order} }
 	grep { !$_->{nolex} }
-	values %{$self->{X}}, values %{$self->{BR}}, values %{$self->{CR}}, values %{$self->{OP}};
+	values %{$self->{LEX}};
 	
 	if($self->{addspacelex}) {
 		$lex .= ($lex ne ""? " |\n": "") . "
@@ -377,12 +355,60 @@ sub lex {
 		(?<error_nosym> . )	"
 	}
 	
+	$app->file("var/lex.pl")->write("qr{$lex}xni");
 	
 	#msg1 $lex;
 	
 	my $re = eval "qr{$lex}xni";
 	die $@ if $@;
 	$re
+}
+
+# формирует дерево
+sub masking {
+	my ($self, $s) = @_;
+	
+	my $lex = $self->{lex} //= $self->lex;
+	my $LEX = $self->{LEX};
+	my $trace = $self->{trace};
+	my $endline;
+
+	while($s =~ /$lex/g) {			# формируем дерево
+	
+		if($trace) {
+			$endline = index($&, "\n")!=-1;
+			$app->log->info(":nonewline", "$&") if !$endline;
+			$endline = $& if $endline;
+		}
+	
+		exists $+{newline}? $self->{lineno}++:
+		exists $+{error_nosym}? $self->error(sprintf($self->{error}{nosym}, $+{error_nosym})):
+		exists $+{spacer}? ():
+		do { if(defined $^R) {
+			my $lex = $LEX->{$^R};
+		
+			$self->error("лексема ". $app->perl->q("$^R") ." не существует в языке " . $self->{name}) if !defined $lex;
+		
+			my $fix = $lex->{fix};
+		
+			$fix & $bracket? do {
+				my $tag = $lex->{tag};
+				$self->push($^R, defined($tag)? (tag=>$tag): ());
+			}:
+			$fix & $crbracket? $self->pop($^R):
+			$fix & $infix | $fix & $prefix | $fix & $postfix | $fix & $terminal? $self->op($^R):
+			$self->error("лексема ". $app->perl->q("$^R") ." не опознана в языке " . $self->{name})
+			
+			
+		}};
+		
+		if($endline) {
+			$app->log->info(":nonewline empty", $endline);
+			#":cyan", $self->{lineno} . ": "
+		}
+	}
+	
+	$self
 }
 
 ###############################  синтаксический разбор  ###############################
@@ -397,7 +423,7 @@ sub op {
 	my $stmt = $_[0];
 
 	# выполняем подпрограмму
-	if(my $x = $self->{X}{$stmt} // $self->{OP}{$stmt}) {
+	if(my $x = $self->{LEX}{$stmt}) {
 		$x->{sub}->($self, $push) if exists $x->{sub};
 	}
 	# проверяем скобки
@@ -426,7 +452,8 @@ sub push {
 	my $self = shift;
 	my $push = {%+, 'stmt', @_};
 	
-	if(my $x = $self->{BR}{$_[0]}) {
+	# выполняем подпрограмму
+	if(my $x = $self->{LEX}{$_[0]}) {
 		$x->{sub}->($self, $push) if exists $x->{sub};
 	}
 	
@@ -440,8 +467,11 @@ sub push {
 sub pop {
 	my ($self, $stag) = @_;
 	
-	if(my $x = $self->{CR}{$stag}) {
-		$x->{sub}->($self) if exists $x->{sub};
+	# выполняем подпрограмму
+	my $x = $self->{LEX}{$stag};
+	if($x && exists $x->{sub}) {
+		my $push = {%+, stmt => $stag};
+		$x->{sub}->($self, $push);
 	}
 	
 	$self->{front} = 0;
@@ -458,12 +488,8 @@ sub pop {
 	
 	my $A = $sk->{'A+'};
 	$self->error("скобки ".($stag eq $sk->{stmt}? $stag: $sk->{stmt}." ".$stag)." не могут быть пусты") if !$A;
-	
-	my $PREFIX =  $self->{PREFIX};
-	my $INFIX =  $self->{INFIX};
-	my $POSTFIX =  $self->{POSTFIX};
-	my $X = $self->{X};
-	my $BR = $self->{BR};
+
+	# лексемы
 	my $LEX = $self->{LEX};
 
 	my @T;
@@ -533,12 +559,6 @@ sub pop {
 	}
 	
 	pop @$stack;	# сбрасываем скобку с вершины стека
-	
-	# # определяем с конца сколько постфиксных операторов
-	# my $n;
-	# for($n=@$A; $n>0; $n--) {
-		# last if !exists $POSTFIX->{$A->[$n-1]{stmt}};
-	# }
 	
 	# ( \n \n ) - обычная ситуация prefix prefix
 	# есть "xfy \n", "fy \n", "yf \n"
@@ -610,7 +630,7 @@ sub pop {
 		my $super_prev = $begin==0? undef: $meta[$begin-1]{fix};
 		my $next = $i==@meta? undef: $meta[$i]{fix};	# следующий операнд
 
-		msg1 @meta[$begin, $i-1];
+		#msg1 @meta[$begin, $i-1];
 		
 		my $k = $begin;
 		FOR: for(; $k<$i; $k++) {
@@ -623,7 +643,7 @@ sub pop {
 			my $fix = $meta->{fix};
 			my $fixk = $fix[$n];
 			
-			msg1 $n, $meta->{name}, $self->namefix($fix), $self->namefix($fixk);
+			#msg1 $n, $meta->{name}, $self->namefix($fix), $self->namefix($fixk);
 			
 			if($fix & $infix && !($fixk & $infix) && $check->($prev, $infix)) {
 				$fix[$n] |= $infix;
@@ -848,52 +868,6 @@ sub error {
 	
 	die $color_msg;
 }
-
-# формирует дерево
-sub masking {
-	my ($self, $s) = @_;
-	
-	my $lex = $self->{lex} //= $self->lex;
-	
-	my $OP = $self->{OP};
-	my $BR = $self->{BR};
-	my $CR = $self->{CR};
-	my $X = $self->{X};
-	
-	my $trace = $self->{trace};
-	my $endline;
-	
-	while($s =~ /$lex/g) {			# формируем дерево
-	
-		if($trace) {
-			$endline = index($&, "\n")!=-1;
-			$app->log->info(":nonewline", "$&") if !$endline;
-			$endline = $& if $endline;
-		}
-	
-		exists $+{newline}? $self->{lineno}++:
-		exists $+{error_nosym}? $self->error(sprintf($self->{error}{nosym}, $+{error_nosym})):
-		exists $+{spacer}? ():
-		do { if(defined $^R) {
-			exists $OP->{$^R}? $self->op($^R):
-			exists $BR->{$^R}? do {
-				my $tag = $BR->{$^R}{tag};
-				$self->push($^R, defined($tag)? (tag=>$tag): ());
-			}:
-			exists $CR->{$^R}? $self->pop($^R):
-			exists $X->{$^R}? $self->atom($^R):
-			$self->error("лексема ". $app->perl->q("$^R") ." не существует в языке " . $self->{name})
-		}};
-		
-		if($endline) {
-			$app->log->info(":nonewline empty", $endline);
-			#":cyan", $self->{lineno} . ": "
-		}
-	}
-	
-	$self
-}
-
 
 # устанавливает модификаторы языка
 sub modifiers {

@@ -148,22 +148,25 @@
 
 Создаём синтаксический анализатор для строк и для выражений.
 
-	my $string = $app->syntax->new(name => "string", show => 1);
-	my $s = $app->syntax->new(name => "master", show => 1);
+	my $string = $app->syntax->new(name => "string");
+	my $s = $app->syntax->new(name => "master");
 	# подключаем строковый анализатор к языковому анализатору
 	$s->bar( $string );
 	
 	# отключаем добавление дефолтных лексем
 	$string->addspacelex(0);
 	
-	$string->tr("yfx", qw/CAT/)->tr("yf", qw/CAT/);
+	$string->tr("yfx", qw/CAT/)->td("yf", qw/CAT/);
+	$string->x(qw/CAT/);
+	
 	$string->br(qw/exec1/);
 	$string->opt("exec1", nolex => 1);
 	
-	$string->opt("CAT", re => qr/ (?<str> [^\$]* ) (?: \$ (?<exec> \S+ ) | $ ) /xs, sub => sub {
+	
+	$string->opt("CAT", re => qr/ (?<str> [^\$]* ) ( \$ (?<CAT> \S+ ) | $ ) /xs, sub => sub {
 		my ($self, $push) = @_;
-		if(exists $push->{exec}) {
-			$self->checkout("master")->push("exec1")->masking($push->{exec})->pop("exec1")->checkout("string");
+		if(exists $push->{CAT}) {
+			$self->checkout("master")->push("exec1")->masking($push->{CAT})->pop("exec1")->checkout("string");
 			delete $push->{str};
 		}
 	});
@@ -184,6 +187,7 @@
 		"num" => "{{ num }}",
 		"yfx CAT" => "{{ left }}{{ str }}{{ right }}",
 		"yf CAT" => "{{ left }}{{ str }}",
+		"CAT" => '{{ str }}',
 		"string" => '"{{ right }}"',
 		"exec1" => '{{ str }}${\({{ right }})}',
 	);
@@ -192,6 +196,7 @@
 	$s->eval('"_ $5"');				# _ 5
 	$s->eval('"$6 _"');				# 6 _
 	$s->eval('"_ $5+6* _"');		# _ -11 _
+	$s->eval('"_ $6 _ $6+1 _"');	# _ 6 _ 7 _
 	
 === Шаблонизатор
 

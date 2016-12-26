@@ -555,6 +555,20 @@ sub read {
 	return $body;
 }
 
+# считывает все файлы через разделитель, а если разделитель не указан и wantaaray, то выдаёт в виде массива
+sub reads {
+	my ($self, $delim) = @_;
+	!defined($delim) && wantarray? (map { $self->one($_)->read } $self->files):
+		(join $delim, map { $self->one($_)->read } $self->files );
+}
+
+# считывает строки в массив через разделитель
+sub readlines {
+	my ($self, $sep) = @_;
+	local $\ = $sep // "\n";
+	map { <$_> } $self->files
+}
+
 # записывает в 1-й файл
 sub write {
 	my $self = shift;
@@ -571,13 +585,6 @@ sub endwrite {
 	my $self = shift;
 	$self->clone(mode => '>>')->write(@_);
 	$self
-}
-
-# считывает все файлы через разделитель, а если разделитель не указан и wantaaray, то выдаёт в виде массива
-sub reads {
-	my ($self, $delim) = @_;
-	!defined($delim) && wantarray? (map { $self->one($_)->read } $self->files):
-		(join $delim, map { $self->one($_)->read } $self->files );
 }
 
 # записывает во все файлы
