@@ -594,8 +594,8 @@ sub pop {
 		my $fix = $x->{fix};
 		my $next = $y->{fix};
 		
-		msg1($x), die "--x!--" if !defined $x->{prio} and $fix & $infix || $fix & $prefix || $fix & $postfix;
-		msg1($y), die "--y!--" if !defined $y->{prio} and $fix & $infix || $fix & $prefix || $fix & $postfix;
+		msg1($x), die "--x!--" if !defined $x->{prio} and ($fix & $infix || $fix & $prefix || $fix & $postfix);
+		msg1($y), die "--y!--" if !defined $y->{prio} and ($fix & $infix || $fix & $prefix || $fix & $postfix);
 		
 		return 1 if !defined($fix) && $next & $prefix;
 		return 1 if !defined($fix) && $next & $atom;
