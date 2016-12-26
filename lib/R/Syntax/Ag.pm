@@ -20,7 +20,8 @@ sub new {
 	my ($cls) = @_;
 	my $self = bless {
 		%$BASICSYNTAX,
-		trace => 1,
+		trace => 0,
+		@_
 	}, ref $cls || $cls;
 	
 	#$self->trace_help if defined $self->{trace};
@@ -82,7 +83,7 @@ $s->tr("yf",  qw{		.$word .word :word 	});
 $s->td("xfy", qw{		.$word() .word() :word()	.$word[] .word[] :word[]	.$word{} .word{} :word{}	});
 $s->td("xfy", qw{		word() word[] word{}	});
 $s->tr("fx",  qw{		@	%		});
-$s->tr("fy",  qw{ ref pairs scalar defined length exists delete })->td("xf", qw{  ? ?! instanceof });
+$s->tr("fy",  qw{  		length delete })->td("xf", qw{  ? instanceof }); # ?!
 $s->tr("yf",  qw{		++ --			})->td("fy", qw{ ++ -- });
 $s->tr("yfx", qw{		^				});
 $s->tr("fy",  qw{ 		+ - ! +~		});
@@ -148,6 +149,7 @@ $s->opt("=", sub => sub {	$_[0]->{assign} = 1 });
 
 $s->opt("instanceof", re => qr{ \b instanceof $re_space (?<class> $re_class_abs ) }xin);
 
+$s->x('\n');
 $s->opt('\n', re => "$re_rem $re_endline", sub => sub {
 	my ($self, $push) = @_;
 	$self->{lineno}++;
@@ -344,14 +346,15 @@ my $string = $STRINGSYNTAX;
 $string->addspacelex(0);
 
 $string->tr("yfx", qw/CAT/)->tr("yf", qw/CAT/);
+$string->x(qw/CAT/);
 $string->br(qw/exec1/);
 $string->opt("exec1", nolex => 1);
 
-$string->opt("CAT", re => qr/ (?<str> [^\$]* ) (?: \$ (?<exec> $re_id([\.:]$re_id)* ) | $ ) /nxs, sub => sub {
+$string->opt("CAT", re => qr/ (?<str> [^\$]* ) ( \$ (?<CAT> $re_id([\.:]$re_id)* ) | $ ) /nxs, sub => sub {
 	my ($self, $push) = @_;
 	$push->{str} =~ s/""|''|\\["']/\\"/g;
-	if(exists $push->{exec}) {
-		$self->checkout("ag")->push("exec1")->masking($push->{exec})->pop("exec1")->checkout("ag.string");
+	if(exists $push->{CAT}) {
+		$self->checkout("ag")->push("exec1")->masking($push->{CAT})->pop("exec1")->checkout("ag.string");
 		delete $push->{str};
 	}
 });

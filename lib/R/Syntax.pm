@@ -355,7 +355,7 @@ sub lex {
 		(?<error_nosym> . )	"
 	}
 	
-	$app->file("var/lex.pl")->write("qr{$lex}xni");
+	#$app->file("var/lex.pl")->write("qr{$lex}xni");
 	
 	#msg1 $lex;
 	
@@ -583,10 +583,20 @@ sub pop {
 	# <>, <, x, (	перед <
 	# >, x			перед >
 	
+	# там где сравниваются операторы, нужно сравнивать и их приоритет, а именно:
+	# 	a? \n
+	#	? - infix и postfix. \n - infix, postfix, prefix, x
+	#	приоритет \n больше ? - знак вопроса не может быть infix
 	
 	my $check = sub {
-		my ($fix, $next) = @_;
+		my ($x, $y) = @_;
 
+		my $fix = $x->{fix};
+		my $next = $y->{fix};
+		
+		msg1($x), die "--x!--" if !defined $x->{prio} and $fix & $infix || $fix & $prefix || $fix & $postfix;
+		msg1($y), die "--y!--" if !defined $y->{prio} and $fix & $infix || $fix & $prefix || $fix & $postfix;
+		
 		return 1 if !defined($fix) && $next & $prefix;
 		return 1 if !defined($fix) && $next & $atom;
 		
@@ -594,21 +604,15 @@ sub pop {
 		return 1 if $fix & $atom && $next & $postfix;
 		return 1 if $fix & $atom && !defined $next;
 		
-		return 1 if $fix & $infix && $next & $prefix;
+		return 1 if $fix & $infix && $next & $prefix && $x->{prio} => $y->{prio};
 		return 1 if $fix & $infix && $next & $atom;
 		
 		return 1 if $fix & $prefix && $next & $prefix;
 		return 1 if $fix & $prefix && $next & $atom;
 		
-		return 1 if $fix & $postfix && $next & $infix;
+		return 1 if $fix & $postfix && $next & $infix && $x->{prio} <= $y->{prio};
 		return 1 if $fix & $postfix && $next & $postfix;
 		return 1 if $fix & $postfix && !defined $next;
-		
-		# return 1 if !defined($next)	&& ($fix & $postfix || $fix & $atom);	# >, x			перед )
-		# return 1 if $next & $atom 	&& ($fix & $infix 	|| $fix & $prefix || !defined $fix);	# <>, <, (		перед x
-		# return 1 if $next & $infix	&& ($fix & $postfix || $fix & $atom);	# >, x			перед <>
-		# return 1 if $next & $prefix	&& ($fix & $infix 	|| $fix & $prefix || $fix & $atom || !defined $fix);	# <>, <, x, (	перед <
-		# return 1 if $next & $postfix&& ($fix & $postfix || $fix & $atom);	# >, x			перед >
 		
 		return "";
 	};
@@ -627,8 +631,7 @@ sub pop {
 		# проходимся по возможным комбинациям и выбираем 1-ю подходящую: которая начинается и заканчивается на требуемые операции
 		my @fix = ();			# комбинации fix-ов
 		my @comb = ();		# текущая комбинация, которая будет подставлена в @meta[$begin..$i-1]
-		my $super_prev = $begin==0? undef: $meta[$begin-1]{fix};
-		my $next = $i==@meta? undef: $meta[$i]{fix};	# следующий операнд
+		my $super_prev = $begin==0? undef: $meta[$begin-1];
 
 		#msg1 @meta[$begin, $i-1];
 		
@@ -637,32 +640,31 @@ sub pop {
 			$meta = $meta[$k];
 			my $n = $k-$begin;
 			
-			my $prev = $n==0? $super_prev: $comb[$n-1]{fix};		# предыдущий fix
-			
+			my $prev = $n==0? $super_prev: $comb[$n-1];		# предыдущий fix
 			
 			my $fix = $meta->{fix};
 			my $fixk = $fix[$n];
 			
 			#msg1 $n, $meta->{name}, $self->namefix($fix), $self->namefix($fixk);
 			
-			if($fix & $infix && !($fixk & $infix) && $check->($prev, $infix)) {
+			if($fix & $infix && !($fixk & $infix) && $check->($prev, $meta->{INFIX})) {
 				$fix[$n] |= $infix;
 				$comb[$n] = $meta->{INFIX};
 			}
-			elsif($fix & $prefix && !($fixk & $prefix) && $check->($prev, $prefix)) {
+			elsif($fix & $prefix && !($fixk & $prefix) && $check->($prev, $meta->{PREFIX})) {
 				$fix[$n] |= $prefix;
 				$comb[$n] = $meta->{PREFIX};
 			}
-			elsif($fix & $postfix && !($fixk & $postfix) && $check->($prev, $postfix)) {
+			elsif($fix & $postfix && !($fixk & $postfix) && $check->($prev, $meta->{POSTFIX})) {
 				$fix[$n] |= $postfix;
 				$comb[$n] = $meta->{POSTFIX};
 			}
-			elsif($fix & $atom && !($fixk & $atom) && $check->($prev, $atom)) {
-				$fix[$n] |= $atom;
+			elsif($fix & $terminal && !($fixk & $terminal) && $check->($prev, $meta->{X})) {
+				$fix[$n] |= $terminal;
 				$comb[$n] = $meta->{X};
 			}
 			elsif($n == 0) {
-				$self->error("нет больше комбинаций для $meta->{alias}");
+				$self->error("нет больше комбинаций для $meta->{alias}. " . join " ", map { $_->{stmt} } @$A);
 			}
 			else {
 				$k -= 2;
@@ -671,9 +673,9 @@ sub pop {
 		}
 		
 		# если $meta соответствует следующему операнду - выходим, а нет - откатываемся
-		my $fix = $comb[-1]{fix};
+		my $next = $i==@meta? undef: $meta[$i];				# следующий операнд
 		
-		@meta[$begin..$i-1] = @comb, return if $check->($fix, $next);
+		@meta[$begin..$i-1] = @comb, return if $check->($comb[-1], $next);
 		
 		$k--;
 		goto FOR;
@@ -711,7 +713,7 @@ sub pop {
 		$op = $A->[$i];
 		my $fix = $meta->{fix};
 		
-		$self->error($app->perl->qq($op->{stmt}) . " не может стоять после " . $self->namefix($prev, 1) . ": " . join " ", map { $_->{stmt} } @$A) if !$check->($prev, $fix);
+		$self->error($app->perl->qq($op->{stmt}) . " не может стоять после " . $self->namefix($prev, 1) . ": " . join " ", map { $_->{stmt} } @$A) if !$check->($prev, $meta);
 		
 		if($fix & $prefix | $fix & $postfix | $fix & $infix) {
 			$popop->($op);
@@ -724,7 +726,7 @@ sub pop {
 			$self->error("неопознанная лексема " . $app->perl->qq($op->{stmt}));
 		}
 	
-		$prev = $fix;
+		$prev = $meta;
 	}
 	continue {
 		$i++;
@@ -763,6 +765,9 @@ sub assign {
 # превращает в удобочитаемый fix
 sub namefix {
 	my ($self, $fix, $open) = @_;
+	
+	$fix = $fix->{fix} if ref $fix;
+	
 	my $s = "";
 	$s .= ($open? "открывающей": "закрывающей") . " скобки " if !defined $fix;
 	$s .= "инфикс " if $fix & $infix;

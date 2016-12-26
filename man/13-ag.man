@@ -24,7 +24,6 @@
 	# $app->syntaxAg->new->eval("0b10");						# 2
 	# $app->syntaxAg->new->eval("3r10");						# 3
 	
-	msg1 "hi!";
 	$app->syntaxAg->new->eval('"строка в utf8"');							# строка в utf8
 	
 Строки поддерживают интерполяцию:
@@ -187,18 +186,23 @@
 	$app->syntaxAg->new->eval("not 0");		# 1
 	$app->syntaxAg->new->eval("!0");		# 1
 
-Надо заметить, что `not`, `xor`, `or` и `and` имеют более высокий приоритет и работают с потоками данных:
+Надо заметить, что `not`, `xor`, `or` и `and` имеют более высокий приоритет:
 
 	$app->syntaxAg->new->eval("(20, 30) and (10, 20, 30) join ','");		# 10,20,30
-	$app->syntaxAg->new->eval("(20, 30)  && (10, 20, 30) join ','");		# 3
+	
+	# TODO: и работают с потоками данных - а вот и нет )))
+	# (( 20, 30 ) && ( 10, 20, 30 )) => 10, 20, 30
+	# (( 20, 30 )) || 1 => 30
+	# (( 20, 30 )) or 1 => 30    vtf ???
+	#$app->syntaxAg->new->eval("(20, 30)  && (10, 20, 30) join ','");		# 3
 	
 === Сравнения
 
 Сравнения строк (переводят скаляр в строку перед сравнением):
 
-	$app->syntaxAg->new->eval("11 lt 100");		# 1
+	$app->syntaxAg->new->eval("11 lt 100");		# 
 	$app->syntaxAg->new->eval("11 gt 100");		# 1
-	$app->syntaxAg->new->eval("11 le 100");		# 1
+	$app->syntaxAg->new->eval("11 le 100");		# 
 	$app->syntaxAg->new->eval("11 ge 100");		# 1
 	$app->syntaxAg->new->eval("11 ne 100");		# 1
 	$app->syntaxAg->new->eval("11 eq 100");		# 
@@ -206,23 +210,23 @@
 Сравнение чисел:
 	
 	$app->syntaxAg->new->eval("11 < 100");		# 1
-	$app->syntaxAg->new->eval("11 > 100");		# 1
+	$app->syntaxAg->new->eval("11 > 100");		# 
 	$app->syntaxAg->new->eval("11 <= 100");		# 1
-	$app->syntaxAg->new->eval("11 >= 100");		# 1
+	$app->syntaxAg->new->eval("11 >= 100");		# 
 	$app->syntaxAg->new->eval("11 != 100");		# 1
 	$app->syntaxAg->new->eval("11 == 100");		# 
 	
 Проверка на `nothing`:
 
-	$app->syntaxAg->new->eval("11?");			# 1
+	$app->syntaxAg->new(trace=>1)->eval("11?");			# 1
 	$app->syntaxAg->new->eval("nothing?");		# 
 	
 
 	
 === Арифметические
 
-	$app->syntaxAg->new->eval("+'34px'");		# 34
-	$app->syntaxAg->new->eval("-'35px'");		# -35
+	$app->syntaxAg->new->eval("+'34.5px'");		# 34.5
+	$app->syntaxAg->new->eval("-'35.9px'");		# -35.9
 
 	$app->syntaxAg->new->eval("1+1");		# 2
 	$app->syntaxAg->new->eval("1-1");		# 0
