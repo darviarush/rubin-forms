@@ -33,7 +33,8 @@ sub new {
 		
 		show_morf => 0,			# отражать ли преобразование в лог
 		#trace => "«eval»",		# файл трейс которого показать
-		trace => undef,			# файл трейс которого показать
+		trace => undef,			# показывать трейс
+		show => undef,			# показывать текст в eval
 		file => "",				# путь к текущему файлу
 		lineno => 1,			# номер строки в текущем файле
 		
@@ -148,7 +149,8 @@ our %FIX = (
 
 # добавляет лексему
 sub newlex {
-	my ($self, $key, $val) = @_;
+	my $self = shift;
+	my ($key, $val) = @_;
 	
 	my $alias = $val->{alias};
 	my $LEX = $self->{LEX};
@@ -157,13 +159,11 @@ sub newlex {
 	if($op) {
 		die "лексема $key:$alias уже есть в лексемах" if exists $op->{$key};
 		die "скобка $alias не может сочетаться с $key:$alias" if exists $op->{BR} || exists $op->{CR};
-		%$op = (%$op, @_, alias => $alias, count => $op->{count} + 1, $key => $val);
+		%$op = (%$op, @_, count => $op->{count} + 1, $key => $val, fix => $op->{fix} | $val->{fix});
 	}
 	else {
-		$LEX->{$alias} = { @_, alias => $alias, count => 1, $key => $val };
+		$LEX->{$alias} = { @_, name => $alias, alias => $alias, count => 1, $key => $val, order => $val->{order}, fix => $val->{fix}, VAL => $val };
 	}
-	
-	$op->{fix} |= $val->{fix};
 	
 	$self
 }
@@ -197,10 +197,10 @@ sub td {
 		}
 		else {
 			die "оператор `$type $x` уже объявлен" if exists $self->{$key}{$x};
-			$self->{$key}{$x} = {%p, name=>"$type $x", alias=>$x};
+			my $r = $self->{$key}{$x} = {%p, name=>"$type $x", alias=>$x};
 			$op = $self->{OP}{$x} //= { name=>$x, alias=>$x, order => -length $x };
 			$op->{fix} |= $fix;
-			$self->newlex($key => $op);
+			$self->newlex($key => $r);
 		}
 	}
 
@@ -368,7 +368,7 @@ sub lex {
 		$_
 	}
 	grep { !$_->{nolex} }
-	values %{$self->{LEX}};
+	values %{$self->{X}}, values %{$self->{BR}}, values %{$self->{CR}}, values %{$self->{OP}};
 	
 	if($self->{addspacelex}) {
 		$lex .= ($lex ne ""? " |\n": "") . "
@@ -465,6 +465,7 @@ sub pop {
 	my $POSTFIX =  $self->{POSTFIX};
 	my $X = $self->{X};
 	my $BR = $self->{BR};
+	my $LEX = $self->{LEX};
 
 	my @T;
 	my @S;
@@ -486,6 +487,7 @@ sub pop {
 			$s->{fix} & $leftassoc))
 		) {
 			my $r = pop @S;
+			
 			if($r->{fix} & $infix) {
 				$self->error("нет операндов для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
 				$self->error("нет левого операнда для оператора $r->{stmt}") if !defined( $r->{left} = pop @T );
@@ -548,6 +550,52 @@ sub pop {
 	# 2-й проход по последовательностям неоднозначных операторов: с начала и конца такой последовательности
 	# 3-й - делаем popop на операторах, а в @T забрасываем терминалы и вложенные скобки
 	
+	# prefix <, infix <>, postfix >, x
+	
+	# после (	<, x
+	# после x	<>, >, )
+	# после <>	<, x
+	# после <	<, x
+	# после >	<>, >, )
+	
+	# >, x			перед )
+	# <>, <, (		перед x
+	# >, x			перед <>
+	# <>, <, x, (	перед <
+	# >, x			перед >
+	
+	
+	my $check = sub {
+		my ($fix, $next) = @_;
+
+		return 1 if !defined($fix) && $next & $prefix;
+		return 1 if !defined($fix) && $next & $atom;
+		
+		return 1 if $fix & $atom && $next & $infix;
+		return 1 if $fix & $atom && $next & $postfix;
+		return 1 if $fix & $atom && !defined $next;
+		
+		return 1 if $fix & $infix && $next & $prefix;
+		return 1 if $fix & $infix && $next & $atom;
+		
+		return 1 if $fix & $prefix && $next & $prefix;
+		return 1 if $fix & $prefix && $next & $atom;
+		
+		return 1 if $fix & $postfix && $next & $infix;
+		return 1 if $fix & $postfix && $next & $postfix;
+		return 1 if $fix & $postfix && !defined $next;
+		
+		# return 1 if !defined($next)	&& ($fix & $postfix || $fix & $atom);	# >, x			перед )
+		# return 1 if $next & $atom 	&& ($fix & $infix 	|| $fix & $prefix || !defined $fix);	# <>, <, (		перед x
+		# return 1 if $next & $infix	&& ($fix & $postfix || $fix & $atom);	# >, x			перед <>
+		# return 1 if $next & $prefix	&& ($fix & $infix 	|| $fix & $prefix || $fix & $atom || !defined $fix);	# <>, <, x, (	перед <
+		# return 1 if $next & $postfix&& ($fix & $postfix || $fix & $atom);	# >, x			перед >
+		
+		return "";
+	};
+	
+	
+	
 	# 1-й проход
 	my $i = 0;
 	my $begin = undef;	# начало последовательности неоднозначных операторов
@@ -556,67 +604,67 @@ sub pop {
 		# определяем направленность операторов:
 		# должны ли все быть постфиксными, префиксными или начинаться на префиксные и заканчиваться постфиксными или наоборот?
 		
-		# prefix <, infix <>, postfix >, x
-		
-		# после (	<, x
-		# после x	<>, >, )
-		# после <>	<, x
-		# после <	<, x
-		# после >	<>, >, )
-		
-		# >, x			перед )
-		# <>, <, (		перед x
-		# >, x			перед <>
-		# <>, <, x, (	перед <
-		# >, x			перед >
 		
 		# проходимся по возможным комбинациям и выбираем 1-ю подходящую: которая начинается и заканчивается на требуемые операции
-		my @fix;			# комбинации fix-ов
-		my $prev = undef;	# предыдущий fix
+		my @fix = ();			# комбинации fix-ов
 		my @comb = ();		# текущая комбинация, которая будет подставлена в @meta[$begin..$i-1]
+		my $super_prev = $begin==0? undef: $meta[$begin-1]{fix};
+		my $next = $i==@meta? undef: $meta[$i]{fix};	# следующий операнд
 		for(;;) {
 		
+			my $prev = $super_prev;		# предыдущий fix
+
 			for(my $k = $begin; $k<$i; $k++) {
 				
 				$meta = $meta[$k];
+				
 				my $fix = $meta->{fix};
 				my $fixk = $fix[$k];
-				if($fix & $infix && !$fixk & $infix && ($prev & $postfix || $prev & $atom)) {
-					$fix[$k] &= $infix;
+				
+				#msg1 $self->namefix($prev), $check->($prev, $atom);
+				
+				if($fix & $infix && !($fixk & $infix) && $check->($prev, $infix)) {
+					$fix[$k] |= $prev = $infix;
 					$comb[$k-$begin] = $meta->{INFIX};
 				}
-				elsif($fix & $prefix && !$fixk & $prefix && (!defined($prev) || $prev & $atom || $prev & $prefix || $prev & $infix)) {
-					$fix[$k] &= $prefix;
+				elsif($fix & $prefix && !($fixk & $prefix) && $check->($prev, $prefix)) {
+					$fix[$k] |= $prev = $prefix;
 					$comb[$k-$begin] = $meta->{PREFIX};
 				}
-				elsif($fix & $postfix && !$fixk & $postfix && ($prev & $postfix || $prev & $atom)) {
-					$fix[$k] &= $postfix;
+				elsif($fix & $postfix && !($fixk & $postfix) && $check->($prev, $postfix)) {
+					$fix[$k] |= $prev = $postfix;
 					$comb[$k-$begin] = $meta->{POSTFIX};
 				}
-				elsif($fix & $atom && !$fixk & $atom && (!defined($prev) || $prev & $infix || $prev & $prefix)) {
-					$fix[$k] &= $atom;
-					$comb[$k-$begin] = $meta->{X};
+				elsif($fix & $atom && !($fixk & $atom) && $check->($prev, $atom)) {
+					$fix[$k] |= $prev = $atom;
+					$comb[$k-$begin] = $meta->{X} // $meta->{BR};
 				}
 				else {
 					$self->error("нет больше комбинаций для $meta->{alias}");
 				}
 				
-				$prev = $fix;
+				
 			}
 			
 			# если $meta соответствует следующему операнду - выходим
-			last if ...;
+			my $fix = $comb[-1]{fix};
+			
+			@meta[$begin..$i-1] = @comb, return if $check->($fix, $next);
 		}
-		
-		@meta[$begin..$i-1] = @comb;
+	
 	};
 	
 	for my $op (@$A) {
 		my $stmt = $op->{stmt};
 		my $lex = $LEX->{$stmt};
-		push @meta, $lex;
-		$begin = $i if $lex->{count} > 1 && !defined $begin;
-		$resolve->(), $begin = undef if $LEX->{$stmt} == 1 && defined $begin;
+		my $count = $lex->{count};
+		if($count > 1) { 
+			push @meta, $lex;
+			$begin = $i if !defined $begin;
+		} else {
+			push @meta, $lex->{VAL};
+			$resolve->(), $begin = undef if defined $begin;
+		}
 	}
 	continue {
 		$i++
@@ -624,37 +672,40 @@ sub pop {
 	
 	$resolve->() if defined $begin;
 	
-	# третий проход
-	$i = 0;
-	for $meta (@meta) {
+	msg1 map { $_->{name} } @meta;
 	
-		my $stmt = $op->{stmt};
+	# третий проход - проверка правильности лексем: кто за кем стоит и 
+	$i = 0;
+	my $prev;
+	my $op;
+	
+	for my $meta1 (@meta) {
+		$meta = $meta1;
+		$op = $A->[$i];
+		my $fix = $meta->{fix};
 		
-		#msg1( ($front? 'префикс': 'пост/инфикс'), $stmt );
+		$self->error($app->perl->qq($op->{stmt}) . " не может стоять после " . $self->namefix($prev, 1) . ": " . join " ", map { $_->{stmt} } @$A) if !$check->($prev, $fix);
 		
-		if($front and $meta = $PREFIX->{$stmt} and $i != $#$A) {
+		if($fix & $prefix | $fix & $postfix | $fix & $infix) {
 			$popop->($op);
 		}
-		elsif(!$front and $meta = $INFIX->{$stmt} and $i<$n) {
-			$popop->($op);
-			$front = 1;
-		}
-		elsif(!$front and $meta = $POSTFIX->{$stmt}) {
-			$popop->($op);
-		}
-		elsif(exists $X->{$stmt} || exists $BR->{$stmt}) {	# терминал
-			$front = 0;			# после терминала - постфиксный или инфиксный оператор
+		elsif($fix & $atom) {	# терминал
 			push @T, $op;
 			$self->trace("¤", $op);
 		}
 		else {
-			$self->error("неопознанная лексема " . $app->perl->qq($stmt));
+			$self->error("неопознанная лексема " . $app->perl->qq($op->{stmt}));
 		}
-		
+	
+		$prev = $fix;
 	}
 	continue {
 		$i++;
 	}
+	
+	$self->error($app->perl->qq($op->{stmt}) . " не может стоять перед " . $self->namefix($prev, 0) . ": " . join " ", map { $_->{stmt} . ($_->{$_->{stmt}}? ":$_->{$_->{stmt}}": "") } @$A) if !$check->($prev);
+	
+	
 	
 	# выбрасываем всё
 	$meta = {prio => 1_000_000};
@@ -680,6 +731,22 @@ sub assign {
 	%$push = (%$push, %{ pop @{$self->{stack}[-1]{"A+"}} });
 	
 	$self
+}
+
+# превращает в удобочитаемый fix
+sub namefix {
+	my ($self, $fix, $open) = @_;
+	my $s = "";
+	$s .= ($open? "открывающей": "закрывающей") . " скобки " if !defined $fix;
+	$s .= "инфикс " if $fix & $infix;
+	$s .= "постфикс " if $fix & $postfix;
+	$s .= "префикс " if $fix & $prefix;
+	$s .= "терминал " if $fix & $terminal;
+	$s .= "скобка " if $fix & $bracket;
+	$s .= "атом " if $fix & $atom;
+	$s = "неизвестно" if $s eq "";
+	$s;
+
 }
 
 my %COLOR = (
@@ -980,6 +1047,9 @@ sub morf {
 # вычисляет выражение
 sub eval {
 	my ($self, $code) = @_;
+	
+	$app->log->info($code) if $self->{show};
+	
 	my $morf = $self->morf($code);
 	my @ret;
 	my $lang = $self->{lang};
