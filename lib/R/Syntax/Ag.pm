@@ -89,20 +89,21 @@ $s->tr("fy",  qw{ 		+ - ! +~		});
 $s->tr("xfy", qw{		=~ !~	~		});
 $s->tr("xfy", qw{		* / % mod **		});
 $s->tr("xfy", qw{		+ - .				});
-$s->tr("xfy", qw{		+< +>				});
 # in perl in this: named unary operators
+$s->tr("xfy", qw{		+< +>				});
 $s->tr("xfy", qw{		+&					});
 $s->tr("xfy", qw{		+|  +^				});
 $s->tr("xfx", qw{		< > <= >= lt gt le ge		});
-$s->tr("xfx", qw{		== != eq ne  <=> cmp ~~		});
-$s->tr("xfy", qw{		in of 			})->td("yfx", qw{		join		});
+$s->tr("xfx", qw{		== != eq ne  <=> cmp 		});			# ~~
+$s->tr("xfy", qw{		in of split			});
 $s->tr("xfy", qw{		&&					});
 $s->tr("xfy", qw{		|| ^^ ?				});
 $s->tr("xfx", qw{		..  to  step		});
 $s->tr("yfx", qw{		-> = += -= *= /= ^= &&= ||= ^^=   and= or= xor=  ,= =, 	}); # goto last next redo dump
 $s->tr("xfy", qw{		, =>					})->td("yf", qw{ , })->td("fy", qw{ => });
 #$s->tr("xfx", qw{	list operators (rightward)});
-$s->tr("fy", qw{		not						});
+$s->tr("yfx", qw{		isa can	join			});
+$s->tr("fy",  qw{		not						});
 $s->tr("xfy", qw{		and						});
 $s->tr("xfy", qw{		or	xor					});
 $s->tr("yfx", qw{		as	is					});
@@ -264,8 +265,8 @@ $s->x("redo");
 $s->x("wantarray");
 
 $s->x("new"		=> qr{ 	\b NEW $re_space (?<new>$re_class) 	}ix);
-$s->x("var"		=> qr{ 	(?<var>$re_id) 									}x);
-$s->x("num"		=> qr{ 	(?<num> -? (?: [\d_]+(\.[\d_]+)? | \.[\d_]+ )	(?: E[\+\-][\d_]+ )?	)			}ix);
+$s->x("var"		=> qr{ 	(?<var>$re_id) 						}x);
+$s->x("num"		=> qr{ 	(?<num> -? ( \d[\d_]*(\.[\d_]+)? | \.[\d_]+ )	( E[\+\-][\d_]+ )?	)			}ixn);
 #$s->x("regexp"	=> qr{ 	" (?<QR> (?:[^"]|\\")* ) "! (?<qr_args> \w+ )? 	}x);
 
 $s->x("string"	=> qr{	( " (?<string> (?:\\"|""|[^"])* ) " | ' (?<string> (?:\\'|''|[^'])* ) ' ) (?<qr>! (?<qr_args> \w*))?	 }xn => sub {
@@ -343,6 +344,8 @@ my $string = $STRINGSYNTAX;
 $string->addspacelex(0);
 
 $string->tr("yfx", qw/CAT/)->tr("yf", qw/CAT/);
+$string->br(qw/exec1/);
+$string->opt("exec1", nolex => 1);
 
 $string->opt("CAT", re => qr/ (?<str> [^\$]* ) (?: \$ (?<exec> $re_id([\.:]$re_id)* ) | $ ) /nxs, sub => sub {
 	my ($self, $push) = @_;

@@ -20,7 +20,11 @@
 	$app->syntaxAg->new->eval("7_007_001_11_11");			# 70070011111
 	$app->syntaxAg->new->eval("7_007_001_11_11.7_007");		# 70070011111.7007
 	$app->syntaxAg->new->eval("-10");						# -10
+	# $app->syntaxAg->new->eval("0xFF");						# 255
+	# $app->syntaxAg->new->eval("0b10");						# 2
+	# $app->syntaxAg->new->eval("3r10");						# 3
 	
+	msg1 "hi!";
 	$app->syntaxAg->new->eval('"строка в utf8"');							# строка в utf8
 	
 Строки поддерживают интерполяцию:

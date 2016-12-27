@@ -126,10 +126,13 @@ interpolation => '{{ str }}${\( {{ right }} )}',
 # проверки
 "xf ?" => 'defined({{ left }})',
 "xf instanceof" => 'Isa({{ left }}, "{{ class }}")',
+"yfx isa" => 'Isa({{ left }}, {{ right }})',
+"yfx can" => 'Can({{ left }}, {{ right }})',
 
 
 # массивов
-"yfx join" => 'join({{ left }}, {{ right }})',
+"yfx join" => 'join({{ right }}, {{ left }})',
+"xfy split" => 'split({{ right }}, {{ left }})',
 #"xfy in" => '(grep { {{ left }} }, {{ right }})',
 
 # хешей

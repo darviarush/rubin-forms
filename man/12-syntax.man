@@ -148,15 +148,17 @@
 
 Создаём синтаксический анализатор для строк и для выражений.
 
-	my $string = $app->syntax->new(name => "string");
-	my $s = $app->syntax->new(name => "master");
+	my $string = $app->syntax->new(name => "string", show => 1);
+	my $s = $app->syntax->new(name => "master", show => 1);
+	# подключаем строковый анализатор к языковому анализатору
 	$s->bar( $string );
 	
 	# отключаем добавление дефолтных лексем
 	$string->addspacelex(0);
 	
 	$string->tr("yfx", qw/CAT/)->tr("yf", qw/CAT/);
-	$string->br(qw/exec1 exec1/);
+	$string->br(qw/exec1/);
+	$string->opt("exec1", nolex => 1);
 	
 	$string->opt("CAT", re => qr/ (?<str> [^\$]* ) (?: \$ (?<exec> \S+ ) | $ ) /xs, sub => sub {
 		my ($self, $push) = @_;
@@ -186,6 +188,9 @@
 		"exec1" => '{{ str }}${\({{ right }})}',
 	);
 	
+	$s->eval('"_"');				# _
+	$s->eval('"_ $5"');				# _ 5
+	$s->eval('"$6 _"');				# 6 _
 	$s->eval('"_ $5+6* _"');		# _ -11 _
 	
 === Шаблонизатор

@@ -64,7 +64,7 @@ sub checkout {
 	
 	local $_;
 	
-	my $fields = [qw/ name PREFIX INFIX POSTFIX OP BR CR X POP_A lex addspacelex /];
+	my $fields = [qw/ name PREFIX INFIX POSTFIX OP BR CR X LEX POP_A lex addspacelex trace show /];
 	
 	# сохраняем текущий в LA_MASTER
 	my $name = $self->{name};
@@ -609,49 +609,54 @@ sub pop {
 		my @comb = ();		# текущая комбинация, которая будет подставлена в @meta[$begin..$i-1]
 		my $super_prev = $begin==0? undef: $meta[$begin-1]{fix};
 		my $next = $i==@meta? undef: $meta[$i]{fix};	# следующий операнд
-		for(;;) {
-		
-			my $prev = $super_prev;		# предыдущий fix
 
-			for(my $k = $begin; $k<$i; $k++) {
-				
-				$meta = $meta[$k];
-				my $n = $k-$begin;
-				
-				
-				my $fix = $meta->{fix};
-				my $fixk = $fix[$n];
-				
-				msg1 \@fix, $self->namefix($prev), $self->namefix($fix), $self->namefix($fixk);
-				
-				if($fix & $infix && !($fixk & $infix) && $check->($prev, $infix)) {
-					$fix[$n] |= $prev = $infix;
-					$comb[$n] = $meta->{INFIX};
-				}
-				elsif($fix & $prefix && !($fixk & $prefix) && $check->($prev, $prefix)) {
-					$fix[$n] |= $prev = $prefix;
-					$comb[$n] = $meta->{PREFIX};
-				}
-				elsif($fix & $postfix && !($fixk & $postfix) && $check->($prev, $postfix)) {
-					$fix[$n] |= $prev = $postfix;
-					$comb[$n] = $meta->{POSTFIX};
-				}
-				elsif($fix & $atom && !($fixk & $atom) && $check->($prev, $atom)) {
-					$fix[$n] |= $prev = $atom;
-					$comb[$n] = $meta->{X} // $meta->{BR};
-				}
-				else {
-					$self->error("нет больше комбинаций для $meta->{alias}");
-				}
-				
-				
+		msg1 @meta[$begin, $i-1];
+		
+		my $k = $begin;
+		FOR: for(; $k<$i; $k++) {
+			$meta = $meta[$k];
+			my $n = $k-$begin;
+			
+			my $prev = $n==0? $super_prev: $comb[$n-1]{fix};		# предыдущий fix
+			
+			
+			my $fix = $meta->{fix};
+			my $fixk = $fix[$n];
+			
+			msg1 $n, $meta->{name}, $self->namefix($fix), $self->namefix($fixk);
+			
+			if($fix & $infix && !($fixk & $infix) && $check->($prev, $infix)) {
+				$fix[$n] |= $infix;
+				$comb[$n] = $meta->{INFIX};
 			}
-			
-			# если $meta соответствует следующему операнду - выходим
-			my $fix = $comb[-1]{fix};
-			
-			@meta[$begin..$i-1] = @comb, return if $check->($fix, $next);
+			elsif($fix & $prefix && !($fixk & $prefix) && $check->($prev, $prefix)) {
+				$fix[$n] |= $prefix;
+				$comb[$n] = $meta->{PREFIX};
+			}
+			elsif($fix & $postfix && !($fixk & $postfix) && $check->($prev, $postfix)) {
+				$fix[$n] |= $postfix;
+				$comb[$n] = $meta->{POSTFIX};
+			}
+			elsif($fix & $atom && !($fixk & $atom) && $check->($prev, $atom)) {
+				$fix[$n] |= $atom;
+				$comb[$n] = $meta->{X};
+			}
+			elsif($n == 0) {
+				$self->error("нет больше комбинаций для $meta->{alias}");
+			}
+			else {
+				$k -= 2;
+				$fix[$n] = 0;
+			}
 		}
+		
+		# если $meta соответствует следующему операнду - выходим, а нет - откатываемся
+		my $fix = $comb[-1]{fix};
+		
+		@meta[$begin..$i-1] = @comb, return if $check->($fix, $next);
+		
+		$k--;
+		goto FOR;
 	
 	};
 	
@@ -673,7 +678,8 @@ sub pop {
 	
 	$resolve->() if defined $begin;
 	
-	msg1 map { $_->{name} } @meta;
+	#msg1 \@meta;
+	#msg1 map { $_->{name} } @meta;
 	
 	# третий проход - проверка правильности лексем: кто за кем стоит и 
 	$i = 0;
@@ -742,9 +748,12 @@ sub namefix {
 	$s .= "инфикс " if $fix & $infix;
 	$s .= "постфикс " if $fix & $postfix;
 	$s .= "префикс " if $fix & $prefix;
-	$s .= "терминал " if $fix & $terminal;
-	$s .= "скобка " if $fix & $bracket;
-	$s .= "атом " if $fix & $atom;
+	if($fix & $atom) {
+		if($fix & $terminal && $fix & $bracket) { $s .= "терминал+скобка " }
+		elsif($fix & $terminal) { $s .= "терминал " }
+		elsif($fix & $bracket) { $s .= "скобка " }
+		else { $s .= "атом " }
+	}
 	$s = "неизвестно" if $s eq "";
 	$s;
 
