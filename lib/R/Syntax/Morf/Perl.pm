@@ -75,11 +75,17 @@ interpolation => '{{ str }}${\( {{ right }} )}',
 "yfx as" => '({{ right }}) = ({{ left }})',
 
 # арифметические операторы
+"yf ++" => '({{ left }})++',
+"yf --" => '({{ left }})--',
+"fy ++" => '++({{ right }})',
+"fy --" => '--({{ right }})',
+
+
 "xfy +" => '({{ left }}) + ({{ right }})',
 "xfy -" => '({{ left }}) - ({{ right }})',
 "xfy *" => '({{ left }}) * ({{ right }})',
 "xfy /" => '({{ left }}) / ({{ right }})',
-"xfy ^" => '({{ left }}) ** ({{ right }})',
+"yfx ^" => '({{ left }}) ** ({{ right }})',
 
 "fy +" => '0+({{ right }})',
 "fy -" => '-({{ right }})',
@@ -134,6 +140,8 @@ interpolation => '{{ str }}${\( {{ right }} )}',
 "yfx join" => 'join({{ right }}, {{ left }})',
 "xfy split" => 'split({{ right }}, {{ left }})',
 #"xfy in" => '(grep { {{ left }} }, {{ right }})',
+"xfx .." => '({{ left }}) .. ({{ right }})',
+
 
 # хешей
 "fx delete" => 'delete({{ right }})',
@@ -145,7 +153,7 @@ interpolation => '{{ str }}${\( {{ right }} )}',
 "xfy ELSEIF" => '{{ left }} }: ({{ right }}',
 
 # скобки
-CLASS => '(do { package {{ class }}; use common::sense; use R::App;{{ _extends class, extends }} sub render { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
+CLASS => '(do { package {{ class }}; use common::sense; use R::App;{{ _extends class, extends }} sub void { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
 
 SUB => 'sub {{ SUB }} { my $DATA = { me => {{ _shift SUB }} }; {{ _args args }} {{ right }}{{ _ifnewend SUB }}}',
 
@@ -164,6 +172,9 @@ false => '$R::App::app->json->false',
 
 var => '$DATA->{{{ var }}}',
 num => '{{ num }}',
+hex => '{{ hex }}',
+bin => '{{ bin }}',
+radix => '{{ radix }}',
 '[]' => '[]',
 '()' => '()',
 '{}' => '{}',

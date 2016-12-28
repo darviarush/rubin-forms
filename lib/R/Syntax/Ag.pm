@@ -96,14 +96,16 @@ $s->tr("xfy", qw{		+&					});
 $s->tr("xfy", qw{		+|  +^				});
 $s->tr("xfx", qw{		< > <= >= lt gt le ge		});
 $s->tr("xfx", qw{		== != eq ne  <=> cmp 		});			# ~~
-$s->tr("xfy", qw{		in of split			});
+$s->tr("xfy", qw{		in of isa can				});
 $s->tr("xfy", qw{		&&					});
 $s->tr("xfy", qw{		|| ^^ ?				});
 $s->tr("xfx", qw{		..  to  step		});
-$s->tr("yfx", qw{		-> = += -= *= /= ^= &&= ||= ^^=   and= or= xor=  ,= =, 	}); # goto last next redo dump
+$s->tr("yfx", qw{		-> = += -= *= /= ^= &&= ||= ^^=   and= or= xor=  ,= =, .= 	}); # goto last next redo dump
 $s->tr("xfy", qw{		, =>					})->td("yf", qw{ , })->td("fy", qw{ => });
 #$s->tr("xfx", qw{	list operators (rightward)});
-$s->tr("yfx", qw{		isa can	join			});
+#$s->tr("yfx", qw{		|	|map	|grep	|reduce		|sort		|order		|pairsort	|group	});
+$s->tr("xfx", qw{		split					});
+$s->tr("yfx", qw{		join					});
 $s->tr("fy",  qw{		not						});
 $s->tr("xfy", qw{		and						});
 $s->tr("xfy", qw{		or	xor					});
@@ -268,6 +270,14 @@ $s->x("wantarray");
 
 $s->x("new"		=> qr{ 	\b NEW $re_space (?<new>$re_class) 	}ix);
 $s->x("var"		=> qr{ 	(?<var>$re_id) 						}x);
+$s->x("hex"		=> qr{	0x[\da-f_]+	}ix);
+$s->x("bin"		=> qr{	0b[10_]+	}ix);
+$s->x("radix"	=> qr{	(?<radix> (?<rad>\d+) r (?<num> [\da-z_]+ ) )	}ix => sub {
+	my ($self, $push)=@_;
+	$self->error("$push->{radix} - система счисления не может быть 0") if $push->{rad} == 0;
+	$self->error("$push->{radix} - система счисления должна быть не более 62-х")  if $push->{rad} > 62;
+	$push->{radix} = $app->perl->from_radix($push->{num}, $push->{rad});
+});
 $s->x("num"		=> qr{ 	(?<num> -? ( \d[\d_]*(\.[\d_]+)? | \.[\d_]+ )	( E[\+\-][\d_]+ )?	)			}ixn);
 #$s->x("regexp"	=> qr{ 	" (?<QR> (?:[^"]|\\")* ) "! (?<qr_args> \w+ )? 	}x);
 
@@ -400,7 +410,7 @@ sub ag {
 	
 	my $class = $self->require( $app->file($path)->abs->subdir($root, "")->path );
 	
-	$class->new->render(@args);
+	$class->new->void(@args);
 }
 
 # превращает путь в класс

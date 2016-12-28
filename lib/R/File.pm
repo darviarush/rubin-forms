@@ -10,7 +10,6 @@ sub new {
 	bless {
 		files => [@_],
 		encode => 'utf-8',
-		#mode => undef
 	}, ref $cls || $cls;
 }
 
@@ -33,7 +32,7 @@ sub clone {
 sub encode {
 	my $self = shift;
 	if(@_) {
-		$self->clone(encode => scalar shift());
+		$self->clone(encode => shift());
 	} else {
 		$self->{encode}
 	}
@@ -43,7 +42,7 @@ sub encode {
 sub mode {
 	my $self = shift;
 	if(@_) {
-		$self->clone(mode => scalar shift());
+		$self->clone(mode => shift());
 	} else {
 		$self->{mode}
 	}
@@ -53,7 +52,7 @@ sub mode {
 sub bufsize {
 	my $self = shift;
 	if(@_) {
-		$self->clone(bufsize => scalar shift());
+		$self->clone(bufsize => shift());
 	} else {
 		$self->{bufsize}
 	}
@@ -562,11 +561,43 @@ sub reads {
 		(join $delim, map { $self->one($_)->read } $self->files );
 }
 
+# устанавливает межстрочный сепаратор
+sub sep {
+	my $self = shift;
+	if(@_) {
+		$self->clone(sep => shift());
+	} else {
+		$self->{sep}
+	}
+}
+
+# устанавливает обрезать ли разделитель строки
+sub chop {
+	my $self = shift;
+	if(@_) {
+		$self->clone(chop => shift());
+	} else {
+		$self->{chop}
+	}
+}
+
 # считывает строки в массив через разделитель
 sub readlines {
-	my ($self, $sep) = @_;
-	local $\ = $sep // "\n";
-	map { <$_> } $self->files
+	my ($self, $sep, $chop) = @_;
+	
+	$sep //= $self->{sep} // "\n";
+	$chop //= $self->{chop};
+	
+	local $_;
+	
+	if($chop) {
+		$sep = qr/$sep/;
+		return map { split $sep, $self->one($_)->read } $self->files;
+	}
+	
+	local $/ = $sep;
+	
+	map { my $f = $self->one($_)->open; my @lines = <$f>; $f->close; @lines } $self->files
 }
 
 # записывает в 1-й файл
@@ -691,7 +722,7 @@ sub open {
 	my ($self, $mode) = @_;
 	my $mode = ($mode // $self->{mode} // "<") . ($self->{encode}? ":encoding($self->{encode})": "");
 	my $path = $self->{files}[0];
-	open my($f), $mode, $path or die("file($path)->open($mode): Не могу открыть: $!\n");
+	open my($f), $mode, $path or die "file($path)->open($mode): Не могу открыть: $!\n";
 	
 	# для Coro
 	#$f = Coro::Handle->new_from_fh($f) if $app->{coro};
@@ -699,6 +730,13 @@ sub open {
 	$f
 }
 
+# возвращает ссылку на хэш связанный с файлом в формате dbm
+sub dbm {
+	my ($self) = @_;
+	my $hash = {};
+	dbmopen %$hash, $self->path, 0642 or die "dbm(" . $self->path . "): Не могу открыть: $!\n";
+	$hash
+}
 
 # возвращает массив файлов
 sub files {

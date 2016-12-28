@@ -20,9 +20,9 @@
 	$app->syntaxAg->new->eval("7_007_001_11_11");			# 70070011111
 	$app->syntaxAg->new->eval("7_007_001_11_11.7_007");		# 70070011111.7007
 	$app->syntaxAg->new->eval("-10");						# -10
-	# $app->syntaxAg->new->eval("0xFF");						# 255
-	# $app->syntaxAg->new->eval("0b10");						# 2
-	# $app->syntaxAg->new->eval("3r10");						# 3
+	$app->syntaxAg->new->eval("0xFF");						# 255
+	$app->syntaxAg->new->eval("0b10");						# 2
+	$app->syntaxAg->new->eval("3r10");						# 3
 	
 	$app->syntaxAg->new->eval('"строка в utf8"');							# строка в utf8
 	
@@ -108,10 +108,7 @@
 	
 === Методы и свойства
 
-Все переменные в *Серебрянке* - локальные. 
-
-
-Свойства объектов доступны через `me` и его синонимы `self` и `this`:
+Все переменные в *Серебрянке* - локальные, а свойства объектов доступны через `me` и его синонимы `self` и `this`:
 	
 	$app->syntaxAg->eval("
 		class TestProperty
@@ -125,15 +122,25 @@
 === Декораторы
 
 
-=== Контрактное программирование
+==== Контрактное программирование
 
+Контрактное программирование использует декораторы.
+Когда установлено `app.site.test` контракторы осуществляют проверки и выбрасывают эксепшены.
+TODO:
 
 == Конвееры
 	
+Конвеер обрабатывает список поэлементно и возвращает другой.
+Конвееры могут быть левосторонними и правосторонними.
+	
+=== map
+
+`map` считывает из потока элементов один элемент, а вот возвращать может ноль или более элементов в поток.
+	
+	$app->syntaxAg->eval("(1..3, 6 | a+1) join");			# 2347
 	
 	
-	
-== Контролы - условия, циклы и исключения
+== Условия
 
 === `if`
 
@@ -142,7 +149,30 @@
 	$app->syntaxAg->eval("if 0 then 10 elseif -1 then 20");		# 20
 	$app->syntaxAg->eval("if 0 \n 10 \n end");					## undef
 	$app->syntaxAg->eval("if 0 \n 10 \n else \n 20 \n end");	# 20
+	$app->syntaxAg->eval("if 1 then s = 10 end; s");			# 10
 
+== Циклы
+	
+=== `for`
+	
+	$app->syntaxAg->eval("s=''; for i in [1..2] then s .= i end; s");			# 12
+	$app->syntaxAg->eval("s=''; for i = 1..2 then s .= i end; s");				# 12
+	$app->syntaxAg->eval("s=''; for k, v of {1 => 10, 2 => 20} then s += i end; s");				# 3
+	$app->syntaxAg->eval("s=''; for i, j, k = 1..10 then s .= '|' . i . j . k end; s");				# 123|456|789|10
+	
+=== `while`
+	
+	$app->syntaxAg->eval("while s < 12 then s++ end; s");			# 12
+	$app->syntaxAg->eval("while s < 12 \n s++ \n end \n s");		# 12
+	
+=== `repeat`
+
+	$app->syntaxAg->eval("repeat s++ until s==12; s");			# 12
+	
+== Исключения
+
+
+	
 == Операторы
 
 === Присваивания
@@ -218,7 +248,7 @@
 	
 Проверка на `nothing`:
 
-	$app->syntaxAg->new(trace=>1)->eval("11?");			# 1
+	$app->syntaxAg->new->eval("11?");			# 1
 	$app->syntaxAg->new->eval("nothing?");		# 
 	
 
@@ -232,7 +262,7 @@
 	$app->syntaxAg->new->eval("1-1");		# 0
 	$app->syntaxAg->new->eval("4*5");		# 20
 	$app->syntaxAg->new->eval("5/4");		# 1.25
-	$app->syntaxAg->new->eval("3^3");		# 9
+	$app->syntaxAg->new->eval("3^3");		# 27
 	
 === Инкремент и декремент
 	
@@ -249,13 +279,22 @@
 	$app->syntaxAg->new->eval("0b0001 +| 0b0010");		## 0b0011
 	$app->syntaxAg->new->eval("0b1001 +^ 0b1010");		## 0b0011
 	$app->syntaxAg->new->eval("+~ -1");					## 0
-	$app->syntaxAg->new->eval("0b0001 +< 3");			## 0b0100
-	$app->syntaxAg->new->eval("0b0100 +> 3");			## 0b0001
+	$app->syntaxAg->new->eval("0b0001 +< 3");			## 0b1000
+	$app->syntaxAg->new->eval("0b1001 +> 3");			## 0b0001
 	
 === Для строк и массивов
 
-	$app->syntaxAg->new->eval("10, 20 join ', '");		# 10, 20
 	$app->syntaxAg->new->eval("10 . 20.2");				# 1020.2
+	$app->syntaxAg->new->eval("10, 20 join ', '");		# 10, 20
+	$app->syntaxAg->new->eval("['1,2,3' split '\d'!]");		## [1,2,3]
+	
+	$app->syntaxAg->new->eval("10, 20	.+	', '");		# 10, 20
+	$app->syntaxAg->new->eval("'1,2,3'	./	','");		## [1,2,3]
+	
+	
+	$app->syntaxAg->new->eval(" 1..6 join");		# 123456
+	$app->syntaxAg->new->eval(" 1...6 join");		# 12345
+	
 
 == ООП
 
