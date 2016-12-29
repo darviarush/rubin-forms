@@ -68,6 +68,11 @@ interpolation => '{{ str }}${\( {{ right }} )}',
 "xfy =>" => '{{ left }}{{ id }} => {{ right }}',
 "fy =>" => '{{ id }} => {{ right }}',
 
+
+# конвеер
+"yfx |" => 'do{ {{ _conveer left, op, param, arity, right }} }',
+
+
 # операторы присваивания
 "yfx =" => '({{ left }}) = ({{ right }})',
 "yfx is" => '({{ left }}) = ({{ right }})',
@@ -139,13 +144,24 @@ interpolation => '{{ str }}${\( {{ right }} )}',
 # массивов
 "yfx join" => 'join({{ right }}, {{ left }})',
 "xfy split" => 'split({{ right }}, {{ left }})',
+"yf join" => 'join("", {{ left }})',
+"xf split" => 'split(/\s+/, {{ left }})',
+
+"yfx implode" => 'join({{ right }}, {{ left }})',
+"xfy explode" => 'split({{ right }}, {{ left }})',
+"yf implode" => 'join("", {{ left }})',
+"xf explode" => 'split(/\s+/, {{ left }})',
+
+
 #"xfy in" => '(grep { {{ left }} }, {{ right }})',
 "xfx .." => '({{ left }}) .. ({{ right }})',
+"xfx ..." => '({{ left }}) .. ({{ right }})-1',
 
 
 # хешей
 "fx delete" => 'delete({{ right }})',
 "xfx of" => 'exists {{ left }}->{{{ right }}}',
+
 
 # операторы смысловых конструкций
 "xfy THEN" => '{{ left }}{{ _then then }}{{ right }}',
@@ -188,16 +204,13 @@ CAT => '{{ str }}',
 exec1 => '{{ str }}${\({{ right }})}',
 string => '"{{ right }}"',
 
-# HTML => "{{ html }}",
-# 'xfy CAT' => "{{ left }}{{ right }}",
-# GET => "{{ html }}" . $esc . '{{ right }}' . $_esc,
-# RAW => "{{ html }}" . $raw . '{{ right }}' . $_raw,
-# LET => "{{ html }}" . $in . '{{ right }}' . $_in,
-# COMMENT => "{{ html }}" . $in . '{{ lines }}' . $_in,
-# TEMPLATE => 'package {{ class }};{{ extends }} use common::sense; use R::App; use List::Util;{{ begin }} sub {{ block }} { my $DATA = shift; '.$_in.'{{ right }}'.$in.' return; } 1;',
-# INHERITS => '',
-
 );
+
+# конвеер
+sub _conveer {
+	my ($self, $left, $op, $param, $arity, $right) = @_;
+	$self
+}
 
 # если есть комментарий - выводит
 sub _rem {

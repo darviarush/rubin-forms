@@ -99,13 +99,13 @@ $s->tr("xfx", qw{		== != eq ne  <=> cmp 		});			# ~~
 $s->tr("xfy", qw{		in of isa can				});
 $s->tr("xfy", qw{		&&					});
 $s->tr("xfy", qw{		|| ^^ ?				});
-$s->tr("xfx", qw{		..  to  step		});
+$s->tr("xfx", qw{		.. ...  to  step		});
+$s->tr("xfy", qw{		, =>		})->td("yf",  qw{ 	,		})->td("fy", qw{	=>		});
+$s->tr("xfx", qw{		split		})->td("yfx", qw{	join	})->td("xf", qw{ split })->td("yf", qw{ join });
 $s->tr("yfx", qw{		-> = += -= *= /= ^= &&= ||= ^^=   and= or= xor=  ,= =, .= 	}); # goto last next redo dump
-$s->tr("xfy", qw{		, =>					})->td("yf", qw{ , })->td("fy", qw{ => });
 #$s->tr("xfx", qw{	list operators (rightward)});
-#$s->tr("yfx", qw{		|	|map	|grep	|reduce		|sort		|order		|pairsort	|group	});
-$s->tr("xfx", qw{		split					});
-$s->tr("yfx", qw{		join					});
+$s->tr("yfx", qw{		|						});
+$s->tr("xfx", qw{		explode		})->td("yfx", qw{		implode		})->td("xf", qw{ explode })->td("yf", qw{ implode });
 $s->tr("fy",  qw{		not						});
 $s->tr("xfy", qw{		and						});
 $s->tr("xfy", qw{		or	xor					});
@@ -114,7 +114,7 @@ $s->tr("fx",  qw{		return					});
 
 $s->tr("xfy", qw{	;	})->td("yf", qw{	;	})->td("fy", qw{	;	});
 $s->tr("xfy", qw{	\n	})->td("yf", qw{	\n	})->td("fy", qw{	\n	});
-$s->tr("xfy", qw{		THEN	ELSEIF	ELSE	UNTIL	FROM	CATCH	ADDHANDLER	});
+$s->tr("xfy", qw{		THEN	ELSEIF	ELSE	UNTIL	FROM	CATCH	});
 
 
 $s->tr("xfy", qw{		CAT						});			# операция конкантенации в шаблонах
@@ -150,6 +150,13 @@ $s->opt("=>", re => qr{ (?<id>$re_id)? \s* => }xn );
 $s->opt("=", sub => sub {	$_[0]->{assign} = 1 });
 
 $s->opt("instanceof", re => qr{ \b instanceof $re_space (?<class> $re_class_abs ) }xin);
+
+$s->opt("|", re => qr{ \| ( (?<param> $re_id (, $re_id)*)?  (?<op> map | grep | reduce | sort | order ) (?<arity> \d+ )? \b )? }xni, sub => sub {
+	my ($self, $push) = @_;
+	$self->error("| $push->{op} не может иметь и параметры $push->{param} и арность $push->{arity} одновременно") if defined $push->{param} and defined $push->{arity};
+	$self->error("может быть только |sort2") if $push->{op} eq "sort" and defined $push->{arity} and $push->{arity} != 2;
+	$push->{op} //= "map";
+});
 
 $s->x('\n');
 $s->opt('\n', re => "$re_rem $re_endline", sub => sub {
