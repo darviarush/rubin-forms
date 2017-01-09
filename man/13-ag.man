@@ -180,13 +180,14 @@ TODO:
 
 Сортирует с числовым сравнением.
 
+=== `reduce`
+
+Сворачивает список.
+
 === `group`
 
 Группирует 
 
-=== `reduce`
-
-Сворачивает список.
 
 	
 == Условия
@@ -216,11 +217,12 @@ TODO:
 	
 === `repeat`
 
-	$app->syntaxAg->eval("repeat s++ until s==12; s");			# 12
+	$app->syntaxAg->eval("repeat s++ until s==12; s");				# 12
 	
 === Счётчики итераций в циклах
 
-
+	$app->syntaxAg->eval("for i=1..2 then if index(i)==1 then last end end; i");			# 2
+	$app->syntaxAg->eval("for i,j=1..6 then if index(i)==2 then last end end; i");			# 3
 	
 == Исключения
 
@@ -284,6 +286,12 @@ TODO:
 	# (( 20, 30 )) or 1 => 30    vtf ???
 	#$app->syntaxAg->new->eval("(20, 30)  && (10, 20, 30) join ','");		# 3
 	
+Проверка на `nothing`:
+
+	$app->syntaxAg->new->eval("11?");			# 1
+	$app->syntaxAg->new->eval("nothing?");		# 
+	$app->syntaxAg->new->eval("nothing ? 2");	# 2
+	
 === Сравнения
 
 Сравнения строк (переводят скаляр в строку перед сравнением):
@@ -303,12 +311,7 @@ TODO:
 	$app->syntaxAg->new->eval("11 >= 100");		# 
 	$app->syntaxAg->new->eval("11 != 100");		# 1
 	$app->syntaxAg->new->eval("11 == 100");		# 
-	
-Проверка на `nothing`:
 
-	$app->syntaxAg->new->eval("11?");			# 1
-	$app->syntaxAg->new->eval("nothing?");		# 
-	
 
 	
 === Арифметические
@@ -340,25 +343,86 @@ TODO:
 	$app->syntaxAg->new->eval("0b0001 +< 3");			## 0b1000
 	$app->syntaxAg->new->eval("0b1001 +> 3");			## 0b0001
 	
-=== Для строк и массивов
+=== Строковые
+
+Объединяет две строки.
 
 	$app->syntaxAg->new->eval("10 . 20.2");				# 1020.2
+	
+Повторяет строку несколько раз.
+	
+	$app->syntaxAg->new->eval("5 ** 3");				# 555
+	
+Объединяет строки по разделителю.
+	
 	$app->syntaxAg->new->eval("10, 20 join ', '");		# 10, 20
+	$app->syntaxAg->new->eval("10, 20 join");			# 1020
+	
+Разделяет строки по регулярному выражению или строке. Дополнительный параметр указывает количество раз которое нужно разделить.
+	
 	$app->syntaxAg->new->eval("['1,2,3' split '\d'!]");		## [1,2,3]
+	$app->syntaxAg->new->eval("['1,2*3' split '(\d)'!]");	## [1, ',', 2, '*', 3]
+	$app->syntaxAg->new->eval("['1*2*3' split '*']");		## [1,2,3]
+	
+	$app->syntaxAg->new->eval("['1,2,3' split '\d'!, 1]");		## [1,'2,3']
+	$app->syntaxAg->new->eval("['1*2*3' split '*', 1]");		## [1,'2*3']
+	
+Если по чему разбивать не указано - разбивает по пробельным символам (`\s+`):
+	
+	$app->syntaxAg->new->eval("['1  2 3' split]");		## [1,2,3]
 	
 	$app->syntaxAg->new->eval("10, 20 | a+1	implode	', '");		# 11, 21
-	$app->syntaxAg->new->eval("'1,2,3'	explode	','");		## [1,2,3]
+	$app->syntaxAg->new->eval("['1,2,3'	explode	',']");		## [1,2,3]
 	
 	$app->syntaxAg->new->eval("10, 20	implode	', '");		# 10, 20
 	$app->syntaxAg->new->eval("'1,2,3'	explode	','");		## [1,2,3]
 	
-=== Для массивов
+
+=== Регулярные
+
+	$app->syntaxAg->new->eval('"7" ~ "^\d*$"!');		# 1
+	$app->syntaxAg->new->eval('"7x" !~ "^\d*$"!');		# 1
 	
+	$app->syntaxAg->new->eval('"7" ~ "{\d}"~');		# 1
+	$app->syntaxAg->new->eval('"7x" !~ "{\d}"~');	# 1
+	
+	
+=== Интервальные
+
+	$app->syntaxAg->new->eval(" ^6 join");			# 0123456
+
 	$app->syntaxAg->new->eval(" 1..6 join");		# 123456
 	$app->syntaxAg->new->eval(" 1...6 join");		# 12345
 	
 	$app->syntaxAg->new->eval(" 0 to 1 step .2 join ', ' ");		# 0, 0.2, 0.4, 0.6, 0.8, 1
+	$app->syntaxAg->new->eval(" 1 to -2 step -1.5 join ', ' ");		# 1, -0.5, -2
 	
+`..*`, `...*` и `to *` - один и тот же оператор. Обозначает "до бесконечности". Значение `^*` - до бесконечности.
+	
+	$app->syntaxAg->new->eval(" (0..*)@[1..3] join");		# 123
+	$app->syntaxAg->new->eval(" (0...*)@[1..3] join");		# 123
+	$app->syntaxAg->new->eval(" (0 to *)@[1..3] join");		# 123
+	
+	$app->syntaxAg->new->eval(" (0..* step 2)@[1..3] join");		# 246
+	
+Операторы `^..` и  `^...` не включают начало интервала.
+	
+	$app->syntaxAg->new->eval(" 1^..6 join");					# 23456
+	$app->syntaxAg->new->eval(" 1^...6 join");					# 2345
+	$app->syntaxAg->new->eval("(1 ^to * step .2)@[0...5] join ', '");	# 0.2, 0.4, 0.6, 0.8, 1
+	
+Что так же полезно при сравнениях.
+
+	$app->syntaxAg->new->eval(" 1 in 1^..6");					# 
+	$app->syntaxAg->new->eval(" 1 in 1..6");					# 1
+	$app->syntaxAg->new->eval(" 3 in 1..6");					# 3
+	
+`in` возвращает индекс первого найденного элемента от 1.
+	
+	
+	
+=== Для массивов
+		
 push:
 	
 	$app->syntaxAg->new->eval('a=[1]; @a ,= 2, 3; @a join');		# 123
@@ -375,21 +439,41 @@ pop:
 
 	$app->syntaxAg->new->eval('a=[1,2,3]; b, c =, @a; @a join');	# 1
 	
-Запятая у `=` показывает в какую сторону будет производиться сдвиг
+Запятая у `=` показывает в какую сторону будет производиться сдвиг.
 
-# slice:
+slice:
 
-	# $app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@[0,3,4] join');		# 145
-	# $app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@[0,3,4] = 7,8,9; @a join');		# 7234896
+	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@[0,3,4] join');				# 145
+	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@[0,3,4] = 7,8,9; @a join');	# 7234896
+	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@[0,3,4] = 7; a');				## [7, 2, 3, 4, undef, undef, 6]
 
-# splice:
+splice:
 
-	# $app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@ 2, 4 = 7; @a join');		# 1276
+	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@ 2, 4 = 7; @a join');		# 1276
+	
 
 === Для хэшей
 
+	$app->syntaxAg->new->eval('2 of {1=>10,2=>20,3=>30}');	# 1
+	$app->syntaxAg->new->eval('2 of ^{1,2,3}');				# 1
+	$app->syntaxAg->new->eval('{  ^{1,2,3}  }');			## {1=>undef, 2=>undef, 3=>undef}
+	
+	$app->syntaxAg->new->eval('2 of ^{1,2,3}');				# 1
+	
+=== Для объектов
 
+Является или наследует ли объект указанный класс:
 
+	$app->syntaxAg->new->eval('a = new Nil; a isa "Nil"');				# 1
+	$app->syntaxAg->new->eval('a = new Nil; a isa "Nil1"');				# 
+	
+	$app->syntaxAg->new->eval('a = new Nil; a isa a');					# 1
+	$app->syntaxAg->new->eval('a = new Nil; sense = new common::sense; a isa sense');		# 
+	
+Есть ли в классе метод:
+	
+	$app->syntaxAg->new->eval('a = new Nil; a can "new"');				# 1
+	$app->syntaxAg->new->eval('a = new Nil; a can "xyz"');				# 
 	
 == ООП
 

@@ -79,16 +79,16 @@ my $re_for = qr!
 {
 my $s = $BASICSYNTAX;
 
-$s->tr("yf",  qw{		.$word .word :word 	});
-$s->td("xfy", qw{		.$word() .word() :word()	.$word[] .word[] :word[]	.$word{} .word{} :word{}	});
+$s->tr("yf",  qw{		.word :word .?word .$word .?$word 	});
+$s->td("xfy", qw{		.word() :word()	.$word() .?word() .?$word() .$word[] .word[] :word[] .?word[] .?$word[]	.$word{} .word{} :word{} .?word{} .?$word{}	});
 $s->td("xfy", qw{		word() word[] word{}	});
 $s->tr("fx",  qw{		@	%		});
 $s->tr("yf",  qw{		++ --			})->td("fy", qw{ ++ -- });
-$s->tr("fy",  qw{  		length delete })->td("xf", qw{  ? instanceof }); # ?!
+$s->tr("fy",  qw{  		length delete })->td("xf", qw{  ?  }); # ?!
 $s->tr("yfx", qw{		^				});
 $s->tr("fy",  qw{ 		+ - ! +~		});
 $s->tr("xfy", qw{		=~ !~	~		});
-$s->tr("xfy", qw{		* / % mod **		});
+$s->tr("xfy", qw{		* / mod div **		});
 $s->tr("xfy", qw{		+ - .				});
 # in perl in this: named unary operators
 $s->tr("xfy", qw{		+< +>				});
@@ -99,7 +99,7 @@ $s->tr("xfx", qw{		== != eq ne  <=> cmp 		});			# ~~
 $s->tr("xfy", qw{		in of isa can				});
 $s->tr("xfy", qw{		&&					});
 $s->tr("xfy", qw{		|| ^^ ?				});
-$s->tr("xfx", qw{		.. ...  to  step		});
+$s->tr("xfx", qw{		.. ...  to  step		})->td("fx", qw{	^	});
 $s->tr("xfy", qw{		, =>		})->td("yf",  qw{ 	,		})->td("fy", qw{	=>		});
 $s->tr("xfx", qw{		split		})->td("yfx", qw{	join	})->td("xf", qw{ split })->td("yf", qw{ join });
 $s->tr("yfx", qw{		-> = += -= *= /= ^= &&= ||= ^^=   and= or= xor=  ,= =, .= 	}); # goto last next redo dump
@@ -149,12 +149,16 @@ $s->opt(".?word()",		re => qr{		\.\? (?<var>$re_id) \(		}x);
 $s->opt(".?word[]",		re => qr{		\.\? (?<var>$re_id) \[		}x);
 $s->opt(".?word{}",		re => qr{		\.\? (?<var>$re_id) \{		}x);
 
+$s->opt(".?\$word",		re => qr{		\.\?\$ (?<var>$re_id)			}x);
+$s->opt(".?\$word()",	re => qr{		\.\?\$ (?<var>$re_id) \(		}x);
+$s->opt(".?\$word[]",	re => qr{		\.\?\$ (?<var>$re_id) \[		}x);
+$s->opt(".?\$word{}",	re => qr{		\.\?\$ (?<var>$re_id) \{		}x);
 
 
 $s->opt("=>", re => qr{ (?<id>$re_id)? \s* => }xn );
 $s->opt("=", sub => sub {	$_[0]->{assign} = 1 });
 
-$s->opt("instanceof", re => qr{ \b instanceof $re_space (?<class> $re_class_abs ) }xin);
+#$s->opt("instanceof", re => qr{ \b instanceof $re_space (?<class> $re_class_abs ) }xin);
 
 $s->opt("|", re => qr{ \| ( (?<param> $re_id (, $re_id)*)?  (?<op> map | grep | reduce | sort | order ) (?<arity> \d+ )? \b )? }xni, sub => sub {
 	my ($self, $push) = @_;
