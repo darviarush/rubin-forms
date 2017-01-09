@@ -38,7 +38,6 @@
 
 Проект, это папка в которой лежит `Aquafile`.
 Файлы с расширением `.ag` - классы на `Серебряне`.
-Файлы с расширением `.au` - шаблоны.
 
 Файлы в подпапках - это классы.
 Компилляция просходит в подпапку `.Aqua` проекта.
@@ -82,7 +81,7 @@
 	
 Любой класс без `inherits` по умолчанию наследует класс `Nil`.
 
-	$app->file("var/_test_13_ag/Inherits.ag")->write("me instanceof Nil");
+	$app->file("var/_test_13_ag/Inherits.ag")->write("me isa 'Nil'");
 	$app->syntaxAg->ag("var/_test_13_ag/Inherits.ag");		# 1
 
 Код который не входит в объявление какого-то метода будет входить в неявный метод `render`. При попытке создать такой метод будет сгенерирована ошибка.
@@ -90,20 +89,24 @@
 
 `Aquafilе` содержит конфигурацию проекта. Поэтому он назван *Акваторией*.
 
-Классы подгружаются оператором `new`, если класс ещё не был загружен. При этом по путям `app.syntaxAg:INC` ищется файл с расширением *.ag* или *.au* (именно в таком порядке).
+Классы подгружаются оператором `new`, если класс ещё не был загружен. При этом по путям `app.syntaxAg:INC` ищется файл с расширением *.ag*.
+Все файлы по вложенным путям в имени класса так же подгражаются - ведь в файле класса могут быть подклассы.
 
-	#$app->file("var/_test_13_ag/Ress.au")->write("{{ hi }}");
+	$app->file("var/_test_13_ag/Nik.ag")->write("class Risk \n end");
+	$app->file("var/_test_13_ag/Nik/Risk.ag")->write("1");
+	
+	$app->syntaxAg->ag("var/_test_13_ag/Nik/Risk.ag");	#@ ~ класс Nik::Risk встречается в .* и в .*
 	
 === Тесты
 
-	# $app->file("var/_test_13_ag/Test.ag")->write("
-		# sub plus a,b then a+b
-		# scenario
-			# me.plus(10, 16)		# 26
-		# end
-		# 6
-	# ");
-	# $app->syntaxAg->ag("var/_test_13_ag/Test.ag");		# 6
+	$app->file("var/_test_13_ag/Test.ag")->write("
+		sub plus a,b then a+b
+		scenario
+			new Test.plus(10, 16)		# 26
+		end
+		6
+	");
+	$app->syntaxAg->ag("var/_test_13_ag/Test.ag");		# 6
 
 	
 === Методы и свойства
@@ -133,7 +136,7 @@ TODO:
 Конвеер обрабатывает список поэлементно и возвращает другой.
 Конвееры могут быть левосторонними и правосторонними.
 	
-=== map
+=== `map`
 
 `map` считывает из потока элементов один элемент, а вот возвращать может ноль или более элементов в поток.
 	
@@ -141,8 +144,50 @@ TODO:
 	
 Чтобы считать несколько элементов:
 	
-	$app->syntaxAg->eval("(1..3, 6 | a, b map a+b) join");			# 39
+	$app->syntaxAg->eval("(1..3, 6 | x, y map x+y) join");			# 39
 	$app->syntaxAg->eval("(1..3, 6 | map2 a+b) join");				# 39
+	
+=== `grep`
+
+`grep` возвращает элементы, которые соответствуют условию.
+
+	$app->syntaxAg->eval("(1..3, 6 | grep a < 3) join");					# 12
+	$app->syntaxAg->eval("(1..3, 6 | grep2 b-a == 3) join");				# 36
+	$app->syntaxAg->eval("(1..3, 6 | x, y grep y-x == 3) join");			# 36
+	
+
+=== `first`
+
+Ищет первый элемент, удовлетворяющий условию.
+
+	$app->syntaxAg->eval("(1..3, 6..10 | first a > 3) join");						# 6
+	$app->syntaxAg->eval("(1..3, 6..10, 13 | first2 b-a >= 3) join");				# 36
+	$app->syntaxAg->eval("(1..3, 6..10, 13 | x, y first y-x >= 3) join");			# 36
+
+=== `any`
+
+1, если какой-то из элементов списка удовлетворяет условию.
+
+=== `all`
+
+1, если все элементы списка удовлетворяют условию.
+
+=== `sort`
+
+Сортирует со строковым сравнением.
+
+=== `order`
+
+Сортирует с числовым сравнением.
+
+=== `group`
+
+Группирует 
+
+=== `reduce`
+
+Сворачивает список.
+
 	
 == Условия
 
@@ -173,8 +218,17 @@ TODO:
 
 	$app->syntaxAg->eval("repeat s++ until s==12; s");			# 12
 	
+=== Счётчики итераций в циклах
+
+
+	
 == Исключения
 
+Оператор `rescue`, `catch`, `except` ловит исключение в коде перед собой и выполняет код после.
+
+Оператор `die`, `throw`, `raise` посылает исключение.
+
+Исключение должно наследовать 
 
 	
 == Операторы
@@ -298,16 +352,93 @@ TODO:
 	$app->syntaxAg->new->eval("10, 20	implode	', '");		# 10, 20
 	$app->syntaxAg->new->eval("'1,2,3'	explode	','");		## [1,2,3]
 	
+=== Для массивов
+	
 	$app->syntaxAg->new->eval(" 1..6 join");		# 123456
 	$app->syntaxAg->new->eval(" 1...6 join");		# 12345
 	
 	$app->syntaxAg->new->eval(" 0 to 1 step .2 join ', ' ");		# 0, 0.2, 0.4, 0.6, 0.8, 1
 	
+push:
+	
 	$app->syntaxAg->new->eval('a=[1]; @a ,= 2, 3; @a join');		# 123
-	$app->syntaxAg->new->eval('a=[1,2,3]; b, c ,= @a; @a join');	# 3
 
+shift:
+	
+	$app->syntaxAg->new->eval('a=[1,2,3]; b, c ,= @a; @a join');	# 3
+	
+unshift:
+
+	$app->syntaxAg->new->eval('a=[1]; @a =, 2, 3; @a join');		# 231
+
+pop:
+
+	$app->syntaxAg->new->eval('a=[1,2,3]; b, c =, @a; @a join');	# 1
+	
+Запятая у `=` показывает в какую сторону будет производиться сдвиг
+
+# slice:
+
+	# $app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@[0,3,4] join');		# 145
+	# $app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@[0,3,4] = 7,8,9; @a join');		# 7234896
+
+# splice:
+
+	# $app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@ 2, 4 = 7; @a join');		# 1276
+
+=== Для хэшей
+
+
+
+	
 == ООП
 
+=== Методы
 
+	$app->syntaxAg->new->eval('class MethodTest
+		sub slut b, c then me:number * b?1 + c
+	end');
+	
+	$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut a.slut, a.slut + 6');	# 116
+	$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut -+1');	# -10
+	$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut -+1');	# -10
+	
+Тут `-` без пробела после него - по этому признаку происходит вызов метода с параметрами
 
-== 
+=== Декораторы
+
+Пример декоратора:
+
+	$app->syntaxAg->new->eval('
+	
+	# добавляем сервис
+	class R::Routers
+		sub add name then @me:routers ,= name
+	end
+	
+	class MyDecorator
+		sub init then app.routers.add "$me:class.$me:name"
+		sub replace me1 then
+		sub before me1 then
+		sub after me1 then
+	end
+	
+	class DecoratorTest
+		*MyDecorator
+		sub myroute then
+	end
+	
+	');
+	
+Экземпляр декоратора создаётся для каждого метода, который он декорирует.
+
+Метод `init` декоратора вызывается при создании класса. В данном примере он собирает в сервис роутеров наименования методов.
+	
+`replace` будет выполняться вместо метода.
+`before`  и `after` выполняются до и после метода, соответственно.
+
+Свойство `me:name` содержит имя декорируемого метода.
+Свойство `me:class` содержит имя класса.
+Свойство `me:me` содержит контекст метода.
+
+	

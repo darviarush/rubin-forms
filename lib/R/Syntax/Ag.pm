@@ -83,8 +83,8 @@ $s->tr("yf",  qw{		.$word .word :word 	});
 $s->td("xfy", qw{		.$word() .word() :word()	.$word[] .word[] :word[]	.$word{} .word{} :word{}	});
 $s->td("xfy", qw{		word() word[] word{}	});
 $s->tr("fx",  qw{		@	%		});
-$s->tr("fy",  qw{  		length delete })->td("xf", qw{  ? instanceof }); # ?!
 $s->tr("yf",  qw{		++ --			})->td("fy", qw{ ++ -- });
+$s->tr("fy",  qw{  		length delete })->td("xf", qw{  ? instanceof }); # ?!
 $s->tr("yfx", qw{		^				});
 $s->tr("fy",  qw{ 		+ - ! +~		});
 $s->tr("xfy", qw{		=~ !~	~		});
@@ -117,7 +117,7 @@ $s->tr("xfy", qw{	\n	})->td("yf", qw{	\n	})->td("fy", qw{	\n	});
 $s->tr("xfy", qw{		THEN	ELSEIF	ELSE	UNTIL	FROM	CATCH	});
 
 
-$s->tr("xfy", qw{		CAT						});			# операция конкантенации в шаблонах
+#$s->tr("xfy", qw{		CAT						});			# операция конкантенации в шаблонах
 
 
 ### дополнительные опции операторов
@@ -143,6 +143,11 @@ $s->opt(".\$word",		re => qr{		\.\$ (?<var>$re_id)			}x);
 $s->opt(".\$word()",	re => qr{		\.\$ (?<var>$re_id) \(		}x);
 $s->opt(".\$word[]",	re => qr{		\.\$ (?<var>$re_id) \[		}x);
 $s->opt(".\$word{}",	re => qr{		\.\$ (?<var>$re_id) \{		}x);
+
+$s->opt(".?word",		re => qr{		\.\? (?<var>$re_id)			}x);
+$s->opt(".?word()",		re => qr{		\.\? (?<var>$re_id) \(		}x);
+$s->opt(".?word[]",		re => qr{		\.\? (?<var>$re_id) \[		}x);
+$s->opt(".?word{}",		re => qr{		\.\? (?<var>$re_id) \{		}x);
 
 
 
@@ -476,26 +481,34 @@ sub require {
 	
 	my $file = $app->file($path);
 	my $class = $self->path2class($path);
+	my @path = split /\//, $path;
 	
 	for my $inc (@$INC) {
-		my $f = $file->frontdir($inc);
-		if($f->exists) {
-			my $to = $app->file("$inc/.Aqua/$path.pm");
+		my $load = 0;
+		
+		for(my $i=0; $i<@path; $i++) {
+			my $rpath = join "/", @path[0..$i];
+			my $f = $app->file("$inc/$rpath");
 			
-			if(!$to->exists || $to->mtime < $f->mtime) {
-				$self->compile($f->path, $to->path, $class);
+			if($f->exists) {
+				my $to = $app->file("$inc/.Aqua/$rpath.pm");
+				
+				if(!$to->exists || $to->mtime < $f->mtime) {
+					$self->compile($f->path, $to->path, $class);
+				}
+				
+				$Nil::REQUIRE{$rpath} = $rpath;
+				require $to->path;
+				$load = 1;
 			}
-			
-			$Nil::REQUIRE{$path} = $path;
-			require $to->path;
-			return $class;
 		}
+		return $class if $load;
 	}
 	
 	die "нет " . $app->perl->qq($path);
 }
 
-# подключает классы Ag, Au или Perl
+# подключает классы Ag или Perl
 sub include {
 	my $self = shift;
 	
@@ -511,7 +524,7 @@ sub include {
 
 		for my $inc (@$INC) {
 			$self->require("$path.ag", [$inc]), next CLASSES if -e "$inc/$path.ag";
-			$self->parse("$path.au", [$inc]), next CLASSES if -e "$inc/$path.au";
+			#$self->parse("$path.au", [$inc]), next CLASSES if -e "$inc/$path.au";
 		}
 		
 		require "$path.pm";
