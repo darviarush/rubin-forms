@@ -93,25 +93,32 @@
 Все файлы по вложенным путям в имени класса так же подгражаются - ведь в файле класса могут быть подклассы.
 
 	$app->file("var/_test_13_ag/Nik.ag")->write("class Risk \n end");
-	$app->file("var/_test_13_ag/Nik/Risk.ag")->write("1");
+	$app->file("var/_test_13_ag/Nik/Risk.ag")->mkpath->write("1");
 	
-	$app->syntaxAg->ag("var/_test_13_ag/Nik/Risk.ag");	#@ ~ класс Nik::Risk встречается в .* и в .*
+	#$app->syntaxAg->ag("var/_test_13_ag/Nik/Risk.ag");	#@ ~ класс Nik::Risk встречается в .* и в .*
+	$app->syntaxAg->ag("var/_test_13_ag/Nik/Risk.ag");	#@ ~ Risk\.ag
 	
 === Тесты
 
 	$app->file("var/_test_13_ag/Test.ag")->write("
 		sub plus a,b then a+b
 		scenario
-			new Test.plus(10, 16)		# 26
+			a = new Test
 		end
+		
 		6
+		
+		scenario
+			if a.plus(10, 16) != 26 then 5 else 7
+		end
 	");
 	$app->syntaxAg->ag("var/_test_13_ag/Test.ag");		# 6
+	#$app->syntaxAg->ag("var/_test_13_ag/Test.ag", 1);	# 7
 
 	
 === Методы и свойства
 
-Все переменные в *Серебрянке* - локальные, а свойства объектов доступны через `me` и его синонимы `self` и `this`:
+Все переменные в *Серебряне* - локальные, а свойства объектов доступны через `me` и его синонимы `self` и `this`:
 	
 	$app->syntaxAg->eval("
 		class TestProperty
@@ -121,15 +128,6 @@
 	
 	$app->syntaxAg->eval("new TestProperty:a");			# 10
 
-	
-=== Декораторы
-
-
-==== Контрактное программирование
-
-Контрактное программирование использует декораторы.
-Когда установлено `app.site.test` контракторы осуществляют проверки и выбрасывают эксепшены.
-TODO:
 
 == Конвееры
 	
@@ -139,6 +137,8 @@ TODO:
 === `map`
 
 `map` считывает из потока элементов один элемент, а вот возвращать может ноль или более элементов в поток.
+	
+	msg1 $app->syntaxAg->morf("(1..3, 6 | a+1) join");
 	
 	$app->syntaxAg->eval("(1..3, 6 | a+1) join");			# 2347
 	
@@ -168,26 +168,62 @@ TODO:
 
 1, если какой-то из элементов списка удовлетворяет условию.
 
+	$app->syntaxAg->eval("1..3 | any a==3");		# 1
+	$app->syntaxAg->eval("1..3 | any a==4");		# 
+
 === `all`
 
 1, если все элементы списка удовлетворяют условию.
+
+	$app->syntaxAg->eval("1..3 | all a > 0");		# 1
+	$app->syntaxAg->eval("1..3 | all a < 3");		# 
 
 === `sort`
 
 Сортирует со строковым сравнением.
 
+	$app->syntaxAg->eval("[ 'abc', 'r', 'axc' | sort a ]");			## ['abc', 'asx', 'r']
+	$app->syntaxAg->eval("[ 'abc', 'r', 'axc' | x sort x ]");		## ['abc', 'asx', 'r']
+
+
 === `order`
 
 Сортирует с числовым сравнением.
 
+	$app->syntaxAg->eval("^3 | order -a | join");			# 3210
+	$app->syntaxAg->eval("^3 | x order -x | join");			# 3210
+	
+
 === `reduce`
 
-Сворачивает список.
+Редукция. Сворачивает список к одному элементу.
+
+	$app->syntaxAg->eval("1..3 | reduce a*b");				# 6
+	$app->syntaxAg->eval("1..3 | x, y reduce x*y");			# 6
 
 === `group`
 
-Группирует 
+Группировка со строковым сравнением.
+Оставляет только первый элемент из группы. Группой считаются все элементы для которых выражение после `| group` возвращает одинаковое значение.
+Другими словами `| group` строит хэш всех значений в котором оставляет первый попавшийся.
 
+	$app->syntaxAg->eval("1..66 |   group a div 10 | join ', '");		# 1, 10, 20, 30, 40, 50, 60
+	$app->syntaxAg->eval("1..66 | x group x div 10 | join ', '");		# 1, 10, 20, 30, 40, 50, 60
+
+
+=== `compress`
+
+Группировка с числовым сравнением.
+
+	$app->syntaxAg->eval("1..66 |   compress a div 10 | join ', '");			# 1, 10, 20, 30, 40, 50, 60
+	$app->syntaxAg->eval("1..66 | x compress x div 10 | join ', '");			# 1, 10, 20, 30, 40, 50, 60
+
+=== `join`
+
+Добавлен для удобства работы с конвеерами: оператор с другим приоритетом.
+
+	$app->syntaxAg->eval("1..6 | join ', ' ");			# 1, 2, 3, 4, 5, 6
+	$app->syntaxAg->eval("1..6 | join      ");			# 123456
 
 	
 == Условия
@@ -200,6 +236,22 @@ TODO:
 	$app->syntaxAg->eval("if 0 \n 10 \n end");					## undef
 	$app->syntaxAg->eval("if 0 \n 10 \n else \n 20 \n end");	# 20
 	$app->syntaxAg->eval("if 1 then s = 10 end; s");			# 10
+	
+=== `case`
+
+	my $res = $app->syntaxAg->eval("
+		a = 10
+		case a+1
+			when 1 then 30
+			when 2...6 then 50
+			when 8..10
+				60
+			default 'default'
+		end
+	");
+	
+	$res; 		# default
+
 
 == Циклы
 	
@@ -224,6 +276,8 @@ TODO:
 	$app->syntaxAg->eval("for i=1..2 then if index(i)==1 then last end end; i");			# 2
 	$app->syntaxAg->eval("for i,j=1..6 then if index(i)==2 then last end end; i");			# 3
 	
+`index(var)` показывает индекс элемента в потоке данных. Поэтому во втором примере он будет принимать значения 0, 2, 4
+	
 == Исключения
 
 Оператор `rescue`, `catch`, `except` ловит исключение в коде перед собой и выполняет код после.
@@ -231,6 +285,17 @@ TODO:
 Оператор `die`, `throw`, `raise` посылает исключение.
 
 Исключение должно наследовать 
+
+== `with`
+
+`with` позволяет гарантированно закрыть объект, даже если в блоке произойдёт исключение.
+
+	my $res = $app->syntaxAg->eval("
+		with new R::File('var/test-1') as file
+			file.print(10)
+		end
+	");			
+	$res;		# 3
 
 	
 == Операторы
@@ -244,7 +309,7 @@ TODO:
 Он имеет меньший приоритет, чем операторы `and`, `or`, `xor` и `not`:
 	
 	$app->syntaxAg->new->eval("a = 10 and 20; a");	# 10
-	$app->syntaxAg->new->eval("a = 10 && 20; a");	# 20
+	$app->syntaxAg->new->eval("a = 10  && 20; a");	# 20
 
 Оператор `is` аналогичен `=`, но имеет больший приоритет:
 
@@ -254,6 +319,17 @@ TODO:
 
 	$app->syntaxAg->new->eval("20 and 10 as a; a");	# 10
 	$app->syntaxAg->new->eval("20  && 10 -> a; a");	# 10
+	
+	
+	$app->syntaxAg->new->eval("a ?= 10");			# 10
+	$app->syntaxAg->new->eval("a = 5; a ?= 10");	# 5
+	$app->syntaxAg->new->eval("a=1;  a += 10");		# 11
+	$app->syntaxAg->new->eval("a=10; a -= 10");		# 0
+	$app->syntaxAg->new->eval("a=10; a *= 10");		# 100
+	$app->syntaxAg->new->eval("a=10; a /= 100");	# 0.1
+	$app->syntaxAg->new->eval("a=10; a div= 4");		# 2
+	$app->syntaxAg->new->eval("a=10; a mod= 4");		# 1
+	
 
 === Логические
 
@@ -323,7 +399,16 @@ TODO:
 	$app->syntaxAg->new->eval("1-1");		# 0
 	$app->syntaxAg->new->eval("4*5");		# 20
 	$app->syntaxAg->new->eval("5/4");		# 1.25
+	$app->syntaxAg->new->eval("5 div 4");	# 1
+	$app->syntaxAg->new->eval("5 mod 3");	# 2
 	$app->syntaxAg->new->eval("3^3");		# 27
+	
+	# $app->syntaxAg->new->eval("3.25 ceil");		# 4
+	# $app->syntaxAg->new->eval("3.25 floor");		# 3
+	# $app->syntaxAg->new->eval("3.25 round");		# 3
+	# $app->syntaxAg->new->eval("3.25 ceil 1");		# 3.3
+	# $app->syntaxAg->new->eval("3.25 floor 1");		# 3.2
+	# $app->syntaxAg->new->eval("3.25 round 1");		# 3.3
 	
 === Инкремент и декремент
 	
@@ -371,12 +456,6 @@ TODO:
 	
 	$app->syntaxAg->new->eval("['1  2 3' split]");		## [1,2,3]
 	
-	$app->syntaxAg->new->eval("10, 20 | a+1	implode	', '");		# 11, 21
-	$app->syntaxAg->new->eval("['1,2,3'	explode	',']");		## [1,2,3]
-	
-	$app->syntaxAg->new->eval("10, 20	implode	', '");		# 10, 20
-	$app->syntaxAg->new->eval("'1,2,3'	explode	','");		## [1,2,3]
-	
 
 === Регулярные
 
@@ -405,7 +484,12 @@ TODO:
 	
 	$app->syntaxAg->new->eval(" (0..* step 2)@[1..3] join");		# 246
 	
-Операторы `^..` и  `^...` не включают начало интервала.
+Так же работает и с `inf`:
+	
+	$app->syntaxAg->new->eval(" (0...Inf)@[1..3] join");		# 123
+	
+	
+Операторы `^..`, `^to` и  `^...` не включают начало интервала.
 	
 	$app->syntaxAg->new->eval(" 1^..6 join");					# 23456
 	$app->syntaxAg->new->eval(" 1^...6 join");					# 2345
@@ -422,8 +506,17 @@ TODO:
 	
 	
 === Для массивов
-		
-push:
+	
+`reverse` - переворачивает список. 
+
+	$app->syntaxAg->eval(" ^3, 6 reverse join");					# 63210
+	
+`zip` - объединяет списки.
+
+	$app->syntaxAg->eval("[1..3 zip 4,5 zip 9..11]");		## [1,4,9,2,5,10,3,undef,11]
+
+	
+`push` - добавляет элементы в конец списка.
 	
 	$app->syntaxAg->new->eval('a=[1]; @a ,= 2, 3; @a join');		# 123
 
@@ -487,7 +580,7 @@ splice:
 	$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut -+1');	# -10
 	$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut -+1');	# -10
 	
-Тут `-` без пробела после него - по этому признаку происходит вызов метода с параметрами
+Тут `-` без пробела после него - по этому признаку происходит вызов метода с параметрами.
 
 === Декораторы
 
@@ -501,14 +594,14 @@ splice:
 	end
 	
 	class MyDecorator
-		sub init then app.routers.add "$me:class.$me:name"
+		sub init then app.routers.add "$me:args[0] $me:class.$me:name"
 		sub replace me1 then
 		sub before me1 then
 		sub after me1 then
 	end
 	
 	class DecoratorTest
-		*MyDecorator
+		*MyDecorator "/page"
 		sub myroute then
 	end
 	
@@ -524,5 +617,12 @@ splice:
 Свойство `me:name` содержит имя декорируемого метода.
 Свойство `me:class` содержит имя класса.
 Свойство `me:me` содержит контекст метода.
+Свойство `me:args` содержит аргументы декторатора.
 
-	
+
+
+==== Контрактное программирование
+
+Контрактное программирование использует декораторы.
+Когда установлено `app.site.test` контракторы осуществляют проверки и выбрасывают эксепшены.
+TODO:

@@ -36,7 +36,7 @@ sub new {
 		#trace => "«eval»",		# файл трейс которого показать
 		trace => undef,			# показывать трейс
 		show => undef,			# показывать текст в eval
-		file => "",				# путь к текущему файлу
+		file => undef,				# путь к текущему файлу
 		lineno => 1,			# номер строки в текущем файле
 		
 		stack => undef,			# стек скобок
@@ -167,16 +167,7 @@ sub td {
 	
 	my $key = $fix & $infix? "INFIX": $fix & $prefix? "PREFIX": "POSTFIX";
 	for my $x (@_) {
-		if(ref $x eq "Regexp") {
-			die "не указан оператор" if !$op;
-			die "регулярка уже есть у оператора $op->{name}" if exists $op->{re};
-			$op->{re} = $x;
-		}
-		elsif(ref $x eq "CODE") {
-			die "не указан оператор" if !$op;
-			die "подпрограмма уже есть у оператора $op->{name}" if exists $op->{sub};
-			$op->{sub} = $x;
-		}
+		if(ref $x) { die "имена операторов должны быть строками: `$x`" }
 		else {
 			die "оператор `$type $x` уже объявлен" if exists $self->{$key}{$x};
 			$op = $self->newlex($key => {%p, name=>"$type $x", alias=>$x, fix => $fix, order => -length $x});
@@ -271,7 +262,7 @@ sub opt {
 	
 	pairmap {
 		die "свойство $a в $stmt уже есть" if exists $x->{$a};
-		die "можно добавлять только re, sub, order, или nolex в $stmt" if $a !~ /^(?:re|sub|order|nolex)$/;
+		die "можно добавлять только re, sub, sur, order, или nolex в $stmt" if $a !~ /^(?:re|sub|sur|order|nolex)$/;
 		$x->{$a} = $b;
 	} @_;
 	
@@ -361,7 +352,7 @@ sub lex {
 		(?<error_nosym> . )	"
 	}
 	
-	$app->file("var/lex.pl")->write("qr{$lex}xni");
+	$app->file("var/lex-$self->{name}.pl")->write("my \$a = qr{$lex}xni;\n");
 	
 	#msg1 $lex;
 	
@@ -385,6 +376,8 @@ sub masking {
 			$endline = index($&, "\n")!=-1;
 			$app->log->info(":nonewline", "$&") if !$endline;
 			$endline = $& if $endline;
+			
+			$app->log->info(":nonewline on_cyan black", "$^R") if defined $^R and !exists $+{newline} and !exists $+{error_nosym} and !exists $+{spacer};
 		}
 	
 		exists $+{newline}? $self->{lineno}++:
@@ -432,11 +425,18 @@ sub op {
 	if(my $x = $self->{LEX}{$stmt}) {
 		$x->{sub}->($self, $push) if exists $x->{sub};
 	}
+	
 	# проверяем скобки
 	my $br = $self->{IN}{$stmt};
 	$self->check($push->{stmt}, stmt => $br) if $br;
 	
 	push @{ $self->{stack}[-1]{'A+'} }, $push;
+	
+	# выполняем подпрограмму
+	if(my $x = $self->{LEX}{$stmt}) {
+		$x->{sur}->($self, $push) if exists $x->{sur};
+	}
+	
 	#$self->trace("_", $push);
 	$self
 }
@@ -490,7 +490,7 @@ sub pop {
 	my $sk = $stack->[-1];
 
 	my $tag = $sk->{tag} // $sk->{stmt};
-	$self->error("закрывающая скобка $stag конфликтует со скобкой $tag") if defined $stag and $tag ne $stag;
+	$self->error("закрывающая скобка $stag конфликтует со скобкой ".($sk->{stmt} ne $tag? "$sk->{stmt} … $tag": $tag)) if defined $stag and $tag ne $stag;
 	
 	my $A = $sk->{'A+'};
 	$self->error("скобки ".($stag eq $sk->{stmt}? $stag: $sk->{stmt}." ".$stag)." не могут быть пусты") if !$A;
@@ -808,7 +808,7 @@ sub trace_help {
 # возвращает колоризированный массив стеков для trace и error
 sub color_stacks {
 	my $self = shift;
-	local($a, $b);
+	#local($a, $b);
 	return ":space",
 		pairmap { ":dark white", "\t$a:", ":reset", map({ $_->{stmt} } @$b) } @_
 }

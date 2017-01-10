@@ -32,11 +32,11 @@ our %templates = (
 
 '.word.br' => '{{ right }}',
 
-# строки
-string => '"{{ right }}"',
-str => '{{ str }}',
-kav => '{{ str }}\"',
-interpolation => '{{ str }}${\( {{ right }} )}',
+# # строки
+# string => '"{{ right }}"',
+# str => '{{ str }}',
+# kav => '{{ str }}\"',
+# interpolation => '{{ str }}${\( {{ right }} )}',
 
 # массивы
 '[' => '[ {{ right }} ]',
@@ -46,6 +46,8 @@ interpolation => '{{ str }}${\( {{ right }} )}',
 'xf @' => '@{{{ left }}}',
 'xf %' => '%{{{ left }}}',
 
+# сценарии
+SCENARIO => '{{ _scenario right, lineno }}',
 
 # операторы 
 #'[]=' => 'push(@{{{ left }}}, {{ right }})',
@@ -70,7 +72,7 @@ interpolation => '{{ str }}${\( {{ right }} )}',
 
 
 # конвеер
-"yfx |" => 'do{ {{ _conveer left, op, param, arity, right }} }',
+"yfx |" => 'do{ {{ _conveer left, op, param, right }} }',
 
 
 # операторы присваивания
@@ -136,9 +138,9 @@ interpolation => '{{ str }}${\( {{ right }} )}',
 
 # проверки
 "xf ?" => 'defined({{ left }})',
-"xf instanceof" => 'Isa({{ left }}, "{{ class }}")',
-"yfx isa" => 'Isa({{ left }}, {{ right }})',
-"yfx can" => 'Can({{ left }}, {{ right }})',
+#"xf instanceof" => 'Isa({{ left }}, "{{ class }}")',
+"xfx isa" => 'Isa({{ left }}, {{ right }})',
+"xfx can" => 'Can({{ left }}, {{ right }})',
 
 
 # массивов
@@ -146,11 +148,6 @@ interpolation => '{{ str }}${\( {{ right }} )}',
 "xfy split" => 'split({{ right }}, {{ left }})',
 "yf join" => 'join("", {{ left }})',
 "xf split" => 'split(/\s+/, {{ left }})',
-
-"yfx implode" => 'join({{ right }}, {{ left }})',
-"xfy explode" => 'split({{ right }}, {{ left }})',
-"yf implode" => 'join("", {{ left }})',
-"xf explode" => 'split(/\s+/, {{ left }})',
 
 
 #"xfy in" => '(grep { {{ left }} }, {{ right }})',
@@ -160,7 +157,7 @@ interpolation => '{{ str }}${\( {{ right }} )}',
 
 # хешей
 "fx delete" => 'delete({{ right }})',
-"xfx of" => 'exists {{ left }}->{{{ right }}}',
+"xfx of" => 'exists( {{ left }}->{{{ right }}} )',
 
 
 # операторы смысловых конструкций
@@ -169,7 +166,7 @@ interpolation => '{{ str }}${\( {{ right }} )}',
 "xfy ELSEIF" => '{{ left }} }: ({{ right }}',
 
 # скобки
-CLASS => '(do { package {{ class }}; use common::sense; use R::App;{{ _extends class, extends }} sub void { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
+CLASS => '(do { package {{ class }}; use common::sense; use R::App;{{ _extends class, extends, lineno, file }} sub void { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
 
 SUB => 'sub {{ SUB }} { my $DATA = { me => {{ _shift SUB }} }; {{ _args args }} {{ right }}{{ _ifnewend SUB }}}',
 
@@ -206,10 +203,52 @@ string => '"{{ right }}"',
 
 );
 
+# возвращает новую переменную
+sub ref {
+	my ($self) = @_;
+	'\$ref' . (++$self->{REF})
+}
+
+
 # конвеер
 sub _conveer {
-	my ($self, $left, $op, $param, $arity, $right) = @_;
-	$self
+	my ($self, $left, $op, $param, $right) = @_;
+	
+	my $code = "<<<<< conveer not!!! >>>>>";
+	my $arity = @$param;
+	
+	if($op eq "map") {
+		my $ref = $self->ref;
+		my $new = $self->ref;
+		my $i = $self->ref;
+		my $fn = $self->ref;
+		my $if;
+		my $closeif = "";
+		if(@$param == 1) {
+			$if = "\$DATA->{$param->[0]} = $ref;";
+		} else {
+			my $k = 0;
+			$if = join " else ", map { $k == $#$param? (): "if($i % $arity == $k) { \$DATA->{$_} = $ref }" } @$param;
+			$if .= "else { \$DATA->{$param->[-1]} = $ref; ";
+			$closeif = "}";
+			# TODO: добить params!
+			$last = "if($i % $arity) { push \@$new, $fn->() }";
+		}
+		
+		
+		$code = "my $new = []; my $i = 0; my $fn = sub { $right }; for my $ref ( $left ) { $if push \@$new, $fn->()$closeif $i++ }$last";
+	}
+	
+	$code
+}
+
+# сценарий - добавляет в файл
+sub _scenario {
+	my ($self, $right, $lineno) = @_;
+	
+	push @{$self->{SCENARIO}}, {lineno => $lineno, text => $right};
+	
+	""
 }
 
 # если есть комментарий - выводит
@@ -247,11 +286,12 @@ sub _args {
 
 # хелпер для расширения класса
 sub _extends {
-	my ($self, $class, $extends) = @_;
+	my ($self, $class, $extends, $lineno, $file) = @_;
 	
 	#push @Nil::CLASSES, "{{ class }}"$Nil::CLASSES{"{{ class }}"}++;
 	
-	$self->{BEGIN} .= "\$Nil::CLASSES{\"$class\"}++; ";
+	$file =~ s!'!\'!g;
+	$self->{BEGIN} .= "my (\$class, \$file, \$lineno) = (\"$class\", '$file', $lineno); my \$c = \$Nil::CLASSES{\$class}; die \"класс \$class встречается в \$file:\$lineno и в \$c->{file}:\$c->{lineno}\" if \$c; \$Nil::CLASSES{\$class} = { file => \$file, lineno => \$lineno }; ";
 	
 	my $ext = "";
 	$ext .= " BEGIN { \$R::App::app->syntaxAg->include( \@${class}::ISA = qw/".join(" ", @$extends)."/ ) }" if @$extends;
@@ -283,10 +323,28 @@ sub _ifnewend {
 sub end {
 	my ($self, $ret, $syntax) = @_;
 	
-	if(defined $self->{BEGIN}) {
-		$ret = "BEGIN { $self->{BEGIN} } $ret";
-		delete $self->{BEGIN};
+	if(my $begin = delete $self->{BEGIN}) {
+		$ret = "BEGIN { $begin } $ret";
 	}
+	
+	# сценарий - в отдельный файл
+	if(my $scenario = delete $self->{SCENARIO}) {
+		my $to = $syntax->{tofile};
+		die "не указан выходной файл" if !$to;
+		$to =~ s/\.pm$/.t/;
+		
+		my $code = "";
+		my $lineno = 0;
+		for my $x (@$scenario) {
+			$code .= ("\n" x ($lineno - $x->{lineno})) . $x->{text} . "; ";
+			$lineno = $x->{lineno} + $x->{endlineno}; # TODO: endlineno добавить
+		}
+		
+		$code = join '', 'use common::sense; use R::App; my $DATA = { me => \$app->syntaxAg->include(\"Nil\")->new }; ', $code ,'1';
+		
+		$app->file($to)->mkpath->write($code);
+	}
+	
 	
 	$ret
 }

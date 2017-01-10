@@ -17,13 +17,13 @@ $BASICSYNTAX->bar($STRINGSYNTAX);
 
 # конструктор
 sub new {
-	my ($cls) = @_;
+	my $cls = shift;
 	my $self = bless {
 		%$BASICSYNTAX,
 		trace => 0,
 		@_
 	}, ref $cls || $cls;
-	
+
 	#$self->trace_help if defined $self->{trace};
 	
 	#msg1 $app->raise->tracex;
@@ -52,13 +52,13 @@ my $re_class_stmt = qr!
 (?<with> [\t\ ]+ with [\t\ ]+ (?<with_args> [^\r\n]+) )?
 !xismo;				
 my $re_args = qr!
-[\ \t]* (?<args>$re_arg (?:$re_space_ask , $re_space_ask $re_arg)*)
-!xismo;
+$re_space_ask (?<args>$re_arg ($re_space_ask , $re_space_ask $re_arg)*)
+!xismon;
 my $re_overload_id = qr!
 	(?<id>"\w+"|[[:punct:]]+|0\+)
 !xismo;
 my $re_sub_in = qr/ [\ \t]+ CLASS [\ \t]+ (?<sub_in>(?<sub_self>::)?$re_class) /xn;
-my $re_args_then = qr/ $re_space (?<then> \b THEN \b ) | $re_args (?<then> \b THEN \b ) | ( $re_args )? /ixno;
+my $re_args_then = qr/ $re_space_ask (?<then> \b THEN \b ) | $re_args $re_space_ask (?<then> \b THEN \b ) | $re_args | /ixno;
 my $re_then = qr/ (?<re_endline> $re_space_ask \b THEN \b) | $re_rem $re_endline /xn;
 my $re_for = qr!
 (?<for_k>$re_id) (?: $re_space_ask,$re_space_ask (?<for_v>$re_id) (?: $re_space_ask,$re_space_ask (?<for_i>$re_id) )? )? (?: $re_space (?<for_in>IN) \b | $re_space (?<for_of>OF) \b | $re_space_ask = )
@@ -80,7 +80,10 @@ my $re_for = qr!
 my $s = $BASICSYNTAX;
 
 $s->tr("yf",  qw{		.word :word .?word .$word .?$word 	});
-$s->td("xfy", qw{		.word() :word()	.$word() .?word() .?$word() .$word[] .word[] :word[] .?word[] .?$word[]	.$word{} .word{} :word{} .?word{} .?$word{}	});
+$s->td("xfy", qw{		.word() :word()	.$word() .?word() .?$word() 
+						.word[] :word[] .$word[] .?word[] .?$word[]
+						.word{} :word{} .$word{} .?word{} .?$word{}
+				});
 $s->td("xfy", qw{		word() word[] word{}	});
 $s->tr("fx",  qw{		@	%		});
 $s->tr("yf",  qw{		++ --			})->td("fy", qw{ ++ -- });
@@ -96,16 +99,16 @@ $s->tr("xfy", qw{		+&					});
 $s->tr("xfy", qw{		+|  +^				});
 $s->tr("xfx", qw{		< > <= >= lt gt le ge		});
 $s->tr("xfx", qw{		== != eq ne  <=> cmp 		});			# ~~
-$s->tr("xfy", qw{		in of isa can				});
+$s->tr("xfx", qw{		isa can	of					});
 $s->tr("xfy", qw{		&&					});
 $s->tr("xfy", qw{		|| ^^ ?				});
 $s->tr("xfx", qw{		.. ...  to  step		})->td("fx", qw{	^	});
 $s->tr("xfy", qw{		, =>		})->td("yf",  qw{ 	,		})->td("fy", qw{	=>		});
 $s->tr("xfx", qw{		split		})->td("yfx", qw{	join	})->td("xf", qw{ split })->td("yf", qw{ join });
-$s->tr("yfx", qw{		-> = += -= *= /= ^= &&= ||= ^^=   and= or= xor=  ,= =, .= 	}); # goto last next redo dump
+$s->tr("yfx", qw{		-> = += -= *= /= ^= div= mod= &&= ||= ^^=   and= or= xor=  ,= =, .= ?= }); # goto last next redo dump
+$s->tr("xfx", qw{		zip		reverse		in	});
 #$s->tr("xfx", qw{	list operators (rightward)});
 $s->tr("yfx", qw{		|						});
-$s->tr("xfx", qw{		explode		})->td("yfx", qw{		implode		})->td("xf", qw{ explode })->td("yf", qw{ implode });
 $s->tr("fy",  qw{		not						});
 $s->tr("xfy", qw{		and						});
 $s->tr("xfy", qw{		or	xor					});
@@ -117,54 +120,69 @@ $s->tr("xfy", qw{	\n	})->td("yf", qw{	\n	})->td("fy", qw{	\n	});
 $s->tr("xfy", qw{		THEN	ELSEIF	ELSE	UNTIL	FROM	CATCH	});
 
 
-#$s->tr("xfy", qw{		CAT						});			# операция конкантенации в шаблонах
-
-
 ### дополнительные опции операторов
 
+$s->br('.word.br');
+$s->opt('.word.br', nolex => 1);
+my $wordbr1 = sub { my ($self, $push) = @_; $self->push('.word.br', tag => ')'); };
+my $wordbr2 = sub { my ($self, $push) = @_; $self->push('.word.br', tag => ']'); };
+my $wordbr3 = sub { my ($self, $push) = @_; $self->push('.word.br', tag => '}'); };
 
-
-$s->opt("word()", 		re => qr{		(?<var>$re_id) \(			}x);
-$s->opt("word[]", 		re => qr{		(?<var>$re_id) \[			}x);
-$s->opt("word{}", 		re => qr{		(?<var>$re_id) \{			}x);
+$s->opt("word()", 		re => qr{		(?<var>$re_id) \(			}x,	sur => $wordbr1);
+$s->opt("word[]", 		re => qr{		(?<var>$re_id) \[			}x,	sur => $wordbr2);
+$s->opt("word{}", 		re => qr{		(?<var>$re_id) \{			}x,	sur => $wordbr3);
 
 
 $s->opt(":word",		re => qr{		: (?<var>$re_id)			}x);
-$s->opt(":word()",		re => qr{		: (?<var>$re_id) \(			}x);
-$s->opt(":word[]",		re => qr{		: (?<var>$re_id) \[			}x);
-$s->opt(":word{}",		re => qr{		: (?<var>$re_id) \{			}x);
+$s->opt(":word()",		re => qr{		: (?<var>$re_id) \(			}x,	sur => $wordbr1);
+$s->opt(":word[]",		re => qr{		: (?<var>$re_id) \[			}x,	sur => $wordbr2);
+$s->opt(":word{}",		re => qr{		: (?<var>$re_id) \{			}x,	sur => $wordbr3);
 
 $s->opt(".word",		re => qr{		\. (?<var>$re_id)			}x);
-$s->opt(".word()",		re => qr{		\. (?<var>$re_id) \(		}x);
-$s->opt(".word[]",		re => qr{		\. (?<var>$re_id) \[		}x);
-$s->opt(".word{}",		re => qr{		\. (?<var>$re_id) \{		}x);
+$s->opt(".word()",		re => qr{		\. (?<var>$re_id) \(		}x,	sur => $wordbr1);
+$s->opt(".word[]",		re => qr{		\. (?<var>$re_id) \[		}x,	sur => $wordbr2);
+$s->opt(".word{}",		re => qr{		\. (?<var>$re_id) \{		}x,	sur => $wordbr3);
 
 $s->opt(".\$word",		re => qr{		\.\$ (?<var>$re_id)			}x);
-$s->opt(".\$word()",	re => qr{		\.\$ (?<var>$re_id) \(		}x);
-$s->opt(".\$word[]",	re => qr{		\.\$ (?<var>$re_id) \[		}x);
-$s->opt(".\$word{}",	re => qr{		\.\$ (?<var>$re_id) \{		}x);
+$s->opt(".\$word()",	re => qr{		\.\$ (?<var>$re_id) \(		}x,	sur => $wordbr1);
+$s->opt(".\$word[]",	re => qr{		\.\$ (?<var>$re_id) \[		}x,	sur => $wordbr2);
+$s->opt(".\$word{}",	re => qr{		\.\$ (?<var>$re_id) \{		}x,	sur => $wordbr3);
 
 $s->opt(".?word",		re => qr{		\.\? (?<var>$re_id)			}x);
-$s->opt(".?word()",		re => qr{		\.\? (?<var>$re_id) \(		}x);
-$s->opt(".?word[]",		re => qr{		\.\? (?<var>$re_id) \[		}x);
-$s->opt(".?word{}",		re => qr{		\.\? (?<var>$re_id) \{		}x);
+$s->opt(".?word()",		re => qr{		\.\? (?<var>$re_id) \(		}x,	sur => $wordbr1);
+$s->opt(".?word[]",		re => qr{		\.\? (?<var>$re_id) \[		}x,	sur => $wordbr2);
+$s->opt(".?word{}",		re => qr{		\.\? (?<var>$re_id) \{		}x,	sur => $wordbr3);
 
 $s->opt(".?\$word",		re => qr{		\.\?\$ (?<var>$re_id)			}x);
-$s->opt(".?\$word()",	re => qr{		\.\?\$ (?<var>$re_id) \(		}x);
-$s->opt(".?\$word[]",	re => qr{		\.\?\$ (?<var>$re_id) \[		}x);
-$s->opt(".?\$word{}",	re => qr{		\.\?\$ (?<var>$re_id) \{		}x);
+$s->opt(".?\$word()",	re => qr{		\.\?\$ (?<var>$re_id) \(		}x,	sur => $wordbr1);
+$s->opt(".?\$word[]",	re => qr{		\.\?\$ (?<var>$re_id) \[		}x,	sur => $wordbr2);
+$s->opt(".?\$word{}",	re => qr{		\.\?\$ (?<var>$re_id) \{		}x,	sur => $wordbr3);
 
 
 $s->opt("=>", re => qr{ (?<id>$re_id)? \s* => }xn );
 $s->opt("=", sub => sub {	$_[0]->{assign} = 1 });
 
-#$s->opt("instanceof", re => qr{ \b instanceof $re_space (?<class> $re_class_abs ) }xin);
-
-$s->opt("|", re => qr{ \| ( (?<param> $re_id (, $re_id)*)?  (?<op> map | grep | reduce | sort | order ) (?<arity> \d+ )? \b )? }xni, sub => sub {
+$s->opt("|", re => qr{ 
+	\| ( (?<param> $re_id (, $re_id)*)?  (?<op> map | grep | reduce | sort | order | group | compress | join ) (?<arity> \d+ )? \b )? 
+}xni, sub => sub {
 	my ($self, $push) = @_;
 	$self->error("| $push->{op} не может иметь и параметры $push->{param} и арность $push->{arity} одновременно") if defined $push->{param} and defined $push->{arity};
-	$self->error("может быть только |sort2") if $push->{op} eq "sort" and defined $push->{arity} and $push->{arity} != 2;
+	$self->error("у | $push->{op} не может быть арности") if any { $push->{op} eq $_} qw/sort order join/ and defined $push->{arity};
+	$self->error("у | join не может быть параметров") if $push->{op} eq "join" and defined $push->{param};
+	$self->error("| $push->{op} - арность не может быть равна 0") if defined $push->{arity} and $push->{arity} == 0;
+	
+	
 	$push->{op} //= "map";
+	
+	if(defined $push->{param}) {
+		$push->{param} = split /\s*,\s*/, $push->{param};
+	}
+	else {
+		my $arity = $push->{arity} // 1;
+		for(my $i=0, $n='a'; $i<$arity; $i++, $n++) {
+			push @{$push->{param}}, $n;
+		}
+	}
 });
 
 $s->x('\n');
@@ -192,7 +210,7 @@ $s->opt("ELSEIF", sub => sub {
 });
 $s->opt("ELSE", sub => sub { my ($self, $push) = @_; $self->check("ELSE", stmt=>"IF", else=>"", then=>"")->top->{else} = 1 });
 $s->opt("UNTIL", sub => sub { my ($self, $push) = @_; $self->check("UNTIL", stmt=>"REPEAT")->top->{endline} = 1 });
-$s->opt("FROM", sub => sub { my ($self, $push) = @_; my $top = $self->endline->top; $self->error("FROM должен использоваться после MAP, PAIRMAP, GREP, SORT, NSORT, QSORT или REDUCE") if $top->{stmt} !~ /^(?:map|grep|[nq]sort|reduce|pairmap)$/; $push->{endline} = $push->{gosub} = 1 });
+#$s->opt("FROM", sub => sub { my ($self, $push) = @_; my $top = $self->endline->top; $self->error("FROM должен использоваться после MAP, PAIRMAP, GREP, SORT, NSORT, QSORT или REDUCE") if $top->{stmt} !~ /^(?:map|grep|[nq]sort|reduce|pairmap)$/; $push->{endline} = $push->{gosub} = 1 });
 
 
 
@@ -206,11 +224,12 @@ $s->br(qw{			FOR		} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		EN
 $s->br(qw{			WHILE	} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
 $s->br(qw{			IF		} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
 $s->br(qw{			BEGIN		END		});
-$s->br(qw{			ON	} => qr{ \b ON $re_space (?<route>$re_string) }x => sub {
-	my ($self, $push) = @_; 
-	$push->{route}=$self;
-	$app->perl->unstring($push->{route});
-}, "END");
+
+# $s->br(qw{			ON	} => qr{ \b ON $re_space (?<route>$re_string) }x => sub {
+	# my ($self, $push) = @_; 
+	# $push->{route}=$self;
+	# $app->perl->unstring($push->{route});
+# }, "END");
 
 $s->opt("END", sub => sub {
 	my ($self, $push) = @_;
@@ -219,17 +238,19 @@ $s->opt("END", sub => sub {
 });
 
 $s->br(qw/			REPEAT				/);
-$s->br(qw/			MAP					/);
-$s->br(qw/			PAIRMAP				/);
-$s->br(qw/			GREP				/);
-$s->br(qw/			REDUCE				/);
-$s->br(qw/			SORT				/);
-$s->br(qw/			QSORT				/);
-$s->br(qw/			NSORT				/);
+# $s->br(qw/			MAP					/);
+# $s->br(qw/			PAIRMAP				/);
+# $s->br(qw/			GREP				/);
+# $s->br(qw/			REDUCE				/);
+# $s->br(qw/			SORT				/);
+# $s->br(qw/			QSORT				/);
+# $s->br(qw/			NSORT				/);
 
 $s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => sub {
 	my ($self, $push) = @_;
 	my $S = $self->{stack};
+	$push->{lineno} = $self->{lineno};
+	$push->{file} = $self->{file};
 	my $class;
 	for(my $i=$#$S; $i>=0; $i--) {
 		$class = $S->[$i]{class}, last if $S->[$i]{stmt} eq "CLASS";
@@ -248,7 +269,7 @@ $s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => sub {
 $s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_id ) $re_args_then }ix => sub {
 	my ($self, $push) = @_;
 	if($push->{then}) {
-		$push->{endline}=1; 
+		$push->{endline} = 1; 
 		delete $push->{then};
 	}
 } => "END");
@@ -256,9 +277,10 @@ $s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_id ) $re_args_then }ix => sub {
 
 #$s->br("DEF" => qr{ \b DEF $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
 #$s->br("LET" => qr{ \b LET $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
-$s->br("DO" => qr{ \b DO $re_args  }ix => "END");
 
 $s->br("new_apply" => qr{ 	\b NEW $re_space (?<new>$re_class) \(	}ix => ")");
+
+$s->br("SCENARIO" => sub { my ($self, $push) = @_; $push->{lineno} = $self->{lineno} } => "END");
 
 ### операнды
 
@@ -271,7 +293,7 @@ $s->x("app");
 $s->x("q");
 $s->x("user");
 $s->x("super");
-$s->x("nothing" => qr/\b(?: null | nothing | undef | nil) \b/x);
+$s->x("nothing" => qr/\b(?: null | nothing | undef | nil | void) \b/x);
 $s->x("pi");
 $s->x("nan");
 $s->x("inf");
@@ -281,8 +303,8 @@ $s->x("paramarray" => qr/\b(?:paramarray | arguments)\b/x);
 $s->x("throw" => qr/ \b (?: die | throw | raise ) \b /x => sub { $b->{gosub} = $b->{endline} = 1 });
 $s->x("next");
 $s->x("last");
-$s->x("redo");
-$s->x("wantarray");
+#$s->x("redo");
+#$s->x("wantarray");
 
 $s->x("new"		=> qr{ 	\b NEW $re_space (?<new>$re_class) 	}ix);
 $s->x("var"		=> qr{ 	(?<var>$re_id) 						}x);
@@ -292,7 +314,9 @@ $s->x("radix"	=> qr{	(?<radix> (?<rad>\d+) r (?<num> [\da-z_]+ ) )	}ix => sub {
 	my ($self, $push)=@_;
 	$self->error("$push->{radix} - система счисления не может быть 0") if $push->{rad} == 0;
 	$self->error("$push->{radix} - система счисления должна быть не более 62-х")  if $push->{rad} > 62;
-	$push->{radix} = $app->perl->from_radix($push->{num}, $push->{rad});
+	my $num = $push->{num};
+	$num =~ s/_//g;
+	$push->{radix} = $app->perl->from_radix($num, $push->{rad});
 });
 $s->x("num"		=> qr{ 	(?<num> -? ( \d[\d_]*(\.[\d_]+)? | \.[\d_]+ )	( E[\+\-][\d_]+ )?	)			}ixn);
 #$s->x("regexp"	=> qr{ 	" (?<QR> (?:[^"]|\\")* ) "! (?<qr_args> \w+ )? 	}x);
@@ -304,8 +328,8 @@ $s->x("string"	=> qr{	( " (?<string> (?:\\"|""|[^"])* ) " | ' (?<string> (?:\\'|
 });
 
 ### какие операторы в каких скобках могут существовать
-$s->in("on"		=> qw{		addhandler		});
-$s->in("try"	=> qw{		catch			});
+#$s->in("on"		=> qw{		addhandler		});
+#$s->in("try"	=> qw{		catch			});
 $s->in("if"		=> qw{		else elseif		});
 $s->in("repeat"	=> qw{		until			});
 
@@ -451,7 +475,7 @@ sub compile {
 	my $file = $app->file($path);
 	my $text = $file->read;
 	
-	my $cc = $self->new(file => $path);
+	my $cc = $self->new(file => $path, tofile => $to, trace => $self->{trace});
 	
 	if($text !~ /^($re_space_ask $re_rem $re_endline)* $re_space_ask (?i: class ) $re_space_ask \Q$name\E/xn) {
 		if($text =~ s/^(?<first>($re_space_ask $re_rem $re_endline)* $re_space_ask) (?<last>extends|inherits) \b /$+{first}class $name $+{last}/xin) {
@@ -464,7 +488,7 @@ sub compile {
 	}
 	
 	#msg1 $path, $to, $name, $text;
-	
+
 	my $code = $cc->morf( $text );
 	$app->file($to)->mkpath->write($code);
 
@@ -481,8 +505,6 @@ sub require {
 	
 	$INC //= $Nil::INC;
 	
-	#my $to_dir = $Nil::INC->[0];
-	
 	my $file = $app->file($path);
 	my $class = $self->path2class($path);
 	my @path = split /\//, $path;
@@ -492,9 +514,10 @@ sub require {
 		
 		for(my $i=0; $i<@path; $i++) {
 			my $rpath = join "/", @path[0..$i];
+			$rpath .= ".ag" if $i != $#path;
 			my $f = $app->file("$inc/$rpath");
 			
-			if($f->exists) {
+			if($f->exists && $f->isfile) {
 				my $to = $app->file("$inc/.Aqua/$rpath.pm");
 				
 				if(!$to->exists || $to->mtime < $f->mtime) {
