@@ -222,6 +222,10 @@ sub _conveer {
 		my $arity0 = $arity-1;
 		$code = "my \@list = do { $left }; my \$fn = sub { \@\$DATA{qw/$qwparam/} = \@_; $right }; map { \@list[\$_..\$_+$arity0] } sort { my (\$i,\$j)=(\$a,\$b); \$fn->(\@list[\$i..\$i+$arity0]) $cmp \$fn->(\@list[\$j..\$j+$arity0]) } map { \$_*$arity } 0 .. int(\@list / $arity) - (\@list % $arity? 0: 1)";
 	}
+	elsif($op eq "reduce") {
+		my $arity0 = $arity-1;
+		$code = "my \$A; my \$i = ; for my \$i ( $left ) {  }";
+	}
 	else {
 		my $ref = $self->ref;
 		my $new = $self->ref;
