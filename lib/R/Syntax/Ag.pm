@@ -91,7 +91,7 @@ $s->tr("fy",  qw{  		length delete })->td("xf", qw{  ?  }); # ?!
 $s->tr("yfx", qw{		^				});
 $s->tr("fy",  qw{ 		+ - ! +~		});
 $s->tr("xfy", qw{		=~ !~	~		});
-$s->tr("xfy", qw{		* / mod div **		});
+$s->tr("xfy", qw{		* / mod div ** %	});
 $s->tr("xfy", qw{		+ - .				});
 # in perl in this: named unary operators
 $s->tr("xfy", qw{		+< +>				});
@@ -108,7 +108,7 @@ $s->tr("xfx", qw{		split		})->td("yfx", qw{	join	})->td("xf", qw{ split })->td("
 $s->tr("yfx", qw{		-> = += -= *= /= ^= div= mod= &&= ||= ^^=   and= or= xor=  ,= =, .= ?= }); # goto last next redo dump
 $s->tr("xfx", qw{		zip		reverse		in	});
 #$s->tr("xfx", qw{	list operators (rightward)});
-$s->tr("yfx", qw{		|						});
+$s->tr("xfy", qw{		|						});
 $s->tr("fy",  qw{		not						});
 $s->tr("xfy", qw{		and						});
 $s->tr("xfy", qw{		or	xor					});
@@ -163,26 +163,28 @@ $s->opt("=>", re => qr{ (?<id>$re_id)? \s* => }xn );
 $s->opt("=", sub => sub {	$_[0]->{assign} = 1 });
 
 $s->opt("|", re => qr{ 
-	\| ( (?<param> $re_id (, $re_id)*)?  (?<op> map | grep | reduce | sort | order | group | compress | join ) (?<arity> \d+ )? \b )? 
+	\| $re_space_ask ( 
+		( (?<param> $re_id ( $re_space_ask , $re_space_ask $re_id)* ) $re_space_ask )? (?<op> map | grep | first | all | any | reduce | sort | order | group | compress ) (?<arity> \d+ )? \b |
+		(?<op> join ) \b
+	)? 
 }xni, sub => sub {
 	my ($self, $push) = @_;
+	
 	$self->error("| $push->{op} не может иметь и параметры $push->{param} и арность $push->{arity} одновременно") if defined $push->{param} and defined $push->{arity};
-	$self->error("у | $push->{op} не может быть арности") if any { $push->{op} eq $_} qw/sort order join/ and defined $push->{arity};
-	$self->error("у | join не может быть параметров") if $push->{op} eq "join" and defined $push->{param};
+	#$self->error("у | $push->{op} не может быть арности") if any { $push->{op} eq $_} qw/sort order join/ and defined $push->{arity};
+	#$self->error("у | join не может быть параметров") if $push->{op} eq "join" and defined $push->{param};
 	$self->error("| $push->{op} - арность не может быть равна 0") if defined $push->{arity} and $push->{arity} == 0;
 	
-	
-	$push->{op} //= "map";
-	
 	if(defined $push->{param}) {
-		$push->{param} = split /\s*,\s*/, $push->{param};
+		$push->{param} = [ split /\s*,\s*/, $push->{param} ];
 	}
 	else {
 		my $arity = $push->{arity} // 1;
-		for(my $i=0, $n='a'; $i<$arity; $i++, $n++) {
+		for(my $i=0, my $n='a'; $i<$arity; $i++, $n++) {
 			push @{$push->{param}}, $n;
 		}
 	}
+	
 });
 
 $s->x('\n');
@@ -563,7 +565,6 @@ sub include {
 	
 	@_==1? $_[0]: @_
 }
-
 
 
 1;

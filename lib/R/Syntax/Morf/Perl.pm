@@ -13,7 +13,7 @@ my $esc = "', R::View::Views::escapeHTML(scalar do { "; my $_esc = " }), '";
 ### шаблоны
 our %templates = (
 
-
+# разыменования
 'yf .$word' => '{{ left }}->${$DATA->{{{ var }}}}',
 'yf .word' => '{{ left }}->{{ var }}',
 'yf :word' => '{{ left }}->{{{ var }}}',
@@ -31,27 +31,6 @@ our %templates = (
 'xfy :word[]' => '{{ left }}->{{{ var }}}[{{ right }}]',
 
 '.word.br' => '{{ right }}',
-
-# # строки
-# string => '"{{ right }}"',
-# str => '{{ str }}',
-# kav => '{{ str }}\"',
-# interpolation => '{{ str }}${\( {{ right }} )}',
-
-# массивы
-'[' => '[ {{ right }} ]',
-'{' => '{ {{ right }} }',
-'(' => '( {{ right }} )',
-
-'xf @' => '@{{{ left }}}',
-'xf %' => '%{{{ left }}}',
-
-# сценарии
-SCENARIO => '{{ _scenario right, lineno }}',
-
-# операторы 
-#'[]=' => 'push(@{{{ left }}}, {{ right }})',
-#gosub => '->( {{ right }} )',
 
 
 # операторы распределения данных
@@ -72,7 +51,7 @@ SCENARIO => '{{ _scenario right, lineno }}',
 
 
 # конвеер
-"yfx |" => 'do{ {{ _conveer left, op, param, right }} }',
+"xfy |" => 'do{ {{ _conveer left, op, param, right }} }',
 
 
 # операторы присваивания
@@ -142,18 +121,22 @@ SCENARIO => '{{ _scenario right, lineno }}',
 "xfx isa" => 'Isa({{ left }}, {{ right }})',
 "xfx can" => 'Can({{ left }}, {{ right }})',
 
+# интервальные
+"fx ^" => '(0 .. ({{ right }}))',
+"xfx .." => '({{ left }}) .. ({{ right }})',
+"xfx ..." => '({{ left }}) .. ({{ right }})-1',
+
 
 # массивов
+'xf @' => '@{{{ left }}}',
+'xf %' => '%{{{ left }}}',
+
+#"xfy in" => '(grep { {{ left }} }, {{ right }})',
+
 "yfx join" => 'join({{ right }}, {{ left }})',
 "xfy split" => 'split({{ right }}, {{ left }})',
 "yf join" => 'join("", {{ left }})',
 "xf split" => 'split(/\s+/, {{ left }})',
-
-
-#"xfy in" => '(grep { {{ left }} }, {{ right }})',
-"xfx .." => '({{ left }}) .. ({{ right }})',
-"xfx ..." => '({{ left }}) .. ({{ right }})-1',
-
 
 # хешей
 "fx delete" => 'delete({{ right }})',
@@ -165,7 +148,17 @@ SCENARIO => '{{ _scenario right, lineno }}',
 "xfy ELSE" => '{{ left }} }: do { {{ right }}',
 "xfy ELSEIF" => '{{ left }} }: ({{ right }}',
 
+
 # скобки
+
+# - массивы
+'[' => '[ {{ right }} ]',
+'{' => '{ {{ right }} }',
+'(' => '( {{ right }} )',
+
+# - смысловые конструкции
+SCENARIO => '{{ _scenario right, lineno }}',
+
 CLASS => '(do { package {{ class }}; use common::sense; use R::App;{{ _extends class, extends, lineno, file }} sub void { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
 
 SUB => 'sub {{ SUB }} { my $DATA = { me => {{ _shift SUB }} }; {{ _args args }} {{ right }}{{ _ifnewend SUB }}}',
@@ -206,7 +199,7 @@ string => '"{{ right }}"',
 # возвращает новую переменную
 sub ref {
 	my ($self) = @_;
-	'\$ref' . (++$self->{REF})
+	'$ref' . (++$self->{REF})
 }
 
 
@@ -214,29 +207,77 @@ sub ref {
 sub _conveer {
 	my ($self, $left, $op, $param, $right) = @_;
 	
+	$op = lc $op || "map";
+	
 	my $code = "<<<<< conveer not!!! >>>>>";
 	my $arity = @$param;
+	my $qwparam = join " ", @$param;
 	
-	if($op eq "map") {
+	if($op eq "join") {
+		$right = '""' . $right if $right =~ /^\s*$/;
+		$code = "join($right, $left)";
+	}
+	elsif($op eq "sort" || $op eq "order") {
+		my $cmp = $op eq "sort"? "cmp": "<=>";
+		my $arity0 = $arity-1;
+		$code = "my \@list = do { $left }; my \$fn = sub { \@\$DATA{qw/$qwparam/} = \@_; $right }; map { \@list[\$_..\$_+$arity0] } sort { my (\$i,\$j)=(\$a,\$b); \$fn->(\@list[\$i..\$i+$arity0]) $cmp \$fn->(\@list[\$j..\$j+$arity0]) } map { \$_*$arity } 0 .. int(\@list / $arity) - (\@list % $arity? 0: 1)";
+	}
+	else {
 		my $ref = $self->ref;
 		my $new = $self->ref;
 		my $i = $self->ref;
 		my $fn = $self->ref;
+		my $fn0;
+		my $fn_call;
 		my $if;
 		my $closeif = "";
-		if(@$param == 1) {
-			$if = "\$DATA->{$param->[0]} = $ref;";
-		} else {
-			my $k = 0;
-			$if = join " else ", map { $k == $#$param? (): "if($i % $arity == $k) { \$DATA->{$_} = $ref }" } @$param;
-			$if .= "else { \$DATA->{$param->[-1]} = $ref; ";
-			$closeif = "}";
-			# TODO: добить params!
-			$last = "if($i % $arity) { push \@$new, $fn->() }";
+		my $last;
+		my $closelast;
+		my $i0;
+		my $return = "\@$new";
+		my $f = "<<<<< no func!!! >>>>>";
+		if($op eq "map") { $f = $right }
+		elsif($op eq "grep") {
+			$f = " do { $right }? do { \@\$DATA{qw/$qwparam/} }: () ";
+			$closelast = "; splice \@$new, -$arity+$i";
+		}
+		elsif($op eq "first") {
+			$f = " do { $right }? do { \@\$DATA{qw/$qwparam/} }: () ";
+			$closeif = "; last if \@$new ";
+			$closelast = "; splice \@$new, -$arity+$i";
+		}
+		elsif($op eq "any") {
+			$f = "do { $right }? 1: ()";
+			$closeif = "; last if \@$new ";
+			$return = "\@$new? 1: ''";
+		}
+		elsif($op eq "all") {
+			$f = "do { $right }? (): 1";
+			$closeif = "; last if \@$new ";
+			$return = "\@$new? '': 1";
 		}
 		
+		if(@$param == 1) {
+			$if = "\$DATA->{$param->[0]} = $ref;";
+			$fn_call = $f;
+		} else {
+			$i0 = " my $i = 0;";
+			$fn0 = " my $fn = sub { $f };";
+			$fn_call = "$fn->()";
+			my $k = 0;
+			$if = "$i++; ";
+			$if .= join " els", map { ++$k == @$param? (): "if($i == $k) { \$DATA->{$_} = $ref }" } @$param;
+			$if .= " else { $i = 0; \$DATA->{$param->[-1]} = $ref; ";
+			$closeif .= "}";
+			# TODO: добить params!
+			my @p;
+			for my $x (1..$#$param) {
+				push @p, "if($i==$x) { \@\$DATA{qw/".join(" ", @$param[$x..$#$param])."/} = () }";
+			}
+			$last = " if($i!=0) { ".join(" els", @p)." push \@$new, $fn_call$closelast }";
+		}
 		
-		$code = "my $new = []; my $i = 0; my $fn = sub { $right }; for my $ref ( $left ) { $if push \@$new, $fn->()$closeif $i++ }$last";
+		$code = "my $new = [];$i0$fn0 for my $ref ( $left ) { $if push \@$new, $fn_call$closeif }$last $return";
 	}
 	
 	$code
@@ -319,10 +360,10 @@ sub _ifnewend {
 }
 
 # вызывается после разбора файла
-# добавляет в начало
 sub end {
 	my ($self, $ret, $syntax) = @_;
 	
+	# добавляет в начало
 	if(my $begin = delete $self->{BEGIN}) {
 		$ret = "BEGIN { $begin } $ret";
 	}
@@ -345,6 +386,8 @@ sub end {
 		$app->file($to)->mkpath->write($code);
 	}
 	
+	# обнуляем
+	$self->{REF} = undef;
 	
 	$ret
 }
