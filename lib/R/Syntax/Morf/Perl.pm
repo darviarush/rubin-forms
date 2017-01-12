@@ -44,15 +44,10 @@ our %templates = (
 'yf ;' => "{{ left }}; ",
 
 
-"xfy ," => '{{ left }}, {{ right }}',
-"yf ," => '{{ left }}',
+"xfy ," => '({{ left }}), ({{ right }})',
+"yf ," => '{{ left }},',
 "xfy =>" => '{{ left }}{{ id }} => {{ right }}',
 "fy =>" => '{{ id }} => {{ right }}',
-
-
-# конвеер
-"xfy |" => 'do{ {{ _conveer left, op, param, right }} }',
-
 
 # операторы присваивания
 "yfx =" => '({{ left }}) = ({{ right }})',
@@ -71,6 +66,8 @@ our %templates = (
 "xfy -" => '({{ left }}) - ({{ right }})',
 "xfy *" => '({{ left }}) * ({{ right }})',
 "xfy /" => '({{ left }}) / ({{ right }})',
+"xfy div" => 'int(({{ left }}) / ({{ right }}))',
+"xfy mod" => '({{ left }}) % ({{ right }})',
 "yfx ^" => '({{ left }}) ** ({{ right }})',
 
 "fy +" => '0+({{ right }})',
@@ -128,8 +125,8 @@ our %templates = (
 
 
 # массивов
-'xf @' => '@{{{ left }}}',
-'xf %' => '%{{{ left }}}',
+'fx @' => '@{{{ right }}}',
+'fx %' => '%{{{ right }}}',
 
 #"xfy in" => '(grep { {{ left }} }, {{ right }})',
 
@@ -141,6 +138,23 @@ our %templates = (
 # хешей
 "fx delete" => 'delete({{ right }})',
 "xfx of" => 'exists( {{ left }}->{{{ right }}} )',
+
+
+# конвеер
+#"xfy |" => 'do{ {{ _conveer left, op, param, right }} }',
+map => '{{ _init_conveer * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = []; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; push @{{R}}, do { {{ right }} } } @{{R}} }',
+grep => '{{ _init_conveer * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = []; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; push @{{R}}, map { {{A}}->[$_] } {{i}}..({{i}}+{{arity0}}>$#{{A}}? $#{{A}}: {{i}}+{{arity0}}) if do { {{ right }} } } @{{R}} }',
+first => '{{ _init_conveer * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = []; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; push(@{{R}}, map { {{A}}->[$_] } {{i}}..({{i}}+{{arity0}}>$#{{A}}? $#{{A}}: {{i}}+{{arity0}})), last if do { {{ right }} } } @{{R}} }',
+any => '{{ _init_conveer * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = ""; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{R}} = 1, last if do { {{ right }} } } {{R}} }',
+all => '{{ _init_conveer * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = 1; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{R}} = "", last if !do { {{ right }} } } {{R}} }',
+sort => 'do { my @list = do { {{ left }} }; my $fn = sub { @$DATA{qw/{{ qwparam }}/} = @_; {{ right }} }; map { @list[$_..$_+{{ arity0 }}] } sort { my ($i,$j)=($a,$b); $fn->(@list[$i..$i+{{ arity0 }}]) cmp $fn->(@list[$j..$j+{{ arity0 }}]) } map { $_*{{ arity }} } 0 .. int(@list / {{ arity }}) - (@list % {{ arity }}? 0: 1) }',
+order => 'do { my @list = do { {{ left }} }; my $fn = sub { @$DATA{qw/{{ qwparam }}/} = @_; {{ right }} }; map { @list[$_..$_+{{ arity0 }}] } sort { my ($i,$j)=($a,$b); $fn->(@list[$i..$i+{{ arity0 }}]) <=> $fn->(@list[$j..$j+{{ arity0 }}]) } map { $_*{{ arity }} } 0 .. int(@list / {{ arity }}) - (@list % {{ arity }}? 0: 1) }',
+assort => '{{ _assort_init * }}do { my @list = do { {{ left }} }; map { @list[$_..$_+{{ arity0 }}] } sort { @$DATA{qw/{{ qwparam1 }}/} = @list[$a..$a+{{ arity0 }}]; @$DATA{qw/{{ qwparam2 }}/} = @list[$b..$b+{{ arity0 }}]; {{ right }} } map { $_*{{ arity }} } 0 .. int(@list / {{ arity }}) - (@list % {{ arity }}? 0: 1) }',
+reduce => '{{ _init_conveer * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = {{A}}->[0]; for(my {{i}}=1; {{i}}<@{{A}}; {{i}}+={{ arity0 }}) { @$DATA{qw/{{ qwparam }}/} = ({{R}}, map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}-1); {{R}} = do { {{ right }} } } {{R}} }',
+group => '{{ _group_init * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = []; my {{M}} = {}; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; my {{E}} = {{M}}->{do { {{ right }} }} //= do { my $x = []; push @{{R}}, $x; $x }; push @{{E}}, map { {{A}}->[$_] } {{i}}..({{i}}+{{arity0}}>$#{{A}}? $#{{A}}: {{i}}+{{arity0}}) } @{{R}} }',
+
+
+join => 'join({{ _for_join *, right }}, {{ left }}){{ newline }}',
 
 
 # операторы смысловых конструкций
@@ -157,6 +171,9 @@ our %templates = (
 '(' => '( {{ right }} )',
 
 # - смысловые конструкции
+
+
+
 SCENARIO => '{{ _scenario right, lineno }}',
 
 CLASS => '(do { package {{ class }}; use common::sense; use R::App;{{ _extends class, extends, lineno, file }} sub void { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
@@ -164,6 +181,10 @@ CLASS => '(do { package {{ class }}; use common::sense; use R::App;{{ _extends c
 SUB => 'sub {{ SUB }} { my $DATA = { me => {{ _shift SUB }} }; {{ _args args }} {{ right }}{{ _ifnewend SUB }}}',
 
 IF => '(({{ right }}{{ _else else }})',
+
+FOR => '{{ _init_for * }}do { my {{A}} = [do { {{ left }} }]; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{ right }} } }',
+
+DO => 'do { {{ right }} }',
 
 # атомы
 self => '$DATA->{me}',
@@ -203,88 +224,57 @@ sub ref {
 }
 
 
-# конвеер
-sub _conveer {
-	my ($self, $left, $op, $param, $right) = @_;
-	
-	$op = lc $op || "map";
-	
-	my $code = "<<<<< conveer not!!! >>>>>";
-	my $arity = @$param;
-	my $qwparam = join " ", @$param;
-	
-	if($op eq "join") {
-		$right = '""' . $right if $right =~ /^\s*$/;
-		$code = "join($right, $left)";
-	}
-	elsif($op eq "sort" || $op eq "order") {
-		my $cmp = $op eq "sort"? "cmp": "<=>";
-		my $arity0 = $arity-1;
-		$code = "my \@list = do { $left }; my \$fn = sub { \@\$DATA{qw/$qwparam/} = \@_; $right }; map { \@list[\$_..\$_+$arity0] } sort { my (\$i,\$j)=(\$a,\$b); \$fn->(\@list[\$i..\$i+$arity0]) $cmp \$fn->(\@list[\$j..\$j+$arity0]) } map { \$_*$arity } 0 .. int(\@list / $arity) - (\@list % $arity? 0: 1)";
-	}
-	elsif($op eq "reduce") {
-		my $arity0 = $arity-1;
-		$code = "my \$A; my \$i = ; for my \$i ( $left ) {  }";
-	}
-	else {
-		my $ref = $self->ref;
-		my $new = $self->ref;
-		my $i = $self->ref;
-		my $fn = $self->ref;
-		my $fn0;
-		my $fn_call;
-		my $if;
-		my $closeif = "";
-		my $last;
-		my $closelast;
-		my $i0;
-		my $return = "\@$new";
-		my $f = "<<<<< no func!!! >>>>>";
-		if($op eq "map") { $f = $right }
-		elsif($op eq "grep") {
-			$f = " do { $right }? do { \@\$DATA{qw/$qwparam/} }: () ";
-			$closelast = "; splice \@$new, -$arity+$i";
-		}
-		elsif($op eq "first") {
-			$f = " do { $right }? do { \@\$DATA{qw/$qwparam/} }: () ";
-			$closeif = "; last if \@$new ";
-			$closelast = "; splice \@$new, -$arity+$i";
-		}
-		elsif($op eq "any") {
-			$f = "do { $right }? 1: ()";
-			$closeif = "; last if \@$new ";
-			$return = "\@$new? 1: ''";
-		}
-		elsif($op eq "all") {
-			$f = "do { $right }? (): 1";
-			$closeif = "; last if \@$new ";
-			$return = "\@$new? '': 1";
-		}
+# инициализирует конвеер
+sub _init_conveer {
+	my ($self, $push) = @_;
 		
-		if(@$param == 1) {
-			$if = "\$DATA->{$param->[0]} = $ref;";
-			$fn_call = $f;
-		} else {
-			$i0 = " my $i = 0;";
-			$fn0 = " my $fn = sub { $f };";
-			$fn_call = "$fn->()";
-			my $k = 0;
-			$if = "$i++; ";
-			$if .= join " els", map { ++$k == @$param? (): "if($i == $k) { \$DATA->{$_} = $ref }" } @$param;
-			$if .= " else { $i = 0; \$DATA->{$param->[-1]} = $ref; ";
-			$closeif .= "}";
-			# TODO: добить params!
-			my @p;
-			for my $x (1..$#$param) {
-				push @p, "if($i==$x) { \@\$DATA{qw/".join(" ", @$param[$x..$#$param])."/} = () }";
-			}
-			$last = " if($i!=0) { ".join(" els", @p)." push \@$new, $fn_call$closelast }";
-		}
-		
-		$code = "my $new = [];$i0$fn0 for my $ref ( $left ) { $if push \@$new, $fn_call$closeif }$last $return";
-	}
+	$push->{i} = $self->ref;
+	$push->{A} = $self->ref;
+	$push->{R} = $self->ref;
 	
-	$code
+	""
+}
+
+# инициализирует for
+sub _init_for {
+	my ($self, $push) = @_;
+		
+	$push->{i} = $self->ref;
+	$push->{A} = $self->ref;
+	
+	""
+}
+
+
+# 
+sub _group_init {
+	my ($self, $push) = @_;
+	
+	$self->_init_conveer($push);
+	
+	$push->{M} = $self->ref;
+	$push->{E} = $self->ref;
+	
+	""
+}
+
+# инициализирует assort
+sub _assort_init {
+	my ($self, $push) = @_;
+	
+	$push->{arity} /= 2;
+	$push->{arity0} = $push->{arity} - 1;
+	
+	$push->{qwparam1} = join " ", @{$push->{param}}[0..$push->{arity0}];
+	$push->{qwparam2} = join " ", @{$push->{param}}[$push->{arity}..$#{$push->{param}}];
+	
+	""
+}
+
+# добавляет '', если ничего нет
+sub _for_join {
+	my ($self, $push, $right) = @_;
+	$right =~ /^\s*$/? do { $push->{newline} = $right; "''" }: $right
 }
 
 # сценарий - добавляет в файл

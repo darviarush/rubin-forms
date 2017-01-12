@@ -159,12 +159,12 @@ $s->opt(".?\$word[]",	re => qr{		\.\?\$ (?<var>$re_id) \[		}x,	sur => $wordbr2);
 $s->opt(".?\$word{}",	re => qr{		\.\?\$ (?<var>$re_id) \{		}x,	sur => $wordbr3);
 
 
-$s->opt("=>", re => qr{ (?<id>$re_id)? \s* => }xn );
+$s->opt("=>", re => qr{ (?<id>$re_id)? $re_space_ask => }xn );
 $s->opt("=", sub => sub {	$_[0]->{assign} = 1 });
 
 $s->opt("|", re => qr{ 
 	\| $re_space_ask ( 
-		( (?<param> $re_id ( $re_space_ask , $re_space_ask $re_id)* ) $re_space_ask )? (?<op> map | grep | first | all | any | reduce | sort | order | group | compress ) (?<arity> \d+ )? \b |
+		( (?<param> $re_id ( $re_space_ask , $re_space_ask $re_id)* ) $re_space )? (?<op> map | grep | first | all | any | reduce | assort | sort | order | group ) (?<arity> \d+ )? \b |
 		(?<op> join ) \b
 	)? 
 }xni, sub => sub {
@@ -175,6 +175,8 @@ $s->opt("|", re => qr{
 	#$self->error("у | join не может быть параметров") if $push->{op} eq "join" and defined $push->{param};
 	$self->error("| $push->{op} - арность не может быть равна 0") if defined $push->{arity} and $push->{arity} == 0;
 	
+	$push->{arity} = 2 if $push->{op} =~ /^(assort|reduce)$/ni && !defined $push->{param} && !defined $push->{arity};
+	
 	if(defined $push->{param}) {
 		$push->{param} = [ split /\s*,\s*/, $push->{param} ];
 	}
@@ -184,6 +186,18 @@ $s->opt("|", re => qr{
 			push @{$push->{param}}, $n;
 		}
 	}
+	
+	
+	my $op = $push->{op};
+	$op = lc $op || "map";
+
+	$push->{tmpl} = $op;
+
+	$push->{arity} = @{$push->{param}};
+	$push->{arity0} = $push->{arity} - 1;
+	$push->{qwparam} = join " ", @{$push->{param}};
+	
+	$self->error("арность assort должна быть кратна 2-м") if $op eq "assort" and $push->{arity} % 2;
 	
 });
 
@@ -222,10 +236,19 @@ $s->br(qw{			(	)			});
 $s->br(qw{			[	]			});
 $s->br(qw{			{	}			});
 
-$s->br(qw{			FOR		} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
+$s->br(qw{			FOR		} => qr{ FOR $re_space (?<args> $re_id ( $re_space_ask , $re_space_ask $re_id)* ) ( $re_space(?<op> in | of ) | $re_space_ask = ) }xin => sub {
+	my($self, $push) = @_;
+	$push->{then} = 1;
+	
+	my $args = $+{args};
+	$push->{param} = my @args = split /\s*,\s*/, $args;
+	$push->{arity} = @args;
+	$push->{arity0} = $push->{arity} - 1;
+	$push->{qwparam} = join " ", @args;
+} => qw{		END		});
 $s->br(qw{			WHILE	} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
 $s->br(qw{			IF		} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
-$s->br(qw{			BEGIN		END		});
+$s->br(qw{			DO		END		});
 
 # $s->br(qw{			ON	} => qr{ \b ON $re_space (?<route>$re_string) }x => sub {
 	# my ($self, $push) = @_; 

@@ -883,6 +883,7 @@ sub templates {
 	my $self = shift;
 	
 	my $c = $self->{lang}{templates} //= {};
+	my $re_arg = "(\\*|\\w+)";
 	
 	for(my $i=0; $i<@_; $i+=2) {
 		my ($k, $v) = @_[$i, $i+1];
@@ -891,10 +892,10 @@ sub templates {
 		
 		$v =~ s/'/\\'/g;
 		$v =~ s/\{\{\s*(\w+)\s*\}\}/', \$b->{$1} ,'/g;
-		$v =~ s/\{\{\s*(?<id>\w+)\s+(?<args>\w+(\s*,\s*\w+)*)\s*\}\}/
+		$v =~ s/\{\{\s*(?<id>\w+)\s+(?<args>$re_arg(\s*,\s*$re_arg)*)\s*\}\}/
 			my $args = $+{args};
 			my $id = $+{id};
-			$args =~ s!\w+!\$b->{$&}!g; 
+			$args =~ s!$re_arg! $& eq "*"? "\$b": "\$b->{$&}"!ge;
 			"', \$a->{lang}->$id($args) ,'"
 		/gen;
 		
@@ -960,8 +961,9 @@ sub expirience {
 			$b = pop @path;		# удаляем элемент
 			
 			#$_->{code} = join "", @$code if $code;
-			my $template = $templates->{ $b->{stmt} };
-			die "нет шаблона `$b->{stmt}` в языке " . ($self->{lang}{name} // "«язык Батькович»") if !$template;
+			my $tmpl = $b->{tmpl} // $b->{stmt};
+			my $template = $templates->{ $tmpl };
+			die "нет шаблона `$tmpl` в языке " . ($self->{lang}{name} // "«язык Батькович»") if !$template;
 			
 			if(@path) {
 				my $parent = $path[-1];
