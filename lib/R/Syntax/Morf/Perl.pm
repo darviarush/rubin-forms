@@ -45,9 +45,9 @@ our %templates = (
 
 
 "xfy ," => '({{ left }}), ({{ right }})',
-"yf ," => '{{ left }},',
-"xfy =>" => '{{ left }}{{ id }} => {{ right }}',
-"fy =>" => '{{ id }} => {{ right }}',
+"yf ," => '{{ left }}',
+"xfy =>" => '{{ left }} => {{ right }}',
+"fy word=>" => '{{ id }} => {{ right }}',
 
 # операторы присваивания
 "yfx =" => '({{ left }}) = ({{ right }})',
@@ -76,6 +76,7 @@ our %templates = (
 # строковые
 "xfy **" => '({{ left }}) x ({{ right }})',
 "xfy ." => '({{ left }}) . ({{ right }})',
+"yfx .=" => '({{ left }}) .= ({{ right }})',
 
 # логические
 "xfy and" => '(({{ left }}) and ({{ right }}))',
@@ -123,7 +124,6 @@ our %templates = (
 "xfx .." => '({{ left }}) .. ({{ right }})',
 "xfx ..." => '({{ left }}) .. ({{ right }})-1',
 
-
 # массивов
 'fx @' => '@{{{ right }}}',
 'fx %' => '%{{{ right }}}',
@@ -152,27 +152,23 @@ order => 'do { my @list = do { {{ left }} }; my $fn = sub { @$DATA{qw/{{ qwparam
 assort => '{{ _assort_init * }}do { my @list = do { {{ left }} }; map { @list[$_..$_+{{ arity0 }}] } sort { @$DATA{qw/{{ qwparam1 }}/} = @list[$a..$a+{{ arity0 }}]; @$DATA{qw/{{ qwparam2 }}/} = @list[$b..$b+{{ arity0 }}]; {{ right }} } map { $_*{{ arity }} } 0 .. int(@list / {{ arity }}) - (@list % {{ arity }}? 0: 1) }',
 reduce => '{{ _init_conveer * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = {{A}}->[0]; for(my {{i}}=1; {{i}}<@{{A}}; {{i}}+={{ arity0 }}) { @$DATA{qw/{{ qwparam }}/} = ({{R}}, map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}-1); {{R}} = do { {{ right }} } } {{R}} }',
 group => '{{ _group_init * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = []; my {{M}} = {}; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; my {{E}} = {{M}}->{do { {{ right }} }} //= do { my $x = []; push @{{R}}, $x; $x }; push @{{E}}, map { {{A}}->[$_] } {{i}}..({{i}}+{{arity0}}>$#{{A}}? $#{{A}}: {{i}}+{{arity0}}) } @{{R}} }',
+#todo:
+#compress => '{{ _group_init * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = []; my {{M}}; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; my {{E}} = {{M}}->{do { {{ right }} }} //= do { my $x = []; push @{{R}}, $x; $x }; push @{{E}}, map { {{A}}->[$_] } {{i}}..({{i}}+{{arity0}}>$#{{A}}? $#{{A}}: {{i}}+{{arity0}}) } @{{R}} }',
 
 
 join => 'join({{ _for_join *, right }}, {{ left }}){{ newline }}',
 
 
-# операторы смысловых конструкций
-"xfy THEN" => '{{ left }}{{ _then then }}{{ right }}',
-"xfy ELSE" => '{{ left }} }: do { {{ right }}',
-"xfy ELSEIF" => '{{ left }} }: ({{ right }}',
 
 
 # скобки
 
 # - массивы
 '[' => '[ {{ right }} ]',
-'{' => '{ {{ right }} }',
+'{' => '+{ {{ right }} }',
 '(' => '( {{ right }} )',
 
 # - смысловые конструкции
-
-
 
 SCENARIO => '{{ _scenario right, lineno }}',
 
@@ -181,8 +177,13 @@ CLASS => '(do { package {{ class }}; use common::sense; use R::App;{{ _extends c
 SUB => 'sub {{ SUB }} { my $DATA = { me => {{ _shift SUB }} }; {{ _args args }} {{ right }}{{ _ifnewend SUB }}}',
 
 IF => '(({{ right }}{{ _else else }})',
+"IF THEN" => '{{ left }})? do {{{ right }}',
+"xfy ELSE" => '{{ left }} }: do { {{ right }}',
+"xfy ELSEIF" => '{{ left }} }: ({{ right }}',
 
-FOR => '{{ _init_for * }}do { my {{A}} = [do { {{ left }} }]; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{ right }} } }',
+# as ->
+FOR => '{{ right }}',
+"FOR THEN" => '{{ _init_for * }}do { my {{A}} = [do { {{ left }} }]; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{ right }} } }',
 
 DO => 'do { {{ right }} }',
 
@@ -246,7 +247,7 @@ sub _init_for {
 }
 
 
-# 
+# инициализация группировки
 sub _group_init {
 	my ($self, $push) = @_;
 	
@@ -290,16 +291,6 @@ sub _scenario {
 sub _rem {
 	my ($self, $rem) = @_;
 	defined($rem)? "# $rem": "";
-}
-
-# оператор then
-sub _then {
-	my ($self, $then) = @_;
-	local $_;
-	given($then) {
-		when ("IF") { ")? do { " }
-		default { die "нет такого THEN: $_" }
-	}
 }
 
 # какое окончание у if

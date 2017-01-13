@@ -241,22 +241,26 @@
 	
 	$app->syntaxAg->eval("[ 1..66 | group2 a div 10 ]");		## [[1..10], [11..20], [21..30], [31..40], [41..50], [51..60], [61..66]]
 	
-	msg1 $app->syntaxAg->morf('a=[a=>2, b=>1, r=>2, c=>1]; app.perl.inline_dump( [ @a | group2 b | { @a } ] )');
-	
 	$app->syntaxAg->eval('a=[a=>2, b=>1, r=>2, c=>1]; [ @a | group2 b ]');	## [[a=>2, r=>2], [b=>1, c=>1]]
-	$app->syntaxAg->eval('a=[a=>2, b=>1, r=>2, c=>1]; app.perl.inline_dump( [ @a | group2 b | { @a } ] )');	#1
-## [{a=>2, r=>2}, {b=>1, c=>1}]
+	$app->syntaxAg->eval('a=[a=>2, b=>1, r=>2, c=>1]; [ @a | group2 b | { @a } ]');	## [{a=>2, r=>2}, {b=>1, c=>1}]
 	
+=== `groupby`
+	
+Эта группировка возвращает так же ключ перед группой.
+	
+	#$app->syntaxAg->eval('@a = a=>2, b=>1, r=>2, c=>1; [@a | groupby2 b]');	## [2=>[a=>2, r=>2], 1=>[b=>1, c=>1]]
+	#$app->syntaxAg->eval('@a = a=>2, b=>1, r=>2, c=>1; {@a | groupby2 b}');	## {2=>[a=>2, r=>2], 1=>[b=>1, c=>1]}
 
-# === `compress`
 
-# Группировка с числовым сравнением.
+=== `compress`
 
-	# $app->syntaxAg->eval("1..66 |   compress a div 10 | join ', '");			# 1, 10, 20, 30, 40, 50, 60
-	# $app->syntaxAg->eval("1..66 | x compress x div 10 | join ', '");			# 1, 10, 20, 30, 40, 50, 60
+Сжатие. Аналогична группировке, только сжимает в группы рядомстоящие элементы.
+
+	#$app->syntaxAg->eval("10, 11, 34, 16 | compress a div 10");	## [ [10, 11], [34], [16] ]
 
 === `join`
 
+TODO: | join - отдельным оператором.
 Добавлен для удобства работы с конвеерами: как бы оператор с другим приоритетом.
 
 	$app->syntaxAg->eval("1..6 | join ', ' ");			# 1, 2, 3, 4, 5, 6
@@ -647,7 +651,7 @@ splice:
 	end
 	
 	class DecoratorTest
-		*MyDecorator "/page"
+		$MyDecorator "/page"
 		sub myroute then
 	end
 	
@@ -664,6 +668,10 @@ splice:
 Свойство `me:class` содержит имя класса.
 Свойство `me:me` содержит контекст метода.
 Свойство `me:args` содержит аргументы декторатора.
+
+Свойство `me:noAfter` установленное отменяет `after`.
+Свойство `me:noBefore` установленное отменяет `before`.
+Свойство `me:noReplace` установленное отменяет `replace`.
 
 
 

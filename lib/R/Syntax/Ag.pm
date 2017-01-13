@@ -103,7 +103,8 @@ $s->tr("xfx", qw{		isa can	of					});
 $s->tr("xfy", qw{		&&					});
 $s->tr("xfy", qw{		|| ^^ ?				});
 $s->tr("xfx", qw{		.. ...  to  step		})->td("fx", qw{	^	});
-$s->tr("xfy", qw{		, =>		})->td("yf",  qw{ 	,		})->td("fy", qw{	=>		});
+$s->tr("xfy", qw{		=>		})->td("fy", qw{	word=>		});
+$s->tr("xfy", qw{		,		})->td("yf",  qw{ 	,		});
 $s->tr("xfx", qw{		split		})->td("yfx", qw{	join	})->td("xf", qw{ split })->td("yf", qw{ join });
 $s->tr("yfx", qw{		-> = += -= *= /= ^= div= mod= &&= ||= ^^=   and= or= xor=  ,= =, .= ?= }); # goto last next redo dump
 $s->tr("xfx", qw{		zip		reverse		in	});
@@ -159,7 +160,7 @@ $s->opt(".?\$word[]",	re => qr{		\.\?\$ (?<var>$re_id) \[		}x,	sur => $wordbr2);
 $s->opt(".?\$word{}",	re => qr{		\.\?\$ (?<var>$re_id) \{		}x,	sur => $wordbr3);
 
 
-$s->opt("=>", re => qr{ (?<id>$re_id)? $re_space_ask => }xn );
+$s->opt("word=>", re => qr{ (?<id>$re_id)? $re_space_ask => }xn );
 $s->opt("=", sub => sub {	$_[0]->{assign} = 1 });
 
 $s->opt("|", re => qr{ 
@@ -217,7 +218,7 @@ $s->opt("THEN", sub => sub {
 	my $br = $self->check("THEN", then=>1)->top;
 	$br->{endline} = 1;
 	delete $br->{then};
-	$push->{then} = $br->{stmt};
+	$push->{tmpl} = "$br->{stmt} THEN";
 });
 $s->opt("ELSEIF", sub => sub {
 	my ($self, $push) = @_;
