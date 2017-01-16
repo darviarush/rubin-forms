@@ -19,7 +19,7 @@ our $id = qr/(?:[a-z_]\w*)/i;
 our $css_id = qr/(?:[a-z_\-][\w\-]*)/i;
 
 # переводы строк
-our $endline = qr/(?P<re_endline>\r\n|\r|\n)/;
+our $endline = qr/(?<newline>\r\n|\r|\n)/;
 
 # если функция не найдена
 use vars '$AUTOLOAD';

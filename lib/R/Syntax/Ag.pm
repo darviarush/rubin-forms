@@ -205,7 +205,7 @@ $s->opt("|", re => qr{
 $s->x('\n');
 $s->opt('\n', re => "$re_rem $re_endline", sub => sub {
 	my ($self, $push) = @_;
-	$self->{lineno}++;
+	#$self->{lineno}++;
 	my $br = $self->endline->top;
 	if($br->{then}) {
 		$self->op("THEN");
@@ -219,6 +219,10 @@ $s->opt("THEN", sub => sub {
 	$br->{endline} = 1;
 	delete $br->{then};
 	$push->{tmpl} = "$br->{stmt} THEN";
+	
+	# для FOR
+	$push->{param} = $br->{param};
+	
 });
 $s->opt("ELSEIF", sub => sub {
 	my ($self, $push) = @_;
@@ -240,12 +244,8 @@ $s->br(qw{			{	}			});
 $s->br(qw{			FOR		} => qr{ FOR $re_space (?<args> $re_id ( $re_space_ask , $re_space_ask $re_id)* ) ( $re_space(?<op> in | of ) | $re_space_ask = ) }xin => sub {
 	my($self, $push) = @_;
 	$push->{then} = 1;
-	
 	my $args = $+{args};
 	$push->{param} = my @args = split /\s*,\s*/, $args;
-	$push->{arity} = @args;
-	$push->{arity0} = $push->{arity} - 1;
-	$push->{qwparam} = join " ", @args;
 } => qw{		END		});
 $s->br(qw{			WHILE	} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
 $s->br(qw{			IF		} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});

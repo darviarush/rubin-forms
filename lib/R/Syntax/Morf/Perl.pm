@@ -239,7 +239,13 @@ sub _init_conveer {
 # инициализирует for
 sub _init_for {
 	my ($self, $push) = @_;
-		
+
+	my $args = $push->{param};
+	$push->{arity} = @$args;
+	$push->{arity0} = $push->{arity} - 1;
+	$push->{qwparam} = join " ", @$args;
+
+	
 	$push->{i} = $self->ref;
 	$push->{A} = $self->ref;
 	

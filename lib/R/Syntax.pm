@@ -372,6 +372,8 @@ sub masking {
 
 	while($s =~ /$lex/g) {			# формируем дерево
 	
+		$self->{charno} = length($`) - $self->{startline} + 1;
+	
 		if($trace) {
 			$endline = index($&, "\n")!=-1;
 			$app->log->info(":nonewline", "$&") if !$endline;
@@ -380,7 +382,7 @@ sub masking {
 			$app->log->info(":nonewline on_cyan black", "$^R") if defined $^R and !exists $+{newline} and !exists $+{error_nosym} and !exists $+{spacer};
 		}
 	
-		exists $+{newline}? $self->{lineno}++:
+		exists $+{newline}? do { $self->{lineno}++; $self->{startline} = length($`); }:
 		exists $+{error_nosym}? $self->error(sprintf($self->{error}{nosym}, $+{error_nosym})):
 		exists $+{spacer}? ():
 		do { if(defined $^R) {
@@ -417,7 +419,7 @@ sub masking {
 # пришёл оператор
 sub op {
 	my $self = shift;
-	my $push = {%+, 'stmt', @_};
+	my $push = {%+, 'stmt', @_, lineno => $self->{lineno}, charno => $self->{charno}};
 	
 	my $stmt = $_[0];
 
@@ -456,7 +458,7 @@ sub atom {
 # все операторы и атомы добавляются в неё
 sub push {
 	my $self = shift;
-	my $push = {%+, 'stmt', @_};
+	my $push = {%+, 'stmt', @_, lineno => $self->{lineno}, charno => $self->{charno}};
 	
 	# выполняем подпрограмму
 	if(my $x = $self->{LEX}{$_[0]}) {
