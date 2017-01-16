@@ -299,9 +299,11 @@ TODO: | join - отдельным оператором.
 	
 === `for`
 	
+	#msg1 $app->syntaxAg->morf("s=''; for i in [1..2] then s .= i end; s");exit;
+	
 	$app->syntaxAg->eval("s=''; for i in [1..2] then s .= i end; s");			# 12
 	$app->syntaxAg->eval("s=''; for i = 1..2 then s .= i end; s");				# 12
-	$app->syntaxAg->eval("s=''; for k, v of {1 => 10, 2 => 20} then s += i end; s");				# 3
+	$app->syntaxAg->eval("s=''; for k, v of {1 => 10, 2 => 20} then s += v end; s");				# 30
 	$app->syntaxAg->eval("s=''; for i, j, k = 1..10 then s .= '|' . i . j . k end; s");				# |123|456|789|10
 	
 === `while`

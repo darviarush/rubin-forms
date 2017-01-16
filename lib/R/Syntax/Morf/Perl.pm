@@ -184,6 +184,8 @@ IF => '(({{ right }}{{ _else else }})',
 # as ->
 FOR => '{{ right }}',
 "FOR THEN" => '{{ _init_for * }}do { my {{A}} = [do { {{ left }} }]; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{ right }} } }',
+"FOR IN" => '{{ _init_for * }}do { my {{A}} = do { {{ left }} }; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{ right }} } }',
+"FOR OF" => '{{ _init_for * }}do { my {{A}} = [%{ do { {{ left }} } }]; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{ right }} } }',
 
 DO => 'do { {{ right }} }',
 
@@ -241,6 +243,9 @@ sub _init_for {
 	my ($self, $push) = @_;
 
 	my $args = $push->{param};
+	
+	#$self->error("у FOR нет параметров!") if !@$args;
+	
 	$push->{arity} = @$args;
 	$push->{arity0} = $push->{arity} - 1;
 	$push->{qwparam} = join " ", @$args;

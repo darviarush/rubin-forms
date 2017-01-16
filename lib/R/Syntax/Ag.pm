@@ -205,7 +205,8 @@ $s->opt("|", re => qr{
 $s->x('\n');
 $s->opt('\n', re => "$re_rem $re_endline", sub => sub {
 	my ($self, $push) = @_;
-	#$self->{lineno}++;
+	$self->{startline} = length($`);
+	$self->{lineno}++;
 	my $br = $self->endline->top;
 	if($br->{then}) {
 		$self->op("THEN");
@@ -218,10 +219,16 @@ $s->opt("THEN", sub => sub {
 	my $br = $self->check("THEN", then=>1)->top;
 	$br->{endline} = 1;
 	delete $br->{then};
-	$push->{tmpl} = "$br->{stmt} THEN";
 	
 	# для FOR
-	$push->{param} = $br->{param};
+	if($br->{stmt} eq "FOR") {
+		$push->{param} = $br->{param};
+		$push->{tmpl} = $br->{op} eq "in"? "FOR IN": $br->{op} eq "of"? "FOR OF": "FOR THEN";
+		
+	}
+	else {
+		$push->{tmpl} = "$br->{stmt} THEN";
+	}
 	
 });
 $s->opt("ELSEIF", sub => sub {
@@ -245,7 +252,7 @@ $s->br(qw{			FOR		} => qr{ FOR $re_space (?<args> $re_id ( $re_space_ask , $re_s
 	my($self, $push) = @_;
 	$push->{then} = 1;
 	my $args = $+{args};
-	$push->{param} = my @args = split /\s*,\s*/, $args;
+	$push->{param} = [ split /\s*,\s*/, $args ];
 } => qw{		END		});
 $s->br(qw{			WHILE	} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
 $s->br(qw{			IF		} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
@@ -526,11 +533,11 @@ sub compile {
 # если Aquafile ещё не загружен - загружает
 sub require {
 	my ($self, $path, $INC) = @_;
-	
+
 	return $Nil::REQUIRE{$path} if exists $Nil::REQUIRE{$path};
 	
 	$INC //= $Nil::INC;
-	
+
 	my $file = $app->file($path);
 	my $class = $self->path2class($path);
 	my @path = split /\//, $path;
@@ -545,7 +552,7 @@ sub require {
 			
 			if($f->exists && $f->isfile) {
 				my $to = $app->file("$inc/.Aqua/$rpath.pm");
-				
+
 				if(!$to->exists || $to->mtime < $f->mtime) {
 					$self->compile($f->path, $to->path, $class);
 				}
