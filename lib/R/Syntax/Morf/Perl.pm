@@ -73,10 +73,29 @@ our %templates = (
 "fy +" => '0+({{ right }})',
 "fy -" => '-({{ right }})',
 
+"yfx +=" => '({{ left }}) += ({{ right }})',
+"yfx -=" => '({{ left }}) -= ({{ right }})',
+"yfx *=" => '({{ left }}) *= ({{ right }})',
+"yfx /=" => '({{ left }}) /= ({{ right }})',
+"yfx ^=" => '({{ left }}) **= ({{ right }})',
+"yfx div=" => '({{ left }}) = int(({{ left }}) / ({{ right }}))',
+"yfx mod=" => '({{ left }}) %= ({{ right }})',
+
 # строковые
-"xfy **" => '({{ left }}) x ({{ right }})',
+"xfy **" => 'scalar({{ left }}) x scalar({{ right }})',
 "xfy ." => '({{ left }}) . ({{ right }})',
 "yfx .=" => '({{ left }}) .= ({{ right }})',
+"yfx **=" => '({{ left }}) x= scalar({{ right }})',
+"yf len" => 'length({{ left }})',
+"fy len" => 'length({{ right }})',
+"fy lc" => 'lc({{ right }})',
+"fy uc" => 'uc({{ right }})',
+"fy lcfirst" => 'lcfirst({{ right }})',
+"fy ucfirst" => 'ucfirst({{ right }})',
+"fy chr" => 'chr({{ right }})',
+"fy ord" => 'ord({{ right }})',
+"xfy %" => 'sprintf({{ left }}, {{ right }})',
+"yfx %=" => '({{ left }}) = sprintf({{ left }}, {{ right }})',
 
 # логические
 "xfy and" => '(({{ left }}) and ({{ right }}))',
@@ -89,6 +108,15 @@ our %templates = (
 "xfy ^^" => '(scalar({{ left }}) xor scalar({{ right }}))',
 "fy !" => '(! ({{ right }}))',
 
+'yfx ||=' => '({{ left }}) ||= ({{ right }})',
+'yfx &&=' => '({{ left }}) &&= ({{ right }})',
+'yfx ^^=' => '({{ left }}) = ({{ left }}) xor ({{ right }})',
+
+'yfx or=' => '({{ left }}) ||= ({{ right }})',
+'yfx and=' => '({{ left }}) &&= ({{ right }})',
+'yfx xor=' => '({{ left }}) = ({{ left }}) xor ({{ right }})',
+
+
 # побитовые
 "xfy +&" => '(({{ left }}) & ({{ right }}))',
 "xfy +|" => '(({{ left }}) | ({{ right }}))',
@@ -96,6 +124,13 @@ our %templates = (
 "fy  +~" => '(~ ({{ right }}))',
 "xfy +<" => '(({{ left }}) << ({{ right }}))',
 "xfy +>" => '(({{ left }}) >> ({{ right }}))',
+
+"yfx +&=" => '(({{ left }}) &= ({{ right }}))',
+"yfx +|=" => '(({{ left }}) |= ({{ right }}))',
+"yfx +^=" => '(({{ left }}) ^= ({{ right }}))',
+"yfx +<=" => '(({{ left }}) <<= ({{ right }}))',
+"yfx +>=" => '(({{ left }}) >>= ({{ right }}))',
+
 
 # сравнения
 "xfx lt" => '(({{ left }}) lt ({{ right }}))',
@@ -115,9 +150,11 @@ our %templates = (
 
 # проверки
 "xf ?" => 'defined({{ left }})',
-#"xf instanceof" => 'Isa({{ left }}, "{{ class }}")',
+"xfy ?" => 'defined({{ left }})? ({{ left }}): ({{ right }})',
+"yfx ?=" => '({{ left }}) //= ({{ right }})',
 "xfx isa" => 'Isa({{ left }}, {{ right }})',
 "xfx can" => 'Can({{ left }}, {{ right }})',
+
 
 # интервальные
 "fx ^" => '(0 .. ({{ right }}))',
@@ -158,7 +195,10 @@ group => '{{ _group_init * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = [];
 
 join => 'join({{ _for_join *, right }}, {{ left }}){{ newline }}',
 
-
+# исключения
+'fx raise' => 'die( {{ right }} )',
+'xfy rescue' => '(sub { my @ev = eval { {{ left }} }; if($@) { $DATA->{{{id}}} = $@; {{ right }} } else { wantarray? @ev: $ev[0] } })->()',
+'rescue isa' => '(sub { my @ev = eval { {{ left }} }; if($@ && Isa( $@, qw/qwISA/ )) { $DATA->{{{id}}} = $@; {{ right }} } else { wantarray? @ev: $ev[0] } })->()',
 
 
 # скобки
@@ -183,13 +223,20 @@ IF => '(({{ right }}{{ _else else }})',
 
 # as ->
 FOR => '{{ right }}',
-"FOR THEN" => '{{ _init_for * }}do { my {{A}} = [do { {{ left }} }]; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{ right }} } }',
-"FOR IN" => '{{ _init_for * }}do { my {{A}} = do { {{ left }} }; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{ right }} } }',
-"FOR OF" => '{{ _init_for * }}do { my {{A}} = [%{ do { {{ left }} } }]; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{ right }} } }',
+"FOR THEN" => '{{ _init_for * }}do { my {{A}} = [do { {{ left }} }]; {{L}}: for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{ right }} } }',
+"FOR IN" => '{{ _init_for * }}do { my {{A}} = do { {{ left }} }; {{L}}: for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{ right }} } }',
+"FOR OF" => '{{ _init_for * }}do { my {{A}} = [%{ {{ left }} }]; {{L}}: for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{ right }} } }',
+
+WHILE => '{{ right }}',
+"WHILE THEN" => 'do { while({{ left }}) { {{ right }} } }',
+
+REPEAT => '{{ right }}',
+"xfy UNTIL" => 'do { do { {{ left }} } until( {{ right }} ) }',
 
 DO => 'do { {{ right }} }',
 
 # атомы
+index => '({{i}}+{{n}})',
 self => '$DATA->{me}',
 app => '$R::App::app',
 q => '$R::App::app->{q}',
@@ -199,6 +246,10 @@ nan => '(0+"nan")',
 pi => '(atan2(1,1)*4)',
 true => '$R::App::app->json->true',
 false => '$R::App::app->json->false',
+last => 'last',
+"last label" => 'last {{L}}',
+next => 'next',
+"next label" => 'next {{L}}',
 
 var => '$DATA->{{{ var }}}',
 num => '{{ num }}',
@@ -226,6 +277,11 @@ sub ref {
 	'$ref' . (++$self->{REF})
 }
 
+# возвращает новую метку
+sub label {
+	my ($self) = @_;
+	'A' . (++$self->{LABEL})
+}
 
 # инициализирует конвеер
 sub _init_conveer {
@@ -251,7 +307,7 @@ sub _init_for {
 	$push->{qwparam} = join " ", @$args;
 
 	
-	$push->{i} = $self->ref;
+	#$push->{i} = $self->ref;
 	$push->{A} = $self->ref;
 	
 	""

@@ -261,7 +261,7 @@ sub opt {
 	die "нет opt($stmt)" unless $x = $self->{LEX}{$stmt};
 	
 	pairmap {
-		die "свойство $a в $stmt уже есть" if exists $x->{$a};
+		die "свойство $a в $stmt уже есть" if exists $x->{$a} and $a ne "order";
 		die "можно добавлять только re, sub, sur, order, или nolex в $stmt" if $a !~ /^(?:re|sub|sur|order|nolex)$/;
 		$x->{$a} = $b;
 	} @_;

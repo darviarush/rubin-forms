@@ -91,12 +91,14 @@ $s->tr("fy",  qw{  		length delete })->td("xf", qw{  ?  }); # ?!
 $s->tr("yfx", qw{		^				});
 $s->tr("fy",  qw{ 		+ - ! +~		});
 $s->tr("xfy", qw{		=~ !~	~		});
-$s->tr("xfy", qw{		* / mod div ** %	});
+$s->tr("xfy", qw{		* / mod div **	});
 $s->tr("xfy", qw{		+ - .				});
 # in perl in this: named unary operators
+$s->tr("yf", qw{		len 		})->td("fy", qw{ 	len	lc uc lcfirst ucfirst chr ord	 });
 $s->tr("xfy", qw{		+< +>				});
 $s->tr("xfy", qw{		+&					});
 $s->tr("xfy", qw{		+|  +^				});
+$s->tr("xfy", qw{		%					});
 $s->tr("xfx", qw{		< > <= >= lt gt le ge		});
 $s->tr("xfx", qw{		== != eq ne  <=> cmp 		});			# ~~
 $s->tr("xfx", qw{		isa can	of					});
@@ -106,7 +108,7 @@ $s->tr("xfx", qw{		.. ...  to  step		})->td("fx", qw{	^	});
 $s->tr("xfy", qw{		=>		})->td("fy", qw{	word=>		});
 $s->tr("xfy", qw{		,		})->td("yf",  qw{ 	,		});
 $s->tr("xfx", qw{		split		})->td("yfx", qw{	join	})->td("xf", qw{ split })->td("yf", qw{ join });
-$s->tr("yfx", qw{		-> = += -= *= /= ^= div= mod= &&= ||= ^^=   and= or= xor=  ,= =, .= ?= }); # goto last next redo dump
+$s->tr("yfx", qw{		-> = += -= *= /= ^= div= mod= &&= ||= ^^=   and= or= xor=  +&= +|= +^= +<= +>= **= .= ?= ,= =, %= }); # goto last next redo dump
 $s->tr("xfx", qw{		zip		reverse		in	});
 #$s->tr("xfx", qw{	list operators (rightward)});
 $s->tr("xfy", qw{		|						});
@@ -114,11 +116,12 @@ $s->tr("fy",  qw{		not						});
 $s->tr("xfy", qw{		and						});
 $s->tr("xfy", qw{		or	xor					});
 $s->tr("yfx", qw{		as	is					});
-$s->tr("fx",  qw{		return					});
+$s->tr("fx",  qw{		return	raise			});
 
 $s->tr("xfy", qw{	;	})->td("yf", qw{	;	})->td("fy", qw{	;	});
 $s->tr("xfy", qw{	\n	})->td("yf", qw{	\n	})->td("fy", qw{	\n	});
-$s->tr("xfy", qw{		THEN	ELSEIF	ELSE	UNTIL	FROM	CATCH	});
+$s->tr("xfy", qw{		rescue	});
+$s->tr("xfy", qw{		THEN	ELSEIF	ELSE	UNTIL	});
 
 
 ### дополнительные опции операторов
@@ -160,7 +163,18 @@ $s->opt(".?\$word[]",	re => qr{		\.\?\$ (?<var>$re_id) \[		}x,	sur => $wordbr2);
 $s->opt(".?\$word{}",	re => qr{		\.\?\$ (?<var>$re_id) \{		}x,	sur => $wordbr3);
 
 
-$s->opt("word=>", re => qr{ (?<id>$re_id)? $re_space_ask => }xn );
+$s->opt("raise", re => qr/ \b ( die | throw | raise ) \b /xni);
+$s->opt("rescue", re => qr/ \b ( rescue | catch | except ) ( ( $re_space_ask \* | $re_space (?<isa> $re_extends ) ( $re_space_ask AS $re_space (?<id> $re_id ) )? )? ( $re_space_ask THEN \b ) | \b )  /xni, sub => sub {
+	my ($self, $push) = @_;
+	$push->{id} = 'e' if !$push->{id};
+	if($push->{isa}) {
+		# TODO: дополнить ::CLASS
+		$push->{isa} = [ split /\s*,\s*/, $push->{isa} ];
+		$push->{tmpl} = 'rescue isa';
+	}
+});
+
+$s->opt("word=>", re => qr{ (?<id>$re_id) $re_space_ask => }xn );
 $s->opt("=", sub => sub {	$_[0]->{assign} = 1 });
 
 $s->opt("|", re => qr{ 
@@ -177,6 +191,7 @@ $s->opt("|", re => qr{
 	$self->error("| $push->{op} - арность не может быть равна 0") if defined $push->{arity} and $push->{arity} == 0;
 	
 	$push->{arity} = 2 if $push->{op} =~ /^(assort|reduce)$/ni && !defined $push->{param} && !defined $push->{arity};
+
 	
 	if(defined $push->{param}) {
 		$push->{param} = [ split /\s*,\s*/, $push->{param} ];
@@ -199,6 +214,7 @@ $s->opt("|", re => qr{
 	$push->{qwparam} = join " ", @{$push->{param}};
 	
 	$self->error("арность assort должна быть кратна 2-м") if $op eq "assort" and $push->{arity} % 2;
+	$self->error("арность reduce должна быть больше 1-го") if $op eq "reduce" and $push->{arity} < 2;
 	
 });
 
@@ -223,6 +239,8 @@ $s->opt("THEN", sub => sub {
 	# для FOR
 	if($br->{stmt} eq "FOR") {
 		$push->{param} = $br->{param};
+		$push->{i} = $br->{i};
+		$push->{L} = $br->{L};
 		$push->{tmpl} = $br->{op} eq "in"? "FOR IN": $br->{op} eq "of"? "FOR OF": "FOR THEN";
 		
 	}
@@ -248,15 +266,17 @@ $s->br(qw{			(	)			});
 $s->br(qw{			[	]			});
 $s->br(qw{			{	}			});
 
-$s->br(qw{			FOR		} => qr{ FOR $re_space (?<args> $re_id ( $re_space_ask , $re_space_ask $re_id)* ) ( $re_space(?<op> in | of ) | $re_space_ask = ) }xin => sub {
+$s->br(FOR => qr{ FOR $re_space (?<args> $re_id ( $re_space_ask , $re_space_ask $re_id)* ) ( $re_space(?<op> in | of ) | $re_space_ask = ) }xin => sub {
 	my($self, $push) = @_;
 	$push->{then} = 1;
 	my $args = $+{args};
 	$push->{param} = [ split /\s*,\s*/, $args ];
-} => qw{		END		});
-$s->br(qw{			WHILE	} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
-$s->br(qw{			IF		} => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
-$s->br(qw{			DO		END		});
+	$push->{i} = $self->{lang}->ref;
+	$push->{L} = $self->{lang}->label;
+} => "END");
+$s->br(WHILE => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
+$s->br(IF => sub { my($self, $push) = @_; $push->{then}=1 } => qw{		END		});
+$s->br(qw{		DO		END		});
 
 # $s->br(qw{			ON	} => qr{ \b ON $re_space (?<route>$re_string) }x => sub {
 	# my ($self, $push) = @_; 
@@ -317,6 +337,54 @@ $s->br("SCENARIO" => sub { my ($self, $push) = @_; $push->{lineno} = $self->{lin
 
 ### операнды
 
+# возвращает скобку в стеке имеющую параметр $id
+sub get_sk {
+	my ($self, $id) = @_;
+	my $stack = $self->{stack};
+
+	for(my $i=$#$stack; $i>=0; $i--) {
+		my $sk = $stack->[$i];
+		if(ref $sk->{param}) {
+			my $param = $sk->{param};
+			for(my $j=0; $j<@$param; $j++) {
+				return $sk, $j if $param->[$j] eq $id;
+			}
+		}
+	}
+	
+	return;
+}
+
+$s->x("index" => qr{ \b INDEX\( $re_space_ask (?<id> $re_id ) $re_space_ask \) }ixn => sub {
+	my ($self, $push)=@_;
+	
+	my $id = $push->{id};
+	my ($sk, $n) = $self->get_sk($id);
+	$self->error("index($id): переменная $id не связана с циклом или конвеером") if !defined $sk;
+	
+	$push->{i} = $sk->{i}; 
+	$push->{n} = $n;
+});
+$s->x("next label" => qr/ \b NEXT \( $re_space_ask (?<id> $re_id ) $re_space_ask \) /xin => sub {
+	my ($self, $push) = @_;
+	my $id = $push->{id};
+	my ($sk, $n) = $self->get_sk($id);
+	$self->error("next $push->{id}: переменная $id не связана с циклом или конвеером") if !defined $sk;
+	$push->{L} = $sk->{L};
+});
+$s->x("last label" => qr/ \b LAST \( $re_space_ask (?<id> $re_id ) $re_space_ask \) /xin => sub {
+	my ($self, $push) = @_;
+	my $id = $push->{id};
+	my ($sk, $n) = $self->get_sk($id);
+	$self->error("last $push->{id}: переменная $id не связана с циклом или конвеером") if !defined $sk;
+	$push->{L} = $sk->{L};
+});
+$s->opt("index", order => -1000);
+$s->opt("next label", order => -1000);
+$s->opt("last label", order => -1000);
+
+
+
 $s->x("()");
 $s->x("[]");
 $s->x("{}");
@@ -333,9 +401,10 @@ $s->x("inf");
 $s->x("true");
 $s->x("false");
 $s->x("paramarray" => qr/\b(?:paramarray | arguments)\b/x);
-$s->x("throw" => qr/ \b (?: die | throw | raise ) \b /x => sub { $b->{gosub} = $b->{endline} = 1 });
+
 $s->x("next");
 $s->x("last");
+
 #$s->x("redo");
 #$s->x("wantarray");
 
@@ -361,8 +430,6 @@ $s->x("string"	=> qr{	( " (?<string> (?:\\"|""|[^"])* ) " | ' (?<string> (?:\\'|
 });
 
 ### какие операторы в каких скобках могут существовать
-#$s->in("on"		=> qw{		addhandler		});
-#$s->in("try"	=> qw{		catch			});
 $s->in("if"		=> qw{		else elseif		});
 $s->in("repeat"	=> qw{		until			});
 
