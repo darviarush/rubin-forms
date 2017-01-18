@@ -13,7 +13,7 @@
 [test]
 
 
-== Скаляры - строки и цифры
+== Скаляры - строки, регулярные выражения и цифры
 
 	$app->syntaxAg->new->eval("1");							# 1
 	$app->syntaxAg->new->eval("1.1");						# 1.1
@@ -31,7 +31,38 @@
 	$app->syntaxAg->new->eval('utf8 = "utf8"; "строка в $utf8"');					# строка в utf8
 	$app->syntaxAg->new->eval('hash = {key=>"utf8"}; "строка в $hash:key"');		# строка в utf8
 	#$app->syntaxAg->new->eval('hash = {a=>6}; "строка в $a:6"');					# строка в utf8
+	
+	$app->syntaxAg->new->eval(' "AbC" ~ "abc"!i ');					# 1
+	
+Регулярные выражения удобные для распознавания файлов:
+	
+	$app->syntaxAg->new->eval(' "file.EXP" ~ "*.exp"~i ');			# 1
+	$app->syntaxAg->new->eval(' "1231.exp" ~ "{|123|}.exp"~ ');		# 1
+	
+=== Преобразователи у строк и цифр
 
+Можно сразу преобразовать константу, дописав за ней без пробела название преобразователя.
+
+	$app->syntaxAg->new->eval('
+		class number::fix::i
+			sub new n then me:n = n
+		end
+	');
+
+	$app->syntaxAg->new->eval(' 2 + 1i ');		# 1
+	
+Преобразователи - это классы в директории `Number::Fix` для чисел и `String::Fix` для строк.
+
+	$app->syntaxAg->new->eval('
+		class string::fix::f inherits R::File
+		end
+	');
+	
+	$app->syntaxAg->new->eval(' "1"f.exists ');		# 
+	
+В стандартной библиотеке уже есть довольно много преобразователей.
+Для строк это `""f` - файл.
+	
 == Классы и методы
 
 === Проект

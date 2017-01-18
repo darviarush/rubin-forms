@@ -423,7 +423,8 @@ $s->x("radix"	=> qr{	(?<radix> (?<rad>\d+) r (?<num> [\da-z_]+ ) )	}ix => sub {
 $s->x("num"		=> qr{ 	(?<num> -? ( \d[\d_]*(\.[\d_]+)? | \.[\d_]+ )	( E[\+\-][\d_]+ )?	)			}ixn);
 #$s->x("regexp"	=> qr{ 	" (?<QR> (?:[^"]|\\")* ) "! (?<qr_args> \w+ )? 	}x);
 
-$s->x("string"	=> qr{	( " (?<string> (?:\\"|""|[^"])* ) " | ' (?<string> (?:\\'|''|[^'])* ) ' ) (?<qr>! (?<qr_args> \w*))?	 }xn => sub {
+$s->x("string"	=> qr{	( " (?<string> (?:\\"|""|[^"])* ) " | ' (?<string> (?:\\'|''|[^'])* ) ' ) 
+	( (?<qr>! (?<qr_args> \w*)) | (?<like>\? ))?	 }xn => sub {
 	my ($self, $push) = @_;
 	my $sk = $push->{qr}? "qr": "string";
 	$self->checkout("ag.string")->push($sk)->masking($push->{string})->pop($sk)->checkout("ag")->assign($push);
