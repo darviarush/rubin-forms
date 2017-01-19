@@ -90,7 +90,7 @@ $s->tr("yf",  qw{		++ --			})->td("fy", qw{ ++ -- });
 $s->tr("fy",  qw{  		length delete })->td("xf", qw{  ?  }); # ?!
 $s->tr("yfx", qw{		^				});
 $s->tr("fy",  qw{ 		+ - ! +~		});
-$s->tr("xfy", qw{		=~ !~	~		});
+$s->tr("xfy", qw{		~	!~		});
 $s->tr("xfy", qw{		* / mod div **	});
 $s->tr("xfy", qw{		+ - .				});
 # in perl in this: named unary operators
@@ -116,7 +116,7 @@ $s->tr("fy",  qw{		not						});
 $s->tr("xfy", qw{		and						});
 $s->tr("xfy", qw{		or	xor					});
 $s->tr("yfx", qw{		as	is					});
-$s->tr("fx",  qw{		return	raise			});
+$s->tr("fx",  qw{		return	raise msg msg1			});
 
 $s->tr("xfy", qw{	;	})->td("yf", qw{	;	})->td("fy", qw{	;	});
 $s->tr("xfy", qw{	\n	})->td("yf", qw{	\n	})->td("fy", qw{	\n	});
@@ -125,6 +125,10 @@ $s->tr("xfy", qw{		THEN	ELSEIF	ELSE	UNTIL	});
 
 
 ### дополнительные опции операторов
+
+# a-1 тогда не сработает
+# $s->opt("-", order => 10000);	# чтобы был за num и -1.1 распознавался как num, а не - и num
+$s->opt("^", order => 10000);	# чтобы распознавались скобки ^{...}
 
 $s->br('.word.br');
 $s->opt('.word.br', nolex => 1);
@@ -265,6 +269,7 @@ $s->opt("UNTIL", sub => sub { my ($self, $push) = @_; $self->check("UNTIL", stmt
 $s->br(qw{			(	)			});
 $s->br(qw{			[	]			});
 $s->br(qw{			{	}			});
+$s->br(qw{			^{	}			});
 
 $s->br(FOR => qr{ FOR $re_space (?<args> $re_id ( $re_space_ask , $re_space_ask $re_id)* ) ( $re_space(?<op> in | of ) | $re_space_ask = ) }xin => sub {
 	my($self, $push) = @_;
@@ -321,6 +326,9 @@ $s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => sub {
 
 $s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_id ) $re_args_then }ix => sub {
 	my ($self, $push) = @_;
+	
+	$push->{args} = [ split /\s*,\s*/, $push->{args} ];
+	
 	if($push->{then}) {
 		$push->{endline} = 1; 
 		delete $push->{then};
@@ -420,14 +428,30 @@ $s->x("radix"	=> qr{	(?<radix> (?<rad>\d+) r (?<num> [\da-z_]+ ) )	}ix => sub {
 	$num =~ s/_//g;
 	$push->{radix} = $app->perl->from_radix($num, $push->{rad});
 });
-$s->x("num"		=> qr{ 	(?<num> -? ( \d[\d_]*(\.[\d_]+)? | \.[\d_]+ )	( E[\+\-][\d_]+ )?	)			}ixn);
-#$s->x("regexp"	=> qr{ 	" (?<QR> (?:[^"]|\\")* ) "! (?<qr_args> \w+ )? 	}x);
+$s->x("num"		=> qr{ 	(?<num> -? ( \d[\d_]*(\.[\d_]+)? | \.[\d_]+ )	( E[\+\-][\d_]+ )?	) (?<new> \w+)?	}ixn);
+$s->opt("num",
+sub => sub {
+	my ($self, $push) = @_;
+	$self->push("new_apply", new => "Number::Fix::$push->{new}") if exists $push->{new};
+}, sur => sub {
+	my ($self, $push) = @_;
+	$self->pop("new_apply") if exists $push->{new};
+});
+
+$s->br("regexp");			$s->opt("regexp", nolex => 1);
+$s->br("like");				$s->opt("like", nolex => 1);
+$s->br("string_modify");	$s->opt("string_modify", nolex => 1);
 
 $s->x("string"	=> qr{	( " (?<string> (?:\\"|""|[^"])* ) " | ' (?<string> (?:\\'|''|[^'])* ) ' ) 
-	( (?<qr>! (?<qr_args> \w*)) | (?<like>\? ))?	 }xn => sub {
+	( (?<qr>! ) | (?<like>\? ) )? (?<arg> $re_id )?	 }xn => sub {
 	my ($self, $push) = @_;
-	my $sk = $push->{qr}? "qr": "string";
+	my $sk = exists $push->{qr}? "regexp": exists $push->{like}? "like": "string";
+	$self->push("new_apply", new => "String::Fix::$push->{arg}") if $push->{new} = !exists $push->{qr} && !exists $push->{like} && exists $push->{arg};
 	$self->checkout("ag.string")->push($sk)->masking($push->{string})->pop($sk)->checkout("ag")->assign($push);
+});
+$s->opt("string", sur => sub {
+	my ($self, $push) = @_;
+	$self->pop("new_apply") if $push->{new};
 });
 
 ### какие операторы в каких скобках могут существовать
@@ -501,9 +525,15 @@ $string->x(qw/CAT/);
 $string->br(qw/exec1/);
 $string->opt("exec1", nolex => 1);
 
-$string->opt("CAT", re => qr/ (?<str> [^\$]* ) ( \$ (?<CAT> $re_id([\.:]$re_id)* ) | $ ) /nxs, sub => sub {
+$string->opt("CAT", re => qr/ (?<str> [^\$]* ) ( \$ (?<CAT> $re_id ( [\.:]$re_id )* ) | (?<str> \$ ) | $ ) /nxs, sub => sub {
 	my ($self, $push) = @_;
-	$push->{str} =~ s/""|''|\\["']/\\"/g;
+	if( $self->top->{stmt} eq "string" ) {
+		$push->{str} =~ s/""|''|\\["']/\\"/g;
+	}
+	else {
+		$push->{str} =~ s/""/"/g;
+		$push->{str} =~ s/''/'/g;
+	}
 	if(exists $push->{CAT}) {
 		$self->checkout("ag")->push("exec1")->masking($push->{CAT})->pop("exec1")->checkout("ag.string");
 		delete $push->{str};

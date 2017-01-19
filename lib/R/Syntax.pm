@@ -712,8 +712,7 @@ sub pop {
 		$meta = $meta1;
 		$op = $A->[$i];
 		my $fix = $meta->{fix};
-		
-		$self->error($app->perl->qq($op->{stmt}) . " не может стоять после " . $self->namefix($prev, 1) . ": " . join " ", map { $_->{stmt} } @$A) if !$check->($prev, $fix);
+		$self->error($app->perl->qq($op->{stmt}) . " не может стоять после " . $self->namefix($prev, 1) . ": " . join "   ", map { $_->{stmt} } @$A) if !$check->($prev, $fix);
 		
 		if($fix & $prefix | $fix & $postfix | $fix & $infix) {
 			$popop->($op);
@@ -1042,12 +1041,18 @@ sub eval {
 	my @ret;
 	my $lang = $self->{lang};
 	if(Can $lang, "eval") {
-		@ret = wantarray? $lang->eval($morf): scalar $lang->eval($morf);
+		@ret = wantarray? $lang->eval($morf): $lang->eval($morf);
 	}
 	else {
 		@ret = wantarray? eval $morf: scalar eval $morf;
 	}
-	msg(":empty black on_cyan", "eval morf", ":reset", "\n", $morf), die $@ if $@;
+	if($@) {
+		{
+			local $@;
+			msg(":empty black on_cyan", "eval morf", ":reset", "\n", $morf);
+		}
+		die $@;
+	}
 	wantarray? @ret: $ret[0]
 }
 

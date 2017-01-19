@@ -13,6 +13,10 @@ my $esc = "', R::View::Views::escapeHTML(scalar do { "; my $_esc = " }), '";
 ### шаблоны
 our %templates = (
 
+'fx msg' => 'msg({{ right }})',
+'fx msg1' => 'msg1({{ right }})',
+
+
 # разыменования
 'yf .$word' => '{{ left }}->${$DATA->{{{ var }}}}',
 'yf .word' => '{{ left }}->{{ var }}',
@@ -85,7 +89,7 @@ our %templates = (
 "xfy **" => 'scalar({{ left }}) x scalar({{ right }})',
 "xfy ." => '({{ left }}) . ({{ right }})',
 "yfx .=" => '({{ left }}) .= ({{ right }})',
-"yfx **=" => '({{ left }}) x= scalar({{ right }})',
+"yfx **=" => '{{ left }} x= scalar({{ right }})',
 "yf len" => 'length({{ left }})',
 "fy len" => 'length({{ right }})',
 "fy lc" => 'lc({{ right }})',
@@ -118,35 +122,37 @@ our %templates = (
 
 
 # побитовые
-"xfy +&" => '(({{ left }}) & ({{ right }}))',
-"xfy +|" => '(({{ left }}) | ({{ right }}))',
-"xfy +^" => '(({{ left }}) ^ ({{ right }}))',
+"xfy +&" => '({{ left }}) & ({{ right }})',
+"xfy +|" => '({{ left }}) | ({{ right }})',
+"xfy +^" => '({{ left }}) ^ ({{ right }})',
 "fy  +~" => '(~ ({{ right }}))',
-"xfy +<" => '(({{ left }}) << ({{ right }}))',
-"xfy +>" => '(({{ left }}) >> ({{ right }}))',
+"xfy +<" => '({{ left }}) << ({{ right }})',
+"xfy +>" => '({{ left }}) >> ({{ right }})',
 
-"yfx +&=" => '(({{ left }}) &= ({{ right }}))',
-"yfx +|=" => '(({{ left }}) |= ({{ right }}))',
-"yfx +^=" => '(({{ left }}) ^= ({{ right }}))',
-"yfx +<=" => '(({{ left }}) <<= ({{ right }}))',
-"yfx +>=" => '(({{ left }}) >>= ({{ right }}))',
+"yfx +&=" => '({{ left }}) &= ({{ right }})',
+"yfx +|=" => '({{ left }}) |= ({{ right }})',
+"yfx +^=" => '({{ left }}) ^= ({{ right }})',
+"yfx +<=" => '({{ left }}) <<= ({{ right }})',
+"yfx +>=" => '({{ left }}) >>= ({{ right }})',
 
 
 # сравнения
-"xfx lt" => '(({{ left }}) lt ({{ right }}))',
-"xfx gt" => '(({{ left }}) gt ({{ right }}))',
-"xfx le" => '(({{ left }}) le ({{ right }}))',
-"xfx ge" => '(({{ left }}) ge ({{ right }}))',
-"xfx ne" => '(({{ left }}) ne ({{ right }}))',
-"xfx eq" => '(({{ left }}) eq ({{ right }}))',
-"xfx <" => '(({{ left }}) < ({{ right }}))',
-"xfx >" => '(({{ left }}) > ({{ right }}))',
-"xfx <=" => '(({{ left }}) <= ({{ right }}))',
-"xfx >=" => '(({{ left }}) >= ({{ right }}))',
-"xfx !=" => '(({{ left }}) != ({{ right }}))',
-"xfx ==" => '(({{ left }}) == ({{ right }}))',
-"xfx <=>" => '(({{ left }}) <=> ({{ right }}))',
-"xfx cmp" => '(({{ left }}) cmp ({{ right }}))',
+"xfx lt" => '({{ left }}) lt ({{ right }})',
+"xfx gt" => '({{ left }}) gt ({{ right }})',
+"xfx le" => '({{ left }}) le ({{ right }})',
+"xfx ge" => '({{ left }}) ge ({{ right }})',
+"xfx ne" => '({{ left }}) ne ({{ right }})',
+"xfx eq" => '({{ left }}) eq ({{ right }})',
+"xfx <" => '({{ left }}) < ({{ right }})',
+"xfx >" => '({{ left }}) > ({{ right }})',
+"xfx <=" => '({{ left }}) <= ({{ right }})',
+"xfx >=" => '({{ left }}) >= ({{ right }})',
+"xfx !=" => '({{ left }}) != ({{ right }})',
+"xfx ==" => '({{ left }}) == ({{ right }})',
+"xfx <=>" => '({{ left }}) <=> ({{ right }})',
+"xfx cmp" => '({{ left }}) cmp ({{ right }})',
+"xfy ~" => '({{ left }}) =~ ({{ right }})',
+"xfy !~" => '({{ left }}) !~ ({{ right }})',
 
 # проверки
 "xf ?" => 'defined({{ left }})',
@@ -157,7 +163,7 @@ our %templates = (
 
 
 # интервальные
-"fx ^" => '(0 .. ({{ right }}))',
+"fx ^" => '0 .. ({{ right }})-1',
 "xfx .." => '({{ left }}) .. ({{ right }})',
 "xfx ..." => '({{ left }}) .. ({{ right }})-1',
 
@@ -171,6 +177,7 @@ our %templates = (
 "xfy split" => 'split({{ right }}, {{ left }})',
 "yf join" => 'join("", {{ left }})',
 "xf split" => 'split(/\s+/, {{ left }})',
+"xfx split" => '{{ _split * }}split(do { my ({{i}})=({{ right }}); ref({{i}})? {{i}}: quotemeta({{i}}) }, {{ left }})',
 
 # хешей
 "fx delete" => 'delete({{ right }})',
@@ -204,9 +211,12 @@ join => 'join({{ _for_join *, right }}, {{ left }}){{ newline }}',
 # скобки
 
 # - массивы
+'(' => '( {{ right }} )',
 '[' => '[ {{ right }} ]',
 '{' => '+{ {{ right }} }',
-'(' => '( {{ right }} )',
+'^{' => '$R::App::app->perl->starsetref( {{ right }} )',
+
+
 
 # - смысловые конструкции
 
@@ -268,6 +278,9 @@ CAT => '{{ str }}',
 "yf CAT" => "{{ left }}{{ str }}",
 exec1 => '{{ str }}${\({{ right }})}',
 string => '"{{ right }}"',
+regexp => 'qr{{{ right }}}{{ arg }}',
+like => 'qr{{{ _like * }}}',
+string_modify => '("{{ arg }}"->can("new")? "{{ arg }}": $R::App::app->syntaxAg->include("{{ new }}"))->new("{{ right }}")',
 
 );
 
@@ -409,6 +422,20 @@ sub _ifnewend {
 	if($name eq "new") {
 		'; $DATA->{me}'
 	}
+}
+
+# новое регулярное выражение
+sub _like {
+	my ($self, $push) = @_;
+	#$push->{arg} = s///;
+	$app->perl->likes($push->{right}, $push->{arg});
+}
+
+# разбиение строки
+sub _split {
+	my ($self, $push) = @_;
+	$push->{i} = $self->ref;
+	""
 }
 
 # вызывается после разбора файла

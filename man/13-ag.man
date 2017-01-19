@@ -36,29 +36,30 @@
 	
 Регулярные выражения удобные для распознавания файлов:
 	
-	$app->syntaxAg->new->eval(' "file.EXP" ~ "*.exp"~i ');			# 1
-	$app->syntaxAg->new->eval(' "1231.exp" ~ "{|123|}.exp"~ ');		# 1
+	$app->syntaxAg->new->eval(' "file.EXP" ~ "*.exp"?i ');			# 1
+	$app->syntaxAg->new->eval(' "1231.exp" ~ "{|123|}.exp"? ');		# 1
 	
 === Преобразователи у строк и цифр
 
 Можно сразу преобразовать константу, дописав за ней без пробела название преобразователя.
 
 	$app->syntaxAg->new->eval('
-		class number::fix::i
+		class Number::Fix::math
 			sub new n then me:n = n
+			sub m4 then me:n * 4
 		end
 	');
 
-	$app->syntaxAg->new->eval(' 2 + 1i ');		# 1
+	$app->syntaxAg->new->eval(' -1.1math.m4 ');		# -4.4
 	
 Преобразователи - это классы в директории `Number::Fix` для чисел и `String::Fix` для строк.
 
 	$app->syntaxAg->new->eval('
-		class string::fix::f inherits R::File
+		class String::Fix::f inherits R::File
 		end
 	');
 	
-	$app->syntaxAg->new->eval(' "1"f.exists ');		# 
+	$app->syntaxAg->new->eval(' "1"f.exists ');		## undef 
 	
 В стандартной библиотеке уже есть довольно много преобразователей.
 Для строк это `""f` - файл.
@@ -423,23 +424,22 @@ TODO: циклы с возвращаемым значением через `last
 	$app->syntaxAg->new->eval("a=10; a -= 10");		# 0
 	$app->syntaxAg->new->eval("a=10; a *= 10");		# 100
 	$app->syntaxAg->new->eval("a=10; a /= 100");	# 0.1
-	msg1 $app->syntaxAg->new->morf("a=10; a div= 4");
 	$app->syntaxAg->new->eval("a=10; a div= 4");	# 2
-	msg1 $app->syntaxAg->new->morf("a=10; a mod= 4");
-	$app->syntaxAg->new->eval("a=10; a mod= 4");	# 1
+	$app->syntaxAg->new->eval("a=7; a mod= 4");		# 3
 	$app->syntaxAg->new->eval("a=10; a ^= 4");		# 10000
 	$app->syntaxAg->new->eval("a=0; a ||= 4");		# 4
 	$app->syntaxAg->new->eval("a=5; a &&= 4");		# 4
 	$app->syntaxAg->new->eval("a=5; a ^^= 0");		# 1
 	$app->syntaxAg->new->eval("a=0; a or= 4");		# 4
 	$app->syntaxAg->new->eval("a=5; a and= 4");		# 4
-	$app->syntaxAg->new->eval("a=5; a xor= 4");		# 5
+	$app->syntaxAg->new->eval("a=5; a xor= 0");		# 1
 	$app->syntaxAg->new->eval("a=0b101; a +|= 0b011");		## 0b111
 	$app->syntaxAg->new->eval("a=0b101; a +&= 0b011");		## 0b001
 	$app->syntaxAg->new->eval("a=0b101; a +^= 0b011");		## 0b110
-	$app->syntaxAg->new->eval("a=0b101; a +<= 0b011");		## 0b001
-	$app->syntaxAg->new->eval("a=0b101; a +>= 0b011");		## 0b110
+	$app->syntaxAg->new->eval("a=0b101; a +<= 2");			## 0b10100
+	$app->syntaxAg->new->eval("a=0b101; a +>= 2");			# 1
 	$app->syntaxAg->new->eval("a=6; a **= 3");				# 666
+	#$app->syntaxAg->new->eval('a=[6,2]; @a **= 3; a');	## [6,2,6,2,6,2]
 	$app->syntaxAg->new->eval("a=6; a .= 3");				# 63
 	
 
@@ -562,8 +562,8 @@ TODO: циклы с возвращаемым значением через `last
 	
 Форматирование строки.
 
-	$app->syntaxAg->new->eval("'x=%i y=%.2f' % (123, 2.555)");					# x=123 y=2.55
-	$app->syntaxAg->new->eval("a = 'x=%i y=%.2f'; a %= (123, 2.555); a");		# x=123 y=2.55
+	$app->syntaxAg->new->eval("'x=%i y=%.2f' % (123, 2.555)");					# x=123 y=2.56
+	$app->syntaxAg->new->eval("a = 'x=%i y=%.2f'; a %= (123, 2.555); a");		# x=123 y=2.56
 
 Объединяет две строки.
 
@@ -580,65 +580,68 @@ TODO: циклы с возвращаемым значением через `last
 	
 Разделяет строки по регулярному выражению или строке. Дополнительный параметр указывает количество раз которое нужно разделить.
 	
-	$app->syntaxAg->new->eval("['1,2,3' split '\d'!]");		## [1,2,3]
-	$app->syntaxAg->new->eval("['1,2*3' split '(\d)'!]");	## [1, ',', 2, '*', 3]
-	$app->syntaxAg->new->eval("['1*2*3' split '*']");		## [1,2,3]
+	$app->syntaxAg->new->eval('["1,2,3" split "\D"!]');		## [1,2,3]
+	$app->syntaxAg->new->eval('["1,2*3" split "(\D)"!]');	## [1, ",", 2, "*", 3]
+	$app->syntaxAg->new->eval('["1*2*3" split "*"]');		## [1,2,3]
 	
-	$app->syntaxAg->new->eval("['1,2,3' split '\d'!, 1]");		## [1,'2,3']
-	$app->syntaxAg->new->eval("['1*2*3' split '*', 1]");		## [1,'2*3']
+	#$app->syntaxAg->new->eval('["1,2,3" split "\d"!, 1]');		## [1,"2,3"]
+	#$app->syntaxAg->new->eval('["1*2*3" split1 "*"]');		## [1,"2*3"]
+	#$app->syntaxAg->new->eval('["1*2*3*4" split2 "*"]');		## [1,2,"3*4"]
 	
 Если по чему разбивать не указано - разбивает по пробельным символам (`\s+`):
 	
-	$app->syntaxAg->new->eval("['1  2 3' split]");		## [1,2,3]
+	$app->syntaxAg->new->eval('["1  2 3" split]');		## [1,2,3]
 	
 
 === Регулярные
 
+	$app->syntaxAg->new->eval(' a = "\\d"; "7" ~ "^$a*$"! ');
+
 	$app->syntaxAg->new->eval('"7" ~ "^\d*$"!');		# 1
 	$app->syntaxAg->new->eval('"7x" !~ "^\d*$"!');		# 1
 	
-	$app->syntaxAg->new->eval('"7" ~ "{\d}"~');		# 1
-	$app->syntaxAg->new->eval('"7x" !~ "{\d}"~');	# 1
+	$app->syntaxAg->new->eval('"7" ~ "{\d}"?');		# 1
+	$app->syntaxAg->new->eval('"7x" !~ "{\d}"?');	# 1
 	
 	
 === Интервальные
 
-	$app->syntaxAg->new->eval(" ^6 join");			# 0123456
+	$app->syntaxAg->new->eval(" ^6 join");			# 012345
 
 	$app->syntaxAg->new->eval(" 1..6 join");		# 123456
 	$app->syntaxAg->new->eval(" 1...6 join");		# 12345
 	
-	$app->syntaxAg->new->eval(" 0 to 1 step .2 join ', ' ");		# 0, 0.2, 0.4, 0.6, 0.8, 1
-	$app->syntaxAg->new->eval(" 1 to -2 step -1.5 join ', ' ");		# 1, -0.5, -2
+	# $app->syntaxAg->new->eval(" 0 to 1 step .2 join ', ' ");		# 0, 0.2, 0.4, 0.6, 0.8, 1
+	# $app->syntaxAg->new->eval(" 1 to -2 step -1.5 join ', ' ");		# 1, -0.5, -2
 	
 `..*`, `...*` и `to *` - один и тот же оператор. Обозначает "до бесконечности". Значение `^*` - до бесконечности.
 	
-	$app->syntaxAg->new->eval(" (0..*)@[1..3] join");		# 123
-	$app->syntaxAg->new->eval(" (0...*)@[1..3] join");		# 123
-	$app->syntaxAg->new->eval(" (0 to *)@[1..3] join");		# 123
+	# $app->syntaxAg->new->eval(" (0..*)@[1..3] join");		# 123
+	# $app->syntaxAg->new->eval(" (0...*)@[1..3] join");		# 123
+	# $app->syntaxAg->new->eval(" (0 to *)@[1..3] join");		# 123
 	
-	$app->syntaxAg->new->eval(" (0..* step 2)@[1..3] join");		# 246
+	#$app->syntaxAg->new->eval(" (0..* step 2)@[1..3] join");		# 246
 	
 Так же работает и с `inf`:
 	
-	$app->syntaxAg->new->eval(" (0...Inf)@[1..3] join");		# 123
+	#$app->syntaxAg->new->eval(" (0...Inf)@[1..3] join");		# 123
 	
 	
 Операторы `^..`, `^to` и  `^...` не включают начало интервала.
 	
 	$app->syntaxAg->new->eval(" 1^..6 join");					# 23456
 	$app->syntaxAg->new->eval(" 1^...6 join");					# 2345
-	$app->syntaxAg->new->eval("(1 ^to * step .2)@[0...5] join ', '");	# 0.2, 0.4, 0.6, 0.8, 1
+	#$app->syntaxAg->new->eval("(1 ^to * step .2)@[0...5] join ', '");	# 0.2, 0.4, 0.6, 0.8, 1
 	
 Что так же полезно при сравнениях.
 
-	$app->syntaxAg->new->eval(" 1 in 1^..6");					# 
-	$app->syntaxAg->new->eval(" 1 in 1..6");					# 1
-	$app->syntaxAg->new->eval(" 3 in 1..6");					# 3
+	# $app->syntaxAg->new->eval(" 1 in 1^..6");					# 
+	# $app->syntaxAg->new->eval(" 1 in 1..6");					# 1
+	# $app->syntaxAg->new->eval(" 3 in 1..6");					# 3
 	
 `in` возвращает индекс первого найденного элемента от 1.
 	
-	
+https://metacpan.org/pod/Tie::LazyList
 	
 === Для массивов
 	

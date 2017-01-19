@@ -12,7 +12,7 @@ use Devel::Peek qw/SvREFCNT/;
 sub new {
 	my ($cls) = @_;
 	bless {
-		starset_base => 0,
+		starset_base => 1,
 	}, $cls;
 }
 
