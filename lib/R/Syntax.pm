@@ -139,6 +139,9 @@ our $xf=$postfix | $nonassoc;			# неассоциативный префикс�
 our $fy=$prefix | $rightassoc;			# левоассоциативный постфиксный
 our $fx=$prefix | $nonassoc;			# неассоциативный постфиксный
 
+our $yF=$postfix | $leftassoc | $bracket;		# левоассоциативная скобка (postcircumfix)
+our $xF=$postfix | $nonassoc  | $bracket;		# неассоциативная скобка (postcircumfix)
+
 our %FIX = (
 	xfy => $xfy,
 	yfx => $yfx,
@@ -147,6 +150,8 @@ our %FIX = (
 	yf => $yf,
 	fx => $fx,
 	fy => $fy,
+	yF => $yF,
+	xF => $xF,
 );
 
 
@@ -166,11 +171,15 @@ sub td {
 	my $op = "no val!";
 	
 	my $key = $fix & $infix? "INFIX": $fix & $prefix? "PREFIX": "POSTFIX";
-	for my $x (@_) {
+	my $step = $fix & $bracket? 2: 1;
+	for(my $i=0; $i<@_; $i+=$step) {
+		my $x = $_[$i];
 		if(ref $x) { die "имена операторов должны быть строками: `$x`" }
 		else {
 			die "оператор `$type $x` уже объявлен" if exists $self->{$key}{$x};
 			$op = $self->newlex($key => {%p, name=>"$type $x", alias=>$x, fix => $fix, order => -length $x});
+			
+			$op->{tag} = $_[$i+1], $self->newlex(CR => { name => "cr $op->{tag}", alias => $op->{tag}, order=>$self->{ORDER}++, fix => $crbracket }) if $fix & $bracket;
 		}
 	}
 
@@ -308,7 +317,7 @@ sub newlex {
 		#my $ofix = $op->{fix};
 		
 		die "скобка $alias не может сочетаться с $key:$alias" if $op->{BR} || $op->{CR};
-		die "$alias не может сочетаться со скобкой $key:$alias" if $val->{fix} & ($bracket | $crbracket);
+		#die "$alias не может сочетаться со скобкой $key:$alias" if $val->{fix} & ($bracket | $crbracket);
 		
 		%$op = (%$op, @_, count => $op->{count} + 1, $key => $val, fix => $op->{fix} | $val->{fix});
 	}
@@ -475,8 +484,11 @@ sub push {
 sub pop {
 	my ($self, $stag) = @_;
 	
+	# лексемы
+	my $LEX = $self->{LEX};
+	
 	# выполняем подпрограмму
-	my $x = $self->{LEX}{$stag};
+	my $x = $LEX->{$stag};
 	if($x && exists $x->{sub}) {
 		my $push = {%+, stmt => $stag};
 		$x->{sub}->($self, $push);
@@ -496,9 +508,6 @@ sub pop {
 	
 	my $A = $sk->{'A+'};
 	$self->error("скобки ".($stag eq $sk->{stmt}? $stag: $sk->{stmt}." ".$stag)." не могут быть пусты") if !$A;
-
-	# лексемы
-	my $LEX = $self->{LEX};
 
 	my @T;
 	my @S;
@@ -870,11 +879,28 @@ sub error {
 	die $color_msg;
 }
 
+# устанавливает модификаторы синтаксиса
+sub modificators {
+	my $self = shift;
+	my $modifiers = $self->{modifiers} //= {};
+	for(my $i=0; $i<@_; $i+=2) {
+		my ($key, $val) = @_[$i..$i+1];
+		die "синтаксический модификатор `$key` встречается дважды" if exists $modifiers->{$key};
+		$modifiers->{$key} = $val;
+	}
+	
+	$self
+}
+
 # устанавливает модификаторы языка
 sub modifiers {
 	my $self = shift;
-	
-	%{ $self->{lang}{modifiers} } = ( %{$self->{lang}{modifiers}}, @_ );
+	my $modifiers = $self->{lang}{modifiers} //= {};
+	for(my $i=0; $i<@_; $i+=2) {
+		my ($key, $val) = @_[$i..$i+1];
+		die "модификатор языка `$key` встречается дважды" if exists $modifiers->{$key};
+		$modifiers->{$key} = $val;
+	}
 	
 	$self
 }
@@ -908,37 +934,45 @@ sub templates {
 	$self
 }
 
-
+# модифицирует дерево
+sub modify {
+	my ($self, $root, $modifiers) = @_;
+	
+	my @path = $root;
+	while(@path) {
+		my $node = $path[-1];
+		
+		# вызываем модификатор, если мы на элементе впервые
+		if(!exists $node->{"&"}) {
+			my $fn = $modifiers->{$node->{stmt}};
+			$fn->($self, $node, \@path) if $fn;
+		}
+		
+		if(exists $node->{left} && $node->{"&"} < 1) {	# на подэлемент
+			$node->{"&"}=1;
+			push @path, $node->{left};
+		}
+		elsif(exists $node->{right} && $node->{"&"} < 2) {	# на подэлемент
+			$node->{"&"}=2;
+			push @path, $node->{right};
+		}
+		else {
+			pop @path;		# удаляем элемент
+		}
+	}
+	
+	$self
+}
 
 # осуществляет два прохода по дереву кода и формирует код
 sub expirience {
 	my ($self, $root) = @_;
 	
 	# обход в глубину - модификации дерева
-	if(defined(my $modifiers = $self->{lang}{modifiers})) {
-		my @path = $root;
-		while(@path) {
-			my $node = $path[-1];
-			
-			# вызываем модификатор, если мы на элементе впервые
-			if(!exists $node->{"&"}) {
-				my $fn = $modifiers->{$node->{stmt}};
-				$fn->($self, $node, \@path) if $fn;
-			}
-			
-			if(exists $node->{left} && $node->{"&"} < 1) {	# на подэлемент
-				$node->{"&"}=1;
-				push @path, $node->{left};
-			}
-			elsif(exists $node->{right} && $node->{"&"} < 2) {	# на подэлемент
-				$node->{"&"}=2;
-				push @path, $node->{right};
-			}
-			else {
-				pop @path;		# удаляем элемент
-			}
-		}
-	}
+	$self->modify($root, $self->{modifiers}) if $self->{modifiers};
+	
+	# обход в глубину - модификации дерева
+	$self->modify($root, $self->{lang}{modifiers}) if $self->{lang}{modifiers};
 	
 	# формирование кода из шаблонов
 	$a = $self;	# используется в функциях-шаблонах
