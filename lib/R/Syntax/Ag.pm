@@ -104,12 +104,11 @@ $s->tr("xfx", qw{		== != eq ne  <=> cmp 		});			# ~~
 $s->tr("xfx", qw{		isa can	of					});
 $s->tr("xfy", qw{		&&					});
 $s->tr("xfy", qw{		|| ^^ ?				});
-$s->tr("xfx", qw{		.. ...  to  step		})->td("fx", qw{	^	});
+$s->tr("xfx", qw{		.. ... ^.. ^...  to ^to ^to^   step		})->td("fx", qw{	^	});
 $s->tr("xfy", qw{		=>		})->td("fy", qw{	word=>		});
 $s->tr("xfy", qw{		,		})->td("yf",  qw{ 	,		});
-$s->tr("xfx", qw{		split		})->td("yfx", qw{	join	})->td("xf", qw{ split })->td("yf", qw{ join });
+$s->tr("xfx", qw{		split in		})->td("yfx", qw{	join zip	})->td("xf", qw{ split })->td("yf", qw{ join reverse });
 $s->tr("yfx", qw{		-> = += -= *= /= ^= div= mod= &&= ||= ^^=   and= or= xor=  +&= +|= +^= +<= +>= **= .= ?= ,= =, %= }); # goto last next redo dump
-$s->tr("xfx", qw{		zip		reverse		in	});
 #$s->tr("xfx", qw{	list operators (rightward)});
 $s->tr("xfy", qw{		|						});
 $s->tr("fy",  qw{		not						});
@@ -525,7 +524,7 @@ $string->x(qw/CAT/);
 $string->br(qw/exec1/);
 $string->opt("exec1", nolex => 1);
 
-$string->opt("CAT", re => qr/ (?<str> [^\$]* ) ( \$ (?<CAT> $re_id ( [\.:]$re_id )* ) | (?<str> \$ ) | $ ) /nxs, sub => sub {
+$string->opt("CAT", re => qr/ (?<str> [^\$]* ) ( \$ (?<CAT> $re_id ( [\.:]$re_id )* ) | (?<dollar> \$ ) | $ ) /nxs, sub => sub {
 	my ($self, $push) = @_;
 	if( $self->top->{stmt} eq "string" ) {
 		$push->{str} =~ s/""|''|\\["']/\\"/g;
@@ -534,6 +533,7 @@ $string->opt("CAT", re => qr/ (?<str> [^\$]* ) ( \$ (?<CAT> $re_id ( [\.:]$re_id
 		$push->{str} =~ s/""/"/g;
 		$push->{str} =~ s/''/'/g;
 	}
+	$push->{str} .= delete $push->{dollar} if exists $push->{dollar};
 	if(exists $push->{CAT}) {
 		$self->checkout("ag")->push("exec1")->masking($push->{CAT})->pop("exec1")->checkout("ag.string");
 		delete $push->{str};

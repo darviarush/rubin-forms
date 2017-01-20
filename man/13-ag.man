@@ -1,4 +1,4 @@
-= Язык "Серебро" (Argentum)
+= Язык *Серебряна* (лат. Argentum)
 
 == Инициализация фреймворка
 
@@ -182,6 +182,11 @@
 	$app->syntaxAg->eval("[ 1..7 | map3 c, b, a ]");				## [3, 2, 1, 6, 5, 4, undef, undef, 7]
 	$app->syntaxAg->eval("[ 1..8 | map3 c, b, a ]");				## [3, 2, 1, 6, 5, 4, undef, 8, 7]
 	
+В конвеерах так же можно использовать разделитель `:`. Это аналог операторов перевода строки и `;`, только с низким приоритетом.
+
+		$app->syntaxAg->eval("[ 1..8 | map3 c, b, a ]");				## [3, 2, 1, 6, 5, 4, undef, 8, 7]
+	
+	
 === `grep`
 
 `grep` возвращает элементы, которые соответствуют условию.
@@ -236,8 +241,8 @@
 
 Сортирует с числовым сравнением.
 
-	$app->syntaxAg->eval("^3 | order -a | join");			# 3210
-	$app->syntaxAg->eval("^3 | x order -x | join");			# 3210
+	$app->syntaxAg->eval("^3 | order -a | join");			# 210
+	$app->syntaxAg->eval("^3 | x order -x | join");			# 210
 	$app->syntaxAg->eval("1..6 | x, y order -x | join");	# 563412
 	
 === `assort`
@@ -246,7 +251,7 @@
 
 	#msg1 $app->syntaxAg->morf("^3 | assort b <=> a | join");
 
-	$app->syntaxAg->eval("^3 | assort b <=> a | join");					# 3210
+	$app->syntaxAg->eval("^4 | assort b <=> a | join");					# 3210
 	$app->syntaxAg->eval("1..6 | x, y0, z, u0 assort z <=> x | join");	# 563412
 
 === `reduce`
@@ -645,42 +650,42 @@ https://metacpan.org/pod/Tie::LazyList
 	
 === Для массивов
 	
-`reverse` - переворачивает список. 
+*reverse* - переворачивает список. 
 
-	$app->syntaxAg->eval(" ^3, 6 reverse join");					# 63210
+	$app->syntaxAg->eval(" ^3, 6 reverse join");					# 6210
 	
-`zip` - объединяет списки.
+*zip* - объединяет списки.
 
-	$app->syntaxAg->eval("[1..3 zip 4,5 zip 9..11]");		## [1,4,9,2,5,10,3,undef,11]
+	#$app->syntaxAg->eval("[1..3 zip 4,5 zip 9..11]");		## [1,4,9,2,5,10,3,undef,11]
 
 	
-`push` - добавляет элементы в конец списка.
+*push* - добавляет элементы в конец списка.
 	
 	$app->syntaxAg->new->eval('a=[1]; @a ,= 2, 3; @a join');		# 123
 
-shift:
+*shift*:
 	
 	$app->syntaxAg->new->eval('a=[1,2,3]; b, c ,= @a; @a join');	# 3
 	
-unshift:
+*unshift*:
 
 	$app->syntaxAg->new->eval('a=[1]; @a =, 2, 3; @a join');		# 231
 
-pop:
+*pop*:
 
 	$app->syntaxAg->new->eval('a=[1,2,3]; b, c =, @a; @a join');	# 1
 	
 Запятая у `=` показывает в какую сторону будет производиться сдвиг.
 
-slice:
+*slice*:
 
 	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@[0,3,4] join');				# 145
 	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@[0,3,4] = 7,8,9; @a join');	# 7234896
 	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@[0,3,4] = 7; a');				## [7, 2, 3, 4, undef, undef, 6]
 
-splice:
+*splice*:
 
-	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@ 2, 4 = 7; @a join');		# 1276
+	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@@[2..4] = 7; @a join');		# 1276
 	
 
 === Для хэшей
@@ -751,7 +756,7 @@ splice:
 	end
 	
 	class DecoratorTest
-		$MyDecorator "/page"
+		@MyDecorator "/page"
 		sub myroute then
 	end
 	

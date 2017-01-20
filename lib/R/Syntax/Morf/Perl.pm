@@ -166,6 +166,9 @@ our %templates = (
 "fx ^" => '0 .. ({{ right }})-1',
 "xfx .." => '({{ left }}) .. ({{ right }})',
 "xfx ..." => '({{ left }}) .. ({{ right }})-1',
+"xfx ^.." => '({{ left }})+1 .. ({{ right }})',
+"xfx ^..." => '({{ left }})+1 .. ({{ right }})-1',
+
 
 # массивов
 'fx @' => '@{{{ right }}}',
@@ -178,6 +181,7 @@ our %templates = (
 "yf join" => 'join("", {{ left }})',
 "xf split" => 'split(/\s+/, {{ left }})',
 "xfx split" => '{{ _split * }}split(do { my ({{i}})=({{ right }}); ref({{i}})? {{i}}: quotemeta({{i}}) }, {{ left }})',
+"yf reverse" => 'reverse( {{ left }} )',
 
 # хешей
 "fx delete" => 'delete({{ right }})',

@@ -643,7 +643,7 @@ sub pop {
 			
 			
 			my $fix = $meta->{fix};
-			my $fixk = $fix[$n];
+			my $fixk = $fix[$n];	# проверяем, что ещё не проходили
 			
 			#msg1 $n, $meta->{name}, $self->namefix($fix), $self->namefix($fixk);
 			
@@ -664,7 +664,7 @@ sub pop {
 				$comb[$n] = $meta->{X};
 			}
 			elsif($n == 0) {
-				$self->error("нет больше комбинаций для $meta->{alias}");
+				$self->error("нет больше комбинаций для $meta->{alias} ( как: " . $self->namefix($fix) . ")");
 			}
 			else {
 				$k -= 2;
