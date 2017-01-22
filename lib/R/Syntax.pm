@@ -124,10 +124,12 @@ our $infix      = 0b001_000;				# инфиксный оператор
 our $prefix     = 0b010_000;				# префиксный оператор
 our $postfix    = 0b100_000;				# постфиксный оператор
 
-our $terminal = 0b001_000_000;				# терминал
-our $bracket  = 0b010_000_000;				# скобка
-our $atom	  = 0b100_000_000;				# или терминал или скобка
-our $crbracket= 0b001_000_000_000;			# закрывающая скобка
+our $terminal	= 0b001_000_000;				# терминал
+our $bracket	= 0b010_000_000;				# скобка
+our $atom		= 0b100_000_000;				# или терминал или скобка
+
+our $crbracket	= 0b001_000_000_000;			# закрывающая скобка
+our $void		= 0b010_000_000_000;			# скобки могут быть пустыми
 
 our $xfy=$infix | $leftassoc;			# левоассоциативный инфиксный
 our $yfx=$infix | $rightassoc;			# правоассоциативный инфиксный
@@ -139,8 +141,22 @@ our $xf=$postfix | $nonassoc;			# неассоциативный префикс�
 our $fy=$prefix | $rightassoc;			# левоассоциативный постфиксный
 our $fx=$prefix | $nonassoc;			# неассоциативный постфиксный
 
-our $yF=$postfix | $leftassoc | $bracket;		# левоассоциативная скобка (postcircumfix)
-our $xF=$postfix | $nonassoc  | $bracket;		# неассоциативная скобка (postcircumfix)
+our $yF=$postfix | $leftassoc  | $bracket;		# левоассоциативная скобка (postcircumfix)
+our $xF=$postfix | $nonassoc   | $bracket;		# неассоциативная скобка (postcircumfix)
+our $Fy=$prefix  | $leftassoc  | $bracket;		# правоассоциативная скобка (precircumfix)
+our $Fx=$prefix  | $nonassoc   | $bracket;		# неассоциативная скобка (precircumfix)
+our $yFx=$infix  | $rightassoc | $bracket;		# левоассоциативная инфиксная скобка (incircumfix)
+our $xFy=$infix  | $leftassoc  | $bracket;		# правоассоциативная инфиксная скобка (incircumfix)
+our $xFx=$infix  | $nonassoc   | $bracket;		# неассоциативная инфиксная скобка (incircumfix)
+
+our $yS=$postfix | $leftassoc  | $bracket | $void;		# левоассоциативная скобка (postcircumfix)
+our $xS=$postfix | $nonassoc   | $bracket | $void;		# неассоциативная скобка (postcircumfix)
+our $Sy=$prefix  | $leftassoc  | $bracket | $void;		# правоассоциативная скобка (precircumfix)
+our $Sx=$prefix  | $nonassoc   | $bracket | $void;		# неассоциативная скобка (precircumfix)
+our $ySx=$infix  | $rightassoc | $bracket | $void;		# левоассоциативная инфиксная скобка (incircumfix)
+our $xSy=$infix  | $leftassoc  | $bracket | $void;		# правоассоциативная инфиксная скобка (incircumfix)
+our $xSx=$infix  | $nonassoc   | $bracket | $void;		# неассоциативная инфиксная скобка (incircumfix)
+
 
 our %FIX = (
 	xfy => $xfy,
@@ -152,6 +168,18 @@ our %FIX = (
 	fy => $fy,
 	yF => $yF,
 	xF => $xF,
+	Fy => $Fy,
+	Fx => $Fx,
+	xFy => $xFy,
+	yFx => $yFx,
+	xFx => $xFx,
+	yS => $yS,
+	xS => $xS,
+	Sy => $Sy,
+	Sx => $Sx,
+	xSy => $xSy,
+	ySx => $ySx,
+	xSx => $xSx,
 );
 
 
@@ -195,8 +223,9 @@ sub tr {
 }
 
 # скобки
-sub br {
+sub _br {
 	my $self = shift;
+	my $VOID = shift;
 	
 	my $open;				# открывающая скобка
 	my $close = 1;		# закрывающая скобка
@@ -217,7 +246,7 @@ sub br {
 		}
 		elsif($close) {	# открывающая скобка, т.к. предыдущая - закрывающая
 			die "скобка `$a` уже есть" if exists $self->{LEX}{ $a } and exists $self->{LEX}{ $a }{BR};
-			$open = $self->newlex(BR => { name => "br $a", alias => $a, order=>$self->{ORDER}++, fix => $bracket | $atom });
+			$open = $self->newlex(BR => { name => "br $a", alias => $a, order=>$self->{ORDER}++, fix => $bracket | $atom | $VOID });
 			undef $close;
 		}
 		else {	# закрывающая скобка
@@ -232,6 +261,19 @@ sub br {
 	
 	$self
 }
+
+# не пустые скобки
+sub br {
+	splice @_, 1, 0, 0;
+	goto &_br;
+}
+
+# скобки могущие быть пустыми
+sub sr {
+	splice @_, 1, 0, $void;
+	goto &_br;
+}
+
 
 # операнды (терминалы)
 # @return добавленные терминалы
@@ -494,7 +536,7 @@ sub pop {
 		$x->{sub}->($self, $push);
 	}
 	
-	$self->{front} = 0;
+	#$self->{front} = 0;
 	
 	my $stack = $self->{stack};		# стек скобок
 	
@@ -507,11 +549,26 @@ sub pop {
 	$self->error("закрывающая скобка $stag конфликтует со скобкой ".($sk->{stmt} ne $tag? "$sk->{stmt} … $tag": $tag)) if defined $stag and $tag ne $stag;
 	
 	my $A = $sk->{'A+'};
-	$self->error("скобки ".($stag eq $sk->{stmt}? $stag: $sk->{stmt}." ".$stag)." не могут быть пусты") if !$A;
+	$self->error("скобки ".($stag eq $sk->{stmt}? $stag: $sk->{stmt}." ".$stag)." не могут быть пусты") if !$A && $sk->{fix} & $void == 0;
 
+	$self->_pop($stag) if $A;
+	
+	$self->trace("-", $sk);
+
+	$self
+}
+
+# разбор операторов в скобках
+sub _pop {
+	my ($self, $stag) = @_;
+
+	my $stack = $self->{stack};		# стек скобок
+	my $sk = $stack->[-1];
+	my $A = $sk->{'A+'};
+	
 	my @T;
 	my @S;
-	my $front = 1;	# после открывающей скобки - только префиксный оператор или терминал
+	#my $front = 1;	# после открывающей скобки - только префиксный оператор или терминал
 	my $meta;
 	
 	# входит оператор и выбрасывает c более низким приоритетом из стека @S (если такие есть)
@@ -691,6 +748,8 @@ sub pop {
 	
 	};
 	
+	my $LEX = $self->{LEX};
+	
 	for my $op (@$A) {
 		my $stmt = $op->{stmt};
 		my $lex = $LEX->{$stmt};
@@ -755,11 +814,8 @@ sub pop {
 	$sk->{right} = pop @T;
 	push @{$stack->[-1]{'A+'}}, $sk;
 	
-	$self->trace("-", $sk);
-
 	$self
 }
-
 
 # снимает последний элемент стека и заменяет $push
 sub assign {
