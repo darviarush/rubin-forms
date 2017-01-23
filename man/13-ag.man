@@ -656,24 +656,25 @@ https://metacpan.org/pod/Tie::LazyList
 	
 *zip* - объединяет списки.
 
-	#$app->syntaxAg->eval("[1..3 zip 4,5 zip 9..11]");		## [1,4,9,2,5,10,3,undef,11]
+	$app->syntaxAg->eval("[1..3 zip 4,5 zip 9..11]");		## [1,4,9,2,5,10,3,undef,11]
 
 	
 *push* - добавляет элементы в конец списка.
 	
 	$app->syntaxAg->new->eval('a=[1]; @a ,= 2, 3; @a join');		# 123
-
-*shift*:
-	
-	$app->syntaxAg->new->eval('a=[1,2,3]; b, c ,= @a; @a join');	# 3
 	
 *unshift*:
 
 	$app->syntaxAg->new->eval('a=[1]; @a =, 2, 3; @a join');		# 231
 
+*shift*:
+	
+	$app->syntaxAg->new->eval('a=[1,2,3]; a shift; @a join');		# 23
+	
 *pop*:
 
-	$app->syntaxAg->new->eval('a=[1,2,3]; b, c =, @a; @a join');	# 1
+	$app->syntaxAg->new->eval('a=[1,2,3]; a pop; @a join');		# 12
+
 	
 Запятая у `=` показывает в какую сторону будет производиться сдвиг.
 
@@ -685,7 +686,7 @@ https://metacpan.org/pod/Tie::LazyList
 
 *splice*:
 
-	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@@[2..4] = 7; @a join');		# 1276
+	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a splice 2,4, 7; @a join');		# 1276
 	
 
 === Для хэшей

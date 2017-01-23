@@ -21,21 +21,16 @@ our %templates = (
 'yf .$word' => '{{ left }}->${$DATA->{{{ var }}}}',
 'yf .word' => '{{ left }}->{{ var }}',
 'yf :word' => '{{ left }}->{{{ var }}}',
+'yf .?word' => '(do { my $q = {{ left }}; $q->can("{{ var }}")? $q->{{ var }}: () })',
+'yf .?$word' => '(do { my $q = {{ left }}; $q->can($DATA->{{{ var }}})? $q->{{ var }}: () })',
 
-'xfy .$word()' => '{{ left }}->${$DATA->{{{ var }}}}({{ right }})',
-'xfy .$word{}' => '{{ left }}->${$DATA->{{{ var }}}}{{{ right }}}',
-'xfy .$word[]' => '{{ left }}->${$DATA->{{{ var }}}}[{{ right }}]',
+'yS .$word(' => '{{ left }}->${$DATA->{{{ var }}}}({{ right }})',
+'yS .word(' => '{{ left }}->{{ var }}({{ right }})',
+'yS .?word' => '(do { my $q = {{ left }}; $q->can("{{ var }}")? $q->{{ var }}( {{ right }} ): () })',
+'yS .?$word' => '(do { my $q = {{ left }}; $q->can($DATA->{{{ var }}})? $q->{{ var }}( {{ right }} ): () })',
 
-'xfy .word()' => '{{ left }}->{{ var }}({{ right }})',
-'xfy .word{}' => '{{ left }}->{{ var }}{{{ right }}}',
-'xfy .word[]' => '{{ left }}->{{ var }}[{{ right }}]',
-
-'xfy :word()' => '{{ left }}->{{{ var }}}({{ right }})',
-'xfy :word{}' => '{{ left }}->{{{ var }}}{{{ right }}}',
-'xfy :word[]' => '{{ left }}->{{{ var }}}[{{ right }}]',
-
-'.word.br' => '{{ right }}',
-
+'yF [' => '{{ left }}->[ {{ right }} ]',
+'yF {' => '{{ left }}->{ {{ right }} }',
 
 # операторы распределения данных
 'xfy \n' => "{{ left }};{{ _rem rem }}\n{{ right }}",
@@ -44,9 +39,10 @@ our %templates = (
 '\n' => "{{ _rem rem }}\n",
 
 "xfy ;" => '{{ left }}; {{ right }}',
-'fy ;' => "{{ right }}",
-'yf ;' => "{{ left }}; ",
+#'fy ;' => "{{ right }}",
+#'yf ;' => "{{ left }}; ",
 
+'xfy :' => "{{ left }}; {{ right }}",
 
 "xfy ," => '({{ left }}), ({{ right }})',
 "yf ," => '{{ left }}',
@@ -173,6 +169,14 @@ our %templates = (
 # массивов
 'fx @' => '@{{{ right }}}',
 'fx %' => '%{{{ right }}}',
+'yfx ,=' => 'push({{ left }}, {{ right }})',
+'yfx =,' => 'unshift({{ left }}, {{ right }})',
+'fx pop' => 'pop(@{{{ right }}})',
+'fx shift' => 'shift(@{{{ right }}})',
+'xf pop' => 'pop(@{{{ left }}})',
+'xf shift' => 'shift(@{{{ left }}})',
+'xfx splice' => 'splice(@{{{ left }}}, {{ right }})',
+'zip' => '$R::App::app->perl->zip({{ arity }}, {{ right }})',
 
 #"xfy in" => '(grep { {{ left }} }, {{ right }})',
 
@@ -244,8 +248,7 @@ FOR => '{{ right }}',
 WHILE => '{{ right }}',
 "WHILE THEN" => 'do { while({{ left }}) { {{ right }} } }',
 
-REPEAT => '{{ right }}',
-"xfy UNTIL" => 'do { do { {{ left }} } until( {{ right }} ) }',
+"Fx REPEAT" => 'do { do { {{ left }} } until( {{ right }} ) }',
 
 DO => 'do { {{ right }} }',
 

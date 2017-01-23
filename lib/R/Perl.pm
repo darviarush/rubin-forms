@@ -117,6 +117,21 @@ sub union {
 	$a
 }
 
+
+# объединяет массивы
+sub zip {
+	my $self = shift;
+	my $k = shift;
+	my @zip;
+	my $max = reduce { $a<@$b? 0+@$b: $a } 0, @_;
+	for(my $zip = 0; $zip < $max; $zip+=$k) {
+		for(my $i=0; $i<@_; $i++) {
+			push @zip, @{$_[$i]}[$zip..$zip+$k];
+		}
+	}
+	@zip
+}
+
 # возвращает имена на все методы в иерархии
 # порядок: с наиболее удалённых к наиболее приближённым
 # из ISA c конца смотрим
@@ -183,6 +198,22 @@ sub order_by {
 #sub dump { substr(eDumper($_[1]), 8, -2) }
 
 use Data::Dumper;
+
+# для объекта
+sub dumper {
+	shift;
+	goto &Dumper;
+}
+
+# распознаёт то, что было выдано dumper 
+sub loader {
+	my ($self, $s) = @_;
+	my $ret = eval "my \$VAR1; $s";
+	die $@ if $@;
+	$ret
+}
+
+# дамп с обрезкой $VAR и заменой лишнего текста на ... в середине.
 sub dump {
 	my ($self, $val, $maxlength) = @_;
 	local($_, $`, $', $1);

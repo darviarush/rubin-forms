@@ -145,18 +145,19 @@ our $yF=$postfix | $leftassoc  | $bracket;		# левоассоциативная
 our $xF=$postfix | $nonassoc   | $bracket;		# неассоциативная скобка (postcircumfix)
 our $Fy=$prefix  | $leftassoc  | $bracket;		# правоассоциативная скобка (precircumfix)
 our $Fx=$prefix  | $nonassoc   | $bracket;		# неассоциативная скобка (precircumfix)
-our $yFx=$infix  | $rightassoc | $bracket;		# левоассоциативная инфиксная скобка (incircumfix)
-our $xFy=$infix  | $leftassoc  | $bracket;		# правоассоциативная инфиксная скобка (incircumfix)
-our $xFx=$infix  | $nonassoc   | $bracket;		# неассоциативная инфиксная скобка (incircumfix)
+# our $yFx=$infix  | $rightassoc | $bracket;		# левоассоциативная инфиксная скобка (incircumfix)
+# our $xFy=$infix  | $leftassoc  | $bracket;		# правоассоциативная инфиксная скобка (incircumfix)
+# our $xFx=$infix  | $nonassoc   | $bracket;		# неассоциативная инфиксная скобка (incircumfix)
 
 our $yS=$postfix | $leftassoc  | $bracket | $void;		# левоассоциативная скобка (postcircumfix)
 our $xS=$postfix | $nonassoc   | $bracket | $void;		# неассоциативная скобка (postcircumfix)
 our $Sy=$prefix  | $leftassoc  | $bracket | $void;		# правоассоциативная скобка (precircumfix)
 our $Sx=$prefix  | $nonassoc   | $bracket | $void;		# неассоциативная скобка (precircumfix)
-our $ySx=$infix  | $rightassoc | $bracket | $void;		# левоассоциативная инфиксная скобка (incircumfix)
-our $xSy=$infix  | $leftassoc  | $bracket | $void;		# правоассоциативная инфиксная скобка (incircumfix)
-our $xSx=$infix  | $nonassoc   | $bracket | $void;		# неассоциативная инфиксная скобка (incircumfix)
+# our $ySx=$infix  | $rightassoc | $bracket | $void;		# левоассоциативная инфиксная скобка (incircumfix)
+# our $xSy=$infix  | $leftassoc  | $bracket | $void;		# правоассоциативная инфиксная скобка (incircumfix)
+# our $xSx=$infix  | $nonassoc   | $bracket | $void;		# неассоциативная инфиксная скобка (incircumfix)
 
+# инфиксные скобки нельзя - иначе придётся делать троичное дерево
 
 our %FIX = (
 	xfy => $xfy,
@@ -170,16 +171,10 @@ our %FIX = (
 	xF => $xF,
 	Fy => $Fy,
 	Fx => $Fx,
-	xFy => $xFy,
-	yFx => $yFx,
-	xFx => $xFx,
 	yS => $yS,
 	xS => $xS,
 	Sy => $Sy,
 	Sx => $Sx,
-	xSy => $xSy,
-	ySx => $ySx,
-	xSx => $xSx,
 );
 
 
@@ -207,7 +202,7 @@ sub td {
 			die "оператор `$type $x` уже объявлен" if exists $self->{$key}{$x};
 			$op = $self->newlex($key => {%p, name=>"$type $x", alias=>$x, fix => $fix, order => -length $x});
 			
-			$op->{tag} = $_[$i+1], $self->newlex(CR => { name => "cr $op->{tag}", alias => $op->{tag}, order=>$self->{ORDER}++, fix => $crbracket }) if $fix & $bracket;
+			$op->{tag} = $_[$i+1], $self->newlex(CR => { name => "cr $op->{tag}", alias => $op->{tag}, order=>$self->{ORDER}++, fix => $crbracket }) if $fix & $bracket && (!exists $self->{LEX}{ $_[$i+1] } || !exists $self->{LEX}{ $_[$i+1] }{CR});
 		}
 	}
 
@@ -377,6 +372,7 @@ sub lex {
 	#use re 'eval';
 	
 	my $lex = join " |\n", map {
+		die "формирование lex: нет alias" if $_->{alias} eq "";
 		my $alias = quotemeta $_->{alias};
 		
 		if($_->{fix} & $terminal && $_->{re} && $_->{name} =~ /^[a-z_]\w*$/i) {
@@ -536,8 +532,6 @@ sub pop {
 		$x->{sub}->($self, $push);
 	}
 	
-	#$self->{front} = 0;
-	
 	my $stack = $self->{stack};		# стек скобок
 	
 	# выбрасываем скобки
@@ -551,7 +545,21 @@ sub pop {
 	my $A = $sk->{'A+'};
 	$self->error("скобки ".($stag eq $sk->{stmt}? $stag: $sk->{stmt}." ".$stag)." не могут быть пусты") if !$A && $sk->{fix} & $void == 0;
 
-	$self->_pop($stag) if $A;
+	
+	# срабатывают обработчики для грамматического разбора
+	# if(my $POP_A = $self->{POP_A}) {
+		# for(my $i=0; $i<@$A; $i++) {
+			# my $op = $A->[$i];
+			# my $sub = $POP_A->{$op};
+			# $sub->($self, $i) if defined $sub;
+		# }
+	# }
+	
+	pop @$stack;	# сбрасываем скобку с вершины стека
+	
+	$self->_pop($stag, $sk, $A) if $A;
+	
+	push @{$stack->[-1]{'A+'}}, $sk;
 	
 	$self->trace("-", $sk);
 
@@ -560,15 +568,11 @@ sub pop {
 
 # разбор операторов в скобках
 sub _pop {
-	my ($self, $stag) = @_;
+	my ($self, $stag, $sk, $A) = @_;
 
-	my $stack = $self->{stack};		# стек скобок
-	my $sk = $stack->[-1];
-	my $A = $sk->{'A+'};
-	
 	my @T;
 	my @S;
-	#my $front = 1;	# после открывающей скобки - только префиксный оператор или терминал
+	
 	my $meta;
 	
 	# входит оператор и выбрасывает c более низким приоритетом из стека @S (если такие есть)
@@ -593,6 +597,7 @@ sub _pop {
 				$self->trace("%", $r);
 			}
 			elsif($r->{fix} & $prefix) {	# -x
+				$r->{left} = $r->{right} if exists $r->{right};
 				$self->error("нет операнда для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
 				$self->trace(">", $r);
 			}
@@ -623,16 +628,7 @@ sub _pop {
 		}
 	};
 	
-	# срабатывают обработчики для грамматического разбора
-	if(my $POP_A = $self->{POP_A}) {
-		for(my $i=0; $i<@$A; $i++) {
-			my $op = $A->[$i];
-			my $sub = $POP_A->{$op};
-			$sub->($self, $i) if defined $sub;
-		}
-	}
 	
-	pop @$stack;	# сбрасываем скобку с вершины стека
 	
 	# ( \n \n ) - обычная ситуация prefix prefix
 	# есть "xfy \n", "fy \n", "yf \n"
@@ -706,8 +702,7 @@ sub _pop {
 			my $n = $k-$begin;
 			
 			my $prev = $n==0? $super_prev: $comb[$n-1]{fix};		# предыдущий fix
-			
-			
+
 			my $fix = $meta->{fix};
 			my $fixk = $fix[$n];	# проверяем, что ещё не проходили
 			
@@ -727,10 +722,10 @@ sub _pop {
 			}
 			elsif($fix & $atom && !($fixk & $atom) && $check->($prev, $atom)) {
 				$fix[$n] |= $atom;
-				$comb[$n] = $meta->{X};
+				$comb[$n] = $meta->{X} // $meta->{BR};
 			}
 			elsif($n == 0) {
-				$self->error("нет больше комбинаций для $meta->{alias} ( как: " . $self->namefix($fix) . ")");
+				$self->error("нет больше комбинаций для $meta->{alias} ( как: " . $self->namefix($fix) . ") ");
 			}
 			else {
 				$k -= 2;
@@ -812,7 +807,6 @@ sub _pop {
 	$self->error("стек S содержит операторы") if @S;
 	
 	$sk->{right} = pop @T;
-	push @{$stack->[-1]{'A+'}}, $sk;
 	
 	$self
 }
@@ -936,9 +930,9 @@ sub error {
 }
 
 # устанавливает модификаторы синтаксиса
-sub modificators {
+sub fixes {
 	my $self = shift;
-	my $modifiers = $self->{modifiers} //= {};
+	my $modifiers = $self->{fixes} //= {};
 	for(my $i=0; $i<@_; $i+=2) {
 		my ($key, $val) = @_[$i..$i+1];
 		die "синтаксический модификатор `$key` встречается дважды" if exists $modifiers->{$key};
@@ -954,7 +948,7 @@ sub modifiers {
 	my $modifiers = $self->{lang}{modifiers} //= {};
 	for(my $i=0; $i<@_; $i+=2) {
 		my ($key, $val) = @_[$i..$i+1];
-		die "модификатор языка `$key` встречается дважды" if exists $modifiers->{$key};
+		die "модификатор `$key` в языке ".($self->{lang}{name} // "«язык Батькович»")." встречается дважды" if exists $modifiers->{$key};
 		$modifiers->{$key} = $val;
 	}
 	
@@ -970,6 +964,8 @@ sub templates {
 	
 	for(my $i=0; $i<@_; $i+=2) {
 		my ($k, $v) = @_[$i, $i+1];
+		
+		die "шаблон `$k` в языке ".($self->{lang}{name} // "«язык Батькович»")." встречается дважды" if exists $c->{$k};
 		
 		$c->{$k} = $v, next if ref $v eq "CODE";
 		
@@ -1025,7 +1021,7 @@ sub expirience {
 	my ($self, $root) = @_;
 	
 	# обход в глубину - модификации дерева
-	$self->modify($root, $self->{modifiers}) if $self->{modifiers};
+	$self->modify($root, $self->{fixes}) if $self->{fixes};
 	
 	# обход в глубину - модификации дерева
 	$self->modify($root, $self->{lang}{modifiers}) if $self->{lang}{modifiers};

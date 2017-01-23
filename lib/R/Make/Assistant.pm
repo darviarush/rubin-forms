@@ -345,6 +345,23 @@ $app->make->run;
 }
 
 
+# name "trace";
+# args "";
+# desc "трейс стека последней ошибки";
+# sub trace {
+	# my $file = $app->file("var/last.raise.trace");
+	# print("нет трейса ошибки\n"), return if !$file->exists;
+	# my $trace = $file->read;
+	# $trace = $app->perl->loader($trace);
+	# my $msg = $app->raise->new($trace, "error", undef);
+	# $app->log->alert("$msg");
+# }
 
+# name "dier";
+# args "";
+# desc "";
+# sub dier {
+	# die "для трейса!";
+# }
 
 1;

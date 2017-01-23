@@ -91,7 +91,11 @@ sub __ondie__ {
 	#die $msg;
 
 	#return $msg if !defined $^S;
+	
 	die $msg if $^S <= 1;
+	
+	print "raise to log\n";
+	
 	_log($msg);
 	exit;
 }
@@ -113,6 +117,8 @@ sub __onwarn__ {
 # логирует
 sub _log {
 	my ($msg) = @_;
+	
+	print "raise _log\n";
 	
 	if($^S == 5) {
 		$msg = "$msg\n\nRAISE IN DESTRUCT\n";
@@ -145,6 +151,12 @@ sub stringify {
 	$_ = ref($_) eq "SCALAR"? $$_: $_;
 	#$_ = (utf8::is_utf8($_)?"utf8":"no")."$_\n";
 	#s/\\x\{(\w+)\}/ chr hex $1 /ge;
+	
+	# eval {
+		# require R::App;
+		# $R::App::app->file("var/last.raise.trace")->write($R::App::app->perl->dumper($self));
+	# };
+	# return "$self->{who}: $self->{orig}\n" if !$@;
 	
 	#print STDERR "XXXXX: ".$self->{who}." $_\n\n";
 	

@@ -79,22 +79,18 @@ my $re_for = qr!
 {
 my $s = $BASICSYNTAX;
 
-$s->tr("yf",  qw{		.word :word .?word .$word .?$word 	});
-$s->td("xfy", qw{		.word() :word()	.$word() .?word() .?$word() 
-						.word[] :word[] .$word[] .?word[] .?$word[]
-						.word{} :word{} .$word{} .?word{} .?$word{}
-				});
-$s->td("xfy", qw{		word() word[] word{}	});
-$s->tr("fx",  qw{		@	%		});
-$s->tr("yf",  qw{		++ --			})->td("fy", qw{ ++ -- });
-$s->tr("fy",  qw{  		length delete })->td("xf", qw{  ?  }); # ?!
-$s->tr("yfx", qw{		^				});
-$s->tr("fy",  qw{ 		+ - ! +~		});
-$s->tr("xfy", qw{		~	!~		});
-$s->tr("xfy", qw{		* / mod div **	});
+$s->tr("yf",  qw{		.word :word .?word .$word .?$word 			});
+$s->td("yS",  qw{		.word( ) .$word( ) .?word( ) .?$word( ) 	});
+$s->tr("yF",  qw{		[ ]		{ }									});
+$s->tr("fx",  qw{		@	%	pop shift							})->td('xf', qw{	pop shift	});
+$s->tr("yf",  qw{		++ --				})->td("fy", qw{	++ -- 	}); 	# ?!
+$s->tr("fy",  qw{  		len delete lc uc lcfirst ucfirst chr ord	})->td("yf", qw{	len  		});
+$s->tr("xf",  qw{		?  					});
+$s->tr("yfx", qw{		^					});
+$s->tr("fy",  qw{ 		+ - ! +~			});
+$s->tr("xfy", qw{		~	!~				});
+$s->tr("xfy", qw{		* / mod div **		});
 $s->tr("xfy", qw{		+ - .				});
-# in perl in this: named unary operators
-$s->tr("yf", qw{		len 		})->td("fy", qw{ 	len	lc uc lcfirst ucfirst chr ord	 });
 $s->tr("xfy", qw{		+< +>				});
 $s->tr("xfy", qw{		+&					});
 $s->tr("xfy", qw{		+|  +^				});
@@ -106,21 +102,20 @@ $s->tr("xfy", qw{		&&					});
 $s->tr("xfy", qw{		|| ^^ ?				});
 $s->tr("xfx", qw{		.. ... ^.. ^...  to ^to ^to^   step		})->td("fx", qw{	^	});
 $s->tr("xfy", qw{		=>		})->td("fy", qw{	word=>		});
-$s->tr("xfy", qw{		,		})->td("yf",  qw{ 	,		});
+$s->tr("xfy", qw{		,		})->td("yf", qw{ 	,			});
 $s->tr("xfx", qw{		split in		})->td("yfx", qw{	join zip	})->td("xf", qw{ split })->td("yf", qw{ join reverse });
-$s->tr("yfx", qw{		-> = += -= *= /= ^= div= mod= &&= ||= ^^=   and= or= xor=  +&= +|= +^= +<= +>= **= .= ?= ,= =, %= }); # goto last next redo dump
-#$s->tr("xfx", qw{	list operators (rightward)});
+$s->tr("yfx", qw{		-> = += -= *= /= ^= div= mod= &&= ||= ^^=   and= or= xor=  +&= +|= +^= +<= +>= **= .= ?= ,= =, %= });
+$s->tr("xfy", qw{		:						});
 $s->tr("xfy", qw{		|						});
 $s->tr("fy",  qw{		not						});
 $s->tr("xfy", qw{		and						});
 $s->tr("xfy", qw{		or	xor					});
 $s->tr("yfx", qw{		as	is					});
-$s->tr("fx",  qw{		return	raise msg msg1			});
-
-$s->tr("xfy", qw{	;	})->td("yf", qw{	;	})->td("fy", qw{	;	});
-$s->tr("xfy", qw{	\n	})->td("yf", qw{	\n	})->td("fy", qw{	\n	});
+$s->tr("fx",  qw{		return	raise msg msg1			})->td("Fx", qw{   REPEAT UNTIL  });
+$s->tr("xfy", qw{		;		});
+$s->tr("xfy", qw{		\n		})->td("yf", qw{	\n	})->td("fy", qw{	\n	});
 $s->tr("xfy", qw{		rescue	});
-$s->tr("xfy", qw{		THEN	ELSEIF	ELSE	UNTIL	});
+$s->tr("xfy", qw{		THEN	ELSEIF	ELSE	});
 
 
 ### дополнительные опции операторов
@@ -129,41 +124,19 @@ $s->tr("xfy", qw{		THEN	ELSEIF	ELSE	UNTIL	});
 # $s->opt("-", order => 10000);	# чтобы был за num и -1.1 распознавался как num, а не - и num
 $s->opt("^", order => 10000);	# чтобы распознавались скобки ^{...}
 
-$s->br('.word.br');
-$s->opt('.word.br', nolex => 1);
-my $wordbr1 = sub { my ($self, $push) = @_; $self->push('.word.br', tag => ')'); };
-my $wordbr2 = sub { my ($self, $push) = @_; $self->push('.word.br', tag => ']'); };
-my $wordbr3 = sub { my ($self, $push) = @_; $self->push('.word.br', tag => '}'); };
-
-$s->opt("word()", 		re => qr{		(?<var>$re_id) \(			}x,	sur => $wordbr1);
-$s->opt("word[]", 		re => qr{		(?<var>$re_id) \[			}x,	sur => $wordbr2);
-$s->opt("word{}", 		re => qr{		(?<var>$re_id) \{			}x,	sur => $wordbr3);
-
-
 $s->opt(":word",		re => qr{		: (?<var>$re_id)			}x);
-$s->opt(":word()",		re => qr{		: (?<var>$re_id) \(			}x,	sur => $wordbr1);
-$s->opt(":word[]",		re => qr{		: (?<var>$re_id) \[			}x,	sur => $wordbr2);
-$s->opt(":word{}",		re => qr{		: (?<var>$re_id) \{			}x,	sur => $wordbr3);
 
 $s->opt(".word",		re => qr{		\. (?<var>$re_id)			}x);
-$s->opt(".word()",		re => qr{		\. (?<var>$re_id) \(		}x,	sur => $wordbr1);
-$s->opt(".word[]",		re => qr{		\. (?<var>$re_id) \[		}x,	sur => $wordbr2);
-$s->opt(".word{}",		re => qr{		\. (?<var>$re_id) \{		}x,	sur => $wordbr3);
+$s->opt(".word(",		re => qr{		\. (?<var>$re_id) \(		}x);
 
 $s->opt(".\$word",		re => qr{		\.\$ (?<var>$re_id)			}x);
-$s->opt(".\$word()",	re => qr{		\.\$ (?<var>$re_id) \(		}x,	sur => $wordbr1);
-$s->opt(".\$word[]",	re => qr{		\.\$ (?<var>$re_id) \[		}x,	sur => $wordbr2);
-$s->opt(".\$word{}",	re => qr{		\.\$ (?<var>$re_id) \{		}x,	sur => $wordbr3);
+$s->opt(".\$word(",		re => qr{		\.\$ (?<var>$re_id) \(		}x);
 
 $s->opt(".?word",		re => qr{		\.\? (?<var>$re_id)			}x);
-$s->opt(".?word()",		re => qr{		\.\? (?<var>$re_id) \(		}x,	sur => $wordbr1);
-$s->opt(".?word[]",		re => qr{		\.\? (?<var>$re_id) \[		}x,	sur => $wordbr2);
-$s->opt(".?word{}",		re => qr{		\.\? (?<var>$re_id) \{		}x,	sur => $wordbr3);
+$s->opt(".?word(",		re => qr{		\.\? (?<var>$re_id) \(		}x);
 
-$s->opt(".?\$word",		re => qr{		\.\?\$ (?<var>$re_id)			}x);
-$s->opt(".?\$word()",	re => qr{		\.\?\$ (?<var>$re_id) \(		}x,	sur => $wordbr1);
-$s->opt(".?\$word[]",	re => qr{		\.\?\$ (?<var>$re_id) \[		}x,	sur => $wordbr2);
-$s->opt(".?\$word{}",	re => qr{		\.\?\$ (?<var>$re_id) \{		}x,	sur => $wordbr3);
+$s->opt(".?\$word",		re => qr{		\.\?\$ (?<var>$re_id)		}x);
+$s->opt(".?\$word(",	re => qr{		\.\?\$ (?<var>$re_id) \(	}x);
 
 
 $s->opt("raise", re => qr/ \b ( die | throw | raise ) \b /xni);
@@ -258,17 +231,19 @@ $s->opt("ELSEIF", sub => sub {
 	$br->{then} = 1;
 });
 $s->opt("ELSE", sub => sub { my ($self, $push) = @_; $self->check("ELSE", stmt=>"IF", else=>"", then=>"")->top->{else} = 1 });
-$s->opt("UNTIL", sub => sub { my ($self, $push) = @_; $self->check("UNTIL", stmt=>"REPEAT")->top->{endline} = 1 });
+#$s->opt("UNTIL", sub => sub { my ($self, $push) = @_; $self->check("UNTIL", stmt=>"REPEAT")->top->{endline} = 1 });
 #$s->opt("FROM", sub => sub { my ($self, $push) = @_; my $top = $self->endline->top; $self->error("FROM должен использоваться после MAP, PAIRMAP, GREP, SORT, NSORT, QSORT или REDUCE") if $top->{stmt} !~ /^(?:map|grep|[nq]sort|reduce|pairmap)$/; $push->{endline} = $push->{gosub} = 1 });
 
 
 
 ### скобки
 
-$s->br(qw{			(	)			});
-$s->br(qw{			[	]			});
-$s->br(qw{			{	}			});
-$s->br(qw{			^{	}			});
+$s->sr(qw{			(	)			});
+$s->sr(qw{			[	]			});
+$s->sr(qw{			{	}			});
+$s->sr(qw{			^{	}			});
+
+$s->sr("word(" => qr{		(?<var>$re_id) \(	 }x => ")");
 
 $s->br(FOR => qr{ FOR $re_space (?<args> $re_id ( $re_space_ask , $re_space_ask $re_id)* ) ( $re_space(?<op> in | of ) | $re_space_ask = ) }xin => sub {
 	my($self, $push) = @_;
@@ -294,7 +269,7 @@ $s->opt("END", sub => sub {
 	$self->error("$top->{stmt}: end встречен до then") if $top->{then};
 });
 
-$s->br(qw/			REPEAT				/);
+# $s->br(qw/			REPEAT				/);
 # $s->br(qw/			MAP					/);
 # $s->br(qw/			PAIRMAP				/);
 # $s->br(qw/			GREP				/);
@@ -391,11 +366,6 @@ $s->opt("next label", order => -1000);
 $s->opt("last label", order => -1000);
 
 
-
-$s->x("()");
-$s->x("[]");
-$s->x("{}");
-
 $s->x("self"		=> qr{ 	\b	(?:	self | this | me	)	\b 	}x);
 $s->x("app");
 $s->x("q");
@@ -455,7 +425,14 @@ $s->opt("string", sur => sub {
 
 ### какие операторы в каких скобках могут существовать
 $s->in("if"		=> qw{		else elseif		});
-$s->in("repeat"	=> qw{		until			});
+
+$s->fixes(
+'yfx zip' => sub {
+	my ($self, $push) = @_;
+	 if $push->{left}{left}{stmt} eq "yfx zip";
+},
+);
+
 
 # устанавливаем обработчик на начало pop
 my %STOPOP = $app->perl->set("\n", qw/ ; THEN ELSE ELSEIF UNTIL FROM | /);
