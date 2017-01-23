@@ -26,8 +26,8 @@ our %templates = (
 
 'yS .$word(' => '{{ left }}->${$DATA->{{{ var }}}}({{ right }})',
 'yS .word(' => '{{ left }}->{{ var }}({{ right }})',
-'yS .?word' => '(do { my $q = {{ left }}; $q->can("{{ var }}")? $q->{{ var }}( {{ right }} ): () })',
-'yS .?$word' => '(do { my $q = {{ left }}; $q->can($DATA->{{{ var }}})? $q->{{ var }}( {{ right }} ): () })',
+'yS ?.word(' => '(do { my $q = {{ left }}; $q->can("{{ var }}")? $q->{{ var }}( {{ right }} ): () })',
+'yS ?.$word(' => '(do { my $q = {{ left }}; $q->can($DATA->{{{ var }}})? $q->{{ var }}( {{ right }} ): () })',
 
 'yF [' => '{{ left }}->[ {{ right }} ]',
 'yF {' => '{{ left }}->{ {{ right }} }',
@@ -83,9 +83,9 @@ our %templates = (
 
 # строковые
 "xfy **" => 'scalar({{ left }}) x scalar({{ right }})',
+"yfx **=" => '{{ left }} x= scalar({{ right }})',
 "xfy ." => '({{ left }}) . ({{ right }})',
 "yfx .=" => '({{ left }}) .= ({{ right }})',
-"yfx **=" => '{{ left }} x= scalar({{ right }})',
 "yf len" => 'length({{ left }})',
 "fy len" => 'length({{ right }})',
 "fy lc" => 'lc({{ right }})',
@@ -178,6 +178,9 @@ our %templates = (
 'xfx splice' => 'splice(@{{{ left }}}, {{ right }})',
 'zip' => '$R::App::app->perl->zip({{ arity }}, {{ right }})',
 
+"xfy ***" => '({{ left }}) x scalar({{ right }})',
+"yfx ***=" => '{{ left }} = ({{ left }}) x scalar({{ right }})',
+
 #"xfy in" => '(grep { {{ left }} }, {{ right }})',
 
 "yfx join" => 'join({{ right }}, {{ left }})',
@@ -253,6 +256,7 @@ WHILE => '{{ right }}',
 DO => 'do { {{ right }} }',
 
 # атомы
+#"&ref" => '({{ var }})',
 index => '({{i}}+{{n}})',
 self => '$DATA->{me}',
 app => '$R::App::app',

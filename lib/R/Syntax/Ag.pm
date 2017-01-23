@@ -75,12 +75,21 @@ my $re_for = qr!
 # super null extends action of block process include raw wrapper eq ne le ge lt gt keys values use sort scenario pairmap map grep reduce from repeat self this me ucfirst lcfirst uc lc ref cmp push pop undef next last redo return pairs or and not eq ne le ge lt gt scalar msg msg1 keys values exists closure length use push pop shift unshift splice delete defined wantarray
 
 
+    # equ «Равно». Дает True, если значения равны
+    # neq «Не равно». Дает True, если значения не равны
+    # lss «Меньше». Дает True, если зпачение1 меньше, чем значение2
+    # lcq «Меньше или равно». Дает True, если значепие1 равно или меньше, чемзначение2
+    # gtr «Больше». Дает True, если значение1 больше, чем значение2
+    # geq «Больше или равно». Дает True, если значепие1 равно или больше, чем значение2
+
+	# equal great less greateq lesseq noneq
+	# equal to   greater then	less then	greater or equal to		less or equal to
 
 {
 my $s = $BASICSYNTAX;
 
-$s->tr("yf",  qw{		.word :word .?word .$word .?$word 			});
-$s->td("yS",  qw{		.word( ) .$word( ) .?word( ) .?$word( ) 	});
+$s->tr("yf",  qw{		.word :word .?word .$word ?.$word 			});
+$s->td("yS",  qw{		.word( ) .$word( ) ?.word( ) ?.$word( ) 	});
 $s->tr("yF",  qw{		[ ]		{ }									});
 $s->tr("fx",  qw{		@	%	pop shift							})->td('xf', qw{	pop shift	});
 $s->tr("yf",  qw{		++ --				})->td("fy", qw{	++ -- 	}); 	# ?!
@@ -89,7 +98,7 @@ $s->tr("xf",  qw{		?  					});
 $s->tr("yfx", qw{		^					});
 $s->tr("fy",  qw{ 		+ - ! +~			});
 $s->tr("xfy", qw{		~	!~				});
-$s->tr("xfy", qw{		* / mod div **		});
+$s->tr("xfy", qw{		* / mod div ** ***	});
 $s->tr("xfy", qw{		+ - .				});
 $s->tr("xfy", qw{		+< +>				});
 $s->tr("xfy", qw{		+&					});
@@ -104,7 +113,7 @@ $s->tr("xfx", qw{		.. ... ^.. ^...  to ^to ^to^   step		})->td("fx", qw{	^	});
 $s->tr("xfy", qw{		=>		})->td("fy", qw{	word=>		});
 $s->tr("xfy", qw{		,		})->td("yf", qw{ 	,			});
 $s->tr("xfx", qw{		split in		})->td("yfx", qw{	join zip	})->td("xf", qw{ split })->td("yf", qw{ join reverse });
-$s->tr("yfx", qw{		-> = += -= *= /= ^= div= mod= &&= ||= ^^=   and= or= xor=  +&= +|= +^= +<= +>= **= .= ?= ,= =, %= });
+$s->tr("yfx", qw{		-> =   += -= *= /= ^= div= mod=   &&= ||= ^^=   and= or= xor=   +&= +|= +^= +<= +>=   **= ***= .= ?= ,= =, %=   });
 $s->tr("xfy", qw{		:						});
 $s->tr("xfy", qw{		|						});
 $s->tr("fy",  qw{		not						});
@@ -132,11 +141,11 @@ $s->opt(".word(",		re => qr{		\. (?<var>$re_id) \(		}x);
 $s->opt(".\$word",		re => qr{		\.\$ (?<var>$re_id)			}x);
 $s->opt(".\$word(",		re => qr{		\.\$ (?<var>$re_id) \(		}x);
 
-$s->opt(".?word",		re => qr{		\.\? (?<var>$re_id)			}x);
-$s->opt(".?word(",		re => qr{		\.\? (?<var>$re_id) \(		}x);
+$s->opt("?.word",		re => qr{		\?\. (?<var>$re_id)			}x);
+$s->opt("?.word(",		re => qr{		\?\. (?<var>$re_id) \(		}x);
 
-$s->opt(".?\$word",		re => qr{		\.\?\$ (?<var>$re_id)		}x);
-$s->opt(".?\$word(",	re => qr{		\.\?\$ (?<var>$re_id) \(	}x);
+$s->opt("?.\$word",		re => qr{		\?\.\$ (?<var>$re_id)		}x);
+$s->opt("?.\$word(",	re => qr{		\?\.\$ (?<var>$re_id) \(	}x);
 
 
 $s->opt("raise", re => qr/ \b ( die | throw | raise ) \b /xni);
@@ -364,6 +373,17 @@ $s->x("last label" => qr/ \b LAST \( $re_space_ask (?<id> $re_id ) $re_space_ask
 $s->opt("index", order => -1000);
 $s->opt("next label", order => -1000);
 $s->opt("last label", order => -1000);
+
+# $s->x("&ref" => qr/ & (?<id> $re_id ) /x => sub {
+	# my ($self, $push)=@_;
+	
+	# my $id = $push->{id};
+	# my ($sk, $n) = $self->get_sk($id);
+	# $self->error("&$id: переменная $id не связана с циклом или конвеером") if !defined $sk;
+	
+	# $push->{i} = $sk->{i}; 
+	# $push->{n} = $n;
+# });
 
 
 $s->x("self"		=> qr{ 	\b	(?:	self | this | me	)	\b 	}x);
