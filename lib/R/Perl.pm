@@ -119,16 +119,31 @@ sub union {
 
 
 # объединяет массивы
+# получает n1, arrayref1, ...
 sub zip {
 	my $self = shift;
-	my $k = shift;
 	my @zip;
-	my $max = reduce { $a<@$b? 0+@$b: $a } 0, @_;
-	for(my $zip = 0; $zip < $max; $zip+=$k) {
-		for(my $i=0; $i<@_; $i++) {
-			push @zip, @{$_[$i]}[$zip..$zip+$k];
-		}
+	my @idx;
+	my $max = 0;
+	
+	unshift @_, 1 if ref $_[0];
+	
+	for(my $i=0; $i<@_; $i+=2) {
+		my ($arity, $array) = @_[$i, $i+1];
+		my $n = @$array / $arity + (@$array % $arity? 1: 0);
+		$max = $n if $n > $max;
 	}
+	
+	for(my $zip = 0, $idx = 0; $zip < @_; $zip+=2, $idx++) {
+		my ($arity, $array) = @_[$zip, $zip+1];
+		my $i = $idx[$idx];
+		$arity += $i;
+		for(; $i<$arity; $i++) {
+			push @zip, $array->[$i];
+		}
+		$idx[$idx] = $i;
+	}
+	
 	@zip
 }
 

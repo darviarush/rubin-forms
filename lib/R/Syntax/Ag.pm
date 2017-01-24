@@ -82,6 +82,7 @@ my $s = $BASICSYNTAX;
 $s->tr("yf",  qw{		.word :word .?word .$word .?$word 			});
 $s->td("yS",  qw{		.word( ) .$word( ) .?word( ) .?$word( ) 	});
 $s->tr("yF",  qw{		[ ]		{ }									});
+$s->tr("xF",  qw{		@[ ]	@{ }								});
 $s->tr("fx",  qw{		@	%	pop shift							})->td('xf', qw{	pop shift	});
 $s->tr("yf",  qw{		++ --				})->td("fy", qw{	++ -- 	}); 	# ?!
 $s->tr("fy",  qw{  		len delete lc uc lcfirst ucfirst chr ord	})->td("yf", qw{	len  		});
@@ -103,7 +104,7 @@ $s->tr("xfy", qw{		|| ^^ ?				});
 $s->tr("xfx", qw{		.. ... ^.. ^...  to ^to ^to^   step		})->td("fx", qw{	^	});
 $s->tr("xfy", qw{		=>		})->td("fy", qw{	word=>		});
 $s->tr("xfy", qw{		,		})->td("yf", qw{ 	,			});
-$s->tr("xfx", qw{		split in		})->td("yfx", qw{	join zip	})->td("xf", qw{ split })->td("yf", qw{ join reverse });
+$s->tr("xfx", qw{		split in		})->td("yfx", qw{	join zip	})->td("xf", qw{ split })->td("yf", qw{ join reverse })->td("fy", qw{		zip		});
 $s->tr("yfx", qw{		-> = += -= *= /= ^= div= mod= &&= ||= ^^=   and= or= xor=  +&= +|= +^= +<= +>= **= .= ?= ,= =, %= });
 $s->tr("xfy", qw{		:						});
 $s->tr("xfy", qw{		|						});
@@ -426,10 +427,13 @@ $s->opt("string", sur => sub {
 ### какие операторы в каких скобках могут существовать
 $s->in("if"		=> qw{		else elseif		});
 
+
+### фиксы
+$s->opt('zip', re => qw{	zip(?<arity>\d+)	}ix);
 $s->fixes(
 'yfx zip' => sub {
 	my ($self, $push) = @_;
-	 if $push->{left}{left}{stmt} eq "yfx zip";
+	$push->{left}{stmt} = "zip" if $push->{left}{stmt} =~ /^(fy|yfx) zip$/n;
 },
 );
 

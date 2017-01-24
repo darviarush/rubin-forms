@@ -176,7 +176,10 @@ our %templates = (
 'xf pop' => 'pop(@{{{ left }}})',
 'xf shift' => 'shift(@{{{ left }}})',
 'xfx splice' => 'splice(@{{{ left }}}, {{ right }})',
-'zip' => '$R::App::app->perl->zip({{ arity }}, {{ right }})',
+
+'yfx zip' => '$R::App::app->perl->zip(({{ left }}), {{ arity }}, ({{ right }}))',
+'fy zip' => '$R::App::app->perl->zip(({{ left }}), {{ arity }}, ({{ right }}))',
+
 
 #"xfy in" => '(grep { {{ left }} }, {{ right }})',
 

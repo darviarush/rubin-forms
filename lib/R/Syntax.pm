@@ -956,6 +956,7 @@ sub modifiers {
 }
 
 # устанавливает шаблоны языка
+# принимает ключ=>шаблон или ключ=>функция=>шаблон
 sub templates {
 	my $self = shift;
 	
@@ -967,7 +968,8 @@ sub templates {
 		
 		die "шаблон `$k` в языке ".($self->{lang}{name} // "«язык Батькович»")." встречается дважды" if exists $c->{$k};
 		
-		$c->{$k} = $v, next if ref $v eq "CODE";
+		my $code = "";
+		$code = $v, $v = $_[$i+2], $i++ if ref $v eq "CODE";
 		
 		$v =~ s/'/\\'/g;
 		$v =~ s/\{\{\s*(\w+)\s*\}\}/', \$b->{$1} ,'/g;
@@ -981,6 +983,7 @@ sub templates {
 		$k =~ s/\s+/ /g;
 		$c->{$k} = eval "sub { join '', '$v' }";
 		die $@ if $@;
+		$c->{$k} = closure $code, $c->{$k}, sub { $_[0]->($a, $b); $_[1]->() } if $code;
 	}
 	
 	$self
@@ -994,11 +997,11 @@ sub modify {
 	while(@path) {
 		my $node = $path[-1];
 		
-		# вызываем модификатор, если мы на элементе впервые
-		if(!exists $node->{"&"}) {
-			my $fn = $modifiers->{$node->{stmt}};
-			$fn->($self, $node, \@path) if $fn;
-		}
+		# # вызываем модификатор, если мы на элементе впервые
+		# if(!exists $node->{"&"}) {
+			# my $fn = $modifiers->{$node->{stmt}};
+			# $fn->($self, $node, \@path) if $fn;
+		# }
 		
 		if(exists $node->{left} && $node->{"&"} < 1) {	# на подэлемент
 			$node->{"&"}=1;
@@ -1009,6 +1012,11 @@ sub modify {
 			push @path, $node->{right};
 		}
 		else {
+		
+			# просматриваем снизу-вверх
+			my $fn = $modifiers->{$node->{stmt}};
+			$fn->($self, $node, \@path) if $fn;
+		
 			pop @path;		# удаляем элемент
 		}
 	}
