@@ -991,7 +991,10 @@ sub templates {
 
 # модифицирует дерево
 sub modify {
-	my ($self, $root, $modifiers) = @_;
+	my ($self, $idx, $root, $modifiers) = @_;
+	
+	my $one = $idx+1;
+	my $two = $idx+2;
 	
 	my @path = $root;
 	while(@path) {
@@ -1003,12 +1006,12 @@ sub modify {
 			# $fn->($self, $node, \@path) if $fn;
 		# }
 		
-		if(exists $node->{left} && $node->{"&"} < 1) {	# на подэлемент
-			$node->{"&"}=1;
+		if(exists $node->{left} && $node->{"&"} < $one) {	# на подэлемент
+			$node->{"&"}=$one;
 			push @path, $node->{left};
 		}
-		elsif(exists $node->{right} && $node->{"&"} < 2) {	# на подэлемент
-			$node->{"&"}=2;
+		elsif(exists $node->{right} && $node->{"&"} < $two) {	# на подэлемент
+			$node->{"&"}=$two;
 			push @path, $node->{right};
 		}
 		else {
@@ -1029,10 +1032,13 @@ sub expirience {
 	my ($self, $root) = @_;
 	
 	# обход в глубину - модификации дерева
-	$self->modify($root, $self->{fixes}) if $self->{fixes};
+	$self->modify(0, $root, $self->{fixes}) if $self->{fixes};
 	
 	# обход в глубину - модификации дерева
-	$self->modify($root, $self->{lang}{modifiers}) if $self->{lang}{modifiers};
+	$self->modify(2, $root, $self->{lang}{modifiers}) if $self->{lang}{modifiers};
+	
+	my $one = 4+1;
+	my $two = 4+2;
 	
 	# формирование кода из шаблонов
 	$a = $self;	# используется в функциях-шаблонах
@@ -1042,12 +1048,12 @@ sub expirience {
 	while(@path) {
 		my $node = $path[-1];
 		
-		if(exists $node->{left} && $node->{"&"} < 3) {	# на подэлемент
-			$node->{"&"}=3;
+		if(exists $node->{left} && $node->{"&"} < $one) {	# на подэлемент
+			$node->{"&"}=$one;
 			push @path, $node->{left};
 		}
-		elsif(exists $node->{right} && $node->{"&"} < 4) {	# на подэлемент
-			$node->{"&"}=4;
+		elsif(exists $node->{right} && $node->{"&"} < $two) {	# на подэлемент
+			$node->{"&"}=$two;
 			push @path, $node->{right};
 		}
 		else {
@@ -1062,7 +1068,7 @@ sub expirience {
 			
 			if(@path) {
 				my $parent = $path[-1];
-				if($parent->{"&"} == 3) {
+				if($parent->{"&"} == $one) {
 					$parent->{left} = $template->();
 				} else {
 					$parent->{right} = $template->();

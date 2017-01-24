@@ -73,6 +73,7 @@ our %templates = (
 "fy +" => '0+({{ right }})',
 "fy -" => '-({{ right }})',
 
+
 "yfx +=" => '({{ left }}) += ({{ right }})',
 "yfx -=" => '({{ left }}) -= ({{ right }})',
 "yfx *=" => '({{ left }}) *= ({{ right }})',
@@ -80,6 +81,8 @@ our %templates = (
 "yfx ^=" => '({{ left }}) **= ({{ right }})',
 "yfx div=" => '({{ left }}) = int(({{ left }}) / ({{ right }}))',
 "yfx mod=" => '({{ left }}) %= ({{ right }})',
+
+#
 
 # строковые
 "xfy **" => 'scalar({{ left }}) x scalar({{ right }})',
@@ -177,9 +180,9 @@ our %templates = (
 'xf shift' => 'shift(@{{{ left }}})',
 'xfx splice' => 'splice(@{{{ left }}}, {{ right }})',
 
-'yfx zip' => '$R::App::app->perl->zip(({{ left }}), {{ arity }}, ({{ right }}))',
-'fy zip' => '$R::App::app->perl->zip(({{ left }}), {{ arity }}, ({{ right }}))',
-
+'xfy zip' => '$R::App::app->perl->zip([{{ left }}], {{ arity }}, [{{ right }}])',
+'fy zip' => '$R::App::app->perl->zip({{ arity }}, [{{ right }}])',
+'zip' => '{{ left }}], {{ arity }}, [{{ right }}',
 
 "xfy ***" => '({{ left }}) x scalar({{ right }})',
 "yfx ***=" => '{{ left }} = ({{ left }}) x scalar({{ right }})',
@@ -199,7 +202,7 @@ our %templates = (
 
 
 # конвеер
-#"xfy |" => 'do{ {{ _conveer left, op, param, right }} }',
+# TODO: рефакторинг для конвеера и for - отказаться от ref-переменных. И |=
 map => '{{ _init_conveer * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = []; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; push @{{R}}, do { {{ right }} } } @{{R}} }',
 grep => '{{ _init_conveer * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = []; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; push @{{R}}, map { {{A}}->[$_] } {{i}}..({{i}}+{{arity0}}>$#{{A}}? $#{{A}}: {{i}}+{{arity0}}) if do { {{ right }} } } @{{R}} }',
 first => '{{ _init_conveer * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = []; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; push(@{{R}}, map { {{A}}->[$_] } {{i}}..({{i}}+{{arity0}}>$#{{A}}? $#{{A}}: {{i}}+{{arity0}})), last if do { {{ right }} } } @{{R}} }',
@@ -210,11 +213,14 @@ order => 'do { my @list = do { {{ left }} }; my $fn = sub { @$DATA{qw/{{ qwparam
 assort => '{{ _assort_init * }}do { my @list = do { {{ left }} }; map { @list[$_..$_+{{ arity0 }}] } sort { @$DATA{qw/{{ qwparam1 }}/} = @list[$a..$a+{{ arity0 }}]; @$DATA{qw/{{ qwparam2 }}/} = @list[$b..$b+{{ arity0 }}]; {{ right }} } map { $_*{{ arity }} } 0 .. int(@list / {{ arity }}) - (@list % {{ arity }}? 0: 1) }',
 reduce => '{{ _init_conveer * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = {{A}}->[0]; for(my {{i}}=1; {{i}}<@{{A}}; {{i}}+={{ arity0 }}) { @$DATA{qw/{{ qwparam }}/} = ({{R}}, map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}-1); {{R}} = do { {{ right }} } } {{R}} }',
 group => '{{ _group_init * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = []; my {{M}} = {}; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; my {{E}} = {{M}}->{do { {{ right }} }} //= do { my $x = []; push @{{R}}, $x; $x }; push @{{E}}, map { {{A}}->[$_] } {{i}}..({{i}}+{{arity0}}>$#{{A}}? $#{{A}}: {{i}}+{{arity0}}) } @{{R}} }',
-#todo:
-#compress => '{{ _group_init * }}do { my {{A}} = [do { {{ left }} }]; my {{R}} = []; my {{M}}; for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; my {{E}} = {{M}}->{do { {{ right }} }} //= do { my $x = []; push @{{R}}, $x; $x }; push @{{E}}, map { {{A}}->[$_] } {{i}}..({{i}}+{{arity0}}>$#{{A}}? $#{{A}}: {{i}}+{{arity0}}) } @{{R}} }',
+
+groupby => 'do { my @A = do { {{ left }} }; my @R = (); my %M = (); for(my $i=0; $i<@A; $i+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { $A[$_] } $i..$i+{{arity0}}; my $K = do { {{ right }} }; my $E = $M{$K} //= do { my $x = []; push @R, $K, $x; $x }; push @$E, map { $A[$_] } $i..($i+{{arity0}}>$#A? $#A: $i+{{arity0}}) } @R }',
+compress => 'do { my @A = do { {{ left }} }; my @R; my $E; my $M; for(my $i=0; $i<@A; $i+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { $A[$_] } $i..$i+{{arity0}}; my $K = do { {{ right }} }; if($i==0) { $M=$K; push @R, $E=[] } else { push(@R, $E=[]), $M=$K if $M ne $K; } push @$E, map { $A[$_] } $i..($i+{{arity0}}>$#A? $#A: $i+{{arity0}}) } @R }',
+compressby => 'do { my @A = do { {{ left }} }; my @R; my $E; my $M; for(my $i=0; $i<@A; $i+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { $A[$_] } $i..$i+{{arity0}}; my $K = do { {{ right }} }; if($i==0) { $M=$K; push @R, $K, $E=[] } else { push(@R, $K, $E=[]), $M=$K if $M ne $K; } push @$E, map { $A[$_] } $i..($i+{{arity0}}>$#A? $#A: $i+{{arity0}}) } @R }',
 
 
 join => 'join({{ _for_join *, right }}, {{ left }}){{ newline }}',
+
 
 # исключения
 'fx raise' => 'die( {{ right }} )',

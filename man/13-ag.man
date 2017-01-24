@@ -285,16 +285,28 @@
 	
 Эта группировка возвращает так же ключ перед группой.
 	
-	#$app->syntaxAg->eval('@a = a=>2, b=>1, r=>2, c=>1; [@a | groupby2 b]');	## [2=>[a=>2, r=>2], 1=>[b=>1, c=>1]]
-	#$app->syntaxAg->eval('@a = a=>2, b=>1, r=>2, c=>1; {@a | groupby2 b}');	## {2=>[a=>2, r=>2], 1=>[b=>1, c=>1]}
+	$app->syntaxAg->eval('@a = a=>2, b=>1, r=>2, c=>1; [@a | groupby2 b]');	## [2=>[a=>2, r=>2], 1=>[b=>1, c=>1]]
+	$app->syntaxAg->eval('@a = a=>2, b=>1, r=>2, c=>1; {@a | groupby2 b}');	## {2=>[a=>2, r=>2], 1=>[b=>1, c=>1]}
 
 
 === `compress`
 
 Сжатие. Аналогична группировке, только сжимает в группы рядомстоящие элементы.
 
-	#$app->syntaxAg->eval("10, 11, 34, 16 | compress a div 10");	## [ [10, 11], [34], [16] ]
+	$app->syntaxAg->eval("[ 10, 11, 34, 16 | compress a div 10 ]");	## [ [10, 11], [34], [16] ]
 
+=== `compressby`
+
+Возвращает перед группой так же ключ.
+
+	$app->syntaxAg->eval("[ 10, 11, 34, 16 | compressby a div 10 ]");	## [ 1 => [10, 11], 3 => [34], 1 => [16] ]
+
+=== `|=`
+
+Присваивает результат массиву. Работает со всеми конвеерами.
+
+	#$app->syntaxAg->eval('a = [10, 11, 34, 16]; @a |= compressby a div 10');	## [ 1 => [10, 11], 3 => [34], 1 => [16] ]
+	
 === `join`
 
 TODO: | join - отдельным оператором.
@@ -444,7 +456,6 @@ TODO: циклы с возвращаемым значением через `last
 	$app->syntaxAg->new->eval("a=0b101; a +<= 2");			## 0b10100
 	$app->syntaxAg->new->eval("a=0b101; a +>= 2");			# 1
 	$app->syntaxAg->new->eval("a=6; a **= 3");				# 666
-	#$app->syntaxAg->new->eval('a=[6,2]; @a **= 3; a');	## [6,2,6,2,6,2]
 	$app->syntaxAg->new->eval("a=6; a .= 3");				# 63
 	
 
@@ -523,10 +534,14 @@ TODO: циклы с возвращаемым значением через `last
 	# $app->syntaxAg->new->eval("3.25 ceil");		# 4
 	# $app->syntaxAg->new->eval("3.25 floor");		# 3
 	# $app->syntaxAg->new->eval("3.25 round");		# 3
-	# $app->syntaxAg->new->eval("3.25 ceil 1");		# 3.3
-	# $app->syntaxAg->new->eval("3.25 floor 1");		# 3.2
-	# $app->syntaxAg->new->eval("3.25 round 1");		# 3.3
-	# $app->syntaxAg->new->eval("3.25 abs");		# 3.3
+	# $app->syntaxAg->new->eval("3.21 ceil 1");		# 3.3
+	# $app->syntaxAg->new->eval("3.29 floor 1");	# 3.2
+	# $app->syntaxAg->new->eval("3.25 round 1");	# 3.3
+	# $app->syntaxAg->new->eval("3.25 abs");		# 3.25
+	
+=== Случайные
+	
+	#$app->syntaxAg->new->eval("3.25 srand; rand");		# 3.25
 	
 === Инкремент и декремент
 	
@@ -616,10 +631,10 @@ TODO: циклы с возвращаемым значением через `last
 	$app->syntaxAg->new->eval(" 1..6 join");		# 123456
 	$app->syntaxAg->new->eval(" 1...6 join");		# 12345
 	
-	# $app->syntaxAg->new->eval(" 0 to 1 step .2 join ', ' ");		# 0, 0.2, 0.4, 0.6, 0.8, 1
-	# $app->syntaxAg->new->eval(" 1 to -2 step -1.5 join ', ' ");		# 1, -0.5, -2
+	#$app->syntaxAg->new->eval(" 0 to 1 step .2 join ', ' ");		# 0, 0.2, 0.4, 0.6, 0.8, 1
+	#$app->syntaxAg->new->eval(" 1 to -2 step -1.5 join ', ' ");		# 1, -0.5, -2
 	
-`..*`, `...*` и `to *` - один и тот же оператор. Обозначает "до бесконечности". Значение `^*` - до бесконечности.
+#`..*`, `...*` и `to *` - один и тот же оператор. Обозначает "до бесконечности". Значение `^*` - до бесконечности.
 	
 	# $app->syntaxAg->new->eval(" (0..*)@[1..3] join");		# 123
 	# $app->syntaxAg->new->eval(" (0...*)@[1..3] join");		# 123
@@ -627,10 +642,11 @@ TODO: циклы с возвращаемым значением через `last
 	
 	#$app->syntaxAg->new->eval(" (0..* step 2)@[1..3] join");		# 246
 	
-Так же работает и с `inf`:
+#Так же работает и с `inf`:
 	
 	#$app->syntaxAg->new->eval(" (0...Inf)@[1..3] join");		# 123
-	
+
+#https://metacpan.org/pod/Tie::LazyList	
 	
 Операторы `^..`, `^to` и  `^...` не включают начало интервала.
 	
@@ -638,15 +654,15 @@ TODO: циклы с возвращаемым значением через `last
 	$app->syntaxAg->new->eval(" 1^...6 join");					# 2345
 	#$app->syntaxAg->new->eval("(1 ^to * step .2)@[0...5] join ', '");	# 0.2, 0.4, 0.6, 0.8, 1
 	
-Что так же полезно при сравнениях.
+# `in` ищет в списке.
 
 	# $app->syntaxAg->new->eval(" 1 in 1^..6");					# 
 	# $app->syntaxAg->new->eval(" 1 in 1..6");					# 1
 	# $app->syntaxAg->new->eval(" 3 in 1..6");					# 3
 	
-`in` возвращает индекс первого найденного элемента от 1.
+# `in` возвращает индекс первого найденного элемента от 1.
 	
-https://metacpan.org/pod/Tie::LazyList
+
 	
 === Для массивов
 	
@@ -656,8 +672,13 @@ https://metacpan.org/pod/Tie::LazyList
 	
 *zip* - объединяет списки.
 
-	$app->syntaxAg->eval("[1..3 zip 4,5 zip 9..11]");		## [1,4,9,2,5,10,3,undef,11]
+	$app->syntaxAg->eval("1..3 zip 4,5 zip 9..11 join ','");		# 1,4,9,2,5,10,3,,11
+	
+	$app->syntaxAg->eval("zip2 1,2,3 zip 5,6 zip3 7..11 join ','");		# 1,2,5,7,8,9,3,,6,10,11,
+	
+*cross* - комбинация элементов списков "все со всеми".
 
+	# TODO
 	
 *push* - добавляет элементы в конец списка.
 	
@@ -667,22 +688,22 @@ https://metacpan.org/pod/Tie::LazyList
 
 	$app->syntaxAg->new->eval('a=[1]; @a =, 2, 3; @a join');		# 231
 
+Запятая у `=` показывает в какую сторону будет производиться сдвиг.
+	
 *shift*:
 	
 	$app->syntaxAg->new->eval('a=[1,2,3]; a shift; @a join');		# 23
 	
 *pop*:
 
-	$app->syntaxAg->new->eval('a=[1,2,3]; a pop; @a join');		# 12
+	$app->syntaxAg->new->eval('a=[1,2,3]; a pop; @a join');			# 12
 
-	
-Запятая у `=` показывает в какую сторону будет производиться сдвиг.
 
 *slice*:
 
-	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@[0,3,4] join');				# 145
-	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@[0,3,4] = 7,8,9; @a join');	# 7234896
-	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a@[0,3,4] = 7; a');				## [7, 2, 3, 4, undef, undef, 6]
+	$app->syntaxAg->new->eval('a=[0,1,2,3,4,5,6]; a@[0,3,4] join');				# 034
+	$app->syntaxAg->new->eval('a=[0,1,2,3,4,5,6]; a@[0,3,4] = 7,8,9; @a join');	# 7128956
+	$app->syntaxAg->new->eval('a=[0,1,2,3,4,5,6]; a@[0,3,4] = 7; a join');		## [7, 2, 3, 4, undef, undef, 6]
 
 *splice*:
 

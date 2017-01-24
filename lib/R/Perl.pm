@@ -130,21 +130,31 @@ sub zip {
 	
 	for(my $i=0; $i<@_; $i+=2) {
 		my ($arity, $array) = @_[$i, $i+1];
-		my $n = @$array / $arity + (@$array % $arity? 1: 0);
+		my $n = int(@$array / $arity) + (@$array % $arity? 1: 0);
 		$max = $n if $n > $max;
 	}
 	
-	for(my $zip = 0, $idx = 0; $zip < @_; $zip+=2, $idx++) {
-		my ($arity, $array) = @_[$zip, $zip+1];
-		my $i = $idx[$idx];
-		$arity += $i;
-		for(; $i<$arity; $i++) {
-			push @zip, $array->[$i];
+	while($max--) {
+		for(my $zip = 0, my $idx = 0; $zip < @_; $zip+=2, $idx++) {
+			my ($arity, $array) = @_[$zip, $zip+1];
+			my $i = $idx[$idx];
+			$arity += $i;
+			for(; $i<$arity; $i++) {
+				push @zip, $array->[$i];
+			}
+			$idx[$idx] = $i;
 		}
-		$idx[$idx] = $i;
 	}
 	
 	@zip
+}
+
+# возвращает все комбинации
+# получает n1, arrayref1...
+sub cross {
+	my ($self) = @_;
+	$self;
+	...
 }
 
 # возвращает имена на все методы в иерархии

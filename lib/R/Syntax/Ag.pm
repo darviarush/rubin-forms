@@ -84,17 +84,21 @@ my $re_for = qr!
 
 	# equal great less greateq lesseq noneq
 	# equal to   greater then	less then	greater or equal to		less or equal to
+	
+	# x == 2.1 +- 0.1
+	# flip-flop		^ff^
 
 {
 my $s = $BASICSYNTAX;
 
-$s->tr("yf",  qw{		.word :word .?word .$word ?.$word 			});
+$s->tr("yf",  qw{		.word :word ?.word .$word ?.$word 			});
 $s->td("yS",  qw{		.word( ) .$word( ) ?.word( ) ?.$word( ) 	});
 $s->tr("yF",  qw{		[ ]		{ }									});
 $s->tr("xF",  qw{		@[ ]	@{ }								});
 $s->tr("fx",  qw{		@	%	pop shift							})->td('xf', qw{	pop shift	});
 $s->tr("yf",  qw{		++ --				})->td("fy", qw{	++ -- 	}); 	# ?!
-$s->tr("fy",  qw{  		len delete lc uc lcfirst ucfirst chr ord	})->td("yf", qw{	len  		});
+$s->tr("fy",  qw{  		len delete lc uc lcfirst ucfirst chr ord	})->td("yf", qw{	len  abs ceil floor round rand srand	});
+$s->tr("xfy", qw{  		ceil floor round	});
 $s->tr("xf",  qw{		?  					});
 $s->tr("yfx", qw{		^					});
 $s->tr("fy",  qw{ 		+ - ! +~			});
@@ -111,12 +115,14 @@ $s->tr("xfx", qw{		isa can	of					});
 $s->tr("xfy", qw{		&&					});
 $s->tr("xfy", qw{		|| ^^ ?				});
 $s->tr("xfx", qw{		.. ... ^.. ^...  to ^to ^to^   step		})->td("fx", qw{	^	});
-$s->tr("xfy", qw{		=>		})->td("fy", qw{	word=>		});
-$s->tr("xfy", qw{		,		})->td("yf", qw{ 	,			});
-$s->tr("xfx", qw{		split in		})->td("yfx", qw{	join zip	})->td("xf", qw{ split })->td("yf", qw{ join reverse })->td("fy", qw{		zip		});
+$s->tr("xfy", qw{		=>		})->td("fy",  qw{	word=>		});
+$s->tr("xfx", qw{		split		})->td("xf",  qw{	split		});
+$s->tr("xfy", qw{		,		})->td("yf",  qw{ 	,			});
+$s->tr("xfy", qw{		zip		})->td("fy", qw{	zip				});
+$s->tr("yfx", qw{		join	})->td("yf", qw{	reverse join	});
 $s->tr("yfx", qw{		-> =   += -= *= /= ^= div= mod=   &&= ||= ^^=   and= or= xor=   +&= +|= +^= +<= +>=   **= ***= .= ?= ,= =, %=   });
 $s->tr("xfy", qw{		:						});
-$s->tr("xfy", qw{		|						});
+$s->tr("xfy", qw{		|						});	# TODO: |=
 $s->tr("fy",  qw{		not						});
 $s->tr("xfy", qw{		and						});
 $s->tr("xfy", qw{		or	xor					});
@@ -165,7 +171,7 @@ $s->opt("=", sub => sub {	$_[0]->{assign} = 1 });
 
 $s->opt("|", re => qr{ 
 	\| $re_space_ask ( 
-		( (?<param> $re_id ( $re_space_ask , $re_space_ask $re_id)* ) $re_space )? (?<op> map | grep | first | all | any | reduce | assort | sort | order | group ) (?<arity> \d+ )? \b |
+		( (?<param> $re_id ( $re_space_ask , $re_space_ask $re_id)* ) $re_space )? (?<op> map | grep | first | all | any | reduce | assort | sort | order | group | groupby | compress | compressby ) (?<arity> \d+ )? \b |
 		(?<op> join ) \b
 	)? 
 }xni, sub => sub {
@@ -449,11 +455,17 @@ $s->in("if"		=> qw{		else elseif		});
 
 
 ### фиксы
-$s->opt('zip', re => qw{	zip(?<arity>\d+)	}ix);
+$s->opt('zip', re => qr{	\b zip (?<arity>\d+)? \b	}ix, sub => sub { my ($self, $push)=@_; $push->{arity} //= 1 });
 $s->fixes(
-'yfx zip' => sub {
+'xfy zip' => sub {
 	my ($self, $push) = @_;
-	$push->{left}{stmt} = "zip" if $push->{left}{stmt} =~ /^(fy|yfx) zip$/n;
+	#msg1 $push->{left}{stmt}, $push->{right}{stmt};
+	$push->{left}{stmt} = "zip" if $push->{left}{stmt} eq "xfy zip";
+	#$push->{left} = $push->{left}{right} if $push->{left}{stmt} eq "fy zip";
+},
+'fy zip' => sub {
+	my ($self, $push) = @_;
+	$push->{right}{stmt} = "zip" if $push->{right}{stmt} eq "xfy zip";
 },
 );
 
