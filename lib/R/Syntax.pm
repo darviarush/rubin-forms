@@ -195,6 +195,7 @@ sub td {
 	
 	my $key = $fix & $infix? "INFIX": $fix & $prefix? "PREFIX": "POSTFIX";
 	my $step = $fix & $bracket? 2: 1;
+	
 	for(my $i=0; $i<@_; $i+=$step) {
 		my $x = $_[$i];
 		if(ref $x) { die "имена операторов должны быть строками: `$x`" }
@@ -202,7 +203,10 @@ sub td {
 			die "оператор `$type $x` уже объявлен" if exists $self->{$key}{$x};
 			$op = $self->newlex($key => {%p, name=>"$type $x", alias=>$x, fix => $fix, order => -length $x});
 			
-			$op->{tag} = $_[$i+1], $self->newlex(CR => { name => "cr $op->{tag}", alias => $op->{tag}, order=>$self->{ORDER}++, fix => $crbracket }) if $fix & $bracket && (!exists $self->{LEX}{ $_[$i+1] } || !exists $self->{LEX}{ $_[$i+1] }{CR});
+			if($fix & $bracket) {
+				$op->{tag} = $_[$i+1];
+				$self->newlex(CR => { name => "cr $op->{tag}", alias => $op->{tag}, order=>$self->{ORDER}++, fix => $crbracket }) if !exists $self->{LEX}{ $_[$i+1] } || !exists $self->{LEX}{ $_[$i+1] }{CR};
+			}
 		}
 	}
 

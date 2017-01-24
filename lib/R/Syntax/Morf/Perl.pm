@@ -179,6 +179,8 @@ our %templates = (
 'xf pop' => 'pop(@{{{ left }}})',
 'xf shift' => 'shift(@{{{ left }}})',
 'xfx splice' => 'splice(@{{{ left }}}, {{ right }})',
+'xF @[' => '@{ {{ left }} }[ {{ right }} ]',
+'xF @{' => '@{ {{ left }} }{ {{ right }} }',
 
 'xfy zip' => '$R::App::app->perl->zip([{{ left }}], {{ arity }}, [{{ right }}])',
 'fy zip' => '$R::App::app->perl->zip({{ arity }}, [{{ right }}])',

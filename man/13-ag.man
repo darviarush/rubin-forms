@@ -701,13 +701,14 @@ TODO: циклы с возвращаемым значением через `last
 
 *slice*:
 
+	msg1 $app->syntaxAg->new(trace=>1)->morf('a=[0,1,2,3,4,5,6]; a@[0,3,4] join');
 	$app->syntaxAg->new->eval('a=[0,1,2,3,4,5,6]; a@[0,3,4] join');				# 034
 	$app->syntaxAg->new->eval('a=[0,1,2,3,4,5,6]; a@[0,3,4] = 7,8,9; @a join');	# 7128956
-	$app->syntaxAg->new->eval('a=[0,1,2,3,4,5,6]; a@[0,3,4] = 7; a join');		## [7, 2, 3, 4, undef, undef, 6]
+	$app->syntaxAg->new->eval('a=[0,1,2,3,4,5,6]; a@[0,3,4] = 7; a join');		## [7, 2, 3, 4, 6]
 
 *splice*:
 
-	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a splice 2,4, 7; @a join');		# 1276
+	$app->syntaxAg->new->eval('a=[1,2,3,4,5,6]; a splice 2,4 , 7; @a join');		# 1276
 	
 
 === Для хэшей
