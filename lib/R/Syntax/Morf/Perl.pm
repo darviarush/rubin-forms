@@ -158,7 +158,8 @@ our %templates = (
 "xfy ?" => 'defined({{ left }})? ({{ left }}): ({{ right }})',
 "yfx ?=" => '({{ left }}) //= ({{ right }})',
 "xfx isa" => 'Isa({{ left }}, {{ right }})',
-"xfx can" => 'Can({{ left }}, {{ right }})',
+"xfx can" => '(Can({{ left }}, {{ right }})? 1: "")',
+"fy Num" => 'Num({{ right }})',
 
 
 # интервальные
@@ -189,8 +190,7 @@ our %templates = (
 "xfy ***" => '({{ left }}) x scalar({{ right }})',
 "yfx ***=" => '{{ left }} = ({{ left }}) x scalar({{ right }})',
 
-#"xfy in" => '(grep { {{ left }} }, {{ right }})',
-
+"xfy splice" => 'splice(@{{{ left }}}, {{ right }})',
 "yfx join" => 'join({{ right }}, {{ left }})',
 "xfy split" => 'split({{ right }}, {{ left }})',
 "yf join" => 'join("", {{ left }})',
@@ -198,9 +198,13 @@ our %templates = (
 "xfx split" => '{{ _split * }}split(do { my ({{i}})=({{ right }}); ref({{i}})? {{i}}: quotemeta({{i}}) }, {{ left }})',
 "yf reverse" => 'reverse( {{ left }} )',
 
+#"xfy in" => '(grep { {{ left }} }, {{ right }})',
+
 # хешей
-"fx delete" => 'delete({{ right }})',
-"xfx of" => 'exists( {{ left }}->{{{ right }}} )',
+"xfx delete" => 'delete(@{ {{left}} }{ {{ right }} })',
+"xfx of" => 'exists( {{ right }}->{{{ left }}} )',
+"yf keys" => 'keys( {{ left }} )',
+"yf values" => 'values( {{ left }} )',
 
 
 # конвеер

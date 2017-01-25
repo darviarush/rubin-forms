@@ -84,7 +84,7 @@ sub setref { shift; return { map { $_=>1 } @_ } }
 sub starset { my $i = shift->{starset_base}; map { $_=>$i++ } @_ }
 
 # создаёт множество-хэш с порядковым номером
-sub starsetref { my $i = shift->{starset_base}; { map { $_=>$i++ } @_ } }
+sub starsetref { my $i = shift->{starset_base}; +{ map { $_=>$i++ } @_ } }
 
 # удаляет дубликаты
 sub unique { shift; my %x; map { if(exists $x{$_}) { () } else { $x{$_} = 1; $_ } } @_ }

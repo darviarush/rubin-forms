@@ -157,7 +157,7 @@ our $Sx=$prefix  | $nonassoc   | $bracket | $void;		# неассоциативн
 # our $xSy=$infix  | $leftassoc  | $bracket | $void;		# правоассоциативная инфиксная скобка (incircumfix)
 # our $xSx=$infix  | $nonassoc   | $bracket | $void;		# неассоциативная инфиксная скобка (incircumfix)
 
-# инфиксные скобки нельзя - иначе придётся делать троичное дерево
+# TODO: инфиксные скобки - просто в right добавить смычку F
 
 our %FIX = (
 	xfy => $xfy,
@@ -317,6 +317,18 @@ sub opt {
 	} @_;
 	
 	$self
+}
+
+# возвращает приоритет оператора (для тестов)
+sub prio {
+	my ($self, $op) = @_;
+	
+	die "не оператор `$op`" unless $op =~ /\s+/;
+	die "не распознана лексема `$'` из `$op`" unless my $lex = $self->{LEX}{$'};
+	my $fix = $FIX{$`};
+	my $key = $fix & $infix? "INFIX": $fix & $prefix? "PREFIX": "POSTFIX";
+	
+	$lex->{$key}{prio}
 }
 
 # указывает, что операторы могут быть только в указанной скобке
@@ -584,15 +596,19 @@ sub _pop {
 	# новый в @S
 	my $popop = sub {
 		my $prio = $meta->{prio};
+		my $fix = $meta->{fix};
 		my $s;
 		my $x;
 
-		while(@S &&
-			(($x = ($s = $S[-1])->{prio}) < $prio || 
-			$x==$prio && ($s->{fix} & $nonassoc || $meta->{fix} & $nonassoc? 
+		while(@S) {
+			my $s = $S[-1];
+			last if $fix & $prefix && $s->{fix} & $prefix;	# prefix не выбрасывает другие префиксы
+			last unless $fix & $postfix && $s->{fix} & $postfix ||	# postfix выбрасывает другие постфиксы
+			($x = $s->{prio}) < $prio || 	# приоритет оператора больше чем у того, что из стека
+			$x==$prio && ( ($s->{fix} | $meta->{fix}) & $nonassoc?	# приоритет равен
 				$self->error("неассоциативный оператор " . ($s->{fix} & $nonassoc? $s->{name}: $meta->{name})):
-			$s->{fix} & $leftassoc))
-		) {
+			$s->{fix} & $leftassoc);	# и он левоасоциативен
+		
 			my $r = pop @S;
 			
 			if($r->{fix} & $infix) {
@@ -601,23 +617,25 @@ sub _pop {
 				$self->trace("%", $r);
 			}
 			elsif($r->{fix} & $prefix) {	# -x
-				$r->{left} = $r->{right} if exists $r->{right};
+				$r->{left} = $r->{right} if exists $r->{right};		# для префиксных скобок
 				$self->error("нет операнда для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
 				$self->trace(">", $r);
 			}
 			else {	# x--
 				$self->error("нет операнда для оператора $r->{stmt}") if !defined( my $prev = pop @T );
 
-				if( $prev->{fix} & $postfix && $prev->{prio} < $r->{prio} ) {
-					$r->{left} = $prev->{left};
-					$prev->{left} = $r;
-					$r = $prev;
-					$self->trace("<", $prev);
-				}
-				else {
+				# msg1 $prev->{fix} & $postfix, "$prev->{stmt}.prio=$prev->{prio}", "$r->{stmt}.prio=$r->{prio}";
+				# if( $prev->{fix} & $postfix && $prev->{prio} < $r->{prio} ) {
+					# msg1 "shuffle";
+					# $r->{left} = $prev->{left};
+					# $prev->{left} = $r;
+					# $r = $prev;
+					# $self->trace("<~", $prev);
+				# }
+				# else {
 					$r->{left} = $prev;
 					$self->trace("<", $r);
-				}
+				# }
 			}
 			
 			
@@ -1019,12 +1037,11 @@ sub modify {
 			push @path, $node->{right};
 		}
 		else {
+			pop @path;		# удаляем элемент
 		
 			# просматриваем снизу-вверх
 			my $fn = $modifiers->{$node->{stmt}};
 			$fn->($self, $node, \@path) if $fn;
-		
-			pop @path;		# удаляем элемент
 		}
 	}
 	

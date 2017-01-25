@@ -143,7 +143,7 @@ sub Isa (@) {
 	my $val = shift;
 	return unless blessed $val;
 	for my $cls (@_) {
-		return 1 if $val->isa($cls);
+		return 1 if $val->isa(ref $cls || $cls);
 	}
 }
 
