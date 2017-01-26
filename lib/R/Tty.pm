@@ -96,4 +96,14 @@ sub progress {
 	$self
 }
 
+# отображает на терминал и запускает команду
+sub run {
+	my ($self, $run, $prefix) = @_;
+	
+	print "$prefix$run\n";
+	print `$run`;
+	
+	$self
+}
+
 1;

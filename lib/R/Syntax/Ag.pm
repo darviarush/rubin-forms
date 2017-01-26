@@ -91,7 +91,7 @@ my $re_for = qr!
 {
 my $s = $BASICSYNTAX;
 
-$s->tr("yf",  qw{		.word :word ?.word .$word ?.$word 			});
+$s->tr("yf",  qw{		.word ?.word .$word ?.$word :word			});
 $s->td("yS",  qw{		.word( ) .$word( ) ?.word( ) ?.$word( ) 	});
 $s->tr("yF",  qw{		[ ]		{ }									});
 $s->tr("xF",  qw{		@[ ]	@{ }								});
@@ -122,6 +122,7 @@ $s->tr("xfy", qw{		zip		})->td("fy",  qw{	zip				});
 $s->tr("xfx", qw{		splice	delete	});
 $s->tr("yfx", qw{		join	})->td("yf", qw{	reverse join	});
 $s->tr("yfx", qw{		-> =   += -= *= /= ^= div= mod=   &&= ||= ^^=   and= or= xor=   +&= +|= +^= +<= +>=   **= ***= .= ?= ,= =, %=   });
+$s->tr("fy",  qw{		+gosub					});
 $s->tr("xfy", qw{		:						});
 $s->tr("xfy", qw{		|						});	# TODO: |=
 $s->tr("fy",  qw{		not						});
@@ -472,42 +473,36 @@ $s->fixes(
 
 
 # устанавливаем обработчик на начало pop
-my %STOPOP = $app->perl->set("\n", qw/ ; THEN ELSE ELSEIF UNTIL FROM | /);
-my %PULLOP = qw(	:word :word()	.$word .$word()		.word .word()	var word()	);
-
-#$s->pull(join(" ", keys %PULLOP) => \&onpull);
+$s->opt("+gosub", nolex=>1);
+my %PULLOP = qw(	.word  .word+  .$word  .$word+   ?.word  ?.word+	?.$word ?.$word+		);
+$s->pull(join(" ", keys %PULLOP) => \&onpull);
 
 sub onpull {
 	my ($self, $i) = @_; 
 	my $A = $self->{stack}[-1]{"A+"};
-	$#$A == $i && return;
+	$#$A == $i && return;	# мы в конце скобки
 	my $me = $A->[$i];
-	$me->{space} || return;	# нужен space
-	my $op = $A->[$i+1];
-	my $op_stmt = $op->{stmt};
+	$me->{spacer} || return;	# нужен space
+	my $lex = $self->{LEX}{ $A->[$i+1] };
+	my $fix = $lex->{fix};
 	
 	# следующий кроме оператора
-	if( !$self->{PREFIX}{$op_stmt} && !$self->{INFIX}{$op_stmt} ||
+	if( !$fix & $R::Syntax::prefix && !$fix & $R::Syntax::infix ||
 	
 	# следующий prefix оператор и нет такого infix
-	$self->{PREFIX}{$op_stmt} && !$self->{INFIX}{$op_stmt} ||
+	$fix & $R::Syntax::prefix && !$fix & $R::Syntax::infix ||
 	
 	# следующий prefix и infix, но у me есть space, а у оператора - нет
-	$self->{PREFIX}{$op_stmt} && $self->{INFIX}{$op_stmt} && length($op->{space})
+	$fix & $R::Syntax::prefix && $fix & $R::Syntax::infix && length( $A->[$i+1]->{spacer} )
 	) {
-		# тогда взять в скобки до \n|;|конца
+		# тогда меняем на оператор .word+ и добавляем постфиксный оператор, для захвата параметров
 		msg1 "sk!";
-		my $j;
-		for($j=$i+1; $j<@$A && !exists $STOPOP{ $A->[$j]{stmt} }; $j++) {}
-		return if $j==$i+1;
-		my $push = {stmt=>".word.br"};
-		$push->{"A+"} = [ splice @$A, $i+1, $j, $push ];
-		push @{$self->{stack}}, $push;
-		# а потом сделать pop
-		$self->pop(".word.br");
 		
 		# поменять stmt оператора
 		$me->{stmt} = $PULLOP{ $me->{stmt} };
+		
+		# вставляем оператор
+		splice @$A, $i+1, 0, { stmt => "+gosub" };
 	}
 	
 }

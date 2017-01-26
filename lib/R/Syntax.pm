@@ -428,12 +428,13 @@ sub lex {
 sub masking {
 	my ($self, $s) = @_;
 	
-	my $lex = $self->{lex} //= $self->lex;
+	my $re_lex = $self->{lex} //= $self->lex;
 	my $LEX = $self->{LEX};
 	my $trace = $self->{trace};
 	my $endline;
+	my $lex;
 
-	while($s =~ /$lex/g) {			# формируем дерево
+	while($s =~ /$re_lex/g) {			# формируем дерево
 	
 		$self->{charno} = length($`) - $self->{startline} + 1;
 	
@@ -447,9 +448,9 @@ sub masking {
 	
 		exists $+{newline}? do { $self->{lineno}++; $self->{startline} = length($`); }:
 		exists $+{error_nosym}? $self->error(sprintf($self->{error}{nosym}, $+{error_nosym})):
-		exists $+{spacer}? ():
+		exists $+{spacer}? do { $lex->{spacer} = 1 }:
 		do { if(defined $^R) {
-			my $lex = $LEX->{$^R};
+			$lex = $LEX->{$^R};
 		
 			$self->error("лексема ". $app->perl->q("$^R") ." не существует в языке " . $self->{name}) if !defined $lex;
 		
@@ -563,13 +564,13 @@ sub pop {
 
 	
 	# срабатывают обработчики для грамматического разбора
-	# if(my $POP_A = $self->{POP_A}) {
-		# for(my $i=0; $i<@$A; $i++) {
-			# my $op = $A->[$i];
-			# my $sub = $POP_A->{$op};
-			# $sub->($self, $i) if defined $sub;
-		# }
-	# }
+	if(my $POP_A = $self->{POP_A}) {
+		for(my $i=0; $i<@$A; $i++) {
+			my $op = $A->[$i];
+			my $sub = $POP_A->{$op};
+			$sub->($self, $i) if defined $sub;
+		}
+	}
 	
 	pop @$stack;	# сбрасываем скобку с вершины стека
 	
@@ -622,20 +623,8 @@ sub _pop {
 				$self->trace(">", $r);
 			}
 			else {	# x--
-				$self->error("нет операнда для оператора $r->{stmt}") if !defined( my $prev = pop @T );
-
-				# msg1 $prev->{fix} & $postfix, "$prev->{stmt}.prio=$prev->{prio}", "$r->{stmt}.prio=$r->{prio}";
-				# if( $prev->{fix} & $postfix && $prev->{prio} < $r->{prio} ) {
-					# msg1 "shuffle";
-					# $r->{left} = $prev->{left};
-					# $prev->{left} = $r;
-					# $r = $prev;
-					# $self->trace("<~", $prev);
-				# }
-				# else {
-					$r->{left} = $prev;
-					$self->trace("<", $r);
-				# }
+				$self->error("нет операнда для оператора $r->{stmt}") if !defined( $r->{left} = pop @T );
+				$self->trace("<", $r);			
 			}
 			
 			

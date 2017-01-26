@@ -88,7 +88,7 @@ task {
 
 name "co";
 #args "[-r]";
-desc "переключиться на ветку";
+desc "переключиться на/создать/удалить ветку";
 sub co {
     my ($remote) = @_;
 
@@ -108,26 +108,32 @@ sub co {
 	# и подсвечиваем цыфры
 	@branch = map { s/[a-z]{3,}|\d+/ !exists $word{$&}? color("cyan").$&.color("reset"): $word{$&}>1? color("red").$&.color("reset"): $& /gie; $_ } @branch;
 
-    push @branch, $app->perl->qq("добавить");
+    unshift @branch, $app->perl->qq("добавить"), $app->perl->qq("удалить");
     
-    my $nbranch = $app->tty->select(\@branch, "выберите ветку")-1;
+    my $nbranch = $app->tty->select(\@branch, "выберите ветку");
     
-    my $branch = $real[$nbranch];
+    my $branch = $real[$nbranch-3];
     
     print("вы остаётесь на ветке $branch"), return if $branch =~ /^\s*\* /;
     
     make("commit");
     
-    if($nbranch == $#branch) {  # добавляем
-        print "Введите название новой ветки (пусто - отмена): ";
-        $branch = <>;
-        $branch = $app->perl->trim($branch);
+    if($nbranch == 1) {  # добавляем
+        $app->tty->input( "Введите название новой ветки (пусто - отмена)", $branch );
         return if $branch =~ /^\s*$/;
-        print `git checkout -b "$branch"`;
+		$app->tty->run("git checkout master");
+        $app->tty->run("git checkout -b $branch");
     }
+	elsif($nbranch == 2) {	# удаляем
+		my $n = $app->tty->select([ @branch[2..$#branch] ], "выберите ветку для удаления");
+		$branch = $real[$n-1];
+		
+		$app->tty->run("git checkout master") if $branch eq current_branch();
+		
+		$app->tty->run("git branch -D $branch");
+	}
     else {
-        $branch = $app->perl->trim($branch);
-        print `git checkout "$branch"`;
+        $app->tty->run("git checkout $branch");
     }
     
 }
@@ -150,26 +156,15 @@ sub mm {
     # print "$push\n";
     # print `$push`;
     
-    my $push = "git checkout master";
-    print "$push\n";
-    print `$push`;
+    $app->tty->run("git checkout master");
     
-    my $push = "git merge --no-ff --no-edit $branch";
-    print "$push\n";
-    print `$push`;
+    $app->tty->run("git merge --no-ff --no-edit $branch");
     
-    my $push = "git pull --no-edit";
-    print "$push\n";
-    print `$push`;
+    $app->tty->run("git pull --no-edit");
     
+    $app->tty->run("git push");
     
-    my $push = "git push";
-    print "$push\n";
-    print `$push`;
-    
-    my $push = "git checkout $branch";
-    print "$push\n";
-    print `$push`;
+    $app->tty->run("git checkout $branch");
 }
 
 
