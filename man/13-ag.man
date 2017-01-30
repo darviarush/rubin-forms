@@ -508,15 +508,15 @@ TODO: циклы с возвращаемым значением через `last
 # То же, но на конвеере:
 	
 	# $app->syntaxAg->new->eval('0..30 | compressby a ~ "1"! flipflop a ~ "3"! | grep2 a | map2 b | (@a | "^$a" | join) | join ","');	# ^1^2^3,^10^11^12^13^14^15^16^17^18^19^20^21^22^23,^31^32
-	
-	
+
+
 === Проверки
 	
 Проверка на `nothing`:
 
-	$app->syntaxAg->new->eval("11?");			# 1
-	$app->syntaxAg->new->eval("nothing?");		# 
-	$app->syntaxAg->new->eval("nothing ? 2");	# 2
+	$app->syntaxAg->new->eval("11?");				# 1
+	$app->syntaxAg->new->eval("nothing?");			# 
+	$app->syntaxAg->new->eval("nothing ? 2");		# 2
 	$app->syntaxAg->new->eval("a=nil; a?= 2; a");	# 2
 	$app->syntaxAg->new->eval("a=11; a?= 2; a");	# 11
 

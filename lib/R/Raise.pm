@@ -4,8 +4,8 @@ package R::Raise;
 
 use common::sense;
 
-use Carp qw/shortmess longmess/;
-use Scalar::Util qw/blessed/;
+#use Carp qw/shortmess longmess/;
+use Scalar::Util qw/blessed looks_like_number/;
 
 use Term::ANSIColor qw/colorstrip color/;
 
@@ -49,29 +49,29 @@ if(defined $^S) {
 # конструктор
 sub bingo {
 	my ($cls, $abbr, $msg) = @_;
-	my $self = $cls->new(longmess($msg), "bingo", $msg);
+	my $self = $cls->new($msg, "bingo");
 	$self->{abbr} = $abbr;
 	$self
 }
 
 # конструктор
 sub new {
-	my ($cls, $msg, $who, $orig) = @_;
+	my ($cls, $msg, $who, $arity) = @_;
 	
 	# longmess почему-то бывает выдаёт скаляр $orig
-	$msg = $$msg if ref $msg eq "SCALAR";
+	#$msg = $$msg if ref $msg eq "SCALAR";
 	
-	if(@_ == 2) {
-		$who = "throw";
-		$orig = $msg;
-		$msg = longmess($msg);
-	}
+	# if(@_ == 2) {
+		# $who = "throw";
+		# $orig = $msg;
+		# $msg = longmess($msg);
+	# }
 	
 	bless {
-		msg => $msg,
-		who => $who,
-		orig => $orig,
-		color => 1,
+		who => $who // "throw",		# error, warning, trace, throw, etc...
+		msg => $msg,		# сообщение об ошибке
+		trace => &DB::__RAISE__TRACE__($arity),		# traceback - массив [[file, lineno, object]]...
+		color => 1,			# колоризировать
 	}, ref $cls || $cls;
 }
 
@@ -83,7 +83,7 @@ sub __ondie__ {
 		#print STDERR "=== $msg\n";
 		#use R::App qw/msg1/;
 		#msg1 ":size10000", $msg;
-		$msg = __PACKAGE__->new( longmess($msg), "error", $msg );
+		$msg = __PACKAGE__->new( $msg, "error", 3 );
 	}
 	
 	#print STDERR "@$ S==$^S ".@_."\@_==@_ GLOBAL_PHASE=${^GLOBAL_PHASE}\n";
@@ -105,7 +105,7 @@ sub __onwarn__ {
 	my ($msg) = @_;
 	
 	unless(blessed($msg) and $msg->isa('R::Raise')) {
-		$msg = __PACKAGE__->new( shortmess($msg), "warning", $msg );
+		$msg = __PACKAGE__->new( $msg, "warning", 3 );
 	}
 	
 	warn $msg;
@@ -139,59 +139,120 @@ sub _log {
 	#&setdie;
 }
 
+
+# возвращает аргументы предпредпоследнего вызова
+package DB {
+	# нужно использовать с функцией 2-й вложенности или задать вложенность
+	sub __RAISE__TRACE__ {
+		my ($arity) = @_;
+		my $trace = [];
+		for(my $i=$arity // 0;; $i++) {
+			my $args = [];
+			@$args = caller($i);
+			last if !@$args;
+			push @$args, [ @DB::args ];
+			push @$trace, $args;
+		}
+		return $trace;
+	}
+}
+
+
 # возвращает пустую строку
 sub empty { "" }
+
+# 
+sub _tostring {
+	my ($x) = @_;
+	$x =~ s/\t/\\t/g;
+	$x =~ s/\n/\\n/g;
+	"\"$x\""
+}
+
+# обращает в строку _toargs
+sub _toargs {
+	my ($args) = @_;
+	my $chars = 100;
+	join(", ", map { 
+		my $x = looks_like_number($_)? $_: !ref($_)? _tostring($_): sprintf("%s=%X", ref($_), int($_));
+		$x = substr($x, 0, $chars) . "…" if length($x) > $chars;
+		$x
+	} @$args)
+}
 
 # превращает в строку
 sub stringify {
 	my $self = shift;
-	
+
 	local($_, $`, $', $1);
-	$_ = $self->{msg};
-	$_ = ref($_) eq "SCALAR"? $$_: $_;
-	#$_ = (utf8::is_utf8($_)?"utf8":"no")."$_\n";
-	#s/\\x\{(\w+)\}/ chr hex $1 /ge;
 	
-	# eval {
-		# require R::App;
-		# $R::App::app->file("var/last.raise.trace")->write($R::App::app->perl->dumper($self));
-	# };
-	# return "$self->{who}: $self->{orig}\n" if !$@;
+	my $res = "";
 	
-	#print STDERR "XXXXX: ".$self->{who}." $_\n\n";
-	
-	my @lines = split /\n/, $_;
-	
-	my $color = $self->{who} eq "bingo"? "cyan": $self->{who} eq "warning"? "yellow": "red";
-	
-    #R::App::msg1(-t STDERR);
-    # -t STDERR;
-    my $cc = 1? \&color: \&empty;
-    
-	my $who = $cc->($color) . $self->{who} . ": " . $cc->("reset");
-	
-	for(@lines) {
-		s{^\t?(.*?)(?: called)? at (.*?) line (\d+)}{
-			my ($x, $f, $l)=($1, $2, $3);
-			
-			$x=~s{^\w+::(?:\w+::)+}{
-				my $y = my $tmp = $&;
-				$y =~ s!::!/!g; $y =~ s!/$!!;
-				$f =~ m!\b$y\.pm$! ? "": $tmp
-			}e;
-			$x=~s![:\(\)]+!$cc->("cyan") . $& . $cc->("reset")!ge;
-            
-            $f =~ s!/cygdrive/(\w)!$1:!, $f =~ s!/!\\!g if $cc == \&empty;
-            
-			"$f:".$cc->("green")."$l".$cc->("reset").": $who$x"
-		}e;
+	for my $trace (@{$self->{trace}}) {
+		my ($package, $filename, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash, $args) = @$trace;
 		
-		$who = "";
+		my $arguments = $hasargs? "("._toargs($args).")": "";
+		
+		$subroutine = "~" if $subroutine eq "__ANON__";
+		
+		my $pack = quotemeta $package;
+		$package = $subroutine =~ /^$pack/? "": "$package ";
+		
+		$subroutine =~ s/::(\w+)$/.$1/;
+		
+		$res .= "$filename:$line $package$subroutine$arguments\n";
 	}
 	
-	unshift @lines, $R::App::app->{connect}{CURR_SQL} if $R::App::app && $R::App::app->{connect} && $R::App::app->{connect}{CURR_SQL};
+	$res .= "$self->{who}: $self->{msg}";
 	
-	join("\n", reverse @lines) . "\n";
+	$res
+	
+	
+	# $_ = $self->{msg};
+	# $_ = ref($_) eq "SCALAR"? $$_: $_;
+	# #$_ = (utf8::is_utf8($_)?"utf8":"no")."$_\n";
+	# #s/\\x\{(\w+)\}/ chr hex $1 /ge;
+	
+	# # eval {
+		# # require R::App;
+		# # $R::App::app->file("var/last.raise.trace")->write($R::App::app->perl->dumper($self));
+	# # };
+	# # return "$self->{who}: $self->{orig}\n" if !$@;
+	
+	# #print STDERR "XXXXX: ".$self->{who}." $_\n\n";
+	
+	# my @lines = split /\n/, $_;
+	
+	# my $color = $self->{who} eq "bingo"? "cyan": $self->{who} eq "warning"? "yellow": "red";
+	
+    # #R::App::msg1(-t STDERR);
+    # # -t STDERR;
+    # my $cc = 1? \&color: \&empty;
+    
+	# my $who = $cc->($color) . $self->{who} . ": " . $cc->("reset");
+	
+	# for(@lines) {
+		# s{^\t?(.*?)(?: called)? at (.*?) line (\d+)}{
+			# my ($x, $f, $l)=($1, $2, $3);
+			
+			# $x=~s{^\w+::(?:\w+::)+}{
+				# my $y = my $tmp = $&;
+				# $y =~ s!::!/!g; $y =~ s!/$!!;
+				# $f =~ m!\b$y\.pm$! ? "": $tmp
+			# }e;
+			# $x=~s![:\(\)]+!$cc->("cyan") . $& . $cc->("reset")!ge;
+            
+            # $f =~ s!/cygdrive/(\w)!$1:!, $f =~ s!/!\\!g if $cc == \&empty;
+            
+			# "$f:".$cc->("green")."$l".$cc->("reset").": $who$x"
+		# }e;
+		
+		# $who = "";
+	# }
+	
+	# unshift @lines, $R::App::app->{connect}{CURR_SQL} if $R::App::app && $R::App::app->{connect} && $R::App::app->{connect}{CURR_SQL};
+	
+	# join("\n", reverse @lines) . "\n";
 }
 
 # объединяет со строкой
@@ -204,21 +265,21 @@ sub concat {
 # Возвращает оригинальную ошибку
 sub orig {
 	my ($self) = @_;
-	$self->{orig}
+	$self->{msg}
 }
 
 # возвращает сообщение без at line
 sub message {
 	my ($self) = @_;
-	ref $self->{orig}? $self->{orig}{message}: do { $self->{orig}=~ / at .* line \d+.*$/? $`: $self->{orig}  }
+	ref $self->{msg}? $self->{msg}{message}: do { $self->{msg}=~ / at .* line \d+.*$/? $`: $self->{msg}  }
 }
 
-# добавляет в начало сообщения
-sub messageAdd {
-	my ($self, $add) = @_;
-	$self->{orig} = join "", $add, "\n", $self->{orig};
-	$self
-}
+# # добавляет в начало сообщения
+# sub messageAdd {
+	# my ($self, $add) = @_;
+	# $self->{orig} = join "", $add, "\n", $self->{orig};
+	# $self
+# }
 
 # сообщает, что аббревиатура совпадает
 sub is {
@@ -231,15 +292,15 @@ sub is {
 sub trace {
 	my ($self, $count) = @_;
 	
-	my $msg = longmess("app.raise.trace");
+	#my $msg = longmess("app.raise.trace");
 
-	if(defined $count) {
-		local ($&, $`, $');
-		my $r = "\n.*" x $count;
-		$msg = $& if $msg =~ /$r$/;
-	}
+	# if(defined $count) {
+		# local ($&, $`, $');
+		# my $r = "\n.*" x $count;
+		# $msg = $& if $msg =~ /$r$/;
+	# }
 	
-	__PACKAGE__->new( $msg, "trace", undef );
+	__PACKAGE__->new( "app.raise.trace", "trace" );
 }
 
 # возвращает строку
