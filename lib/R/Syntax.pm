@@ -432,7 +432,6 @@ sub masking {
 	my $LEX = $self->{LEX};
 	my $trace = $self->{trace};
 	my $endline;
-	my $lex;
 
 	while($s =~ /$re_lex/g) {			# формируем дерево
 	
@@ -448,9 +447,15 @@ sub masking {
 	
 		exists $+{newline}? do { $self->{lineno}++; $self->{startline} = length($`); }:
 		exists $+{error_nosym}? $self->error(sprintf($self->{error}{nosym}, $+{error_nosym})):
-		exists $+{spacer}? do { $lex->{spacer} = 1 }:
+		exists $+{spacer}? do {
+			my $stack = $self->{stack};
+			my $e = @$stack? $stack->[-1]: undef;
+			my $A = $e->{'A+'};
+			my $s = @$A? $A->[-1]: $e;
+			$s->{spacer} = 1;
+		}:
 		do { if(defined $^R) {
-			$lex = $LEX->{$^R};
+			my $lex = $LEX->{$^R};
 		
 			$self->error("лексема ". $app->perl->q("$^R") ." не существует в языке " . $self->{name}) if !defined $lex;
 		
@@ -566,7 +571,7 @@ sub pop {
 	# срабатывают обработчики для грамматического разбора
 	if(my $POP_A = $self->{POP_A}) {
 		for(my $i=0; $i<@$A; $i++) {
-			my $op = $A->[$i];
+			my $op = $A->[$i]{stmt};
 			my $sub = $POP_A->{$op};
 			$sub->($self, $i) if defined $sub;
 		}
@@ -601,34 +606,36 @@ sub _pop {
 		my $s;
 		my $x;
 
-		while(@S) {
-			my $s = $S[-1];
-			last if $fix & $prefix && $s->{fix} & $prefix;	# prefix не выбрасывает другие префиксы
-			last unless $fix & $postfix && $s->{fix} & $postfix ||	# postfix выбрасывает другие постфиксы
-			($x = $s->{prio}) < $prio || 	# приоритет оператора больше чем у того, что из стека
-			$x==$prio && ( ($s->{fix} | $meta->{fix}) & $nonassoc?	# приоритет равен
-				$self->error("неассоциативный оператор " . ($s->{fix} & $nonassoc? $s->{name}: $meta->{name})):
-			$s->{fix} & $leftassoc);	# и он левоасоциативен
-		
-			my $r = pop @S;
+		unless($fix & $prefix) {	# prefix не выбрасывает операторы
+			while(@S) {			
+				my $s = $S[-1];
+				
+				last unless $fix & $postfix && $s->{fix} & $postfix ||	# postfix выбрасывает другие постфиксы
+				($x = $s->{prio}) < $prio || 	# приоритет оператора больше чем у того, что из стека
+				$x==$prio && ( ($fix | $s->{fix}) & $nonassoc?	# приоритет равен
+					$self->error("неассоциативный оператор " . ($s->{fix} & $nonassoc? $s->{name}: $meta->{name})):
+				$s->{fix} & $leftassoc);	# и он левоасоциативен
 			
-			if($r->{fix} & $infix) {
-				$self->error("нет операндов для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
-				$self->error("нет левого операнда для оператора $r->{stmt}") if !defined( $r->{left} = pop @T );
-				$self->trace("%", $r);
+				my $r = pop @S;
+				
+				if($r->{fix} & $infix) {
+					$self->error("нет операндов для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
+					$self->error("нет левого операнда для оператора $r->{stmt}") if !defined( $r->{left} = pop @T );
+					$self->trace("%", $r);
+				}
+				elsif($r->{fix} & $prefix) {	# -x
+					$r->{left} = $r->{right} if exists $r->{right};		# для префиксных скобок
+					$self->error("нет операнда для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
+					$self->trace(">", $r);
+				}
+				else {	# x--
+					$self->error("нет операнда для оператора $r->{stmt}") if !defined( $r->{left} = pop @T );
+					$self->trace("<", $r);			
+				}
+				
+				
+				push @T, $r;			
 			}
-			elsif($r->{fix} & $prefix) {	# -x
-				$r->{left} = $r->{right} if exists $r->{right};		# для префиксных скобок
-				$self->error("нет операнда для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
-				$self->trace(">", $r);
-			}
-			else {	# x--
-				$self->error("нет операнда для оператора $r->{stmt}") if !defined( $r->{left} = pop @T );
-				$self->trace("<", $r);			
-			}
-			
-			
-			push @T, $r;			
 		}
 		
 		# входящий оператор
@@ -810,7 +817,7 @@ sub _pop {
 	
 	
 	# выбрасываем всё
-	$meta = {prio => 1_000_000};
+	$meta = {prio => 1_000_000, fix => $infix};
 	$popop->();
 	
 	$self->error("стек T пуст: невозможно достать операнд для скобки") if !@T;

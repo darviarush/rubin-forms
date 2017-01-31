@@ -188,7 +188,7 @@ sub stringify {
 	
 	my $res = "";
 	
-	for my $trace (@{$self->{trace}}) {
+	for my $trace (reverse @{$self->{trace}}) {
 		my ($package, $filename, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash, $args) = @$trace;
 		
 		my $arguments = $hasargs? "("._toargs($args).")": "";
@@ -196,11 +196,11 @@ sub stringify {
 		$subroutine = "~" if $subroutine eq "__ANON__";
 		
 		my $pack = quotemeta $package;
-		$package = $subroutine =~ /^$pack/? "": "$package ";
+		$subroutine =~ s/^$pack//;
 		
 		$subroutine =~ s/::(\w+)$/.$1/;
 		
-		$res .= "$filename:$line $package$subroutine$arguments\n";
+		$res .= "$filename:$line\t$subroutine$arguments\n";
 	}
 	
 	$res .= "$self->{who}: $self->{msg}";

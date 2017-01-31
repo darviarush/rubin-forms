@@ -93,6 +93,7 @@ my $s = $BASICSYNTAX;
 
 $s->tr("yf",  qw{		.word ?.word .$word ?.$word :word			});
 $s->td("yS",  qw{		.word( ) .$word( ) ?.word( ) ?.$word( ) 	});
+$s->td("xfy", qw{		.word+ .$word+ ?.word+ ?.$word+ 			});
 $s->tr("yF",  qw{		[ ]		{ }									});
 $s->tr("xF",  qw{		@[ ]	@{ }								});
 $s->tr("fx",  qw{		@	%	pop shift							})->td('xf', qw{	pop shift	});
@@ -100,6 +101,7 @@ $s->tr("yf",  qw{		++ --				})->td("fy", qw{	++ -- 	}); 	# ?!
 $s->tr("fy",  qw{  		len lc uc lcfirst ucfirst chr ord	})->td("yf", qw{	len  abs ceil floor round rand srand keys values	});
 $s->tr("xfy", qw{  		ceil floor round	});
 $s->tr("xf",  qw{		?  					})->td("fy", qw{	Num		});
+$s->tr("xfy", qw{		?					});
 $s->tr("yfx", qw{		^					});
 $s->tr("fy",  qw{ 		+ - ! +~			});
 $s->tr("xfy", qw{		~	!~				});
@@ -113,7 +115,7 @@ $s->tr("xfx", qw{		< > <= >= lt gt le ge		});
 $s->tr("xfx", qw{		== != eq ne  <=> cmp 		});			# ~~
 $s->tr("xfx", qw{		isa can	of					});
 $s->tr("xfy", qw{		&&					});
-$s->tr("xfy", qw{		|| ^^ ?				});
+$s->tr("xfy", qw{		|| ^^				});
 $s->tr("xfx", qw{		.. ... ^.. ^...  to ^to ^to^   step			})->td("fx", qw{	^	});
 $s->tr("xfy", qw{		=>		})->td("fy",  qw{	word=>			});
 $s->tr("xfx", qw{		split	})->td("xf",  qw{	split			});
@@ -122,7 +124,7 @@ $s->tr("xfy", qw{		zip		})->td("fy",  qw{	zip				});
 $s->tr("xfx", qw{		splice	delete	});
 $s->tr("yfx", qw{		join	})->td("yf", qw{	reverse join	});
 $s->tr("yfx", qw{		-> =   += -= *= /= ^= div= mod=   &&= ||= ^^=   and= or= xor=   +&= +|= +^= +<= +>=   **= ***= .= ?= ,= =, %=   });
-$s->tr("fy",  qw{		+gosub					});
+$s->tr("fx",  qw{		gosub+					});
 $s->tr("xfy", qw{		:						});
 $s->tr("xfy", qw{		|						});	# TODO: |=
 $s->tr("fy",  qw{		not						});
@@ -461,9 +463,7 @@ $s->opt('zip', re => qr{	\b zip (?<arity>\d+)? \b	}ix, sub => sub { my ($self, $
 $s->fixes(
 'xfy zip' => sub {
 	my ($self, $push) = @_;
-	#msg1 $push->{left}{stmt}, $push->{right}{stmt};
 	$push->{left}{stmt} = "zip" if $push->{left}{stmt} eq "xfy zip";
-	#$push->{left} = $push->{left}{right} if $push->{left}{stmt} eq "fy zip";
 },
 'fy zip' => sub {
 	my ($self, $push) = @_;
@@ -473,36 +473,44 @@ $s->fixes(
 
 
 # устанавливаем обработчик на начало pop
-$s->opt("+gosub", nolex=>1);
+$s->opt("gosub+", nolex=>1);
+$s->opt(".word+", nolex=>1);
+$s->opt('.$word+', nolex=>1);
+$s->opt("?.word+", nolex=>1);
+$s->opt('?.$word+', nolex=>1);
 my %PULLOP = qw(	.word  .word+  .$word  .$word+   ?.word  ?.word+	?.$word ?.$word+		);
 $s->pull(join(" ", keys %PULLOP) => \&onpull);
 
 sub onpull {
-	my ($self, $i) = @_; 
+	my ($self, $i) = @_;
 	my $A = $self->{stack}[-1]{"A+"};
 	$#$A == $i && return;	# мы в конце скобки
 	my $me = $A->[$i];
 	$me->{spacer} || return;	# нужен space
-	my $lex = $self->{LEX}{ $A->[$i+1] };
+	
+	my $op = $A->[$i+1];
+	my $lex = $self->{LEX}{ $op->{stmt} };
 	my $fix = $lex->{fix};
 	
+	#msg1 "xxx", $me->{stmt}, "spacer:", $me->{spacer}, $A->[$i+1]->{spacer}, "u:", !($fix & ($R::Syntax::prefix | $R::Syntax::infix | $R::Syntax::postfix)), $fix & $R::Syntax::prefix && !($fix & ($R::Syntax::infix | $R::Syntax::postfix)), $fix & $R::Syntax::prefix && $fix & ($R::Syntax::infix | $R::Syntax::postfix) && !$A->[$i+1]->{spacer};
+	
 	# следующий кроме оператора
-	if( !$fix & $R::Syntax::prefix && !$fix & $R::Syntax::infix ||
+	if( !($fix & ($R::Syntax::prefix | $R::Syntax::infix | $R::Syntax::postfix)) ||
 	
-	# следующий prefix оператор и нет такого infix
-	$fix & $R::Syntax::prefix && !$fix & $R::Syntax::infix ||
+	# следующий prefix оператор и нет такого infix и постфикс
+	$fix & $R::Syntax::prefix && !($fix & ($R::Syntax::infix | $R::Syntax::postfix)) ||
 	
-	# следующий prefix и infix, но у me есть space, а у оператора - нет
-	$fix & $R::Syntax::prefix && $fix & $R::Syntax::infix && length( $A->[$i+1]->{spacer} )
+	# следующий prefix и infix или postfix, но у me есть space, а у оператора - нет
+	$fix & $R::Syntax::prefix && $fix & ($R::Syntax::infix | $R::Syntax::postfix) && !$op->{spacer}
 	) {
 		# тогда меняем на оператор .word+ и добавляем постфиксный оператор, для захвата параметров
-		msg1 "sk!";
+		#msg1 "sk!";
 		
 		# поменять stmt оператора
 		$me->{stmt} = $PULLOP{ $me->{stmt} };
 		
 		# вставляем оператор
-		splice @$A, $i+1, 0, { stmt => "+gosub" };
+		splice @$A, $i+1, 0, { stmt => "gosub+" };
 	}
 	
 }

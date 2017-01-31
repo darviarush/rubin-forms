@@ -2,6 +2,7 @@ rem корневой класс
 
 rem конструктор корневого класса
 sub new
+	%me = @paramarray
 end
 
 

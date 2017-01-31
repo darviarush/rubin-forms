@@ -784,9 +784,12 @@ TODO: циклы с возвращаемым значением через `last
 		sub slut b, c then me:number * b?1 + c
 	end');
 	
+	$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut( a.slut(), a.slut() + 6 )');	# 116
 	$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut a.slut, a.slut + 6');	# 116
+	$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut(-+1)');	# -10
 	$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut -+1');	# -10
-	$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut -+1');	# -10
+	$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut-+1');	# 9
+	$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut -+ 1');	# -10
 	
 Тут `-` без пробела после него - по этому признаку происходит вызов метода с параметрами.
 
@@ -794,12 +797,20 @@ TODO: циклы с возвращаемым значением через `last
 
 Пример декоратора:
 
-	$app->syntaxAg->new->eval('
+Добавляем сервис:
+
+	$app->file("var/_test_13_ag/R/Routers.ag")->mkpath->write('
+		class App::Service::Routers
+			sub add name then @me:routers ,= name
+		end
+	');
 	
-	# добавляем сервис
-	class R::Routers
-		sub add name then @me:routers ,= name
-	end
+Инициализируем путь для сервисов:
+
+	$app->syntaxAg->ag("var/_test_13_ag/R/Routers.ag");
+
+
+	$app->syntaxAg->new->eval('
 	
 	class MyDecorator
 		sub init then app.routers.add "$me:args[0] $me:class.$me:name"
@@ -814,6 +825,8 @@ TODO: циклы с возвращаемым значением через `last
 	end
 	
 	');
+	
+	$app->syntaxAg->new->eval(' app.routers:routers[0] ');		# /page DecoratorTest.myroute
 	
 Экземпляр декоратора создаётся для каждого метода, который он декорирует.
 
@@ -839,13 +852,13 @@ TODO: циклы с возвращаемым значением через `last
 Когда установлено `app.site.test` контракторы осуществляют проверки и выбрасывают эксепшены.
 TODO:
 
-	$app->syntaxAg->new->eval('
-		class ContractTest
-			in
-				Num r 
+	# $app->syntaxAg->new->eval('
+		# class ContractTest
+			# in
+				# Num r 
 				
-			out
+			# out
 			
-			sub new r, x then 
-		end
-	');
+			# sub new r, x then 
+		# end
+	# ');

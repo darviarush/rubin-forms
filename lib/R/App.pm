@@ -385,7 +385,11 @@ sub AUTOLOAD {
 		$load = $base."/".ucfirst($load).".pm";
 		$new = $base."::".ucfirst($new);
 		#print STDERR "load: $load\n";
-		require $load;
+		if($Nil::INC && @$Nil::INC > 1) {
+			$app->syntaxAg->include($new);
+		} else {
+			require $load;
+		}
 		
 		my $ini = $app->ini;
 		my @param;

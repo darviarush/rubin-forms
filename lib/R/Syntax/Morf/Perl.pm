@@ -18,16 +18,24 @@ our %templates = (
 
 
 # разыменования
-'yf .$word' => '{{ left }}->${$DATA->{{{ var }}}}',
-'yf .word' => '{{ left }}->{{ var }}',
 'yf :word' => '{{ left }}->{{{ var }}}',
+
+'yf .word' => '{{ left }}->{{ var }}',
+'yf .$word' => '{{ left }}->${$DATA->{{{ var }}}}',
 'yf .?word' => '(do { my $q = {{ left }}; $q->can("{{ var }}")? $q->{{ var }}: () })',
 'yf .?$word' => '(do { my $q = {{ left }}; $q->can($DATA->{{{ var }}})? $q->{{ var }}: () })',
 
-'yS .$word(' => '{{ left }}->${$DATA->{{{ var }}}}({{ right }})',
 'yS .word(' => '{{ left }}->{{ var }}({{ right }})',
+'yS .$word(' => '{{ left }}->${$DATA->{{{ var }}}}({{ right }})',
 'yS ?.word(' => '(do { my $q = {{ left }}; $q->can("{{ var }}")? $q->{{ var }}( {{ right }} ): () })',
 'yS ?.$word(' => '(do { my $q = {{ left }}; $q->can($DATA->{{{ var }}})? $q->{{ var }}( {{ right }} ): () })',
+
+'xfy .word+' => '{{ left }}->{{ var }}({{ right }})',
+'xfy .$word+' => '{{ left }}->${$DATA->{{{ var }}}}({{ right }})',
+'xfy ?.word+' => '(do { my $q = {{ left }}; $q->can("{{ var }}")? $q->{{ var }}( {{ right }} ): () })',
+'xfy ?.$word+' => '(do { my $q = {{ left }}; $q->can($DATA->{{{ var }}})? $q->{{ var }}( {{ right }} ): () })',
+
+'fx gosub+' => '{{ right }}',
 
 'yF [' => '{{ left }}->[ {{ right }} ]',
 'yF {' => '{{ left }}->{ {{ right }} }',
@@ -282,6 +290,7 @@ nan => '(0+"nan")',
 pi => '(atan2(1,1)*4)',
 true => '$R::App::app->json->true',
 false => '$R::App::app->json->false',
+paramarray => '(\@_)',
 last => 'last',
 "last label" => 'last {{L}}',
 next => 'next',
@@ -292,9 +301,6 @@ num => '{{ num }}',
 hex => '{{ hex }}',
 bin => '{{ bin }}',
 radix => '{{ radix }}',
-'[]' => '[]',
-'()' => '()',
-'{}' => '{}',
 new => '(exists $Nil::CLASSES{"{{ new }}"}? "{{ new }}": $R::App::app->syntaxAg->include("{{ new }}"))->new',
 new_apply => '(exists $Nil::CLASSES{"{{ new }}"}? "{{ new }}": $R::App::app->syntaxAg->include("{{ new }}"))->new({{ right }})',
 
