@@ -1100,6 +1100,9 @@ sub expirience {
 	$out
 }
 
+
+
+
 my $rootsk = $app->perl->qq("¥");
 
 # приготовления для трансляции в другой язык

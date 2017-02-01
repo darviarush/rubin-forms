@@ -800,7 +800,7 @@ TODO: циклы с возвращаемым значением через `last
 Добавляем сервис:
 
 	$app->file("var/_test_13_ag/R/Routers.ag")->mkpath->write('
-		class App::Service::Routers
+		class R::Routers
 			sub add name then @me:routers ,= name
 		end
 	');

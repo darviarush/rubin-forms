@@ -379,15 +379,18 @@ sub AUTOLOAD {
 		$self
 	} else {
 	
-		my $base = "R";
-		my $load = $prop; $load =~ s![A-Z]!/$&!g;
+		my $base = "R";		
 		my $new = $prop; $new =~ s![A-Z]!::$&!g;
-		$load = $base."/".ucfirst($load).".pm";
 		$new = $base."::".ucfirst($new);
+		
 		#print STDERR "load: $load\n";
-		if($Nil::INC && @$Nil::INC > 1) {
+		
+		#if($Nil::INC && @$Nil::INC > 1) {
+		if($app->{syntaxAg}) {
 			$app->syntaxAg->include($new);
 		} else {
+			my $load = $prop; $load =~ s![A-Z]!/$&!g;
+			$load = $base."/".ucfirst($load).".pm";
 			require $load;
 		}
 		

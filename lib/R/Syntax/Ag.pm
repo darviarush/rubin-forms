@@ -322,11 +322,29 @@ $s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_id ) $re_args_then }ix => sub {
 	my ($self, $push) = @_;
 	
 	$push->{args} = [ split /\s*,\s*/, $push->{args} ];
+	$push->{endline} = 1 if delete $push->{then};
 	
-	if($push->{then}) {
-		$push->{endline} = 1; 
-		delete $push->{then};
+	# пытаемся обнаружить декораторы
+	
+	my $A = $self->{stack}[-1]{'A+'};
+	
+	if($A && @$A && $A->[0]{stmt} eq '\n') {
+		# двигаемся назад, пока не обнаружим перевод строки или начало последовательности
+		# тогда если предыдущий элемент - @, то меняем на декоратор
+		for(my $i=$#$A-1; $i>=-1; $i--) {
+			
+			if($i==-1 || $A->[$i]{stmt} eq '\n') {
+				my $stmt = $A->[$i+1]{stmt};
+				if($stmt eq '\n') { next; }		# пропускаем \n
+				elsif($stmt ne '@') { last; }	# выходим
+				
+				# заменяем на декоратор
+				
+			}
+		}
+		
 	}
+		
 } => "END");
 #$s->br("SUB_CLASS" => qr{ \b SUB $re_space $re_id $re_args_then }ix => "END");
 
