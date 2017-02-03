@@ -58,15 +58,6 @@ sub bingo {
 sub new {
 	my ($cls, $msg, $who, $arity) = @_;
 	
-	# longmess почему-то бывает выдаёт скаляр $orig
-	#$msg = $$msg if ref $msg eq "SCALAR";
-	
-	# if(@_ == 2) {
-		# $who = "throw";
-		# $orig = $msg;
-		# $msg = longmess($msg);
-	# }
-	
 	bless {
 		who => $who // "throw",		# error, warning, trace, throw, etc...
 		msg => $msg,		# сообщение об ошибке
@@ -307,6 +298,15 @@ sub trace {
 sub tracex {
 	my ($self, $count) = @_;
 	$self->trace($count)->stringify
+}
+
+# очищает трейсбак
+sub clear {
+	my ($self) = @_;
+	
+	@{$self->{trace}} = ();
+	
+	$self
 }
 
 1;

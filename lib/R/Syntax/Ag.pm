@@ -325,21 +325,22 @@ $s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_id ) $re_args_then }ix => sub {
 	$push->{endline} = 1 if delete $push->{then};
 	
 	# пытаемся обнаружить декораторы
-	
 	my $A = $self->{stack}[-1]{'A+'};
 	
-	if($A && @$A && $A->[0]{stmt} eq '\n') {
+	if($A && @$A && $A->[-1]{stmt} eq '\n') {
 		# двигаемся назад, пока не обнаружим перевод строки или начало последовательности
 		# тогда если предыдущий элемент - @, то меняем на декоратор
 		for(my $i=$#$A-1; $i>=-1; $i--) {
 			
 			if($i==-1 || $A->[$i]{stmt} eq '\n') {
-				my $stmt = $A->[$i+1]{stmt};
+				my $op = $A->[$i+1];
+				my $stmt = $op->{stmt};
 				if($stmt eq '\n') { next; }		# пропускаем \n
 				elsif($stmt ne '@') { last; }	# выходим
 				
 				# заменяем на декоратор
-				
+				$op->{SUB} = $push->{SUB};
+				$op->{tmpl} = 'decorator';
 			}
 		}
 		

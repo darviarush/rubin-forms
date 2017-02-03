@@ -36,8 +36,13 @@ sub new {
 		#trace => "«eval»",		# файл трейс которого показать
 		trace => undef,			# показывать трейс
 		show => undef,			# показывать текст в eval
-		file => undef,				# путь к текущему файлу
+		
+		text => "",				# текущий код
+		
+		file => undef,			# путь к текущему файлу
 		lineno => 1,			# номер строки в текущем файле
+		charno => 1,			# номер текущего символа
+		startline => 0,			# сколько символов до начала текущей строки
 		
 		stack => undef,			# стек скобок
 		lex => undef,			# кэш - лексический анализатор
@@ -435,9 +440,10 @@ sub masking {
 
 	while($s =~ /$re_lex/g) {			# формируем дерево
 	
-		$self->{charno} = length($`) - $self->{startline} + 1;
+		$self->{charno} = length($`) - length($&) - $self->{startline} + 1;
 	
 		if($trace) {
+			local ($`);
 			$endline = index($&, "\n")!=-1;
 			$app->log->info(":nonewline", "$&") if !$endline;
 			$endline = $& if $endline;
@@ -619,17 +625,17 @@ sub _pop {
 				my $r = pop @S;
 				
 				if($r->{fix} & $infix) {
-					$self->error("нет операндов для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
-					$self->error("нет левого операнда для оператора $r->{stmt}") if !defined( $r->{left} = pop @T );
+					$self->error("нет операндов для оператора $r->{stmt}", $r) if !defined( $r->{right} = pop @T );
+					$self->error("нет левого операнда для оператора $r->{stmt}", $r) if !defined( $r->{left} = pop @T );
 					$self->trace("%", $r);
 				}
 				elsif($r->{fix} & $prefix) {	# -x
 					$r->{left} = $r->{right} if exists $r->{right};		# для префиксных скобок
-					$self->error("нет операнда для оператора $r->{stmt}") if !defined( $r->{right} = pop @T );
+					$self->error("нет операнда для оператора $r->{stmt}", $r) if !defined( $r->{right} = pop @T );
 					$self->trace(">", $r);
 				}
 				else {	# x--
-					$self->error("нет операнда для оператора $r->{stmt}") if !defined( $r->{left} = pop @T );
+					$self->error("нет операнда для оператора $r->{stmt}", $r) if !defined( $r->{left} = pop @T );
 					$self->trace("<", $r);			
 				}
 				
@@ -793,7 +799,11 @@ sub _pop {
 		$meta = $meta1;
 		$op = $A->[$i];
 		my $fix = $meta->{fix};
-		$self->error($app->perl->qq($op->{stmt}) . " не может стоять после " . $self->namefix($prev, 1) . ": " . join "   ", map { $_->{stmt} } @$A) if !$check->($prev, $fix);
+		
+		if(!$check->($prev, $fix)) {
+			my $msg = $app->perl->qq($op->{stmt}) . " не может стоять после " . $self->namefix($prev, 1) . ": " . join "   ", map { $_->{stmt} } @$A;
+			$self->error($msg, $op);
+		}
 		
 		if($fix & $prefix | $fix & $postfix | $fix & $infix) {
 			$popop->($op);
@@ -939,12 +949,27 @@ sub trace {
 
 # выбрасывает ошибку
 sub error {
-	my ($self, $msg) = @_;
+	my ($self, $msg, $simbol) = @_;
 	local ($_, $`, $', $&);
 	
-	my $color_msg = $app->log->colorized( "$self->{file}:$self->{lineno}: $msg", $self->color_stacks );
+	my $file = $self->{file};
+	my $lineno = $simbol? $simbol->{lineno}: $self->{lineno};
+	my $charno = $simbol? $simbol->{charno}: $self->{charno};
 	
-	die $color_msg;
+	my @lines = split /\r\n|[\r\n]/, $self->{text};
+	
+	my $line = $lines[$lineno-1];
+	
+	my ($line1, $line2) = $line =~ /(.{$charno})(.*)/;
+	$line1 =~ s/\t/ $charno+=3; "    "/ge;
+	$line1 =~ s/\t/    /g;
+	$line = "$line1$line2";
+	
+	#my $color_msg = $app->log->colorized( "$file:$lineno: $msg", $self->color_stacks );
+	
+	$msg = "$msg\n$file:$lineno:$charno:\n$line\n" . ('_' x ($charno-1)) . "^\n";
+	
+	die R::Raise->new($msg, "error")->clear;
 }
 
 # устанавливает модификаторы синтаксиса
@@ -1110,7 +1135,8 @@ sub premorf {
 	my ($self, $file) = @_;
 	$self->{file} = $file // $self->{file} // "«eval»";
 	$self->{lineno} = 1;
-	$self->{charlineno} = 0;
+	$self->{charno} = 0;
+	$self->{startline} = 0;
 	
 	$self->{stack} = [{stmt=>$app->perl->qq("root")}];
 	
@@ -1145,6 +1171,8 @@ sub postmorf {
 # морфирует в другой язык
 sub morf {
 	my ($self, $s, $file) = @_;
+	
+	$self->{text} = $s;
 	
 	$app->log->info("") if $self->{trace};
 	
