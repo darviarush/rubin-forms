@@ -3,7 +3,7 @@ package R::Syntax;
 # просматривает на один оператор вперёд, благодаря чему может определить арность оператора
 
 use common::sense;
-use R::App qw/msg msg1 $app todo nsort qsort pairmap has Can Isa/;
+use R::App qw/msg msg1 $app todo nsort qsort pairmap has Can Isa closure/;
 
 has qw/addspacelex/;
 
@@ -107,7 +107,7 @@ sub lang {
 			my $class = "R::Syntax::Morf::" . ucfirst($lang);
 			$self->{lang} = bless { name => $lang }, $class;
 			$self->modifiers( %{"${class}::modifiers"} );
-			$self->templates( %{"${class}::templates"} );
+			$self->templates( @{"${class}::templates"} );
 			$self->{lang}
 		};
 
@@ -420,7 +420,7 @@ sub lex {
 		(?<error_nosym> . )	"
 	}
 	
-	$app->file("var/lex-$self->{name}.pl")->write("my \$a = qr{$lex}xni;\n");
+	#$app->file("var/lex-$self->{name}.pl")->write("my \$a = qr{$lex}xni;\n");
 	
 	#msg1 $lex;
 	
@@ -441,6 +441,7 @@ sub masking {
 	while($s =~ /$re_lex/g) {			# формируем дерево
 	
 		$self->{charno} = length($`) - length($&) - $self->{startline} + 1;
+		$self->{length} = length($&);
 	
 		if($trace) {
 			local ($`);
@@ -494,7 +495,7 @@ sub masking {
 # пришёл оператор
 sub op {
 	my $self = shift;
-	my $push = {%+, 'stmt', @_, lineno => $self->{lineno}, charno => $self->{charno}};
+	my $push = {%+, 'stmt', @_, lineno => $self->{lineno}, charno => $self->{charno}, length => $self->{length}};
 	
 	my $stmt = $_[0];
 
@@ -533,7 +534,7 @@ sub atom {
 # все операторы и атомы добавляются в неё
 sub push {
 	my $self = shift;
-	my $push = {%+, 'stmt', @_, lineno => $self->{lineno}, charno => $self->{charno}};
+	my $push = {%+, 'stmt', @_, lineno => $self->{lineno}, charno => $self->{charno}, length => $self->{length}};
 	
 	# выполняем подпрограмму
 	if(my $x = $self->{LEX}{$_[0]}) {

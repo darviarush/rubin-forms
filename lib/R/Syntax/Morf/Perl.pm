@@ -11,7 +11,7 @@ my $raw = "', (scalar do { "; my $_raw = " }), '";
 my $esc = "', R::View::Views::escapeHTML(scalar do { "; my $_esc = " }), '";
 
 ### шаблоны
-our %templates = (
+our @templates = (
 
 'fx msg' => 'msg({{ right }})',
 'fx msg1' => 'msg1({{ right }})',
@@ -258,7 +258,14 @@ SCENARIO => '{{ _scenario right, lineno }}',
 
 CLASS => '(do { package {{ class }}; use common::sense; use R::App;{{ _extends class, extends, lineno, file }} sub void { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
 
-SUB => 'sub {{ SUB }} { my $DATA = { me => {{ _shift SUB }} }; {{ _args args }} {{ right }}{{ _ifnewend SUB }}}',
+SUB => sub { my ($self, $push) = @_;
+		# вернуть self, если это конструктор
+		$push->{RET} = $push->{SUB} eq "new"? '; $DATA->{me}': '';
+		# если имя функции == new
+		$push->{SHIFT} = $push->{SUB} eq "new"? 'bless({}, do { my $cls=shift; ref $cls || $cls })': 'shift';
+	},
+	'sub {{ SUB }} { my $DATA = { me => {{ SHIFT }} }; {{ _args args }} {{ right }}{{ RET }} }',
+BLOCK => 'do { sub {{ SUB }} { my $DATA = shift; {{ _args args }} {{ right }}; return }; $DATA->{{ SUB }} }',
 
 IF => '(({{ right }}{{ _else else }})',
 "IF THEN" => '{{ left }})? do {{{ right }}',
@@ -437,25 +444,6 @@ sub _extends {
 	$ext
 }
 
-# если имя функции == new
-sub _shift {
-	my ($self, $name) = @_;
-	if($name eq "new") {
-		'bless({}, do { my $cls=shift; ref $cls || $cls })'
-	}
-	else {
-		'shift'
-	}
-}
-
-# вернуть self, если это конструктор
-sub _ifnewend {
-	my ($self, $name) = @_;
-	if($name eq "new") {
-		'; $DATA->{me}'
-	}
-}
-
 # новое регулярное выражение
 sub _like {
 	my ($self, $push) = @_;
@@ -476,7 +464,7 @@ sub end {
 	
 	# добавляет в начало
 	if(my $begin = delete $self->{BEGIN}) {
-		$ret = "BEGIN { $begin } $ret";
+		$ret = "BEGIN { use common::sense; $begin } $ret";
 	}
 	
 	# сценарий - в отдельный файл

@@ -171,7 +171,6 @@ $s->opt("rescue", re => qr/ \b ( rescue | catch | except ) ( ( $re_space_ask \* 
 });
 
 $s->opt("word=>", re => qr{ (?<id>$re_id) $re_space_ask => }xn );
-$s->opt("=", sub => sub {	$_[0]->{assign} = 1 });
 
 $s->opt("|", re => qr{ 
 	\| $re_space_ask ( 
@@ -318,7 +317,7 @@ $s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => sub {
 #$s->br("OBJECT" => qr{ \b OBJECT $re_space $re_class_stmt }ix => "END");
 #$s->br("MODULE" => qr{ \b MODULE $re_space $re_class_stmt }ix => "END");
 
-$s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_id ) $re_args_then }ix => sub {
+sub br_sub {
 	my ($self, $push) = @_;
 	
 	$push->{args} = [ split /\s*,\s*/, $push->{args} ];
@@ -346,7 +345,11 @@ $s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_id ) $re_args_then }ix => sub {
 		
 	}
 		
-} => "END");
+}
+
+$s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_id ) $re_args_then }ix => \&br_sub => "END");
+$s->br("BLOCK" => qr{ \b BLOCK $re_space (?<SUB> $re_id ) $re_args_then }ix => \&br_sub => "END");
+
 #$s->br("SUB_CLASS" => qr{ \b SUB $re_space $re_id $re_args_then }ix => "END");
 
 #$s->br("DEF" => qr{ \b DEF $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
@@ -642,6 +645,15 @@ sub compile {
 	my $file = $app->file($path);
 	my $text = $file->read;
 	
+	if(my $exts = $file->exts) {
+		my @exts = split /\./, $exts;
+		pop @exts if $exts[-1] eq "ag";
+		for my $ext (reverse @exts) {
+			my $Ext = "syntaxPreprocessor" . ucfirst $ext;
+			$text = $app->$Ext->new(file => $path, text => $text)->morf;
+		}
+	}
+	
 	my $cc = $self->new(file => $path, tofile => $to, trace => $self->{trace});
 	
 	if($text !~ /^($re_space_ask $re_rem $re_endline)* $re_space_ask (?i: class ) $re_space_ask \Q$name\E/xn) {
@@ -679,12 +691,20 @@ sub require {
 	for my $inc (@$INC) {
 		my $load = 0;
 		
+		# пробегаемся по пути и пытаемся найти подходящие файлы
 		for(my $i=0; $i<@path; $i++) {
 			my $rpath = join "/", @path[0..$i];
-			$rpath .= ".ag" if $i != $#path;
-			my $f = $app->file("$inc/$rpath");
+			my $f;
+			if($i != $#path) {
+				$f = $app->file("$inc/$rpath*.ag")->glob;
+				die "несколько подходящих файлов: " . join ", ", $f->files if $f->length > 1;
+				$rpath .= "." . $f->exts;
+			}
 			
-			if($f->exists && $f->isfile) {
+			$f = $app->file("$inc/$rpath");
+			
+			
+			if($f->isfile) {
 				my $to = $app->file("$inc/.Aqua/$rpath.pm");
 
 				if(!$to->exists || $to->mtime < $f->mtime) {
@@ -693,7 +713,7 @@ sub require {
 				
 				$Nil::REQUIRE{$rpath} = $rpath;
 				require $to->path;
-				$load = 1;
+				$load = 1 if $i == $#path;
 			}
 		}
 		return $class if $load;
@@ -717,8 +737,9 @@ sub include {
 		my $INC = $Nil::INC;
 
 		for my $inc (@$INC) {
-			$self->require("$path.ag", [$inc]), next CLASSES if -e "$inc/$path.ag";
-			#$self->parse("$path.au", [$inc]), next CLASSES if -e "$inc/$path.au";
+			my $file = $app->file("$inc/$path*.ag")->glob;
+			die "несколько подходящих файлов: " . join ", ", $file->files if $file->length > 1;
+			$self->require($file->subdir($inc, "")->path, [$inc]), next CLASSES if $file->exists;
 		}
 		
 		require "$path.pm";

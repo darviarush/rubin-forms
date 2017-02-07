@@ -130,6 +130,22 @@
 	#$app->syntaxAg->ag("var/_test_13_ag/Nik/Risk.ag");	#@ ~ класс Nik::Risk встречается в .* и в .*
 	$app->syntaxAg->ag("var/_test_13_ag/Nik/Risk.ag");	#@ ~ Risk\.ag
 	
+=== Препроцессоры
+
+Препроцессоры задаются дополнительными расширениями и являются классами `R::Syntax::Preprocessor::*`.
+
+	$app->file("var/_test_13_ag/Template.au.ag")->write("<html><% A+10 %></html>");
+	
+	$app->syntaxAg->ag("var/_test_13_ag/Template.au.ag");		# 
+	
+	$app->syntaxAg->eval("new Template(A => 10).render");		# <html>20</html>
+	
+Темплейт вместо подпрограммы `void` своё тело оборачивает в блок `render`.
+
+Блоки созданы специально для шаблонов. Локальные переменные блоков являются одновременно свойствами объекта. А ещё блок сразу же вызывается.
+
+
+	
 === Тесты
 
 	$app->file("var/_test_13_ag/Test.ag")->write("
