@@ -124,7 +124,8 @@ $s->tr("xfy", qw{		zip		})->td("fy",  qw{	zip				});
 $s->tr("xfx", qw{		splice	delete	});
 $s->tr("yfx", qw{		join	})->td("yf", qw{	reverse join	});
 $s->tr("yfx", qw{		-> =   += -= *= /= ^= div= mod=   &&= ||= ^^=   and= or= xor=   +&= +|= +^= +<= +>=   **= ***= .= ?= ,= =, %=   });
-$s->tr("fx",  qw{		gosub+					});
+$s->tr("fx",  qw{		gosub+					})->td("fy", qw{		sreplace kreplace		});
+$s->tr("xfx", qw{		flipflop ^flipflop flipflop^ ^flipflop^				});
 $s->tr("xfy", qw{		:						});
 $s->tr("xfy", qw{		|						});	# TODO: |=
 $s->tr("fy",  qw{		not						});
@@ -359,6 +360,50 @@ $s->br("new_apply" => qr{ 	\b NEW $re_space (?<new>$re_class) \(	}ix => ")");
 
 $s->br("SCENARIO" => sub { my ($self, $push) = @_; $push->{lineno} = $self->{lineno} } => "END");
 
+
+### строки
+
+# $s->x("words" => qr{		}xn => sub {
+	# my ($self, $push) = @_;
+# });
+
+$s->opt("sreplace", nolex => 1);
+$s->opt("kreplace", nolex => 1);
+$s->br("regexp");			$s->opt("regexp", nolex => 1);
+$s->br("like");				$s->opt("like", nolex => 1);
+$s->br("string_modify");	$s->opt("string_modify", nolex => 1);
+
+
+
+my $re_string = qr{ " (?<string> (?:\\"|""|[^"])* ) " | ' (?<string> (?:\\'|''|[^'])* ) ' }xn;
+
+$s->x("replace", qr{	 (?<s> [sk]) $re_string (?<arg> $re_id )?	}xn, sub {
+	my ($self, $push) = @_;
+	my $sk = $push->{s} eq "s"? "sreplace": "kreplace";
+	$self->checkout("ag.string")->push($sk)->masking($push->{string})->pop($sk)->checkout("ag")->assign($push);
+	$push->{left} = delete $push->{right};
+});
+
+$s->x("regex"	=> qr{	 $re_string ! (?<arg> $re_id )?	}xn => sub {
+	my ($self, $push) = @_;
+	$self->checkout("ag.string")->push("regexp")->masking($push->{string})->pop("regexp")->checkout("ag")->assign($push);
+});
+
+$s->x("likes"	=> qr{	 $re_string \? (?<arg> $re_id )?	}xn => sub {
+	my ($self, $push) = @_;
+	$self->checkout("ag.string")->push("like")->masking($push->{string})->pop("like")->checkout("ag")->assign($push);
+});
+
+$s->x("string"	=> qr{	 $re_string (?<arg> $re_id )?	 }xn => sub {
+	my ($self, $push) = @_;
+	$self->push("new_apply", new => "String::Fix::$push->{arg}") if $push->{new} = exists $push->{arg};
+	$self->checkout("ag.string")->push("string")->masking($push->{string})->pop("string")->checkout("ag")->assign($push);
+});
+$s->opt("string", sur => sub {
+	my ($self, $push) = @_;
+	$self->pop("new_apply") if $push->{new};
+});
+
 ### операнды
 
 # возвращает скобку в стеке имеющую параметр $id
@@ -437,13 +482,14 @@ $s->x("last");
 
 #$s->x("redo");
 #$s->x("wantarray");
+$s->x("local");
 
 $s->x("new"		=> qr{ 	\b NEW $re_space (?<new>$re_class) 	}ix);
 $s->x("var"		=> qr{ 	(?<var>$re_id) 						}x);
 $s->x("hex"		=> qr{	0x[\da-f_]+	}ix);
 $s->x("bin"		=> qr{	0b[10_]+	}ix);
 $s->x("radix"	=> qr{	(?<radix> (?<rad>\d+) r (?<num> [\da-z_]+ ) )	}ix => sub {
-	my ($self, $push)=@_;
+	my ($self, $push) = @_;
 	$self->error("$push->{radix} - система счисления не может быть 0") if $push->{rad} == 0;
 	$self->error("$push->{radix} - система счисления должна быть не более 62-х")  if $push->{rad} > 62;
 	my $num = $push->{num};
@@ -460,21 +506,6 @@ sub => sub {
 	$self->pop("new_apply") if exists $push->{new};
 });
 
-$s->br("regexp");			$s->opt("regexp", nolex => 1);
-$s->br("like");				$s->opt("like", nolex => 1);
-$s->br("string_modify");	$s->opt("string_modify", nolex => 1);
-
-$s->x("string"	=> qr{	( " (?<string> (?:\\"|""|[^"])* ) " | ' (?<string> (?:\\'|''|[^'])* ) ' ) 
-	( (?<qr>! ) | (?<like>\? ) )? (?<arg> $re_id )?	 }xn => sub {
-	my ($self, $push) = @_;
-	my $sk = exists $push->{qr}? "regexp": exists $push->{like}? "like": "string";
-	$self->push("new_apply", new => "String::Fix::$push->{arg}") if $push->{new} = !exists $push->{qr} && !exists $push->{like} && exists $push->{arg};
-	$self->checkout("ag.string")->push($sk)->masking($push->{string})->pop($sk)->checkout("ag")->assign($push);
-});
-$s->opt("string", sur => sub {
-	my ($self, $push) = @_;
-	$self->pop("new_apply") if $push->{new};
-});
 
 ### какие операторы в каких скобках могут существовать
 $s->in("if"		=> qw{		else elseif		});

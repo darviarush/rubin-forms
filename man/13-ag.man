@@ -136,11 +136,11 @@
 
 	$app->file("var/_test_13_ag/Template.au.ag")->write("<html><% A+10 %></html>");
 	
-	$app->syntaxAg->ag("var/_test_13_ag/Template.au.ag");		# 
+	$app->syntaxAg->ag("var/_test_13_ag/Template.au.ag");		# <html>10</html>
 	
 	$app->syntaxAg->eval("new Template(A => 10).render");		# <html>20</html>
 	
-Темплейт вместо подпрограммы `void` своё тело оборачивает в блок `render`.
+Темплейт вместо подпрограммы `void` своё тело оборачивает в блок `render`. А `void` вызывает `render`.
 
 Блоки созданы специально для шаблонов. Локальные переменные блоков являются одновременно свойствами объекта. А ещё блок сразу же вызывается.
 
@@ -682,6 +682,21 @@ TODO: циклы с возвращаемым значением через `last
 	$app->syntaxAg->new->eval('"7" ~ "{\d}"?');		# 1
 	$app->syntaxAg->new->eval('"7x" !~ "{\d}"?');	# 1
 	
+Группы:
+
+	$app->syntaxAg->new->eval('r = "abc_76-89_xy" ~ "(\d+)-(\d+)"!; r.g(1) . "~ " . r.g(2)"');		# 76~89
+
+	#$app->syntaxAg->new->eval('"abc_76-89_xy" ~ "*<(\d)>-<(\d)>*"?; "$1~$2"');	# 76~89
+	
+Именованные группы сразу становятся локальными переменными:
+	
+	$app->syntaxAg->new->eval('"abc_76-89_xy" ~ "(?<x>\d+)-(?<y>\d+)"!; "$x~$y"');		# 76~89
+	$app->syntaxAg->new->eval('"abc_76-89_xy" ~ "*<x:(\d)>-<y:(\d)>*"?; "$x~$y"');		# 76~89
+	
+Замена:
+	
+	$app->syntaxAg->new->eval('(y = "abc_76_89_xy") ~ s"(\d+)"g "-$1-"; y');		# abc_-76-_-89-_xy
+	#$app->syntaxAg->new->eval('(y = "abc_76_89_xy") ~ k"<x:(\d)>"g "-$x-"; y');		# abc_-76-_-89-_xy
 	
 === Интервальные
 

@@ -168,6 +168,7 @@ our @templates = (
 "xfx isa" => 'Isa({{ left }}, {{ right }})',
 "xfx can" => '(Can({{ left }}, {{ right }})? 1: "")',
 "fy Num" => 'Num({{ right }})',
+"xfx flipflop" => 'scalar(({{ left }}) .. ({{ right }}))',
 
 
 # интервальные
@@ -285,6 +286,9 @@ WHILE => '{{ right }}',
 
 DO => 'do { {{ right }} }',
 
+'fx return' => 'return {{ right }}',
+'local' => '$DATA',
+
 # атомы
 #"&ref" => '({{ var }})',
 index => '({{i}}+{{n}})',
@@ -318,9 +322,13 @@ CAT => '{{ str }}',
 exec1 => '{{ str }}${\({{ right }})}',
 string => '"{{ right }}"',
 regexp => 'qr{{{ right }}}{{ arg }}',
-like => 'qr{{{ _like * }}}',
+like => sub { my ($self, $push) = @_; $push->{right} = $app->perl->likes($push->{right}, $push->{arg}) },
+	'qr{{{ right }}}',
 string_modify => '("{{ arg }}"->can("new")? "{{ arg }}": $R::App::app->syntaxAg->include("{{ new }}"))->new("{{ right }}")',
 
+"fy sreplace" => 's{{{ left }}}{ {{ right }} }{{ arg }}',
+"fy kreplace" => sub { my ($self, $push) = @_; $push->{right} = $app->perl->likes($push->{right}, $push->{arg}) },
+	's{{{ left }}}{ {{ right }} }',
 );
 
 # возвращает новую переменную
@@ -444,12 +452,6 @@ sub _extends {
 	$ext
 }
 
-# новое регулярное выражение
-sub _like {
-	my ($self, $push) = @_;
-	#$push->{arg} = s///;
-	$app->perl->likes($push->{right}, $push->{arg});
-}
 
 # разбиение строки
 sub _split {

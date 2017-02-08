@@ -516,8 +516,8 @@ sub likes {
 		(?<escape>		\\. )		 					|
 		(?<esc>		  [\.\+\^\$\@]	 )
 	!
-		exists $+{many}? ".*":
-		exists $+{manyany}? "[^/]*":
+		exists $+{many}? ".*?":
+		exists $+{manyany}? "[^/]*?":
 		exists $+{one}? ".":
 		exists $+{or}? "|":
 		exists $+{open_several}? do { push @st, $+{open_several}; "(?:" }:
