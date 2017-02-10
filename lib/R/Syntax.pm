@@ -106,7 +106,6 @@ sub lang {
 			require "R/Syntax/Morf/" . ucfirst($lang) . ".pm";
 			my $class = "R::Syntax::Morf::" . ucfirst($lang);
 			$self->{lang} = bless { name => $lang }, $class;
-			$self->modifiers( %{"${class}::modifiers"} );
 			$self->templates( @{"${class}::templates"} );
 			$self->{lang}
 		};
@@ -150,19 +149,18 @@ our $yF=$postfix | $leftassoc  | $bracket;		# левоассоциативная
 our $xF=$postfix | $nonassoc   | $bracket;		# неассоциативная скобка (postcircumfix)
 our $Fy=$prefix  | $leftassoc  | $bracket;		# правоассоциативная скобка (precircumfix)
 our $Fx=$prefix  | $nonassoc   | $bracket;		# неассоциативная скобка (precircumfix)
-# our $yFx=$infix  | $rightassoc | $bracket;		# левоассоциативная инфиксная скобка (incircumfix)
-# our $xFy=$infix  | $leftassoc  | $bracket;		# правоассоциативная инфиксная скобка (incircumfix)
-# our $xFx=$infix  | $nonassoc   | $bracket;		# неассоциативная инфиксная скобка (incircumfix)
+our $yFx=$infix  | $rightassoc | $bracket;		# левоассоциативная инфиксная скобка (incircumfix)
+our $xFy=$infix  | $leftassoc  | $bracket;		# правоассоциативная инфиксная скобка (incircumfix)
+our $xFx=$infix  | $nonassoc   | $bracket;		# неассоциативная инфиксная скобка (incircumfix)
 
 our $yS=$postfix | $leftassoc  | $bracket | $void;		# левоассоциативная скобка (postcircumfix)
 our $xS=$postfix | $nonassoc   | $bracket | $void;		# неассоциативная скобка (postcircumfix)
 our $Sy=$prefix  | $leftassoc  | $bracket | $void;		# правоассоциативная скобка (precircumfix)
 our $Sx=$prefix  | $nonassoc   | $bracket | $void;		# неассоциативная скобка (precircumfix)
-# our $ySx=$infix  | $rightassoc | $bracket | $void;		# левоассоциативная инфиксная скобка (incircumfix)
-# our $xSy=$infix  | $leftassoc  | $bracket | $void;		# правоассоциативная инфиксная скобка (incircumfix)
-# our $xSx=$infix  | $nonassoc   | $bracket | $void;		# неассоциативная инфиксная скобка (incircumfix)
+our $ySx=$infix  | $rightassoc | $bracket | $void;		# левоассоциативная инфиксная скобка (incircumfix)
+our $xSy=$infix  | $leftassoc  | $bracket | $void;		# правоассоциативная инфиксная скобка (incircumfix)
+our $xSx=$infix  | $nonassoc   | $bracket | $void;		# неассоциативная инфиксная скобка (incircumfix)
 
-# TODO: инфиксные скобки - просто в right добавить смычку F
 
 our %FIX = (
 	xfy => $xfy,
@@ -180,6 +178,12 @@ our %FIX = (
 	xS => $xS,
 	Sy => $Sy,
 	Sx => $Sx,
+	yFx => $yFx,
+	xFy => $xFy,
+	xFx => $xFx,
+	ySx => $ySx,
+	xSy => $xSy,
+	xSx => $xSx,
 );
 
 
@@ -626,8 +630,17 @@ sub _pop {
 				my $r = pop @S;
 				
 				if($r->{fix} & $infix) {
-					$self->error("нет операндов для оператора $r->{stmt}", $r) if !defined( $r->{right} = pop @T );
+					my $right;
+					$self->error("нет операндов для оператора $r->{stmt}", $r) if !defined( $right = pop @T );
 					$self->error("нет левого операнда для оператора $r->{stmt}", $r) if !defined( $r->{left} = pop @T );
+					
+					if(exists $r->{right}) {
+						$r->{right} = { stmt => $r->{F_stmt} // 'F', left => $r->{right}, right => $right };
+					}
+					else {
+						$r->{right} = $right;
+					}
+					
 					$self->trace("%", $r);
 				}
 				elsif($r->{fix} & $prefix) {	# -x
@@ -986,34 +999,21 @@ sub fixes {
 	$self
 }
 
-# устанавливает модификаторы языка
-sub modifiers {
-	my $self = shift;
-	my $modifiers = $self->{lang}{modifiers} //= {};
-	for(my $i=0; $i<@_; $i+=2) {
-		my ($key, $val) = @_[$i..$i+1];
-		die "модификатор `$key` в языке ".($self->{lang}{name} // "«язык Батькович»")." встречается дважды" if exists $modifiers->{$key};
-		$modifiers->{$key} = $val;
-	}
-	
-	$self
-}
-
 # устанавливает шаблоны языка
 # принимает ключ=>шаблон или ключ=>функция=>шаблон
 sub templates {
 	my $self = shift;
 	
-	my $c = $self->{lang}{templates} //= {};
+	my $templates = $self->{lang}{templates} //= {};
+	my $modifiers = $self->{lang}{modifiers} //= {};
 	my $re_arg = "(\\*|\\w+)";
 	
 	for(my $i=0; $i<@_; $i+=2) {
 		my ($k, $v) = @_[$i, $i+1];
 		
-		die "шаблон `$k` в языке ".($self->{lang}{name} // "«язык Батькович»")." встречается дважды" if exists $c->{$k};
+		die "шаблон `$k` в языке ".($self->{lang}{name} // "«язык Батькович»")." встречается дважды" if exists $templates->{$k};
 		
-		my $code = "";
-		$code = $v, $v = $_[$i+2], $i++ if ref $v eq "CODE";
+		$modifiers->{$k} = $v, $v = $_[$i+2], $i++ if ref $v eq "CODE";
 		
 		$v =~ s/'/\\'/g;
 		$v =~ s/\{\{\s*(\w+)\s*\}\}/', \$b->{$1} ,'/g;
@@ -1025,9 +1025,8 @@ sub templates {
 		/gen;
 		
 		$k =~ s/\s+/ /g;
-		$c->{$k} = eval "sub { join '', '$v' }";
+		$templates->{$k} = eval "sub { join '', '$v' }";
 		die $@ if $@;
-		$c->{$k} = closure $code, $c->{$k}, sub { $_[0]->($a, $b); $_[1]->() } if $code;
 	}
 	
 	$self
@@ -1165,7 +1164,9 @@ sub postmorf {
 	my $ret = $self->expirience($A->[0]{right});
 	
 	$ret = $self->{lang}->end($ret, $self) if Can $self->{lang}, "end";
-	#msg1 ":space cyan", "code:", $s, ":reset", , ":red", "->", ":reset", $ret if $self->{show_morf};
+	
+	msg1 ":cyan", "morf:", ":reset", $ret if $self->{show_morf};
+	
 	$ret
 }
 

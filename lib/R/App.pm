@@ -217,6 +217,51 @@ sub ini {
 	goto &ini;
 }
 
+# объект регулярки - используется в Серебряне
+package MatchData {
+
+	# use overload
+		# '""' => \&stringify,
+		# '.' => \&concat,
+		# 'bool' => sub { $_[0]->{'!'} },
+		# "0+" => sub { $_[0]->{'!'}? 1: 0 },
+		# "qr" => \&stringify,
+		# fallback => 1
+	# ;
+
+	# конструктор с параметрами: string, @-, @+, %+
+	sub new {
+		my ($cls, $s, $begin, $end, $test) = splice @_, 0, 5;
+		bless { '~'=>$s, '^'=>$begin, '$'=>$end, '!'=>$test, @_ }, ref $cls || $cls;
+	}
+	
+	# группа
+	sub g {
+		my ($self, $index) = @_;
+		my $begin = $self->{'^'}[$index];
+		substr $self->{'~'}, $begin, $self->{'$'}[$index] - $begin;
+	}
+	
+	# всё до распознанного $`
+	sub left {
+		my ($self) = @_;
+		substr $self->{'~'}, 0, $self->{'^'}[0]
+	}
+	
+	# всё после распознанного $'
+	sub right {
+		my ($self) = @_;
+		substr $self->{'~'}, $self->{'$'}[0]
+	}
+	
+	# # возвращает строковое представление
+	# sub stringify {
+		# my ($self) = @_;
+		# "<MatchData " . $app->json->to($self->[0]) . ">"
+	# }
+	
+}
+
 ### Контрактное программирование ###
 
 # проверяем условие

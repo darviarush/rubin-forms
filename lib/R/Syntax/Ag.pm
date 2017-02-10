@@ -104,7 +104,7 @@ $s->tr("xf",  qw{		?  					})->td("fy", qw{	Num		});
 $s->tr("xfy", qw{		?					});
 $s->tr("yfx", qw{		^					});
 $s->tr("fy",  qw{ 		+ - ! +~			});
-$s->tr("xfy", qw{		~	!~				});
+$s->tr("xfy", qw{		~	!~	~r~	!~r~	});
 $s->tr("xfy", qw{		* / mod div ** ***	});
 $s->tr("xfy", qw{		+ - .				});
 $s->tr("xfy", qw{		+< +>				});
@@ -116,6 +116,7 @@ $s->tr("xfx", qw{		== != eq ne  <=> cmp 		});			# ~~
 $s->tr("xfx", qw{		isa can	of					});
 $s->tr("xfy", qw{		&&					});
 $s->tr("xfy", qw{		|| ^^				});
+$s->tr("xfx", qw{		flipflop ^flipflop flipflop^ ^flipflop^				});
 $s->tr("xfx", qw{		.. ... ^.. ^...  to ^to ^to^   step			})->td("fx", qw{	^	});
 $s->tr("xfy", qw{		=>		})->td("fy",  qw{	word=>			});
 $s->tr("xfx", qw{		split	})->td("xf",  qw{	split			});
@@ -123,9 +124,9 @@ $s->tr("xfy", qw{		,		})->td("yf",  qw{ 	,				});
 $s->tr("xfy", qw{		zip		})->td("fy",  qw{	zip				});
 $s->tr("xfx", qw{		splice	delete	});
 $s->tr("yfx", qw{		join	})->td("yf", qw{	reverse join	});
-$s->tr("yfx", qw{		-> =   += -= *= /= ^= div= mod=   &&= ||= ^^=   and= or= xor=   +&= +|= +^= +<= +>=   **= ***= .= ?= ,= =, %=   });
-$s->tr("fx",  qw{		gosub+					})->td("fy", qw{		sreplace kreplace		});
-$s->tr("xfx", qw{		flipflop ^flipflop flipflop^ ^flipflop^				});
+$s->tr("yfx", qw{		-> =   += -= *= /= ^= div= mod=   &&= ||= ^^=   and= or= xor=   +&= +|= +^= +<= +>=   **= ***= .= ?= ,= =, %=   =sreplace =kreplace });
+$s->tr("xfy", qw{		sreplace kreplace		});
+$s->tr("fx",  qw{		gosub+					});
 $s->tr("xfy", qw{		:						});
 $s->tr("xfy", qw{		|						});	# TODO: |=
 $s->tr("fy",  qw{		not						});
@@ -159,6 +160,9 @@ $s->opt("?.word(",		re => qr{		\?\. (?<var>$re_id) \(		}x);
 $s->opt("?.\$word",		re => qr{		\?\.\$ (?<var>$re_id)		}x);
 $s->opt("?.\$word(",	re => qr{		\?\.\$ (?<var>$re_id) \(	}x);
 
+
+$s->opt("~r~", re => qr{ ~ (?<id> $re_id ) ~ }x);
+$s->opt("!~r~", re => qr{ !~ (?<id> $re_id ) ~ }x);
 
 $s->opt("raise", re => qr/ \b ( die | throw | raise ) \b /xni);
 $s->opt("rescue", re => qr/ \b ( rescue | catch | except ) ( ( $re_space_ask \* | $re_space (?<isa> $re_extends ) ( $re_space_ask AS $re_space (?<id> $re_id ) )? )? ( $re_space_ask THEN \b ) | \b )  /xni, sub => sub {
@@ -369,6 +373,9 @@ $s->br("SCENARIO" => sub { my ($self, $push) = @_; $push->{lineno} = $self->{lin
 
 $s->opt("sreplace", nolex => 1);
 $s->opt("kreplace", nolex => 1);
+$s->opt("=sreplace", nolex => 1);
+$s->opt("=kreplace", nolex => 1);
+
 $s->br("regexp");			$s->opt("regexp", nolex => 1);
 $s->br("like");				$s->opt("like", nolex => 1);
 $s->br("string_modify");	$s->opt("string_modify", nolex => 1);
@@ -377,12 +384,18 @@ $s->br("string_modify");	$s->opt("string_modify", nolex => 1);
 
 my $re_string = qr{ " (?<string> (?:\\"|""|[^"])* ) " | ' (?<string> (?:\\'|''|[^'])* ) ' }xn;
 
-$s->x("replace", qr{	 (?<s> [sk]) $re_string (?<arg> $re_id )?	}xn, sub {
+$s->x("replace", qr{	(?<assign> = $re_space_ask)? (?<s> [sk]) $re_string (?<arg> $re_id )? ( ~ (?<id> $re_id ))?	}xn, sub {
 	my ($self, $push) = @_;
-	my $sk = $push->{s} eq "s"? "sreplace": "kreplace";
+	my $isS = $push->{s} eq "s";
+	my $sk = $isS? ($push->{assign}? "=sreplace": "sreplace"): ($push->{assign}? "=kreplace": "kreplace");
 	$self->checkout("ag.string")->push($sk)->masking($push->{string})->pop($sk)->checkout("ag")->assign($push);
-	$push->{left} = delete $push->{right};
+	$push->{F_stmt} = $isS? 'F_sreplace': 'F_kreplace';	# устанавливаем смычку: sreplace - F_sreplace = 
+	$push->{arg} .= 'g' if $push->{arg} !~ s/G// && $push->{arg} !~ /g/;
+	$push->{arg} .= 'e';
+	$push->{id} //= "s";
+	
 });
+$s->opt("replace", order => -1000);
 
 $s->x("regex"	=> qr{	 $re_string ! (?<arg> $re_id )?	}xn => sub {
 	my ($self, $push) = @_;

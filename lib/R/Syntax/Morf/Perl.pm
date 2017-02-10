@@ -158,8 +158,22 @@ our @templates = (
 "xfx ==" => '({{ left }}) == ({{ right }})',
 "xfx <=>" => '({{ left }}) <=> ({{ right }})',
 "xfx cmp" => '({{ left }}) cmp ({{ right }})',
+"xfy ~r~" => 'do { my $s; ($s = ({{ left }})) =~ ({{ right }})? do { $DATA->{{{ id }}} = bless({ "~"=>$s, "^"=>[@-], "\$"=>[@+], %+ }, "MatchData"); 1 }: ""}',
+"xfy !~r~" => 'do { my $s; ($s = ({{ left }})) =~ ({{ right }})? do { $DATA->{{{ id }}} = bless({ "~"=>$s, "^"=>[@-], "\$"=>[@+], %+ }, "MatchData"); "" }: 1}',
 "xfy ~" => '({{ left }}) =~ ({{ right }})',
 "xfy !~" => '({{ left }}) !~ ({{ right }})',
+
+# замены
+"xfy sreplace" => 'do { my $s = ({{ left }}); $s =~ {{ right }}{{ arg }}; $s }',
+"yfx =sreplace" => 'do { my ($s, $f); $f=\({{ left }}); $s=$$f; $$f =~ {{ right }}{{ arg }} }',
+F_sreplace => sub { my($s, $p, $path)=@_; $p->{id} = $path->[-1]{id} },
+	's{{{ left }}}{ $DATA->{{{ id }}} = bless({ "~"=>$s, "^"=>[@-], "\$"=>[@+], %+ }, "MatchData"); do { {{ right }} } }',
+
+"xfy kreplace" => 'do { my $s = ({{ left }}); $s =~ {{ right }}{{ arg }}; $s }',
+"yfx =kreplace" => 'do { my ($s, $f); $f=\({{ left }}); $s=$$f; $$f =~ {{ right }}{{ arg }} }',
+F_kreplace => sub { my($s, $p, $path)=@_; $p->{id} = $path->[-1]{id} },
+	's{${\($R::App::app->perl->likes( \'{{ left }}\', \'P\' ))}}{ $DATA->{{{ id }}} = bless({ "~"=>$s, "^"=>[@-], "\$"=>[@+], %+ }, "MatchData"); do { {{ right }} } }',
+
 
 # проверки
 "xf ?" => 'defined({{ left }})',
@@ -322,13 +336,9 @@ CAT => '{{ str }}',
 exec1 => '{{ str }}${\({{ right }})}',
 string => '"{{ right }}"',
 regexp => 'qr{{{ right }}}{{ arg }}',
-like => sub { my ($self, $push) = @_; $push->{right} = $app->perl->likes($push->{right}, $push->{arg}) },
-	'qr{{{ right }}}',
+like => '$R::App::app->perl->likes( \'{{ right }}\', \'{{ arg }}\' )',
 string_modify => '("{{ arg }}"->can("new")? "{{ arg }}": $R::App::app->syntaxAg->include("{{ new }}"))->new("{{ right }}")',
 
-"fy sreplace" => 's{{{ left }}}{ {{ right }} }{{ arg }}',
-"fy kreplace" => sub { my ($self, $push) = @_; $push->{right} = $app->perl->likes($push->{right}, $push->{arg}) },
-	's{{{ left }}}{ {{ right }} }',
 );
 
 # возвращает новую переменную
@@ -508,23 +518,6 @@ sub eval {
 	# return ($class_in? "package $class_in {": "") . "use overload '$name' => sub { my \$DATA = {}; $sub$endline(); ", ($class_in? "}}": "};");
 # }
 
-
-### модификаторы
-our %modifiers = (
-
-# # наследование шаблона
-# INHERITS => sub  {
-	# my ($self, $node, $path) = @_;
-	# $node->{block} = "__UNUSED__";
-	# my $inherits = map { $self->get_name($_) } split /\s*,\s*/, $node->{inherits};	
-	# my $mro = @$inherits>1? " use mro 'c3';": "";
-	# $inherits = join " ", @$inherits;
-	# $node->{extends} = $inherits? " use parent -norequire, qw/$inherits/;$mro": "";
-	# $self
-# },
-
-### конец модификаторов
-);
 
 # # заменяет спецсимволы в строке
 # sub escape_string {

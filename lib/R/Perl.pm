@@ -524,8 +524,8 @@ sub likes {
 		exists $+{close_zseveral}? do { die "нет скобки `{`" if "{" ne pop @st; ")*"}:
 		exists $+{close_oseveral}? do { die "нет скобки `(`" if "(" ne pop @st; ")+"}:
 		exists $+{close_qseveral}? do { die "нет скобки `[`" if "[" ne pop @st; ")?"}:
-		exists $+{name}? do { push @st, "<"; $+{name}? "(?<$+{name}>": "(?:" }:
-		exists $+{open_name}? do { push @st, "<"; "(?:" }:
+		exists $+{name}? do { push @st, "<"; $+{name} ne ""? "(?<$+{name}>": "(" }:
+		exists $+{open_name}? do { push @st, "<"; "(" }:
 		exists $+{close_name}? do { die "нет скобки `<name:`" if "<" ne pop @st; ")"}:
 		exists $+{set}? do { my $x=$+{set}; $x=~s/[\[\]\$\.]/\\$&/g; "[$x]" }:
 		exists $+{unset}? do { my $x=$+{unset}; $x=~s/[\[\]\$\.]/\\$&/g; "[^$x]" }:
@@ -535,7 +535,9 @@ sub likes {
 		die "неучтённая группа"
 	!xges;
 	
-	"(?s$args:^(?:$like)\$)";
+	$like = "^(?:$like)\$" if $args !~ s/P//;
+	
+	"(?s$args:$like)";
 }
 
 sub like {
