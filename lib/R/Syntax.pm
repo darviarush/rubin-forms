@@ -445,7 +445,6 @@ sub masking {
 	while($s =~ /$re_lex/g) {			# формируем дерево
 	
 		$self->{charno} = length($`) - length($&) - $self->{startline} + 1;
-		$self->{length} = length($&);
 	
 		if($trace) {
 			local ($`);
@@ -499,7 +498,7 @@ sub masking {
 # пришёл оператор
 sub op {
 	my $self = shift;
-	my $push = {%+, 'stmt', @_, lineno => $self->{lineno}, charno => $self->{charno}, length => $self->{length}};
+	my $push = {%+, 'stmt', @_, lineno => $self->{lineno}, charno => $self->{charno}};
 	
 	my $stmt = $_[0];
 
@@ -538,7 +537,7 @@ sub atom {
 # все операторы и атомы добавляются в неё
 sub push {
 	my $self = shift;
-	my $push = {%+, 'stmt', @_, lineno => $self->{lineno}, charno => $self->{charno}, length => $self->{length}};
+	my $push = {%+, 'stmt', @_, lineno => $self->{lineno}, charno => $self->{charno}};
 	
 	# выполняем подпрограмму
 	if(my $x = $self->{LEX}{$_[0]}) {

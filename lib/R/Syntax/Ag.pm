@@ -332,6 +332,7 @@ sub br_sub {
 	my $A = $self->{stack}[-1]{'A+'};
 	
 	if($A && @$A && $A->[-1]{stmt} eq '\n') {
+	
 		# двигаемся назад, пока не обнаружим перевод строки или начало последовательности
 		# тогда если предыдущий элемент - @, то меняем на декоратор
 		for(my $i=$#$A-1; $i>=-1; $i--) {
@@ -339,17 +340,18 @@ sub br_sub {
 			if($i==-1 || $A->[$i]{stmt} eq '\n') {
 				my $op = $A->[$i+1];
 				my $stmt = $op->{stmt};
+
 				if($stmt eq '\n') { next; }		# пропускаем \n
 				elsif($stmt ne '@') { last; }	# выходим
 				
 				# заменяем на декоратор
 				$op->{SUB} = $push->{SUB};
 				$op->{tmpl} = 'decorator';
+	
 			}
 		}
 		
 	}
-		
 }
 
 $s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_id ) $re_args_then }ix => \&br_sub => "END");
