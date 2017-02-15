@@ -269,6 +269,8 @@ join => 'join({{ _for_join *, right }}, {{ left }}){{ newline }}',
 
 # - смысловые конструкции
 
+'fx decorator' => 'BEGIN { $R::App::app->syntaxAg->decorate("{{ name }}", "{{ class }}", "{{ SUB }}", ({{ right }})) }',
+
 SCENARIO => '{{ _scenario right, lineno }}',
 
 CLASS => '(do { package {{ class }}; use common::sense; use R::App;{{ _extends class, extends, lineno, file }} sub void { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
@@ -326,8 +328,8 @@ num => '{{ num }}',
 hex => '{{ hex }}',
 bin => '{{ bin }}',
 radix => '{{ radix }}',
-new => '(exists $Nil::CLASSES{"{{ new }}"}? "{{ new }}": $R::App::app->syntaxAg->include("{{ new }}"))->new',
-new_apply => '(exists $Nil::CLASSES{"{{ new }}"}? "{{ new }}": $R::App::app->syntaxAg->include("{{ new }}"))->new({{ right }})',
+new => '("{{ new }}"->can("new")? "{{ new }}": $R::App::app->syntaxAg->include("{{ new }}"))->new',
+new_apply => '("{{ new }}"->can("new")? "{{ new }}": $R::App::app->syntaxAg->include("{{ new }}"))->new({{ right }})',
 
 # строки
 CAT => '{{ str }}',

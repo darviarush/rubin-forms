@@ -59,10 +59,10 @@ my $re_overload_id = qr!
 !xismo;
 my $re_sub_in = qr/ [\ \t]+ CLASS [\ \t]+ (?<sub_in>(?<sub_self>::)?$re_class) /xn;
 my $re_args_then = qr/ $re_space_ask (?<then> \b THEN \b ) | $re_args $re_space_ask (?<then> \b THEN \b ) | $re_args | /ixno;
-my $re_then = qr/ (?<re_endline> $re_space_ask \b THEN \b) | $re_rem $re_endline /xn;
-my $re_for = qr!
-(?<for_k>$re_id) (?: $re_space_ask,$re_space_ask (?<for_v>$re_id) (?: $re_space_ask,$re_space_ask (?<for_i>$re_id) )? )? (?: $re_space (?<for_in>IN) \b | $re_space (?<for_of>OF) \b | $re_space_ask = )
-!xismo;
+# my $re_then = qr/ (?<re_endline> $re_space_ask \b THEN \b) | $re_rem $re_endline /xn;
+# my $re_for = qr!
+# (?<for_k>$re_id) (?: $re_space_ask,$re_space_ask (?<for_v>$re_id) (?: $re_space_ask,$re_space_ask (?<for_i>$re_id) )? )? (?: $re_space (?<for_in>IN) \b | $re_space (?<for_of>OF) \b | $re_space_ask = )
+# !xismo;
 # my $re_gosub_after = qr{
 # \b [\ \t]* (?! [ !\+\-\*/<>=  \)\}\] \|& \? .:,; \r\n ] | %\s |  (?:or|and|not|eq|ne|le|ge|lt|gt|then|else|end|cmp|from) \b | $ )
 # }xismo;
@@ -133,10 +133,11 @@ $s->tr("fy",  qw{		not						});
 $s->tr("xfy", qw{		and						});
 $s->tr("xfy", qw{		or	xor					});
 $s->tr("yfx", qw{		as	is					});
-$s->tr("fx",  qw{		return	raise msg msg1			})->td("Fx", qw{   REPEAT UNTIL  });
-$s->tr("xfy", qw{		;		});
-$s->tr("xfy", qw{		\n		})->td("yf", qw{	\n	})->td("fy", qw{	\n	});
-$s->tr("xfy", qw{		rescue	});
+$s->tr("fx",  qw{		return	raise msg msg1	})->td("Fx", qw{   REPEAT UNTIL  });
+$s->tr("xfy", qw{		;						});
+$s->tr("fx",  qw{		decorator				});
+$s->tr("xfy", qw{		\n						})->td("yf", qw{	\n	})->td("fy", qw{	\n	});
+$s->tr("xfy", qw{		rescue					});
 $s->tr("xfy", qw{		THEN	ELSEIF	ELSE	});
 
 
@@ -255,8 +256,6 @@ $s->opt("ELSEIF", sub => sub {
 	$br->{then} = 1;
 });
 $s->opt("ELSE", sub => sub { my ($self, $push) = @_; $self->check("ELSE", stmt=>"IF", else=>"", then=>"")->top->{else} = 1 });
-#$s->opt("UNTIL", sub => sub { my ($self, $push) = @_; $self->check("UNTIL", stmt=>"REPEAT")->top->{endline} = 1 });
-#$s->opt("FROM", sub => sub { my ($self, $push) = @_; my $top = $self->endline->top; $self->error("FROM должен использоваться после MAP, PAIRMAP, GREP, SORT, NSORT, QSORT или REDUCE") if $top->{stmt} !~ /^(?:map|grep|[nq]sort|reduce|pairmap)$/; $push->{endline} = $push->{gosub} = 1 });
 
 
 
@@ -301,6 +300,9 @@ $s->opt("END", sub => sub {
 # $s->br(qw/			SORT				/);
 # $s->br(qw/			QSORT				/);
 # $s->br(qw/			NSORT				/);
+#$s->opt("UNTIL", sub => sub { my ($self, $push) = @_; $self->check("UNTIL", stmt=>"REPEAT")->top->{endline} = 1 });
+#$s->opt("FROM", sub => sub { my ($self, $push) = @_; my $top = $self->endline->top; $self->error("FROM должен использоваться после MAP, PAIRMAP, GREP, SORT, NSORT, QSORT или REDUCE") if $top->{stmt} !~ /^(?:map|grep|[nq]sort|reduce|pairmap)$/; $push->{endline} = $push->{gosub} = 1 });
+
 
 $s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => sub {
 	my ($self, $push) = @_;
@@ -322,14 +324,27 @@ $s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => sub {
 #$s->br("OBJECT" => qr{ \b OBJECT $re_space $re_class_stmt }ix => "END");
 #$s->br("MODULE" => qr{ \b MODULE $re_space $re_class_stmt }ix => "END");
 
+$s->opt("decorator", nolex=>1);
 sub br_sub {
 	my ($self, $push) = @_;
 	
 	$push->{args} = [ split /\s*,\s*/, $push->{args} ];
 	$push->{endline} = 1 if delete $push->{then};
 	
+	# проставляем класс функции
+	my $stack = $self->{stack};
+	for(my $i=$#$stack; $i>=0; $i--) {
+		my $s = $stack->[$i];
+		if($s->{stmt} eq "CLASS") {
+			$push->{class} = $s->{class};
+			last;
+		}
+	}	
+	
+	
+	
 	# пытаемся обнаружить декораторы
-	my $A = $self->{stack}[-1]{'A+'};
+	my $A = $stack->[-1]{'A+'};
 	
 	if($A && @$A && $A->[-1]{stmt} eq '\n') {
 	
@@ -346,8 +361,20 @@ sub br_sub {
 				
 				# заменяем на декоратор
 				$op->{SUB} = $push->{SUB};
-				$op->{tmpl} = 'decorator';
+				$op->{stmt} = 'decorator';
+				
+				my ($next) = splice @$A, $i+2, 1;
+				if($next->{stmt} eq "var") {
+					$op->{name} = $next->{var};
+				}
+				elsif($next->{stmt} eq "classname") {
+					$op->{name} = $next->{classname};
+				}
+				else {
+					$self->error("после \@ должен быть указан декоратор", $op);
+				}
 	
+				$op->{class} = $push->{class};
 			}
 		}
 		
@@ -512,14 +539,14 @@ $s->x("radix"	=> qr{	(?<radix> (?<rad>\d+) r (?<num> [\da-z_]+ ) )	}ix => sub {
 	$push->{radix} = $app->perl->from_radix($num, $push->{rad});
 });
 $s->x("num"		=> qr{ 	(?<num> -? ( \d[\d_]*(\.[\d_]+)? | \.[\d_]+ )	( E[\+\-][\d_]+ )?	) (?<new> \w+)?	}ixn);
-$s->opt("num",
-sub => sub {
+$s->opt("num", sub => sub {
 	my ($self, $push) = @_;
 	$self->push("new_apply", new => "Number::Fix::$push->{new}") if exists $push->{new};
 }, sur => sub {
 	my ($self, $push) = @_;
 	$self->pop("new_apply") if exists $push->{new};
 });
+$s->x("classname"		=> qr{ 	(?<classname> $re_class ) 						}x);
 
 
 ### какие операторы в каких скобках могут существовать
@@ -546,7 +573,7 @@ $s->opt(".word+", nolex=>1);
 $s->opt('.$word+', nolex=>1);
 $s->opt("?.word+", nolex=>1);
 $s->opt('?.$word+', nolex=>1);
-my %PULLOP = qw(	.word  .word+  .$word  .$word+   ?.word  ?.word+	?.$word ?.$word+		);
+my %PULLOP = qw( .word  .word+  .$word  .$word+   ?.word  ?.word+	?.$word ?.$word+		);
 $s->pull(join(" ", keys %PULLOP) => \&onpull);
 
 sub onpull {
@@ -798,5 +825,58 @@ sub include {
 	@_==1? $_[0]: @_
 }
 
+# оформляет метод функции
+sub decorate {
+	my ($self, $name, $class, $sub) = splice @_, 0, 4;
+	
+	my $decorator = "Decorator::$name";
+	
+	my $dec = ($decorator->can("new")? $decorator: $self->include($decorator))->new;
+	
+	$dec->{class} = $class;
+	$dec->{name} = $sub;
+	$dec->{args} = [@_];
+	
+	$dec->init(@_) if $dec->can("init");
+	
+	$dec->{noBefore} = 1 if !$dec->can("before");
+	$dec->{noReplace} = 1 if !$dec->can("replace");
+	$dec->{noAfter} = 1 if !$dec->can("after");
+	
+	my $key = "${class}::$sub";
+	
+	*$key = closure $dec, $key, \&$key, sub {
+		my ($dec, $key, $address, $self) = splice @_, 0, 4;
+		
+		msg1 "hi!";
+		
+		$dec->{me} = $self;
+		my $save = \&$key;
+		*$key = $address;
+		
+		$dec->{arguments} = \@_;
+		
+		$dec->before(@_) if !$dec->{noBefore};
+		
+		my @ret;
+		
+		if(!$dec->{noReplace}) {
+			@ret = wantarray? $dec->replace(@_): scalar $dec->replace(@_);
+		}
+		else {
+			@ret = wantarray? $address->($self, @_): scalar $address->($self, @_);
+		}
+		
+		$dec->{return} = \@ret, $dec->after(@_), $dec->{return} = undef if !$dec->{noAfter};
+		
+		*$key = $save;
+		$dec->{me} = $dec->{arguments} = undef;
+		
+		wantarray? @ret: $ret[0];
+	} if 0 && (!$dec->{noReplace} || !$dec->{noBefore} || !$dec->{noAfter});
+	
+	
+	$self
+}
 
 1;

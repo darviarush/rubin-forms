@@ -850,21 +850,22 @@ TODO: циклы с возвращаемым значением через `last
 
 	$app->syntaxAg->new->eval('
 	
-	class MyDecorator
-		sub init then app.routers.add "$me:args[0] $me:class.$me:name"
-		sub replace me1 then
-		sub before me1 then
-		sub after me1 then
+	class Decorator::MyDecorator
+		sub init route then app.routers.add "$route $me:class.$me:name"
+		sub before m1 then me:arguments[0] .= " before "
+		sub replace m1 then me:me.myroute m1 . " replace "
+		sub after m1 then me:return[0] .= " after"
 	end
 	
 	class DecoratorTest
 		@MyDecorator "/page"
-		sub myroute then
+		sub myroute m1 then m1 . " myroute "
 	end
 	
 	');
 	
 	$app->syntaxAg->new->eval(' app.routers:routers[0] ');		# /page DecoratorTest.myroute
+	$app->syntaxAg->new->eval(' new DecoratorTest.myroute "." ');		# . before  replace  myroute  after
 	
 Экземпляр декоратора создаётся для каждого метода, который он декорирует.
 
@@ -873,11 +874,18 @@ TODO: циклы с возвращаемым значением через `last
 `replace` будет выполняться вместо метода.
 `before`  и `after` выполняются до и после метода, соответственно.
 
+`init` получает в качестве аргументов параметры декоратора.
+`replace`, `before` и `after` получают аргументы метода.
+
+
 Свойство `me:name` содержит имя декорируемого метода.
 Свойство `me:class` содержит имя класса.
 Свойство `me:me` содержит контекст метода.
 Свойство `me:args` содержит аргументы декторатора.
+Свойство `me:arguments` содержит аргументы метода и их можно изменить.
+Свойство `me:return` содержит массив возвращённый декорируемым методом или `replace` и есть только в `after`. Его можно менять.
 
+В `init` можно установить следующие свойства:
 Свойство `me:noAfter` установленное отменяет `after`.
 Свойство `me:noBefore` установленное отменяет `before`.
 Свойство `me:noReplace` установленное отменяет `replace`.
