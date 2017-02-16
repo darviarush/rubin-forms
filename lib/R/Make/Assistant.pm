@@ -334,8 +334,7 @@ use R::Make;
 $app->make->load;
 
 if( $app->file("Aquafile")->isfile ) {
-	$app->view->require("Aquafile");
-	$app->view->init_classes;
+	$app->syntaxAg->ag("Aquafile");
 }
 
 $app->make->run;

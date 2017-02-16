@@ -269,7 +269,7 @@ join => 'join({{ _for_join *, right }}, {{ left }}){{ newline }}',
 
 # - смысловые конструкции
 
-'fx decorator' => 'BEGIN { $R::App::app->syntaxAg->decorate("{{ name }}", "{{ class }}", "{{ SUB }}", ({{ right }})) }',
+'fx decorator' => '{{ _decorate * }}',
 
 SCENARIO => '{{ _scenario right, lineno }}',
 
@@ -472,6 +472,15 @@ sub _split {
 	""
 }
 
+# описывает декоратор
+sub _decorate {
+	my ($self, $push) = @_;
+	
+	$self->{START} .= "\$R::App::app->syntaxAg->decorate(\"$push->{name}\", \"$push->{class}\", \"$push->{SUB}\", ($push->{right}));\n";
+	
+	""
+}
+
 # вызывается после разбора файла
 sub end {
 	my ($self, $ret, $syntax) = @_;
@@ -479,6 +488,11 @@ sub end {
 	# добавляет в начало
 	if(my $begin = delete $self->{BEGIN}) {
 		$ret = "BEGIN { use common::sense; $begin } $ret";
+	}
+	
+	# добавляет в начало без BEGIN
+	if(my $begin = delete $self->{START}) {
+		$ret = "use common::sense; $begin; $ret";
 	}
 	
 	# сценарий - в отдельный файл

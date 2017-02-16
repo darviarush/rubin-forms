@@ -46,7 +46,7 @@ our $DEFAULT;		# задание по умолчанию
 
 # категория заданий
 sub category ($) {
-	($CATEGORY) = @_;
+	$CATEGORY = $_[-1];
 	push @CATEGORY, {category => $CATEGORY, tasks => []};
 	$LAST = undef;
     $NAMESPACE = "";
@@ -61,9 +61,31 @@ sub namespace ($) {
 	return;
 }
 
-# имя задания
-sub name ($;$$$) {
-	my ($name, $args, $desc, $spec) = @_;
+# описание задания для объектного интерфейса
+sub add {
+	my ($self, $name, $args, $desc, $spec) = @_;
+
+	my ($class, $file, $line) = caller(2);
+	
+	my $code = closure $class, $name, sub {
+		my ($class, $name) = splice @_, 0, 2;
+		$class->new->$name(@_);
+	};
+
+	msg1 $name, $file, $line, $code;
+	
+	_add($name, $file, $line, $code);
+	
+	args( $args ) if defined $args;
+	desc( $desc ) if defined $desc;
+	spec( $spec ) if defined $spec;
+	
+	$self
+}
+
+# добавляет задание
+sub _add {
+	my ($name, $file, $line, $code) = @_;
 	
 	die "команда `$name` уже описана в $TASK{$name}{file}:$TASK{$name}{line}" if exists $TASK{$name};
 	
@@ -71,23 +93,33 @@ sub name ($;$$$) {
 		die "в задаче $LAST->{name} нет task-а" if !$LAST->{code};
 	}
 	
-	my ($package, $file, $line) = caller(0);
-	
 	$LAST = $TASK{$name} = {
 		category => $CATEGORY,
 		name => $name,
 		file => $file,
 		line => $line,
-		code => *{"${package}::$name"}{CODE},
+		code => $code,
 	};
 	
 	push @CATEGORY, {} if !@CATEGORY;
 	
 	push @{ $CATEGORY[$#CATEGORY]->{tasks} }, $LAST;
 	
-	args $args if defined $args;
-	desc $desc if defined $desc;
-	spec $spec if defined $spec;
+	return;
+}
+
+# имя задания
+sub name ($;$$$) {
+	my ($name, $args, $desc, $spec) = @_;
+	
+	my ($package, $file, $line) = caller(0);
+	my $code = *{"${package}::$name"}{CODE};
+	
+	_add($name, $file, $line, $code);
+	
+	args( $args ) if defined $args;
+	desc( $desc ) if defined $desc;
+	spec( $spec ) if defined $spec;
 	return;
 }
 

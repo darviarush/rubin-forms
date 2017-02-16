@@ -405,6 +405,7 @@ sub lex {
 		}
 		
 		$_->{re} //= do {
+			$_->{_lex_re} = 1;
 			my $x = $alias;
 			$x = "\\b$x" if $x =~ /^\w/;
 			$x = "$x\\b" if $x =~ /\w$/;
@@ -489,6 +490,23 @@ sub masking {
 	}
 	
 	$self
+}
+
+# возвращает все ключевые слова
+sub keywords {
+	my ($self) = @_;
+	my $prev = "";
+	sort { length($a) == length($b)? $a cmp $b: length($a) <=> length($b) }
+	map { $prev eq $_? (): ($prev=$_) }
+	sort { $a cmp $b } 
+	map {  $_->{re}? do {
+		my @r = ();
+		
+		while( $_->{re} =~ /\\.|\(\?\^?\w+:|\/uix$|\(\?P?<\w+>|\[[^\[\]]+\]|([a-zA-Z_]\w*)/g ) {
+			push @r, lc $1 if defined $1;
+		}
+		@r
+	}: lc $_->{alias} } grep { !$_->{nolex} } nsort { $_->{order} } values %{$self->{LEX}};
 }
 
 ###############################  синтаксический разбор  ###############################

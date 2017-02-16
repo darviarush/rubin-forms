@@ -44,10 +44,9 @@ my $re_rem = qr/(?:(?:\#|\brem\b)(?<rem>[^\n\r]*))?/i;
 my $re_sk = qr/[\[\{\(]/;
 my $re_arg = qr/$re_id|\*/on;
 my $re_class = qr/(::)?$re_id(::$re_id)*/on;
-my $re_class_abs = qr/$re_id(::$re_id)*/on;
 my $re_extends = qr!$re_class(?:$re_space_ask,$re_space_ask$re_class)*!;
 my $re_class_stmt = qr!
-(?<class>$re_class_abs)
+(?<class>$re_class)
 (?: [\ \t]+ (?:EXTENDS|INHERITS) [\ \t]+ (?<extends>$re_extends))?
 (?<with> [\t\ ]+ with [\t\ ]+ (?<with_args> [^\r\n]+) )?
 !xismo;				
@@ -526,11 +525,12 @@ $s->x("last");
 #$s->x("wantarray");
 $s->x("local");
 
-$s->x("new"		=> qr{ 	\b NEW $re_space (?<new>$re_class) 	}ix);
-$s->x("var"		=> qr{ 	(?<var>$re_id) 						}x);
-$s->x("hex"		=> qr{	0x[\da-f_]+	}ix);
-$s->x("bin"		=> qr{	0b[10_]+	}ix);
-$s->x("radix"	=> qr{	(?<radix> (?<rad>\d+) r (?<num> [\da-z_]+ ) )	}ix => sub {
+$s->x("new"			=> qr{ 	\b NEW $re_space (?<new>$re_class) 	}ix);
+$s->x("classname"	=> qr{ 	(?<classname> $re_id(::$re_id)+ ) 	}x);
+$s->x("var"			=> qr{ 	(?<var>$re_id) 						}x);
+$s->x("hex"			=> qr{	0x[\da-f_]+	}ix);
+$s->x("bin"			=> qr{	0b[10_]+	}ix);
+$s->x("radix"		=> qr{	(?<radix> (?<rad>\d+) r (?<num> [\da-z_]+ ) )	}ix => sub {
 	my ($self, $push) = @_;
 	$self->error("$push->{radix} - система счисления не может быть 0") if $push->{rad} == 0;
 	$self->error("$push->{radix} - система счисления должна быть не более 62-х")  if $push->{rad} > 62;
@@ -546,7 +546,6 @@ $s->opt("num", sub => sub {
 	my ($self, $push) = @_;
 	$self->pop("new_apply") if exists $push->{new};
 });
-$s->x("classname"		=> qr{ 	(?<classname> $re_class ) 						}x);
 
 
 ### какие операторы в каких скобках могут существовать
@@ -688,8 +687,13 @@ sub ag {
 	my $root = $self->root($path);
 	
 	unshift @$Nil::INC, $root if $Nil::INC->[0] ne $root;
+
+	if($path ne "Aquafile") {
+		my $Aquafile = $self->require( "Aquafile" );
 	
-	$self->require("Aquafile");
+		# строим окружение
+		$Aquafile->new->void(@args);
+	}
 	
 	my $class = $self->require( $app->file($path)->abs->subdir($root, "")->path );
 	
@@ -769,7 +773,7 @@ sub require {
 			my $rpath = join "/", @path[0..$i];
 			my $f;
 			if($i != $#path) {
-				$f = $app->file("$inc/$rpath*.ag")->glob;
+				$f = $app->file("$inc/$rpath.*")->glob;
 				die "несколько подходящих файлов: " . join ", ", $f->files if $f->length > 1;
 				$rpath .= "." . $f->exts;
 			}
@@ -844,37 +848,35 @@ sub decorate {
 	$dec->{noAfter} = 1 if !$dec->can("after");
 	
 	my $key = "${class}::$sub";
+	my $can = $class->can($sub);
 	
-	*$key = closure $dec, $key, \&$key, sub {
+	*$key = closure $dec, $key, $can, sub {
 		my ($dec, $key, $address, $self) = splice @_, 0, 4;
-		
-		msg1 "hi!";
 		
 		$dec->{me} = $self;
 		my $save = \&$key;
 		*$key = $address;
 		
-		$dec->{arguments} = \@_;
+		$dec->{arguments} = [@_];
 		
 		$dec->before(@_) if !$dec->{noBefore};
 		
 		my @ret;
 		
 		if(!$dec->{noReplace}) {
-			@ret = wantarray? $dec->replace(@_): scalar $dec->replace(@_);
+			@ret = wantarray? $dec->replace(@{$dec->{arguments}}): scalar $dec->replace(@{$dec->{arguments}});
 		}
 		else {
-			@ret = wantarray? $address->($self, @_): scalar $address->($self, @_);
+			@ret = wantarray? $address->($self, @{$dec->{arguments}}): scalar $address->($self, @{$dec->{arguments}});
 		}
 		
-		$dec->{return} = \@ret, $dec->after(@_), $dec->{return} = undef if !$dec->{noAfter};
+		$dec->{return} = \@ret, $dec->after(@{$dec->{arguments}}), $dec->{return} = undef if !$dec->{noAfter};
 		
 		*$key = $save;
 		$dec->{me} = $dec->{arguments} = undef;
 		
 		wantarray? @ret: $ret[0];
-	} if 0 && (!$dec->{noReplace} || !$dec->{noBefore} || !$dec->{noAfter});
-	
+	} if !$dec->{noReplace} || !$dec->{noBefore} || !$dec->{noAfter};
 	
 	$self
 }
