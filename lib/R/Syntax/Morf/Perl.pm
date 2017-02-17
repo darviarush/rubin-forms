@@ -455,11 +455,13 @@ sub _extends {
 	
 	#push @Nil::CLASSES, "{{ class }}"$Nil::CLASSES{"{{ class }}"}++;
 	
-	$file =~ s!'!\'!g;
-	$self->{BEGIN} .= "my (\$class, \$file, \$lineno) = (\"$class\", '$file', $lineno); my \$c = \$Nil::CLASSES{\$class}; die \"класс \$class встречается в \$file:\$lineno и в \$c->{file}:\$c->{lineno}\" if \$c; \$Nil::CLASSES{\$class} = { file => \$file, lineno => \$lineno }; ";
+	# $file =~ s!'!\'!g;
+	# $self->{BEGIN} .= "my (\$class, \$file, \$lineno) = (\"$class\", '$file', $lineno); my \$c = \$Nil::CLASSES{\$class}; die \"класс \$class встречается в \$file:\$lineno и в \$c->{file}:\$c->{lineno}\" if \$c; \$Nil::CLASSES{\$class} = { file => \$file, lineno => \$lineno }; ";
+	
+	push @{$self->{INCLUDES}}, @$extends if @$extends;
 	
 	my $ext = "";
-	$ext .= " BEGIN { \$R::App::app->syntaxAg->include( \@${class}::ISA = qw/".join(" ", @$extends)."/ ) }" if @$extends;
+	$ext .= " BEGIN { \@${class}::ISA = qw/".join(" ", @$extends)."/ }" if @$extends;
 	$ext .= " use mro 'c3';" if @$extends>1;
 	$ext
 }
@@ -490,9 +492,14 @@ sub end {
 		$ret = "BEGIN { use common::sense; $begin } $ret";
 	}
 	
+	if($self->{INCLUDES}) {
+		my %exists;
+		$self->{START} = 'R::App::app->syntaxAg->include(qw/' . join(" ", map { exists $exists{$_}? (): ($exists{$_} = $_) } @{$self->{INCLUDES}}) . "/);\n" . $self->{START};
+	}
+	
 	# добавляет в начало без BEGIN
 	if(my $begin = delete $self->{START}) {
-		$ret = "use common::sense; $begin; $ret";
+		$ret = "use common::sense; use R::App; $begin; $ret";
 	}
 	
 	# сценарий - в отдельный файл

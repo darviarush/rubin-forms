@@ -89,19 +89,27 @@
 	
 	my $Aquafile = $dir->sub("/Aquafile")->write("");
 	
-	$app->syntaxAg->ag($file->path);		#@ ~ нет “Tess.ag”
+	$app->syntaxAg->ag($file->path);		#@ ~ нет “var/_test_13_ag/Tess.ag”
 
 Компиляция исходников происходит в поддиректорию `.Aqua`. Причём первым компилируется *Aquafile*.
 
 	$app->file("var/_test_13_ag/.Aqua/Aquafile.pm")->exists;		# 1
 
 Если файл не начинается на `class name`, где `name` - имя файла, то `class name` добавляется по умолчанию.
+Так же тело класса обёрнуто в метод `void`. Следующий код `123` будет в классе `Tess` в методе `void`.
 
 	$app->file("var/_test_13_ag/Tess.ag")->write("123");
 	$app->syntaxAg->ag("var/_test_13_ag/Tess.ag");		# 123
 	
+Метод `void` дёргается командой `ag` по умолчанию.
+	
 	$app->file("var/_test_13_ag/Aes.ag")->write("class Aes \n 777 \n end");
 	$app->syntaxAg->ag("var/_test_13_ag/Aes.ag");		# 777
+	
+Свой метод `void` написать нельзя.
+
+	$app->file("var/_test_13_ag/DismissVoid.ag")->write("sub void \n 777 \n end");
+	$app->syntaxAg->ag("var/_test_13_ag/DismissVoid.ag");		#@ ~ void - метод тела класса. Он уже объявлен
 
 Так же файл может начинаться на `extends` или `inherits`.
 	
@@ -118,15 +126,17 @@
 	$app->file("var/_test_13_ag/Inherits.ag")->write("me isa 'Nil'");
 	$app->syntaxAg->ag("var/_test_13_ag/Inherits.ag");		# 1
 
-Код который не входит в объявление какого-то метода будет входить в неявный метод `render`. При попытке создать такой метод будет сгенерирована ошибка.
-Команда `ag` подгружает `Aquafile` и указанный класс, создаёт экземпляр и запускает метод `render`.
+Команда `ag` подгружает `Aquafile` и указанный класс, создаёт экземпляр и запускает метод `void`.
 
 `Aquafilе` содержит конфигурацию проекта. Поэтому он назван *Акваторией*.
 
 Классы подгружаются оператором `new`, если класс ещё не был загружен. При этом по путям `app.syntaxAg:INC` ищется файл с расширением *.ag*.
-Все файлы по вложенным путям в имени класса так же подгражаются - ведь в файле класса могут быть подклассы.
+Все файлы по вложенным путям в имени класса так же подгружаются - ведь в файле класса могут быть подклассы.
 
-	$app->file("var/_test_13_ag/Nik.ag")->write("class Risk \n end");
+	$app->file("var/_test_13_ag/Nikki.ag")->write("class R1 \n 12 \n end");
+	$app->syntaxAg->eval("new Nikki::R1.void");		#	12
+
+	$app->file("var/_test_13_ag/Nik.ag")->write("class Risk \n end");	
 	$app->file("var/_test_13_ag/Nik/Risk.ag")->mkpath->write("1");
 	
 	#$app->syntaxAg->ag("var/_test_13_ag/Nik/Risk.ag");	#@ ~ класс Nik::Risk встречается в .* и в .*
@@ -136,13 +146,17 @@
 
 Препроцессоры задаются дополнительными расширениями и являются классами `R::Syntax::Preprocessor::*`.
 
-	$app->file("var/_test_13_ag/Template.au.ag")->write("<html><% A+10 %></html>");
+Пример для `R::Syntax::Preprocessor::vw`:
+
+	$app->file("var/_test_13_ag/Template.html.vw")->write("<html><% A+10 %></html>");
 	
-	$app->syntaxAg->ag("var/_test_13_ag/Template.au.ag");		# <html>10</html>
+	$app->syntaxAg->ag("var/_test_13_ag/Template.html.vw");		# <html>10</html>
 	
 	$app->syntaxAg->eval("new Template(A => 10).render");		# <html>20</html>
 	
-Темплейт вместо подпрограммы `void` своё тело оборачивает в блок `render`. А `void` вызывает `render`.
+Подрасширение `html` никак не учитывается.
+	
+Темплейт вместо метода `void` своё тело оборачивает в блок `render`. Создаётся и `void`, он вызывает `render`.
 
 Блоки созданы специально для шаблонов. Локальные переменные блоков являются одновременно свойствами объекта. А ещё блок сразу же вызывается.
 

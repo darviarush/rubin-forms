@@ -178,6 +178,7 @@ sub dist {
 	$app->tty->raw;
 	
 	$root->sub("/*")->glob("-d")->then(sub {
+		msg1 $_->path;
 		$_->chdir, msg1(":red", $_->path), print(`git add .; git commit -am dist; git pull --no-edit && git push`), $root->chdir if $_->sub("/.git")->isdir;
 	});
 }

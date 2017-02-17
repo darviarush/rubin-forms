@@ -1033,8 +1033,9 @@ sub rmpath {
 *cd = \&chdir;
 sub chdir {
 	my ($self) = @_;
+	undef $!;
 	chdir $self->{files}[0];
-	die( ($!+0) . ": $!" ) if $! && $! != 17;	# 17 - file exists
+	die "cd " . $self->{files}[0] . " -> " . ($!+0) . ": $!" if $! && $! != 17;	# 17 - file exists
 	$self
 }
 

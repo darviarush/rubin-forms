@@ -1,4 +1,4 @@
-package R::Syntax::Preprocessor::Au;
+package R::Syntax::Preprocessor::Vw;
 # препроцессор шаблонов - преобразует код шаблона в код Серебряны
 
 use common::sense;

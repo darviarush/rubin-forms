@@ -8,7 +8,6 @@ use R::App;
 use R::Re;
 
 $Nil::INC = [$app->file(__FILE__)->file( "/../../../ag" )->abs->path];
-#%Nil::REQUIRE;
 
 my $BASICSYNTAX = $app->syntax->new(name => 'ag')->lang("perl");
 my $STRINGSYNTAX = $app->syntax->new(name => 'ag.string');
@@ -326,6 +325,8 @@ $s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => sub {
 $s->opt("decorator", nolex=>1);
 sub br_sub {
 	my ($self, $push) = @_;
+	
+	$self->error("void - метод тела класса. Он уже объявлен", $push) if $push->{SUB} eq "void";
 	
 	$push->{args} = [ split /\s*,\s*/, $push->{args} ];
 	$push->{endline} = 1 if delete $push->{then};
@@ -689,13 +690,18 @@ sub ag {
 	unshift @$Nil::INC, $root if $Nil::INC->[0] ne $root;
 
 	if($path ne "Aquafile") {
-		my $Aquafile = $self->require( "Aquafile" );
+		my $Aquafile = $self->include( "Aquafile" );
 	
 		# строим окружение
 		$Aquafile->new->void(@args);
 	}
 	
-	my $class = $self->require( $app->file($path)->abs->subdir($root, "")->path );
+	die "нет " . $app->perl->qq($path) if !$app->file($path)->exists;
+	
+	my $file = $app->file($path)->abs->subdir($root, "");
+	my $class = $self->path2class( $file->path );
+	
+	$self->include( $class );
 	
 	$class->new->void(@args);
 }
@@ -710,10 +716,11 @@ sub path2class {
 }
 
 
-
 # компилирует файл
 sub compile {
 	my ($self, $path, $to, $name) = @_;
+	
+	#msg1 $path, $to, $name;
 	
 	die "compile: не указан Класс" if !$name;
 	die "compile: не указан путь файла" if !$path;
@@ -721,14 +728,11 @@ sub compile {
 	
 	my $file = $app->file($path);
 	my $text = $file->read;
+	my $ext = $file->ext;
 	
-	if(my $exts = $file->exts) {
-		my @exts = split /\./, $exts;
-		pop @exts if $exts[-1] eq "ag";
-		for my $ext (reverse @exts) {
-			my $Ext = "syntaxPreprocessor" . ucfirst $ext;
-			$text = $app->$Ext->new(file => $path, text => $text)->morf;
-		}
+	if($ext ne "" and $ext ne "ag") {
+		my $Ext = "syntaxPreprocessor" . ucfirst $ext;
+		$text = $app->$Ext->new(file => $path, text => $text)->morf;
 	}
 	
 	my $cc = $self->new(file => $path, tofile => $to, trace => $self->{trace});
@@ -751,82 +755,94 @@ sub compile {
 	$self
 }
 
-# подключает файл как класс или шаблон
-# получает рутовую директорию
-# если Aquafile ещё не загружен - загружает
-sub require {
-	my ($self, $path, $INC) = @_;
-
-	return $Nil::REQUIRE{$path} if exists $Nil::REQUIRE{$path};
+# # подключает файл как класс или шаблон
+# # получает рутовую директорию
+# # если Aquafile ещё не загружен - загружает
+# sub _require {
+	# my ($self, $path, $INC) = @_;
 	
-	$INC //= $Nil::INC;
-
-	my $file = $app->file($path);
-	my $class = $self->path2class($path);
-	my @path = split /\//, $path;
+	# $INC //= $Nil::INC;
 	
-	for my $inc (@$INC) {
-		my $load = 0;
+	# for my $inc (@$INC) {
+			
+		# $f = $app->file("$inc/$path");
+	
+		# next if !$f->isfile;
 		
-		# пробегаемся по пути и пытаемся найти подходящие файлы
-		for(my $i=0; $i<@path; $i++) {
-			my $rpath = join "/", @path[0..$i];
-			my $f;
-			if($i != $#path) {
-				$f = $app->file("$inc/$rpath.*")->glob;
-				die "несколько подходящих файлов: " . join ", ", $f->files if $f->length > 1;
-				$rpath .= "." . $f->exts;
-			}
-			
-			$f = $app->file("$inc/$rpath");
-			
-			
-			if($f->isfile) {
-				my $to = $app->file("$inc/.Aqua/$rpath.pm");
+		# my $class = $self->path2class($path);
+		# my $to = $app->file("$inc/.Aqua/$rpath.pm");
 
-				if(!$to->exists || $to->mtime < $f->mtime) {
-					$self->compile($f->path, $to->path, $class);
-				}
-				
-				$Nil::REQUIRE{$rpath} = $rpath;
-				require $to->path;
-				$load = 1 if $i == $#path;
-			}
-		}
-		return $class if $load;
-	}
+		# $self->compile($f->path, $to->path, $class) if !$to->exists || $to->mtime < $f->mtime;
+		
+		# require $to->path;
+		# return $class;
+	# }
 	
-	die "нет " . $app->perl->qq($path);
-}
+	# die "нет " . $app->perl->qq($path);
+# }
 
 # подключает классы Ag или Perl
 sub include {
 	my $self = shift;
 	
-
-	CLASSES: for my $class (@_) {
+	CLASS:
+	for my $class (@_) {
 	
-		next if exists $Nil::CLASSES{$class};
+		# класс уже подключен
+		return $class if $class->can("new");
 		
-		my $path = $class;
-		$path =~ s!::!/!g;
-
+		my @path = split /::/, $class;
+		
 		my $INC = $Nil::INC;
-
+		
+		# по указанному пути могут быть файлы с этим классом. Они могут иметь разные расширения или не иметь их вообще
+		# так же нужно проверить, что класс не описан дважды
+		# файлы проверяем только по одному пути
+		
+		my $load = "";
+		
 		for my $inc (@$INC) {
-			my $file = $app->file("$inc/$path*.ag")->glob;
-			die "несколько подходящих файлов: " . join ", ", $file->files if $file->length > 1;
-			$self->require($file->subdir($inc, "")->path, [$inc]), next CLASSES if $file->exists;
+		
+			for(my $i=0; $i<@path; $i++) {
+				my $path = join "/", @path[0..$i];
+		
+				my $file = $app->file("$inc/$path $inc/$path.*")->glob("-f");
+			
+				die "несколько подходящих файлов: " . join ", ", $file->files if $file->length > 1;
+				if($file->length == 1) {
+
+					#$self->_require($file->subdir($inc, "")->path, [$inc]);
+					my $strip_path = $file->subdir($inc, "")->path;
+					my $to = $app->file("$inc/.Aqua/$strip_path.pm");
+					my $newclass = $self->path2class($strip_path);
+					
+					$self->compile($file->path, $to->path, $newclass) if !$to->exists || $to->mtime < $file->mtime;
+					
+					require $to->path;
+					
+					die "нет класса $newclass в " . $file->path if !$newclass->can("new");
+					
+					if($class->can("new")) {
+						die "класс $class встречается в файлах $load и " . $file->path if $load;
+						$load = $file->path;
+					}
+				}
+			}
+			
+			next CLASS if $load;
 		}
 		
-		require "$path.pm";
+		my $pm = $class;
+		$pm =~ s/::/\//g;
+		$pm .= ".pm";
 		
-		die "нет new у " . $app->perl->qq($class) if !$class->can("new");
+		eval { require $pm; };
 		
-		$Nil::CLASSES{$class}++;
+		die "нет класса $class\nв путях:\n" . (join "\n", @$INC) . "\n" if !$class->can("new");
+		
 	}
 	
-	@_==1? $_[0]: @_
+	wantarray? @_: $_[0];
 }
 
 # оформляет метод функции
