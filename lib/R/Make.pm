@@ -63,18 +63,16 @@ sub namespace ($) {
 
 # описание задания для объектного интерфейса
 sub add {
-	my ($self, $name, $args, $desc, $spec) = @_;
-
-	my ($class, $file, $line) = caller(2);
+	my ($self, $class, $name, $args, $desc, $spec) = @_;
 	
 	my $code = closure $class, $name, sub {
 		my ($class, $name) = splice @_, 0, 2;
 		$class->new->$name(@_);
 	};
 
-	msg1 $name, $file, $line, $code;
 	
-	_add($name, $file, $line, $code);
+	
+	_add($name, "?", "?", $code);
 	
 	args( $args ) if defined $args;
 	desc( $desc ) if defined $desc;

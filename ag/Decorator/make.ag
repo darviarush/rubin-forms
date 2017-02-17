@@ -4,11 +4,11 @@ rem make args, desc, spec
 
 sub init args, desc, spec
 	if @arguments == 0
-		app.make.add me:name
+		app.make.add me:class, me:name
 	elseif @arguments == 1
-		app.make.add me:name, "", args
+		app.make.add me:class, me:name, "", args
 	else
-		app.make.add me:name, args, desc, spec
+		app.make.add me:class, me:name, args, desc, spec
 	end
 end
 

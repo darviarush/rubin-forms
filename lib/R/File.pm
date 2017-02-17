@@ -528,10 +528,10 @@ sub rm {
 	my ($self) = @_;
 	my @dir;
 	$self->find(sub {
-		if(-d $_) {unshift @dir, $_} else { msg("rm: не могу удалить файл `$_`: $!") unless unlink $_}
+		if(-d $_) {unshift @dir, $_} else { undef $!; msg("rm: не могу удалить файл `$_`: $!") unless unlink $_}
 		0
 	});
-	do { msg("rm: не могу удалить каталог `$_`: $!") unless rmdir $_ } for @dir;
+	do { undef $!; msg("rm: не могу удалить каталог `$_`: $!") unless rmdir $_ } for @dir;
 	$self
 }
 
@@ -722,6 +722,7 @@ sub open {
 	my ($self, $mode) = @_;
 	my $mode = ($mode // $self->{mode} // "<") . ($self->{encode}? ":encoding($self->{encode})": "");
 	my $path = $self->{files}[0];
+	undef $!;
 	open my($f), $mode, $path or die "file($path)->open($mode): Не могу открыть: $!\n";
 	
 	# для Coro
@@ -734,6 +735,7 @@ sub open {
 sub dbm {
 	my ($self) = @_;
 	my $hash = {};
+	undef $!;
 	dbmopen %$hash, $self->path, 0642 or die "dbm(" . $self->path . "): Не могу открыть: $!\n";
 	$hash
 }
@@ -1025,7 +1027,7 @@ sub rmpath {
 		push @path, $` while /\//g;
 		rmdir $_ or last for reverse @path;
 	}
-	$! = undef;
+	undef $!;
 	$self
 }
 
