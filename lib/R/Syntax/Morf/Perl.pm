@@ -192,6 +192,9 @@ F_kreplace => sub { my($s, $p, $path)=@_; $p->{id} = $path->[-1]{id} },
 "xfx ^.." => '({{ left }})+1 .. ({{ right }})',
 "xfx ^..." => '({{ left }})+1 .. ({{ right }})-1',
 
+# генерации
+"fx gen" => 'do { my @A=(); while(my @x = do { {{ right }} }) { push @A, @x } @A }',
+"xfx gen" => 'do { my @A=(); while(do { {{ left }} }) { push @A, do { {{ right }} } } @A }',
 
 # массивов
 'fx @' => '@{{{ right }}}',
@@ -273,7 +276,7 @@ join => 'join({{ _for_join *, right }}, {{ left }}){{ newline }}',
 
 SCENARIO => '{{ _scenario right, lineno }}',
 
-CLASS => '(do { package {{ class }}; use common::sense; use R::App;{{ _extends class, extends, lineno, file }} sub void { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
+CLASS => '(do { package {{ _class_id class }}; use common::sense; use R::App;{{ _extends class, extends, lineno, file }} sub void { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
 
 SUB => sub { my ($self, $push) = @_;
 		# вернуть self, если это конструктор
@@ -281,8 +284,8 @@ SUB => sub { my ($self, $push) = @_;
 		# если имя функции == new
 		$push->{SHIFT} = $push->{SUB} eq "new"? 'bless({}, do { my $cls=shift; ref $cls || $cls })': 'shift';
 	},
-	'sub {{ SUB }} { my $DATA = { me => {{ SHIFT }} }; {{ _args args }} {{ right }}{{ RET }} }',
-BLOCK => 'do { sub {{ SUB }} { my $DATA = shift; {{ _args args }} {{ right }}; return }; $DATA->{{ SUB }} }',
+	'sub {{ _sub_id SUB, class }} { my $DATA = { me => {{ SHIFT }} }; {{ _args args }} {{ right }}{{ RET }} }',
+BLOCK => 'do { sub {{ _sub_id SUB, class }} { my $DATA = shift; {{ _args args }} {{ right }} }; $DATA->{{ SUB }} }',
 
 IF => '(({{ right }}{{ _else else }})',
 "IF THEN" => '{{ left }})? do {{{ right }}',

@@ -42,7 +42,8 @@ my $re_space_ask = qr/[\ \t]*/;
 my $re_rem = qr/(?:(?:\#|\brem\b)(?<rem>[^\n\r]*))?/i;
 my $re_sk = qr/[\[\{\(]/;
 my $re_arg = qr/$re_id|\*/on;
-my $re_class = qr/(::)?$re_id(::$re_id)*/on;
+my $re_STRING = qr/'(\\'|[^\n\r']*)'|"(\\"|[^\n\r"]*)"/on;
+my $re_class = qr/ (::)? $re_id(::$re_id)* | :: | $re_STRING /xon;
 my $re_extends = qr!$re_class(?:$re_space_ask,$re_space_ask$re_class)*!;
 my $re_class_stmt = qr!
 (?<class>$re_class)
@@ -52,10 +53,11 @@ my $re_class_stmt = qr!
 my $re_args = qr!
 $re_space_ask (?<args>$re_arg ($re_space_ask , $re_space_ask $re_arg)*)
 !xismon;
-my $re_overload_id = qr!
-	(?<id>"\w+"|[[:punct:]]+|0\+)
-!xismo;
-my $re_sub_in = qr/ [\ \t]+ CLASS [\ \t]+ (?<sub_in>(?<sub_self>::)?$re_class) /xn;
+# my $re_overload_id = qr!
+	# (?<id>"\w+"|[[:punct:]]+|0\+)
+# !xismo;
+#my $re_sub_in = qr/ [\ \t]+ CLASS [\ \t]+ (?<sub_in>(?<sub_self>::)?$re_class) /xn;
+my $re_SUB = qr/ $re_id | $re_STRING /xon;
 my $re_args_then = qr/ $re_space_ask (?<then> \b THEN \b ) | $re_args $re_space_ask (?<then> \b THEN \b ) | $re_args | /ixno;
 # my $re_then = qr/ (?<re_endline> $re_space_ask \b THEN \b) | $re_rem $re_endline /xn;
 # my $re_for = qr!
@@ -125,6 +127,7 @@ $s->tr("yfx", qw{		join	})->td("yf", qw{	reverse join	});
 $s->tr("yfx", qw{		-> =   += -= *= /= ^= div= mod=   &&= ||= ^^=   and= or= xor=   +&= +|= +^= +<= +>=   **= ***= .= ?= ,= =, %=   =sreplace =kreplace });
 $s->tr("xfy", qw{		sreplace kreplace		});
 $s->tr("fx",  qw{		gosub+					});
+$s->tr("fx",  qw{		gen		})->td("xfx", qw{		gen					});
 $s->tr("xfy", qw{		:						});
 $s->tr("xfy", qw{		|						});	# TODO: |=
 $s->tr("fy",  qw{		not						});
@@ -301,19 +304,39 @@ $s->opt("END", sub => sub {
 #$s->opt("UNTIL", sub => sub { my ($self, $push) = @_; $self->check("UNTIL", stmt=>"REPEAT")->top->{endline} = 1 });
 #$s->opt("FROM", sub => sub { my ($self, $push) = @_; my $top = $self->endline->top; $self->error("FROM должен использоваться после MAP, PAIRMAP, GREP, SORT, NSORT, QSORT или REDUCE") if $top->{stmt} !~ /^(?:map|grep|[nq]sort|reduce|pairmap)$/; $push->{endline} = $push->{gosub} = 1 });
 
+sub to_class {
+	my ($class) = @_;
+	if($class =~ /^'/) {
+		$class =~ s/^'(.*)'$/$1/;
+		$class =~ s/\\'/'/g;
+	}
+	elsif($class =~ /^"/) {
+		$class =~ s/^"(.*)"$/$1/;
+		$class =~ s/\\"/"/g;
+	}
+	$class
+}
 
 $s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => sub {
 	my ($self, $push) = @_;
 	my $S = $self->{stack};
 	$push->{lineno} = $self->{lineno};
 	$push->{file} = $self->{file};
+	
+	$push->{class} = to_class( $push->{class} );
+	
+	# получаем вышестоящий класс
 	my $class;
 	for(my $i=$#$S; $i>=0; $i--) {
 		$class = $S->[$i]{class}, last if $S->[$i]{stmt} eq "CLASS";
 	}
+	
+	# иерархия классов
 	$push->{class} = "${class}::$push->{class}" if defined $class;
+	
+	# обрабатываем extends
 	if($push->{extends}) {
-		$push->{extends} = [ map { /^:/? "$push->{class}$_": $_ } split /\s*,\s*/, $push->{extends} ];
+		$push->{extends} = [ map { /^:/? "$push->{class}$_": $_ } map { to_class($_) } split /\s*,\s*/, $push->{extends} ];
 	}
 	else {
 		$push->{extends} = ["Nil"] if $push->{class} ne "Nil";
@@ -328,19 +351,23 @@ sub br_sub {
 	
 	$self->error("void - метод тела класса. Он уже объявлен", $push) if $push->{SUB} eq "void";
 	
+	$push->{SUB} = to_class( $push->{SUB} );
+	
 	$push->{args} = [ split /\s*,\s*/, $push->{args} ];
 	$push->{endline} = 1 if delete $push->{then};
 	
-	# проставляем класс функции
+	# в каком классе находится функция
 	my $stack = $self->{stack};
 	for(my $i=$#$stack; $i>=0; $i--) {
 		my $s = $stack->[$i];
 		if($s->{stmt} eq "CLASS") {
 			$push->{class} = $s->{class};
-			last;
+			goto NEXT;
 		}
 	}	
 	
+	$self->error("метод $push->{SUB} не в классе!");
+	NEXT:
 	
 	
 	# пытаемся обнаружить декораторы
@@ -381,8 +408,19 @@ sub br_sub {
 	}
 }
 
-$s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_id ) $re_args_then }ix => \&br_sub => "END");
-$s->br("BLOCK" => qr{ \b BLOCK $re_space (?<SUB> $re_id ) $re_args_then }ix => \&br_sub => "END");
+# переносим sub в начало класса
+sub fix_sub {
+	my ($self, $push, $node) = @_;
+	
+	my $class = $node->up("CLASS");
+	my $right = $class->right;
+	$right->replace('xfy \n', left => $node, right => $right);
+}
+
+$s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_SUB ) $re_args_then }ix => \&br_sub => "END");
+$s->br("BLOCK" => qr{ \b BLOCK $re_space (?<SUB> $re_SUB ) $re_args_then }ix => \&br_sub => "END");
+$s->fixes('SUB' => \&fix_sub, 'BLOCK' => \&fix_sub);
+
 
 #$s->br("SUB_CLASS" => qr{ \b SUB $re_space $re_id $re_args_then }ix => "END");
 

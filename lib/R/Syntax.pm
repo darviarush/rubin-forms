@@ -1056,9 +1056,9 @@ sub modify {
 	my $one = $idx+1;
 	my $two = $idx+2;
 	
-	my @path = $root;
-	while(@path) {
-		my $node = $path[-1];
+	my $path = bless [$root], "R::SyntaxBinary";
+	while(@$path) {
+		my $node = $path->[-1];
 		
 		# # вызываем модификатор, если мы на элементе впервые
 		# if(!exists $node->{"&"}) {
@@ -1068,18 +1068,19 @@ sub modify {
 		
 		if(exists $node->{left} && $node->{"&"} < $one) {	# на подэлемент
 			$node->{"&"}=$one;
-			push @path, $node->{left};
+			push @$path, $node->{left};
 		}
 		elsif(exists $node->{right} && $node->{"&"} < $two) {	# на подэлемент
 			$node->{"&"}=$two;
-			push @path, $node->{right};
+			push @$path, $node->{right};
 		}
 		else {
-			pop @path;		# удаляем элемент
-		
+			
 			# просматриваем снизу-вверх
 			my $fn = $modifiers->{$node->{stmt}};
-			$fn->($self, $node, \@path) if $fn;
+			$fn->($self, $node, $path) if $fn;
+			
+			pop @$path;		# удаляем элемент
 		}
 	}
 	
@@ -1245,5 +1246,79 @@ sub top {
 	$stack->[-1]
 }
 
+
+
+
+########################## манипулятор бинарного дерева
+package R::SyntaxBinary;
+use common::sense;
+use R::App;
+
+
+# !!! Важно !!!
+# в пройденных node будет установлен ключ &
+
+# создаёт очередь
+sub new {
+	my $cls = shift;
+	bless [grep { defined $_ } @_], ref $cls || $cls;
+}
+
+# заменяет ноду
+sub replace {
+	my $self = shift;
+	if(@_ == 1) {
+		my $node = shift;
+		%{$self->[-1]} = ref $node eq ref $self? %{$_[0]->node}: ref $node? %{$_[0]}: (stmt => $_[0]);
+	}
+	else {
+		unshift @_, 'stmt' if @_ % 2 == 1;
+		%{$self->[-1]} = pairmap { ref $_ eq ref $self? $_->node: $_ } @_;
+	}
+		
+	$self
+}
+
+# возвращает парента с указанным stmt
+sub up {
+	my ($self, $up) = @_;
+	for(my $i=$#$self; $i>=0; $i--) {
+		return $self->new($self->[$i]) if $self->[$i]{stmt} eq $up;
+	}
+	return $self->new;
+}
+
+# возвращает левую ветвь
+sub left {
+	my $self = shift;
+	$self->new($self->[-1]{left})
+}
+
+# возвращает правую ветвь
+sub right {
+	my $self = shift;
+	$self->new($self->[-1]{right})
+}
+
+# тестирует stmt
+sub is {
+	my ($self, $stmt) = @_;
+	if(ref $stmt) {
+		my $ret = 1;
+		my $node = $self->[-1];
+		while(my ($k, $v) = each %$stmt) {
+			return "" if !exists $node->{$k};
+			return "" if $node->{$k} ne $v;
+		}
+		$ret
+	}
+	else { $self->[-1]{stmt} eq $stmt }
+}
+
+# возвращает последнюю ноду
+sub node {
+	my ($self) = @_;
+	+{ @$self? %{$self->[-1]}: () }
+}
 
 1;
