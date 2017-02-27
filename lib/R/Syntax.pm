@@ -1033,16 +1033,29 @@ sub templates {
 		$modifiers->{$k} = $v, $v = $_[$i+2], $i++ if ref $v eq "CODE";
 		
 		$v =~ s/'/\\'/g;
-		$v =~ s/\{\{\s*(\w+)\s*\}\}/', \$b->{$1} ,'/g;
-		$v =~ s/\{\{\s*(?<id>\w+)\s+(?<args>$re_arg(\s*,\s*$re_arg)*)\s*\}\}/
+		$v =~ s/\{\{\s*(\w+)\s*\}\}/', \$b->{$1} ,'/g;	# переменные
+		$v =~ s/\{\{\s*(?<id>\w+)\s+(?<args>$re_arg(\s*,\s*$re_arg)*)\s*\}\}/	# вызовы методов класса темплейта
 			my $args = $+{args};
 			my $id = $+{id};
 			$args =~ s!$re_arg! $& eq "*"? "\$b": "\$b->{$&}"!ge;
 			"', \$a->{lang}->$id($args) ,'"
 		/gen;
 		
+		# всплывающие переменные
+		my $begin = '';
+		$v =~ s{	\{% \s* (?<key> \w+:\w+) \s* \|	(?<val> .*? ) %\} }{
+			$begin .= "push \@{\$b->{'UP+'}{'$+{key}'}}, join '', '$+{val}'; ";
+			''
+		}sxgen;
+		
+		$v =~ s{	\{\{  \s* (?<key> \w+:\w+ ) (\s* ("(?<sep>[^"]+)"|'(?<sep>[^']+)'))? \s* \}\}	}{
+			"', join(\"" . ($+{sep} // '""') . "\", \@{delete(\$b->{'UP+'}{'$+{key}'})}) ,'"
+		}xgen;
+		
 		$k =~ s/\s+/ /g;
-		$templates->{$k} = eval "sub { join '', '$v' }";
+		my $code = $begin? "sub { my \$ret = join '', '$v'; $begin\$ret }": "sub { join '', '$v' }";
+		
+		$templates->{$k} = eval $code;
 		die $@ if $@;
 	}
 	
@@ -1105,8 +1118,9 @@ sub expirience {
 	my $templates = $self->{lang}{templates};
 	my $out;
 	my @path = $root;
+	my $node;
 	while(@path) {
-		my $node = $path[-1];
+		$node = $path[-1];
 		
 		if(exists $node->{left} && $node->{"&"} < $one) {	# на подэлемент
 			$node->{"&"}=$one;
@@ -1127,11 +1141,25 @@ sub expirience {
 			die "нет шаблона `$tmpl` в языке " . ($self->{lang}{name} // "«язык Батькович»") if !$template;
 			
 			if(@path) {
-				my $parent = $path[-1];
+				my $parent = $path[-1];		# есть родитель
 				if($parent->{"&"} == $one) {
 					$parent->{left} = $template->();
 				} else {
 					$parent->{right} = $template->();
+				}
+				
+				# поднятие всплывающих переменных
+				if(exists $b->{'UP+'}) {
+					if(exists $parent->{'UP+'}) {
+						my $up = $b->{'UP+'};
+						my $pup = $parent->{'UP+'};
+						while(my ($key, $val) = each %$up) {
+							push @{$pup->{$key}}, @$val;
+						}
+					}
+					else {
+						$parent->{'UP+'} = $b->{'UP+'}; 
+					}
 				}
 			}
 			else {
@@ -1139,6 +1167,8 @@ sub expirience {
 			}
 		}
 	}
+	
+	$self->error("остались всплывающие переменные: " . join ", ", keys %{$node->{'UP+'}}) if %{$node->{'UP+'}};
 	
 	$out
 }
