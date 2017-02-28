@@ -304,26 +304,11 @@ $s->opt("END", sub => sub {
 #$s->opt("UNTIL", sub => sub { my ($self, $push) = @_; $self->check("UNTIL", stmt=>"REPEAT")->top->{endline} = 1 });
 #$s->opt("FROM", sub => sub { my ($self, $push) = @_; my $top = $self->endline->top; $self->error("FROM должен использоваться после MAP, PAIRMAP, GREP, SORT, NSORT, QSORT или REDUCE") if $top->{stmt} !~ /^(?:map|grep|[nq]sort|reduce|pairmap)$/; $push->{endline} = $push->{gosub} = 1 });
 
-sub to_class {
-	my ($class) = @_;
-	if($class =~ /^'/) {
-		$class =~ s/^'(.*)'$/$1/;
-		$class =~ s/\\'/'/g;
-	}
-	elsif($class =~ /^"/) {
-		$class =~ s/^"(.*)"$/$1/;
-		$class =~ s/\\"/"/g;
-	}
-	$class
-}
-
 $s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => sub {
 	my ($self, $push) = @_;
 	my $S = $self->{stack};
 	$push->{lineno} = $self->{lineno};
 	$push->{file} = $self->{file};
-	
-	$push->{class} = to_class( $push->{class} );
 	
 	# получаем вышестоящий класс
 	my $class;
@@ -336,7 +321,7 @@ $s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => sub {
 	
 	# обрабатываем extends
 	if($push->{extends}) {
-		$push->{extends} = [ map { /^:/? "$push->{class}$_": $_ } map { to_class($_) } split /\s*,\s*/, $push->{extends} ];
+		$push->{extends} = [ map { /^:/? "$push->{class}$_": $_ } split /\s*,\s*/, $push->{extends} ];
 	}
 	else {
 		$push->{extends} = ["Nil"] if $push->{class} ne "Nil";
@@ -350,8 +335,6 @@ sub br_sub {
 	my ($self, $push) = @_;
 	
 	$self->error("void - метод тела класса. Он уже объявлен", $push) if $push->{SUB} eq "void";
-	
-	$push->{SUB} = to_class( $push->{SUB} );
 	
 	$push->{args} = [ split /\s*,\s*/, $push->{args} ];
 	$push->{endline} = 1 if delete $push->{then};
@@ -408,18 +391,9 @@ sub br_sub {
 	}
 }
 
-# переносим sub в начало класса
-sub fix_sub {
-	my ($self, $push, $node) = @_;
-	
-	my $class = $node->up("CLASS");
-	my $right = $class->right;
-	$right->replace('xfy \n', left => $node, right => $right);
-}
-
 $s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_SUB ) $re_args_then }ix => \&br_sub => "END");
 $s->br("BLOCK" => qr{ \b BLOCK $re_space (?<SUB> $re_SUB ) $re_args_then }ix => \&br_sub => "END");
-$s->fixes('SUB' => \&fix_sub, 'BLOCK' => \&fix_sub);
+
 
 
 #$s->br("SUB_CLASS" => qr{ \b SUB $re_space $re_id $re_args_then }ix => "END");
@@ -698,6 +672,12 @@ $string->opt("CAT", re => qr/ (?<str> [^\$]* ) ( \$ (?<CAT> $re_id ( [\.:]$re_id
 sub morf {
 	my ($self, $text) = @_;
 	$self->SUPER::morf("$text\n");
+}
+
+# добавляем ROOT
+sub expirience {
+	my ($self, $root) = @_;
+	$self->SUPER::expirience({stmt=>"ROOT", right=>$root});
 }
 
 # возвращает рутовую директорию проекта

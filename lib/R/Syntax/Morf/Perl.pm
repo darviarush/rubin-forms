@@ -276,7 +276,9 @@ join => 'join({{ _for_join *, right }}, {{ left }}){{ newline }}',
 
 SCENARIO => '{{ _scenario right, lineno }}',
 
-CLASS => '(do { package {{ _class_id class }}; use common::sense; use R::App;{{ _extends class, extends, lineno, file }} sub void { my $DATA = { me => shift }; {{ right }} } __PACKAGE__ })',
+ROOT => '{{ ROOT:classes "\n" }}{{ right }}',
+
+CLASS => '{% ROOT:classes |package {{ class }} { use common::sense; use R::App;{{ _extends class, extends, lineno, file }}{{ CLASS:methods "\n" }} sub void { my $DATA = { me => shift }; {{ right }} } }%}"{{ class }}"',
 
 SUB => sub { my ($self, $push) = @_;
 		# вернуть self, если это конструктор
@@ -284,8 +286,8 @@ SUB => sub { my ($self, $push) = @_;
 		# если имя функции == new
 		$push->{SHIFT} = $push->{SUB} eq "new"? 'bless({}, do { my $cls=shift; ref $cls || $cls })': 'shift';
 	},
-	'sub {{ _sub_id SUB, class }} { my $DATA = { me => {{ SHIFT }} }; {{ _args args }} {{ right }}{{ RET }} }',
-BLOCK => 'do { sub {{ _sub_id SUB, class }} { my $DATA = shift; {{ _args args }} {{ right }} }; $DATA->{{ SUB }} }',
+	'{% CLASS:methods |sub {{ SUB }} { my $DATA = { me => {{ SHIFT }} }; {{ _args args }} {{ right }}{{ RET }} }%}',
+BLOCK => '{% CLASS:methods |sub {{ SUB }} { my $DATA = shift; {{ _args args }} {{ right }} }%}$DATA->{{ SUB }}',
 
 IF => '(({{ right }}{{ _else else }})',
 "IF THEN" => '{{ left }})? do {{{ right }}',
