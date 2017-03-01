@@ -289,7 +289,9 @@
 
 	my $s = $app->syntax->new;
 	$s->tr("xfy", '\n')->td("yf", '\n')->td("fy", '\n');
-	$s->opt('\n', re => qr{ \n }x);
+	$s->opt('\n', re => qr{ \n }x, sub => sub { $_[0]->newline; });
+	
+	$s->tr("fx", qw{	TOP		});
 	
 	$s->br("CLASS" => qr{ \b class \s+ (?<name>\w+) }x => "END");
 	$s->sr("method" => qr{ \b method \s+ (?<name>\w+) }x => "END");
@@ -298,7 +300,8 @@
 	$s->x("gomethod" => qr{ (?<class> \w+)  \. (?<method> \w+) }x => );
 	
 	$s->templates(
-		"CLASS" => 'package {{ name }} { {{ CLASS:methods "\n" }} sub void { {{ right }} } }',
+		"fx TOP" => '{{ TOP:classes }} {{ right }}',
+		"CLASS" => '{% TOP:classes | package {{ name }} { {{ CLASS:methods "\n" }} sub void { {{ right }} } } %}"{{ name }}"',
 		"method" => "{% CLASS:methods |
 			sub {{ name }} { {{ right }} }
 		%} '{{ name }}'",
@@ -310,24 +313,28 @@
 		"gomethod" => '{{ class }}->{{ method }}',
 	);
 	
-	$s->eval('
+	my $res = $s->eval('
+		TOP
 		class A
 			
 			1000
 		
 			method A1
-				10
-			end
+				method A2
+					20
+				end
 			
-			method A2
-				20
-			end
+				10
+			end			
+			
 		end
 	');
 	
+	$res;					# A
+	
 	$s->eval("A.A1");		# 10
 	$s->eval("A.A2");		# 20
-	$s->eval("A.void");		# A2
+	$s->eval("A.void");		# A1
 	
 `{{ CLASS:methods "\n" }}` считывает переменную `CLASS:methods` и объединяет её значения через `\n`.
 

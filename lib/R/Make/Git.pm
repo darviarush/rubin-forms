@@ -114,8 +114,6 @@ sub co {
     
     my $branch = $real[$nbranch-3];
     
-    print("вы остаётесь на ветке $branch"), return if $branch =~ /^\s*\* /;
-    
     make("commit");
     
     if($nbranch == 1) {  # добавляем
@@ -133,6 +131,7 @@ sub co {
 		$app->tty->run("git branch -D $branch");
 	}
     else {
+		print("вы остаётесь на ветке $branch"), return if $branch =~ /^\s*\* /;
         $app->tty->run("git checkout $branch");
     }
     

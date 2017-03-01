@@ -223,8 +223,9 @@ $s->opt("|", re => qr{
 $s->x('\n');
 $s->opt('\n', re => "$re_rem $re_endline", sub => sub {
 	my ($self, $push) = @_;
-	$self->{startline} = length($`);
-	$self->{lineno}++;
+	
+	$self->newline;
+	
 	my $br = $self->endline->top;
 	if($br->{then}) {
 		$self->op("THEN");
@@ -648,7 +649,19 @@ $string->x(qw/CAT/);
 $string->br(qw/exec1/);
 $string->opt("exec1", nolex => 1);
 
-$string->opt("CAT", re => qr/ (?<str> [^\$]* ) ( \$ (?<CAT> $re_id ( [\.:]$re_id )* ) | (?<dollar> \$ ) | $ ) /nxs, sub => sub {
+my $re_inbrackets = qr{
+	(?<R1> \(  ( [^\(\)]+ | (?&R1) )* \) ) |
+	(?<R2> \{  ( [^\{\}]+ | (?&R2) )* \} ) |
+	(?<R3> \[  ( [^\[\]]+ | (?&R3) )* \] )
+}xn;
+
+$string->opt("CAT", re => qr/ 
+	(?<str> [^\$]* ) ( 
+		\$ (?<CAT> $re_id $re_inbrackets? ( [\.:]$re_id $re_inbrackets? )* ) | 
+		(?<dollar> \$ ) |
+		$ 
+	) 
+/nxs, sub => sub {
 	my ($self, $push) = @_;
 	if( $self->top->{stmt} eq "string" ) {
 		$push->{str} =~ s/""|''|\\["']/\\"/g;

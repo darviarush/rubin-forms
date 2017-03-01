@@ -166,12 +166,12 @@ our @templates = (
 # замены
 "xfy sreplace" => 'do { my $s = ({{ left }}); $s =~ {{ right }}{{ arg }}; $s }',
 "yfx =sreplace" => 'do { my ($s, $f); $f=\({{ left }}); $s=$$f; $$f =~ {{ right }}{{ arg }} }',
-F_sreplace => sub { my($s, $p, $path)=@_; $p->{id} = $path->[-1]{id} },
+F_sreplace => sub { my($s, $p, $path)=@_; $p->{id} = $path->[-2]{id} },
 	's{{{ left }}}{ $DATA->{{{ id }}} = bless({ "~"=>$s, "^"=>[@-], "\$"=>[@+], %+ }, "MatchData"); do { {{ right }} } }',
 
 "xfy kreplace" => 'do { my $s = ({{ left }}); $s =~ {{ right }}{{ arg }}; $s }',
 "yfx =kreplace" => 'do { my ($s, $f); $f=\({{ left }}); $s=$$f; $$f =~ {{ right }}{{ arg }} }',
-F_kreplace => sub { my($s, $p, $path)=@_; $p->{id} = $path->[-1]{id} },
+F_kreplace => sub { my($s, $p, $path)=@_; $p->{id} = $path->[-2]{id} },
 	's{${\($R::App::app->perl->likes( \'{{ left }}\', \'P\' ))}}{ $DATA->{{{ id }}} = bless({ "~"=>$s, "^"=>[@-], "\$"=>[@+], %+ }, "MatchData"); do { {{ right }} } }',
 
 
@@ -272,13 +272,21 @@ join => 'join({{ _for_join *, right }}, {{ left }}){{ newline }}',
 
 # - смысловые конструкции
 
-'fx decorator' => '{{ _decorate * }}',
+'fx decorator' => '{% CLASS:methods |$R::App::app->syntaxAg->decorate("{{ name }}", "{{ class }}", "{{ SUB }}", ({{ right }}));
+%}',
 
 SCENARIO => '{{ _scenario right, lineno }}',
 
 ROOT => '{{ ROOT:classes "\n" }}{{ right }}',
 
-CLASS => '{% ROOT:classes |package {{ class }} { use common::sense; use R::App;{{ _extends class, extends, lineno, file }}{{ CLASS:methods "\n" }} sub void { my $DATA = { me => shift }; {{ right }} } }%}"{{ class }}"',
+CLASS => '{% ROOT:classes |package {{ class }} {
+	use common::sense;
+	use R::App;
+	{{ _extends class, extends, lineno, file }}
+	{{ CLASS:methods "\n" }}
+	sub void { my $DATA = { me => shift }; {{ right }} }
+}
+%}"{{ class }}"',
 
 SUB => sub { my ($self, $push) = @_;
 		# вернуть self, если это конструктор
@@ -463,12 +471,12 @@ sub _extends {
 	# $file =~ s!'!\'!g;
 	# $self->{BEGIN} .= "my (\$class, \$file, \$lineno) = (\"$class\", '$file', $lineno); my \$c = \$Nil::CLASSES{\$class}; die \"класс \$class встречается в \$file:\$lineno и в \$c->{file}:\$c->{lineno}\" if \$c; \$Nil::CLASSES{\$class} = { file => \$file, lineno => \$lineno }; ";
 	
-	push @{$self->{INCLUDES}}, @$extends if @$extends;
+	#push @{$self->{INCLUDES}}, @$extends if @$extends;
 	
-	my $ext = "";
-	$ext .= " BEGIN { \@${class}::ISA = qw/".join(" ", @$extends)."/ }" if @$extends;
-	$ext .= " use mro 'c3';" if @$extends>1;
-	$ext
+	my @ext;
+	push @ext, "our \@ISA = R::App::app->syntaxAg->include(qw/".join(" ", @$extends)."/);" if @$extends;
+	push @ext, "use mro 'c3';" if @$extends>1;
+	join "\n", @ext;
 }
 
 
@@ -479,14 +487,7 @@ sub _split {
 	""
 }
 
-# описывает декоратор
-sub _decorate {
-	my ($self, $push) = @_;
-	
-	$self->{START} .= "\$R::App::app->syntaxAg->decorate(\"$push->{name}\", \"$push->{class}\", \"$push->{SUB}\", ($push->{right}));\n";
-	
-	""
-}
+
 
 # вызывается после разбора файла
 sub end {
@@ -495,11 +496,6 @@ sub end {
 	# добавляет в начало
 	if(my $begin = delete $self->{BEGIN}) {
 		$ret = "BEGIN { use common::sense; $begin } $ret";
-	}
-	
-	if($self->{INCLUDES}) {
-		my %exists;
-		$self->{START} = 'R::App::app->syntaxAg->include(qw/' . join(" ", map { exists $exists{$_}? (): ($exists{$_} = $_) } @{$self->{INCLUDES}}) . "/);\n" . $self->{START};
 	}
 	
 	# добавляет в начало без BEGIN

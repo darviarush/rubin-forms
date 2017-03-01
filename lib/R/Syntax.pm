@@ -456,7 +456,7 @@ sub masking {
 			$app->log->info(":nonewline on_cyan black", "$^R") if defined $^R and !exists $+{newline} and !exists $+{error_nosym} and !exists $+{spacer};
 		}
 	
-		exists $+{newline}? do { $self->{lineno}++; $self->{startline} = length($`); }:
+		exists $+{newline}? $self->newline:
 		exists $+{error_nosym}? $self->error(sprintf($self->{error}{nosym}, $+{error_nosym})):
 		exists $+{spacer}? do {
 			my $stack = $self->{stack};
@@ -488,6 +488,16 @@ sub masking {
 			#":cyan", $self->{lineno} . ": "
 		}
 	}
+	
+	$self
+}
+
+# инкрементирует строку
+sub newline {
+	my ($self) = @_;
+	
+	$self->{lineno}++;
+	$self->{startline} = length $`;
 	
 	$self
 }
@@ -1044,15 +1054,17 @@ sub templates {
 		/gen;
 		
 		# всплывающие переменные
+		$v =~ s{	\{\{  \s* (?<key> \w+:\w+ ) (\s* ("(?<sep>[^"]+)"|'(?<sep>[^']+)'))? \s* \}\}	}{
+			"', join(\"" . ($+{sep} // "''") . "\", \@{delete(\$b->{'UP+'}{'$+{key}'})}) ,'"
+		}xgen;
+		
 		my $begin = '';
 		$v =~ s{	\{% \s* (?<key> \w+:\w+) \s* \|	(?<val> .*? ) %\} }{
 			$begin .= "push \@{\$b->{'UP+'}{'$+{key}'}}, join '', '$+{val}'; ";
 			''
 		}sxgen;
 		
-		$v =~ s{	\{\{  \s* (?<key> \w+:\w+ ) (\s* ("(?<sep>[^"]+)"|'(?<sep>[^']+)'))? \s* \}\}	}{
-			"', join(\"" . ($+{sep} // '""') . "\", \@{delete(\$b->{'UP+'}{'$+{key}'})}) ,'"
-		}xgen;
+		
 		
 		# # проверяем, что не осталось конструкций
 		# die "осталось `{{` в шаблоне: $k -> $orig -> $v" if $v =~ /\{\{/;
@@ -1060,13 +1072,15 @@ sub templates {
 		# die "осталось `{%` в шаблоне: $k -> $orig -> $v" if $v =~ /\{%/;
 		# die "осталось `%}` в шаблоне: $k -> $orig -> $v" if $v =~ /%\}/;
 		
-		msg1 $v if $k eq "CLASS";
+		
 		
 		$k =~ s/\s+/ /g;
 		my $code = $begin? "sub { my \$ret = join '', '$v'; $begin\$ret }": "sub { join '', '$v' }";
 		
+		#msg1 $k, $code;
+		
 		$templates->{$k} = eval $code;
-		die $@ if $@;
+		die "синтаксическая ошибка в шаблоне кода $k: $@\n$code\n\n$orig" if $@;
 	}
 	
 	$self
@@ -1257,7 +1271,7 @@ sub eval {
 	if($@) {
 		{
 			local $@;
-			msg(":empty black on_cyan", "eval morf", ":reset", "\n", $morf);
+			msg(":empty black on_cyan", "eval morf", ":reset", "\n", $code, "\n\n", $morf);
 		}
 		die $@;
 	}
