@@ -34,6 +34,7 @@ sub new {
 # маскирование переменных
 my $re_string = $R::Re::string;
 my $re_id = $R::Re::id;
+my $re_css_id = $R::Re::css_id;
 my $re_endline = $R::Re::endline;
 my $re_number = $R::Re::number;
 
@@ -42,8 +43,8 @@ my $re_space_ask = qr/[\ \t]*/;
 my $re_rem = qr/(?:(?:\#|\brem\b)(?<rem>[^\n\r]*))?/i;
 my $re_sk = qr/[\[\{\(]/;
 my $re_arg = qr/$re_id|\*/on;
-my $re_STRING = qr/'(\\'|[^\n\r']*)'|"(\\"|[^\n\r"]*)"/on;
-my $re_class = qr/ (::)? $re_id(::$re_id)* | :: | $re_STRING /xon;
+#my $re_STRING = qr/'(\\'|[^\n\r']*)'|"(\\"|[^\n\r"]*)"/on;
+my $re_class = qr/ (::)? $re_css_id(::$re_css_id)* /xon;
 my $re_extends = qr!$re_class(?:$re_space_ask,$re_space_ask$re_class)*!;
 my $re_class_stmt = qr!
 (?<class>$re_class)
@@ -57,7 +58,7 @@ $re_space_ask (?<args>$re_arg ($re_space_ask , $re_space_ask $re_arg)*)
 	# (?<id>"\w+"|[[:punct:]]+|0\+)
 # !xismo;
 #my $re_sub_in = qr/ [\ \t]+ CLASS [\ \t]+ (?<sub_in>(?<sub_self>::)?$re_class) /xn;
-my $re_SUB = qr/ $re_id | $re_STRING /xon;
+my $re_SUB = qr/ $re_id /xon;
 my $re_args_then = qr/ $re_space_ask (?<then> \b THEN \b ) | $re_args $re_space_ask (?<then> \b THEN \b ) | $re_args | /ixno;
 # my $re_then = qr/ (?<re_endline> $re_space_ask \b THEN \b) | $re_rem $re_endline /xn;
 # my $re_for = qr!
@@ -305,31 +306,41 @@ $s->opt("END", sub => sub {
 #$s->opt("UNTIL", sub => sub { my ($self, $push) = @_; $self->check("UNTIL", stmt=>"REPEAT")->top->{endline} = 1 });
 #$s->opt("FROM", sub => sub { my ($self, $push) = @_; my $top = $self->endline->top; $self->error("FROM должен использоваться после MAP, PAIRMAP, GREP, SORT, NSORT, QSORT или REDUCE") if $top->{stmt} !~ /^(?:map|grep|[nq]sort|reduce|pairmap)$/; $push->{endline} = $push->{gosub} = 1 });
 
-$s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => sub {
+sub _class {
 	my ($self, $push) = @_;
 	my $S = $self->{stack};
-	$push->{lineno} = $self->{lineno};
-	$push->{file} = $self->{file};
+	#$push->{lineno} = $self->{lineno};
+	#$push->{file} = $self->{file};
 	
 	# получаем вышестоящий класс
 	my $class;
 	for(my $i=$#$S; $i>=0; $i--) {
-		$class = $S->[$i]{class}, last if $S->[$i]{stmt} eq "CLASS";
+		$class = $S->[$i]{class}, last if $S->[$i]{stmt} =~ /^(CLASS|OBJECT)$/;
 	}
 	
+
 	# иерархия классов
 	$push->{class} = "${class}::$push->{class}" if defined $class;
 	
+	$push->{realname} = $push->{class};
+	
+	$push->{class} =~ s/-/__/g;
+	
 	# обрабатываем extends
 	if($push->{extends}) {
-		$push->{extends} = [ map { /^:/? "$push->{class}$_": $_ } split /\s*,\s*/, $push->{extends} ];
+		$push->{extends} = [ map { s/-/__/g; /^:/? "$push->{class}$_": $_ } split /\s*,\s*/, $push->{extends} ];
 	}
 	else {
 		$push->{extends} = ["Nil"] if $push->{class} ne "Nil";
 	}
+}
+
+$s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => \&_class => "END");
+$s->br("OBJECT" => qr{ \b OBJECT ( $re_space (?<extends> $re_class ( $re_space_ask , $re_space_ask $re_class )* ) )? ($re_space CLASS $re_space (?<class> $re_class))? ($re_space WITH $re_space)? }ixn => sub {
+	my ($self, $push) = @_;
+	$push->{class} = "Ag::OBJECT::OBJECT" . (++$self->{OBJECT_COUNT}) if !defined $push->{class};
+	&_class;
 } => "END");
-#$s->br("OBJECT" => qr{ \b OBJECT $re_space $re_class_stmt }ix => "END");
-#$s->br("MODULE" => qr{ \b MODULE $re_space $re_class_stmt }ix => "END");
 
 $s->opt("decorator", nolex=>1);
 sub br_sub {
@@ -402,7 +413,6 @@ $s->br("BLOCK" => qr{ \b BLOCK $re_space (?<SUB> $re_SUB ) $re_args_then }ix => 
 #$s->br("DEF" => qr{ \b DEF $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
 #$s->br("LET" => qr{ \b LET $re_space $re_sub (?<endline> $re_space_ask THEN \b)? }ix => "END");
 
-$s->br("new_apply" => qr{ 	\b NEW $re_space (?<new>$re_class) \(	}ix => ")");
 
 $s->br("SCENARIO" => sub { my ($self, $push) = @_; $push->{lineno} = $self->{lineno} } => "END");
 
@@ -539,7 +549,19 @@ $s->x("last");
 #$s->x("wantarray");
 $s->x("local");
 
-$s->x("new"			=> qr{ 	\b NEW $re_space (?<new>$re_class) 	}ix);
+$s->br("new_apply" => qr{ 	\b NEW $re_space (?<new>$re_class) \(	}ix => sub {
+	my ($self, $push) = @_;
+	$push->{new} =~ s/-/__/g;
+}  => ")");
+$s->x("new"			=> qr{ 	\b NEW $re_space (?<new>$re_class) 	}ix => sub {
+	my ($self, $push) = @_;
+	$push->{new} =~ s/-/__/g;
+});
+
+$s->br("new_x_apply" => qr{ 	\b NEW $re_space \$(?<new>$re_id) \(	}ix  => ")");
+$s->x("new_x"		 => qr{ 	\b NEW $re_space \$(?<new>$re_id) 		}ix);
+
+
 $s->x("classname"	=> qr{ 	(?<classname> $re_id(::$re_id)+ ) 	}x);
 $s->x("var"			=> qr{ 	(?<var>$re_id) 						}x);
 $s->x("hex"			=> qr{	0x[\da-f_]+	}ix);

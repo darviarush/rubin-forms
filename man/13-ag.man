@@ -798,8 +798,8 @@ TODO: циклы с возвращаемым значением через `last
 
 *массив splice от, количество, значения* - заменяет в массиве указанный интервал на значения. Возвращает вырезанные элементы:
 
-	#msg1 $app->syntaxAg->new->morf('a=[0,1,2,3,4,5,6]; @b = (a splice 2, 4, 7); @b, @a join');
-	#$app->syntaxAg->new->eval('a=[0,1,2,3,4,5,6]; @b = (a splice 2, 4, 7); @b, @a join');		# 2340176
+	#msg1 $app->syntaxAg->new->morf('a=[0,1,2,3,4,5,6]; @b = (a splice 2, 4 of 7); @b, @a join');
+	#$app->syntaxAg->new->eval('a=[0,1,2,3,4,5,6]; @b = splice a, 2, 4, 7; @b, @a join');		# 2340176
 	
 
 === Для хэшей
@@ -830,11 +830,22 @@ TODO: циклы с возвращаемым значением через `last
 
 === Имена
 
-Имена классов могут содержать символ `-`. Он заменяется на `__` в оттранслированном коде.
+Имена классов и методов могут содержать `-`.
 	
-	$app->syntaxAg->new->eval('class I-am-class 34 end');	# I-am-class
+	$app->syntaxAg->new->eval('class I-am-class 34 end');			# I-am-class
 	
-	$app->syntaxAg->new->eval('new I-am-class.void');		# 34
+	$app->syntaxAg->new->eval('new I-am-class.void');				# 34
+	$app->syntaxAg->new->eval('a="I-am-class"; b="void"; new $a.$b');		# 34
+	
+	
+	
+	# $app->syntaxAg->new->eval('class `что угодно?`
+		# sub `я - метод` b, c then b . c
+	# end');
+	
+	# $app->syntaxAg->new->eval('a = "что угодно?"; b = "я - метод"; new $a.$b 3, 4 ');	# 34
+	# $app->syntaxAg->new->eval('new `что угодно?`.`я - метод` 3, 4 ');	# 34
+	
 
 === Методы
 
@@ -857,15 +868,16 @@ TODO: циклы с возвращаемым значением через `last
 		sub bigconst then 10 + me:A
 		sub mul x then x*me.bigconst
 	end');
-
+	
 	my $res = $app->syntaxAg->new->eval('object ObjectTest
 		sub bigconst then 20
 	end.mul 10');
 	
 	$res;			# 200
 	
+Может быть именованным:
 	
-	my $res = $app->syntaxAg->new->eval('object ObjectTest as ObjectTest1 with A => 30
+	my $res = $app->syntaxAg->new->eval('object ObjectTest class ObjectTest1 with A => 30
 		sub bigconst then 20
 	end.mul 10');
 	

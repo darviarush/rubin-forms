@@ -21,7 +21,7 @@ our @templates = (
 'yf :word' => '{{ left }}->{{{ var }}}',
 
 'yf .word' => '{{ left }}->{{ var }}',
-'yf .$word' => '{{ left }}->${$DATA->{{{ var }}}}',
+'yf .$word' => '{{ left }}->${\$DATA->{{{ var }}}}',
 'yf .?word' => '(do { my $q = {{ left }}; $q->can("{{ var }}")? $q->{{ var }}: () })',
 'yf .?$word' => '(do { my $q = {{ left }}; $q->can($DATA->{{{ var }}})? $q->{{ var }}: () })',
 
@@ -179,9 +179,9 @@ F_kreplace => sub { my($s, $p, $path)=@_; $p->{id} = $path->[-2]{id} },
 "xf ?" => 'defined({{ left }})',
 "xfy ?" => 'defined({{ left }})? ({{ left }}): ({{ right }})',
 "yfx ?=" => '({{ left }}) //= ({{ right }})',
-"xfx isa" => 'Isa({{ left }}, {{ right }})',
+"xfx isa" => 'R::App::Isa({{ left }}, {{ right }})',
 "xfx can" => '(Can({{ left }}, {{ right }})? 1: "")',
-"fy Num" => 'Num({{ right }})',
+"fy Num" => 'R::App::Num({{ right }})',
 "xfx flipflop" => 'scalar(({{ left }}) .. ({{ right }}))',
 
 
@@ -281,12 +281,12 @@ ROOT => '{{ ROOT:classes "\n" }}{{ right }}',
 
 CLASS => '{% ROOT:classes |package {{ class }} {
 	use common::sense;
-	use R::App;
+	require R::App;
 	{{ _extends class, extends, lineno, file }}
 	{{ CLASS:methods "\n" }}
 	sub void { my $DATA = { me => shift }; {{ right }} }
 }
-%}"{{ class }}"',
+%}"{{ realname }}"',
 
 SUB => sub { my ($self, $push) = @_;
 		# вернуть self, если это конструктор
@@ -343,6 +343,8 @@ bin => '{{ bin }}',
 radix => '{{ radix }}',
 new => '("{{ new }}"->can("new")? "{{ new }}": $R::App::app->syntaxAg->include("{{ new }}"))->new',
 new_apply => '("{{ new }}"->can("new")? "{{ new }}": $R::App::app->syntaxAg->include("{{ new }}"))->new({{ right }})',
+new_x => '(do { my $cls=$DATA->{{{ new }}}; $cls=~s/-/__/g; $cls->can("new")? $cls: $R::App::app->syntaxAg->include($cls) })->new',
+new_x_apply => '(do { my $cls=$DATA->{{{ new }}}; $cls=~s/-/__/g; $cls->can("new")? $cls: $R::App::app->syntaxAg->include($cls) })->new({{ right }})',
 
 # строки
 CAT => '{{ str }}',
