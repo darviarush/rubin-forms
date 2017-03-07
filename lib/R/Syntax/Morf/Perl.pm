@@ -288,6 +288,16 @@ CLASS => '{% ROOT:classes |package {{ class }} {
 }
 %}"{{ realname }}"',
 
+OBJECT => '{% ROOT:classes |package {{ class }} {
+	use common::sense;
+	require R::App;
+	{{ _extends class, extends, lineno, file }}
+	{{ CLASS:methods "\n" }}
+	sub void { my $DATA = { me => shift }; {{ right }} }
+}
+%}("{{ class }}"->can("new")? "{{ class }}": $R::App::app->syntaxAg->include("{{ class }}"))->new({{ WITH }})',
+
+
 SUB => sub { my ($self, $push) = @_;
 		# вернуть self, если это конструктор
 		$push->{RET} = $push->{SUB} eq "new"? '; $DATA->{me}': '';

@@ -529,11 +529,10 @@ sub op {
 	my $push = {%+, 'stmt', @_, lineno => $self->{lineno}, charno => $self->{charno}};
 	
 	my $stmt = $_[0];
+	my $lex = $self->{LEX}{$stmt}
 
 	# выполняем подпрограмму
-	if(my $x = $self->{LEX}{$stmt}) {
-		$x->{sub}->($self, $push) if exists $x->{sub};
-	}
+	$lex->{sub}->($self, $push) if $lex && exists $lex->{sub};
 	
 	# проверяем скобки
 	my $br = $self->{IN}{$stmt};
@@ -542,9 +541,7 @@ sub op {
 	push @{ $self->{stack}[-1]{'A+'} }, $push;
 	
 	# выполняем подпрограмму
-	if(my $x = $self->{LEX}{$stmt}) {
-		$x->{sur}->($self, $push) if exists $x->{sur};
-	}
+	$lex->{sur}->($self, $push) if $lex && exists $lex->{sur};
 	
 	#$self->trace("_", $push);
 	$self
@@ -567,13 +564,17 @@ sub push {
 	my $self = shift;
 	my $push = {%+, 'stmt', @_, lineno => $self->{lineno}, charno => $self->{charno}};
 	
+	my $lex = $self->{LEX}{$_[0]};
+	
 	# выполняем подпрограмму
-	if(my $x = $self->{LEX}{$_[0]}) {
-		$x->{sub}->($self, $push) if exists $x->{sub};
-	}
+	$lex->{sub}->($self, $push) if $lex && exists $lex->{sub};
 	
 	push @{$self->{stack}}, $push;
 	$self->trace("+", $push);
+	
+	# выполняем подпрограмму
+	$lex->{sur}->($self, $push) if $lex && exists $lex->{sur};
+	
 	$self
 }
 
@@ -585,12 +586,13 @@ sub pop {
 	# лексемы
 	my $LEX = $self->{LEX};
 	
+	# подготовка к выполнению обработчика
+	my $lex = $LEX->{$stag};
+	my $push;
+	$push = {%+, stmt => $stag} if $lex and exists $lex->{sub} || exists $lex->{sur};
+
 	# выполняем подпрограмму
-	my $x = $LEX->{$stag};
-	if($x && exists $x->{sub}) {
-		my $push = {%+, stmt => $stag};
-		$x->{sub}->($self, $push);
-	}
+	$lex->{sub}->($self, $push) if $lex && exists $lex->{sub};
 	
 	my $stack = $self->{stack};		# стек скобок
 	
@@ -622,6 +624,11 @@ sub pop {
 	push @{$stack->[-1]{'A+'}}, $sk;
 	
 	$self->trace("-", $sk);
+	
+	
+	# выполняем подпрограмму
+	$lex->{sur}->($self, $push) if $lex && exists $lex->{sur};
+	
 
 	$self
 }

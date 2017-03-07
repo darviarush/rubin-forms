@@ -317,7 +317,6 @@ sub _class {
 	for(my $i=$#$S; $i>=0; $i--) {
 		$class = $S->[$i]{class}, last if $S->[$i]{stmt} =~ /^(CLASS|OBJECT)$/;
 	}
-	
 
 	# иерархия классов
 	$push->{class} = "${class}::$push->{class}" if defined $class;
@@ -336,10 +335,11 @@ sub _class {
 }
 
 $s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => \&_class => "END");
-$s->br("OBJECT" => qr{ \b OBJECT ( $re_space (?<extends> $re_class ( $re_space_ask , $re_space_ask $re_class )* ) )? ($re_space CLASS $re_space (?<class> $re_class))? ($re_space WITH $re_space)? }ixn => sub {
+$s->br("OBJECT" => qr{ \b OBJECT ( $re_space (?<extends> $re_class ( $re_space_ask , $re_space_ask $re_class )* ) )? ($re_space CLASS $re_space (?<class> $re_class))? ($re_space (?<with> WITH) $re_space)? }ixn => sub {
 	my ($self, $push) = @_;
 	$push->{class} = "Ag::OBJECT::OBJECT" . (++$self->{OBJECT_COUNT}) if !defined $push->{class};
-	&_class;
+	$push->{endline} = 1 if $push->{with};
+	goto &_class;
 } => "END");
 
 $s->opt("decorator", nolex=>1);
@@ -353,9 +353,10 @@ sub br_sub {
 	
 	# в каком классе находится функция
 	my $stack = $self->{stack};
+	
 	for(my $i=$#$stack; $i>=0; $i--) {
 		my $s = $stack->[$i];
-		if($s->{stmt} eq "CLASS") {
+		if($s->{stmt} =~ /^(CLASS|OBJECT)$/) {
 			$push->{class} = $s->{class};
 			goto NEXT;
 		}

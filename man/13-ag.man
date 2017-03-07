@@ -864,6 +864,8 @@ TODO: циклы с возвращаемым значением через `last
 
 === Объекты
 
+Позволяют переопределять методы класса в объекте. На самом деле новый класс создаётся как Ag::OBJECTn. Где n - случайное число.
+
 	$app->syntaxAg->new->eval('class ObjectTest
 		sub bigconst then 10 + me:A
 		sub mul x then x*me.bigconst
