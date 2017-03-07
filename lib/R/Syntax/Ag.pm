@@ -338,9 +338,14 @@ $s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => \&_class => "END"
 $s->br("OBJECT" => qr{ \b OBJECT ( $re_space (?<extends> $re_class ( $re_space_ask , $re_space_ask $re_class )* ) )? ($re_space CLASS $re_space (?<class> $re_class))? ($re_space (?<with> WITH) $re_space)? }ixn => sub {
 	my ($self, $push) = @_;
 	$push->{class} = "Ag::OBJECT::OBJECT" . (++$self->{OBJECT_COUNT}) if !defined $push->{class};
-	$push->{endline} = 1 if $push->{with};
 	goto &_class;
 } => "END");
+$s->br("OBJECT WITH");
+$s->opt("OBJECT WITH", nolex=>1);
+$s->opt("OBJECT", sur => sub {
+	my ($self, $push) = @_;
+	$self->push("OBJECT WITH", endline=>1) if $push->{with};
+});
 
 $s->opt("decorator", nolex=>1);
 sub br_sub {

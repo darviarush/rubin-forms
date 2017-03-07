@@ -529,7 +529,7 @@ sub op {
 	my $push = {%+, 'stmt', @_, lineno => $self->{lineno}, charno => $self->{charno}};
 	
 	my $stmt = $_[0];
-	my $lex = $self->{LEX}{$stmt}
+	my $lex = $self->{LEX}{$stmt};
 
 	# выполняем подпрограмму
 	$lex->{sub}->($self, $push) if $lex && exists $lex->{sub};

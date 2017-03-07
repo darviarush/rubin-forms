@@ -295,8 +295,9 @@ OBJECT => '{% ROOT:classes |package {{ class }} {
 	{{ CLASS:methods "\n" }}
 	sub void { my $DATA = { me => shift }; {{ right }} }
 }
-%}("{{ class }}"->can("new")? "{{ class }}": $R::App::app->syntaxAg->include("{{ class }}"))->new({{ WITH }})',
+%}("{{ class }}"->can("new")? "{{ class }}": $R::App::app->syntaxAg->include("{{ class }}"))->new({{ OBJECT:with }})',
 
+'OBJECT WITH' => '{% OBJECT:with | {{ right }} %}',
 
 SUB => sub { my ($self, $push) = @_;
 		# вернуть self, если это конструктор
@@ -305,7 +306,7 @@ SUB => sub { my ($self, $push) = @_;
 		$push->{SHIFT} = $push->{SUB} eq "new"? 'bless({}, do { my $cls=shift; ref $cls || $cls })': 'shift';
 	},
 	'{% CLASS:methods |sub {{ SUB }} { my $DATA = { me => {{ SHIFT }} }; {{ _args args }} {{ right }}{{ RET }} }%}',
-BLOCK => '{% CLASS:methods |sub {{ SUB }} { my $DATA = shift; {{ _args args }} {{ right }} }%}$DATA->{{ SUB }}',
+BLOCK => '{% CLASS:methods |sub {{ SUB }} { my $DATA = shift; {{ _args args }} {{ right }} }%}$DATA->{me}->{{ SUB }}',
 
 IF => '(({{ right }}{{ _else else }})',
 "IF THEN" => '{{ left }})? do {{{ right }}',

@@ -880,18 +880,18 @@ TODO: циклы с возвращаемым значением через `last
 Может быть именованным:
 	
 	my $res = $app->syntaxAg->new->eval('object ObjectTest class ObjectTest1 with A => 30
-		sub bigconst then 20
+		sub bigconst then 20 + me:A
 	end.mul 10');
 	
-	$res;														# 800
+	$res;																# 500
 	
-	$app->syntaxAg->new->eval('new ObjectTest1(A => 30)');		# 800
+	$app->syntaxAg->new->eval('new ObjectTest1(A => 30).mul 10');		# 500
 	
 === Блоки
 
 Блоки созданы для шаблонов. Это методы. Переменные в них являются свойствами объекта. А так же они сразу вызываются.
 
-	$app->syntaxAg->new->eval('class BlockTest
+	$app->syntaxAg->new(show_morf=>1)->eval('class BlockTest
 		block A then A+10
 	end');
 	
