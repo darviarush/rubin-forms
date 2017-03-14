@@ -440,7 +440,7 @@ $s->br("string_modify");	$s->opt("string_modify", nolex => 1);
 
 
 
-my $re_string = qr{ " (?<string> (?:\\"|""|[^"])* ) " | ' (?<string> (?:\\'|''|[^'])* ) ' }xn;
+my $re_string = qr{ " (?<string> (?:\\"|""|\\\\|[^"])* ) " | ' (?<string> (?:\\'|''|\\\\|[^'])* ) ' }xn;
 
 $s->x("replace", qr{	(?<assign> = $re_space_ask)? (?<s> [sk]) $re_string (?<arg> $re_id )? ( ~ (?<id> $re_id ))?	}xn, sub {
 	my ($self, $push) = @_;

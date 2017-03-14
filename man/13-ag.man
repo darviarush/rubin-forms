@@ -435,9 +435,9 @@ TODO: циклы с возвращаемым значением через `last
 `with` позволяет гарантированно закрыть объект, даже если в блоке произойдёт исключение. Оно добавляет к выражению 
 
 	# my $res = $app->syntaxAg->eval("
-		# with new R::File('var/test-1') as file
+		# With new R::File('var/test-1') As file
 			# file.print(10)
-		# end
+		# End
 	# ");			
 	# $res;		# 3
 
@@ -719,7 +719,9 @@ TODO: циклы с возвращаемым значением через `last
 	
 === Интервальные
 
-	$app->syntaxAg->new->eval(" ^6 join");			# 012345
+	$app->syntaxAg->new->eval(" ^6 join");					# 012345
+	$app->syntaxAg->new->eval(" (k=6; ^k) join ");			# 012345
+	
 
 	$app->syntaxAg->new->eval(" 1..6 join");		# 123456
 	$app->syntaxAg->new->eval(" 1...6 join");		# 12345
