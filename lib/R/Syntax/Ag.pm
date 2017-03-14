@@ -135,8 +135,8 @@ $s->tr("fy",  qw{		not						});
 $s->tr("xfy", qw{		and						});
 $s->tr("xfy", qw{		or	xor					});
 $s->tr("yfx", qw{		as	is					});
-$s->tr("fx",  qw{		return	raise msg msg1	})->td("Fx", qw{   REPEAT UNTIL  });
-$s->tr("xfy", qw{		;						});
+$s->tr("fx",  qw{		return	raise msg msg1	})->td("Fx", qw{   REPEAT UNTIL		});
+$s->tr("xfy", qw{		;						})->td("yf", qw{	;				});
 $s->tr("fx",  qw{		decorator				});
 $s->tr("xfy", qw{		\n						})->td("yf", qw{	\n	})->td("fy", qw{	\n	});
 $s->tr("xfy", qw{		rescue					});
@@ -327,7 +327,7 @@ sub _class {
 	
 	# обрабатываем extends
 	if($push->{extends}) {
-		$push->{extends} = [ map { s/-/__/g; /^:/? "$push->{class}$_": $_ } split /\s*,\s*/, $push->{extends} ];
+		$push->{extends} = [ map { /^:/? "$push->{class}$_": $_ } split /\s*,\s*/, $push->{extends} ];
 	}
 	else {
 		$push->{extends} = ["Nil"] if $push->{class} ne "Nil";
@@ -539,7 +539,6 @@ $s->x("self"		=> qr{ 	\b	(?:	self | this | me	)	\b 	}x);
 $s->x("app");
 $s->x("q");
 $s->x("user");
-$s->x("super");
 $s->x("nothing" => qr/\b(?: null | nothing | undef | nil | void) \b/x);
 $s->x("pi");
 $s->x("nan");
@@ -677,11 +676,7 @@ $string->x(qw/CAT/);
 $string->br(qw/exec1/);
 $string->opt("exec1", nolex => 1);
 
-my $re_inbrackets = qr{
-	(?<R1> \(  ( [^\(\)]+ | (?&R1) )* \) ) |
-	(?<R2> \{  ( [^\{\}]+ | (?&R2) )* \} ) |
-	(?<R3> \[  ( [^\[\]]+ | (?&R3) )* \] )
-}xn;
+my $re_inbrackets = $app->re->inbrackets;
 
 $string->opt("CAT", re => qr/ 
 	(?<str> [^\$]* ) ( 
@@ -760,9 +755,9 @@ sub ag {
 	my $file = $app->file($path)->abs->subdir($root, "");
 	my $class = $self->path2class( $file->path );
 	
-	$self->include( $class );
+	my $real = $self->include( $class );
 	
-	$class->new->void(@args);
+	$real->new->void(@args);
 }
 
 # превращает путь в класс
@@ -814,41 +809,22 @@ sub compile {
 	$self
 }
 
-# # подключает файл как класс или шаблон
-# # получает рутовую директорию
-# # если Aquafile ещё не загружен - загружает
-# sub _require {
-	# my ($self, $path, $INC) = @_;
-	
-	# $INC //= $Nil::INC;
-	
-	# for my $inc (@$INC) {
-			
-		# $f = $app->file("$inc/$path");
-	
-		# next if !$f->isfile;
-		
-		# my $class = $self->path2class($path);
-		# my $to = $app->file("$inc/.Aqua/$rpath.pm");
-
-		# $self->compile($f->path, $to->path, $class) if !$to->exists || $to->mtime < $f->mtime;
-		
-		# require $to->path;
-		# return $class;
-	# }
-	
-	# die "нет " . $app->perl->qq($path);
-# }
-
 # подключает классы Ag или Perl
 sub include {
 	my $self = shift;
+	
+	my @real;
 	
 	CLASS:
 	for my $class (@_) {
 	
 		# класс уже подключен
-		return $class if $class->can("new");
+		my $real = $class;
+		$real =~ s/-/__/g;
+		
+		push @real, $real;
+		
+		next if $real->can("new");
 		
 		my @path = split /::/, $class;
 		
@@ -870,7 +846,6 @@ sub include {
 				die "несколько подходящих файлов: " . join ", ", $file->files if $file->length > 1;
 				if($file->length == 1) {
 
-					#$self->_require($file->subdir($inc, "")->path, [$inc]);
 					my $strip_path = $file->subdir($inc, "")->path;
 					my $to = $app->file("$inc/.Aqua/$strip_path.pm");
 					my $newclass = $self->path2class($strip_path);
@@ -879,15 +854,19 @@ sub include {
 					
 					require $to->path;
 					
-					die "нет класса $newclass в " . $file->path if !$newclass->can("new");
+					my $newreal = $newclass;
+					$newreal =~ s/-/__/g;
 					
-					if($class->can("new")) {
+					die "нет класса $newclass в " . $file->path if !$newreal->can("new");
+					
+					if($real->can("new")) {
 						die "класс $class встречается в файлах $load и " . $file->path if $load;
 						$load = $file->path;
 					}
 				}
 			}
 			
+			# класс найден в данном INC
 			next CLASS if $load;
 		}
 		
@@ -897,11 +876,11 @@ sub include {
 		
 		eval { require $pm; };
 		
-		die "нет класса $class\nв путях:\n" . (join "\n", @$INC) . "\n" if !$class->can("new");
+		die "нет класса $class\nв путях:\n" . (join "\n", @$INC) . "\n" if !$real->can("new");
 		
 	}
 	
-	wantarray? @_: $_[0];
+	wantarray? @real: $real[0];
 }
 
 # оформляет метод функции

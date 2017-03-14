@@ -146,11 +146,11 @@
 
 Препроцессоры задаются дополнительными расширениями и являются классами `R::Syntax::Preprocessor::*`.
 
-Пример для `R::Syntax::Preprocessor::vw`:
+Пример для `R::Syntax::Preprocessor::kemi`:
 
-	$app->file("var/_test_13_ag/Template.html.vw")->write("<html><% A+10 %></html>");
+	$app->file("var/_test_13_ag/Template.html.kemi")->write("<html><% A+10 %></html>");
 	
-	$app->syntaxAg->ag("var/_test_13_ag/Template.html.vw");		# <html>10</html>
+	$app->syntaxAg->ag("var/_test_13_ag/Template.html.kemi");		# <html>10</html>
 	
 	$app->syntaxAg->eval("new Template(A => 10).render");		# <html>20</html>
 	
@@ -891,7 +891,7 @@ TODO: циклы с возвращаемым значением через `last
 
 Блоки созданы для шаблонов. Это методы. Переменные в них являются свойствами объекта. А так же они сразу вызываются.
 
-	$app->syntaxAg->new(show_morf=>1)->eval('class BlockTest
+	$app->syntaxAg->new->eval('class BlockTest
 		block A then A+10
 	end');
 	
@@ -976,53 +976,51 @@ TODO:
 	# ');
 
 	
-== Препроцессор `vw`
+== Препроцессор `kemi`
 
 === Присваивание и возврат значения
 
-	$app->file("var/_test_13_ag/ex1.html.vw")->write("<% A = 10 %><% A+=12 %><% A == 22 %>");
-	$app->syntaxAg->ag("var/_test_13_ag/ex1.html.vw");			# 1
-	
-	$app->file("var/_test_13_ag/ex1-2.html.vw")->write("<% A = 10 %><% A+=12 %><% A == 22 %>");
-	$app->syntaxAg->ag("var/_test_13_ag/ex1-2.html.vw");		# 1
-	
+	$app->file("var/_test_13_ag/ex-1.html.kemi")->write("<% A = 10 %><% A+=12 %><% A == 22 %>");
+	$app->syntaxAg->ag("var/_test_13_ag/ex-1.html.kemi");			# 1
+		
 === Наследование шаблонов и блоки
 	
-	$app->file("var/_test_13_ag/ex-2.html.vw")->write("<title><% block title %>Пример 2<% end %></title>");
-	$app->file("var/_test_13_ag/ex-2-3.html.vw")->write("<% EXTENDS 'ex-2' %><% block title %>Пример 3<% end %>");
-	$app->syntaxAg->ag("var/_test_13_ag/ex-2-3.html.vw");		# <title>Пример 3</title>
+	$app->file("var/_test_13_ag/ex-2.html.kemi")->write("<title><% block title %>Пример 2<% end %></title>");
+	$app->file("var/_test_13_ag/ex-2-3.html.kemi")->write("<% EXTENDS ex-2 %><% block title %>Пример 3<% end %>");
+	$app->syntaxAg->ag("var/_test_13_ag/ex-2-3.html.kemi");		# <title>Пример 3</title>
 	
-	$app->file("var/_test_13_ag/ex-2-4.html.vw")->write("<% EXTENDS ex2 %><% block title %><% super.title %> и 4<% end %>");
-	$app->syntaxAg->ag("var/_test_13_ag/ex-2-4.html.vw");		# <title>Пример 3 и 4</title>
+	$app->file("var/_test_13_ag/ex-2-4.html.kemi")->write("<% EXTENDS ex-2 %><% block title %><% super.title %> и 4<% end %>");
+	$app->syntaxAg->ag("var/_test_13_ag/ex-2-4.html.kemi");		# <title>Пример 3 и 4</title>
 
 === Условия
 
-	$app->file("var/_test_13_ag/ex4.html.vw")->write("{% if 1 %}10{% else %}20{% end %}");
-	$app->syntaxAg->ag("var/_test_13_ag/ex4.html.vw");		# 10
+	$app->file("var/_test_13_ag/ex4.html.kemi")->write("<% if 1 %>10<% else %>20<% end %>");
+	$app->syntaxAg->ag("var/_test_13_ag/ex4.html.kemi");		# 10
 	
 === Циклы
 
-	$app->file("var/_test_13_ag/ex5.html.vw")->write('{% for i = 1..100 %}$i{% let if i==3 then last %}.{% end %}');
-	$app->syntaxAg->ag("var/_test_13_ag/ex5.html.vw");		# 1.2.3
+	$app->file("var/_test_13_ag/ex5.html.kemi")->write('<% for i = 1..100 %>$i<% let if i==3 then last %>.<% end %>');
+	$app->syntaxAg->ag("var/_test_13_ag/ex5.html.kemi");		# 1.2.3
 	
 === Классы, методы и объекты
 
-	$app->file("var/_test_13_ag/ex6.html.vw")->write('{% CLASS A %}{% sub show A %}$A+10{% end %}{% END %}{% new A.show 10 %}');
-	$app->syntaxAg->ag("var/_test_13_ag/ex6.html.vw");		# 10+10
+	$app->file("var/_test_13_ag/ex6.html.kemi")->write('<% CLASS A %><% sub show A %>$A+10<% end %><% END %><% new A.show 10 %>');
+	$app->syntaxAg->ag("var/_test_13_ag/ex6.html.kemi");		# 10+10
 	
-	$app->file("var/_test_13_ag/ex6-1.html.vw")->write('{% OBJECT A WITH B=>12 %}{% sub show A %}$A+$B+$me:B{% end %}{% ME.show(11) %}{% END %}');
-	$app->syntaxAg->ag("var/_test_13_ag/ex6-1.html.vw");	# 11++12
+	$app->file("var/_test_13_ag/ex6-1.html.kemi")->write('<% OBJECT A WITH B=>12 %><% sub show A %>$A+$B+$me:B<% end %>$ME.show(11)<% END %>');
+	$app->syntaxAg->ag("var/_test_13_ag/ex6-1.html.kemi");	# 11++12
 
-=== Инклуды и встороенники
-
-	$app->file("var/_test_13_ag/ex7.html.vw")->write('-{% block ts %}10{% end %}-');
-	$app->file("var/_test_13_ag/ex7-1.html.vw")->write('/{% embed ex7 %}{% block ts %}20{% end %}{% end %}/');
-	$app->syntaxAg->ag("var/_test_13_ag/ex7-1.html.vw");	# /-20-/
-
+=== Включения
+	
 Инклуд будет просто созданием экземпляра шаблона, т.к. загрузка классов осуществляется автоматически, а так же любой объект с методом `render` рендериться в результат шаблона без эскейпов html-символов:
 	
-	$app->file("var/_test_13_ag/ex7-2.html.vw")->write('/{% new ex7 %}/');
-	$app->syntaxAg->ag("var/_test_13_ag/ex7-2.html.vw");	# /-10-/
+	$app->file("var/_test_13_ag/ex7-2.html.kemi")->write('/<% new ex7 %>/');
+	$app->syntaxAg->ag("var/_test_13_ag/ex7-2.html.kemi");	# /-10-/
 	
-	
+=== Встраивание шаблонов
+
+	$app->file("var/_test_13_ag/ex7.html.kemi")->write('-<% block ts %>10<% end %>-');
+	$app->file("var/_test_13_ag/ex7-1.html.kemi")->write('/<% object ex7 %><% block ts %>20<% end %><% end %>/');
+	$app->syntaxAg->ag("var/_test_13_ag/ex7-1.html.kemi");	# /-20-/
+
 

@@ -48,7 +48,7 @@ our @templates = (
 
 "xfy ;" => '{{ left }}; {{ right }}',
 #'fy ;' => "{{ right }}",
-#'yf ;' => "{{ left }}; ",
+'yf ;' => "{{ left }}",
 
 'xfy :' => "{{ left }}; {{ right }}",
 
@@ -306,7 +306,7 @@ SUB => sub { my ($self, $push) = @_;
 		$push->{SHIFT} = $push->{SUB} eq "new"? 'bless({}, do { my $cls=shift; ref $cls || $cls })': 'shift';
 	},
 	'{% CLASS:methods |sub {{ SUB }} { my $DATA = { me => {{ SHIFT }} }; {{ _args args }} {{ right }}{{ RET }} }%}',
-BLOCK => '{% CLASS:methods |sub {{ SUB }} { my $DATA = shift; {{ _args args }} {{ right }} }%}$DATA->{me}->{{ SUB }}',
+BLOCK => '{% CLASS:methods |sub {{ SUB }} { my $DATA = shift; {{ _args args }} {{ right }} }%}$DATA->{{ SUB }}',
 
 IF => '(({{ right }}{{ _else else }})',
 "IF THEN" => '{{ left }})? do {{{ right }}',

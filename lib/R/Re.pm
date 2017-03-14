@@ -21,6 +21,19 @@ our $css_id = qr/(?:[a-z_\-][\w\-]*)/i;
 # переводы строк
 our $endline = qr/(?<re_newline>\r\n|\r|\n)/;
 
+# пробелы
+our $space = qr{ [\t\ ]+ }x;
+our $space_ask = qr{ [\t\ ]* }x;
+
+# вложенные скобки
+our $inbrackets = qr{
+	(?<R1> \(  ( [^\(\)]+ | (?&R1) )* \) ) |
+	(?<R2> \{  ( [^\{\}]+ | (?&R2) )* \} ) |
+	(?<R3> \[  ( [^\[\]]+ | (?&R3) )* \] )
+}xn;
+
+
+
 # если функция не найдена
 use vars '$AUTOLOAD';
 
