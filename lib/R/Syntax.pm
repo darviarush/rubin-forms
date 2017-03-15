@@ -637,8 +637,8 @@ sub pop {
 sub _pop {
 	my ($self, $stag, $sk, $A) = @_;
 
-	my @T;
-	my @S;
+	my @T;	# стек операндов
+	my @S;	# стек операторов
 	
 	my $meta;
 	
@@ -646,60 +646,62 @@ sub _pop {
 	# выброшенные попадают в @T
 	# новый в @S
 	my $popop = sub {
-		my $prio = $meta->{prio};
-		my $fix = $meta->{fix};
+		my $prio = $meta->{prio};	# приоритет пришедшего оператора
+		my $fix = $meta->{fix};		# ассоциативность, строна и арность пришедшего оператора
 		my $s;
 		my $x;
 
-		unless($fix & $prefix) {	# prefix не выбрасывает операторы
-			while(@S) {			
-				my $s = $S[-1];
-				
-				last unless $fix & $postfix && $s->{fix} & $postfix ||	# postfix выбрасывает другие постфиксы
-				($x = $s->{prio}) < $prio || 	# приоритет оператора больше чем у того, что из стека
-				$x==$prio && ( ($fix | $s->{fix}) & $nonassoc?	# приоритет равен
-					$self->error("неассоциативный оператор " . ($s->{fix} & $nonassoc? $s->{name}: $meta->{name})):
-				$s->{fix} & $leftassoc);	# и он левоасоциативен
+		while(@S) {			
+			my $s = $S[-1];
 			
-				my $r = pop @S;
+			
+			last unless  $s->{fix} & $postfix ||	# постфикс из @S выбрасывается всегда
+			($x = $s->{prio}) < $prio || 	# приоритет оператора больше чем у того, что из стека
+			$x==$prio && ( ($fix | $s->{fix}) & $nonassoc?	# приоритет равен
+				$self->error("неассоциативный оператор " . ($s->{fix} & $nonassoc? $s->{name}: $meta->{name})):
+			$s->{fix} & $leftassoc);	# и он левоасоциативен
+			
+			
+			my $r = pop @S;
+			
+			if($r->{fix} & $infix) {
+				my $right;
+				$self->error("нет операндов для оператора $r->{stmt}", $r) if !defined( $right = pop @T );
+				$self->error("нет левого операнда для оператора $r->{stmt}", $r) if !defined( $r->{left} = pop @T );
 				
-				if($r->{fix} & $infix) {
-					my $right;
-					$self->error("нет операндов для оператора $r->{stmt}", $r) if !defined( $right = pop @T );
-					$self->error("нет левого операнда для оператора $r->{stmt}", $r) if !defined( $r->{left} = pop @T );
-					
-					if(exists $r->{right}) {
-						$r->{right} = { stmt => $r->{F_stmt} // 'F', left => $r->{right}, right => $right };
-					}
-					else {
-						$r->{right} = $right;
-					}
-					
-					$self->trace("%", $r);
+				if(exists $r->{right}) {
+					$r->{right} = { stmt => $r->{F_stmt} // 'F', left => $r->{right}, right => $right };
 				}
-				elsif($r->{fix} & $prefix) {	# -x
-					$r->{left} = $r->{right} if exists $r->{right};		# для префиксных скобок
-					$self->error("нет операнда для оператора $r->{stmt}", $r) if !defined( $r->{right} = pop @T );
-					$self->trace(">", $r);
-				}
-				else {	# x--
-					$self->error("нет операнда для оператора $r->{stmt}", $r) if !defined( $r->{left} = pop @T );
-					$self->trace("<", $r);			
+				else {
+					$r->{right} = $right;
 				}
 				
-				
-				push @T, $r;			
+				$self->trace("%", $r);
 			}
+			elsif($r->{fix} & $prefix) {	# -x
+				$r->{left} = $r->{right} if exists $r->{right};		# для префиксных скобок
+				$self->error("нет операнда для оператора $r->{stmt}", $r) if !defined( $r->{right} = pop @T );
+				$self->trace(">", $r);
+			}
+			else {	# x--
+				$self->error("нет операнда для оператора $r->{stmt}", $r) if !defined( $r->{left} = pop @T );
+				$self->trace("<", $r);			
+			}
+			
+			
+			push @T, $r;			
 		}
 		
-		# входящий оператор
-		if(my $op = $_[0]) {
-			@$op{qw/stmt fix prio/} = @$meta{qw/name fix prio/};
-			push @S, $op;
-			$self->trace("^", $op);
-		}
+		
 	};
 	
+	# забрасывает операнд в @S
+	my $pushop = sub {
+		my ($op) = @_;
+		@$op{qw/stmt fix prio/} = @$meta{qw/name fix prio/};
+		push @S, $op;
+		$self->trace("^", $op);		
+	};
 	
 	
 	# ( \n \n ) - обычная ситуация prefix prefix
@@ -751,7 +753,7 @@ sub _pop {
 	
 	
 	
-	# 1-й проход
+	
 	my $i = 0;
 	my $begin = undef;	# начало последовательности неоднозначных операторов
 	my @meta;
@@ -779,6 +781,8 @@ sub _pop {
 			my $fixk = $fix[$n];	# проверяем, что ещё не проходили
 			
 			#msg1 $n, $meta->{name}, $self->namefix($fix), $self->namefix($fixk);
+			
+			# операторы с большим приоритетом рассматривается первыми
 			
 			if($fix & $prefix && !($fixk & $prefix) && $check->($prev, $prefix)) {
 				$fix[$n] |= $prefix;
@@ -817,6 +821,7 @@ sub _pop {
 	
 	my $LEX = $self->{LEX};
 	
+	# 1-й проход
 	for my $op (@$A) {
 		my $stmt = $op->{stmt};
 		my $lex = $LEX->{$stmt};
@@ -838,6 +843,8 @@ sub _pop {
 	#msg1 \@meta;
 	#msg1 map { $_->{name} } @meta;
 	
+	
+	
 	# третий проход - проверка правильности лексем: кто за кем стоит и 
 	$i = 0;
 	my $prev;
@@ -853,8 +860,12 @@ sub _pop {
 			$self->error($msg, $op);
 		}
 		
-		if($fix & $prefix | $fix & $postfix | $fix & $infix) {
-			$popop->($op);
+		if($fix & $prefix) {	# prefix не выбрасывает операторы
+			$pushop->($op);
+		}
+		elsif($fix & $postfix | $fix & $infix) {	# оператор
+			$popop->();
+			$pushop->($op);
 		}
 		elsif($fix & $atom) {	# терминал
 			push @T, $op;
