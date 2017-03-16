@@ -3,7 +3,7 @@ package R::Syntax;
 # просматривает на один оператор вперёд, благодаря чему может определить арность оператора
 
 use common::sense;
-use R::App qw/msg msg1 $app todo nsort qsort pairmap has Can Isa closure/;
+use R::App qw/msg msg1 $app todo nsort qsort pairmap has Can Isa closure all any/;
 
 has qw/addspacelex/;
 
@@ -315,14 +315,16 @@ sub x {
 sub opt {
 	my ($self, $stmt) = splice @_, 0, 2;
 	
-	my $x;
+	my $lex;
 	
-	die "нет opt($stmt)" unless $x = $self->{LEX}{$stmt};
+	die "нет opt($stmt)" unless $lex = $self->{LEX}{$stmt};
 	
 	pairmap {
-		die "свойство $a в $stmt уже есть" if exists $x->{$a} and $a ne "order";
-		die "можно добавлять только re, sub, sur, order, или nolex в $stmt" if $a !~ /^(?:re|sub|sur|order|nolex)$/;
-		$x->{$a} = $b;
+		die "свойство $a в $stmt уже есть" if exists $lex->{$a} and $a ne "order";
+		die "можно добавлять только re, sub, sur, order, или nolex в $stmt" if $a !~ /^(?:re|sub|sur|endsub|endsur|order|nolex)$/;
+		die "$a можно устанавливать только на скобки" if $a =~ /^(?:endsub|endsur)$/ and !exists $lex->{BR};
+		
+		$lex->{$a} = $b;
 	} @_;
 	
 	$self
@@ -586,14 +588,6 @@ sub pop {
 	# лексемы
 	my $LEX = $self->{LEX};
 	
-	# подготовка к выполнению обработчика
-	my $lex = $LEX->{$stag};
-	my $push;
-	$push = {%+, stmt => $stag} if $lex and exists $lex->{sub} || exists $lex->{sur};
-
-	# выполняем подпрограмму
-	$lex->{sub}->($self, $push) if $lex && exists $lex->{sub};
-	
 	my $stack = $self->{stack};		# стек скобок
 	
 	# выбрасываем скобки
@@ -607,6 +601,16 @@ sub pop {
 	my $A = $sk->{'A+'};
 	$self->error("скобки ".($stag eq $sk->{stmt}? $stag: $sk->{stmt}." ".$stag)." не могут быть пусты") if !$A && $sk->{fix} & $void == 0;
 
+	
+	# подготовка к выполнению обработчика
+	my $lex = $LEX->{$tag};
+	my $push;
+	$push = {%+, stmt => $stag} if $lex and exists $lex->{sub} || exists $lex->{sur};
+
+	# выполняем подпрограмму
+	$lex->{sub}->($self, $push, $sk) if $lex && exists $lex->{sub};
+	$sk->{endsub}->($self, $sk, $push) if exists $sk->{endsub};
+	
 	
 	# срабатывают обработчики для грамматического разбора
 	if(my $POP_A = $self->{POP_A}) {
@@ -627,7 +631,8 @@ sub pop {
 	
 	
 	# выполняем подпрограмму
-	$lex->{sur}->($self, $push) if $lex && exists $lex->{sur};
+	$lex->{sur}->($self, $push, $sk) if $lex && exists $lex->{sur};
+	$sk->{endsur}->($self, $sk, $push) if exists $sk->{endsur};
 	
 
 	$self
@@ -1031,16 +1036,23 @@ sub error {
 	
 	my @lines = split /\r\n|[\r\n]/, $self->{text};
 	
-	my $line = $lines[$lineno-1];
+	my $clines = 3;
+	my $lineno0 = $lineno-1;
 	
+	my $before = join "\n", @lines[($lineno0-$clines<0? 0: $lineno0-$clines) .. $lineno0-1];
+	my $after = join "\n", @lines[$lineno .. ($lineno0 + $clines >= $#lines? $#lines: $lineno0 + $clines)];
+	my $line = $lines[$lineno0];
+
 	my ($line1, $line2) = $line =~ /(.{$charno})(.*)/;
 	$line1 =~ s/\t/ $charno+=3; "    "/ge;
-	$line1 =~ s/\t/    /g;
 	$line = "$line1$line2";
+	
+	$before =~ s/\t/    /g;
+	$after =~ s/\t/    /g;
 	
 	#my $color_msg = $app->log->colorized( "$file:$lineno: $msg", $self->color_stacks );
 	
-	$msg = "$msg\n$file:$lineno:$charno:\n$line\n" . ('_' x ($charno-1)) . "^\n";
+	$msg = "$msg\n$file:$lineno:$charno:\n$before\n$line\n" . ('_' x ($charno-1)) . "^\n$after\n";
 	
 	die R::Raise->new($msg, "error")->clear;
 }
@@ -1333,6 +1345,20 @@ sub top {
 }
 
 
+# возвращает вехнюю скобку со stmt = одному из параметров
+sub up {
+	my $self = shift;
+	my $S = $self->{stack};
+	
+	local $_;
+	
+	for(my $i=$#$S; $i>=0; $i--) {
+		my $stmt = $S->[$i]{stmt};
+		return $S->[$i] if any { $stmt eq $_ } @_;
+	}
+	
+	return "";
+}
 
 
 ########################## манипулятор бинарного дерева

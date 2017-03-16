@@ -894,7 +894,7 @@ TODO: циклы с возвращаемым значением через `last
 
 Блоки созданы для шаблонов. Это методы. Переменные в них являются свойствами объекта. А так же они сразу вызываются.
 
-	$app->syntaxAg->new->eval('class BlockTest
+	$app->syntaxAg->new(show_morf=>1)->eval('class BlockTest
 		block A then A+10
 	end');
 	

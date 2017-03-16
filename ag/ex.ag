@@ -1,4 +1,9 @@
-REM класс для примеров
+REM РєР»Р°СЃСЃ РґР»СЏ РїСЂРёРјРµСЂРѕРІ
 
-sub piramid then 
+sub piramid k then ^(k ?= 6) | " " ** k-a . "/" . " " ** a*2 . "\\" | join "\n"
+
+sub fish k then k?=6; ^k, (^k reverse) | " " ** k-a . "/" . " " ** a*2 . "\\" | join "\n"
+
+sub romb k then k?=6; (^k | " " ** k-a . "/" . " " ** a*2 . "\\"), ( (^k reverse) |  " " ** k-a . "\\" . " " ** a*2 . "/" ) | join "\n"
+
 

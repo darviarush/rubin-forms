@@ -47,9 +47,9 @@ sub morf {
 		\$ (?<get> (?<tail> $re_id $re_inbrackets? ( [\.:]$re_id $re_inbrackets? )* )) |
 		$ )
 	}gxnis) {
+		my $txt = $+{text};
 		do {
 			local %+;
-			my $txt = $+{text};
 			$txt =~ s!"!""!g;
 			$txt =~ s!\\!\\\\!g;			
 			push @ret, $txt;

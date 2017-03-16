@@ -19,7 +19,7 @@ sub new {
 	my $cls = shift;
 	my $self = bless {
 		%$BASICSYNTAX,
-		trace => 0,
+		trace => 0,		
 		@_
 	}, ref $cls || $cls;
 
@@ -106,12 +106,14 @@ $s->tr("xfy", qw{		?					});
 $s->tr("yfx", qw{		^					});
 $s->tr("fy",  qw{ 		+ - ! +~			});
 $s->tr("xfy", qw{		~	!~	~r~	!~r~	});
-$s->tr("xfy", qw{		* / mod div ** ***	});
-$s->tr("xfy", qw{		+ - .				});
+$s->tr("xfy", qw{		* / mod div	});
+$s->tr("xfy", qw{		+ -					});
 $s->tr("xfy", qw{		+< +>				});
 $s->tr("xfy", qw{		+&					});
 $s->tr("xfy", qw{		+|  +^				});
+$s->tr("xfy", qw{		**	***				});
 $s->tr("xfy", qw{		%					});
+$s->tr("xfy", qw{		.					});
 $s->tr("xfx", qw{		< > <= >= lt gt le ge		});
 $s->tr("xfx", qw{		== != eq ne  <=> cmp 		});			# ~~
 $s->tr("xfx", qw{		isa can	of					});
@@ -136,7 +138,7 @@ $s->tr("xfy", qw{		and						});
 $s->tr("xfy", qw{		or	xor					});
 $s->tr("yfx", qw{		as	is					});
 $s->tr("fx",  qw{		return	raise msg msg1	})->td("Fx", qw{   REPEAT UNTIL		});
-$s->tr("xfy", qw{		;						})->td("yf", qw{	;				});
+$s->tr("xfy", qw{		;						});
 $s->tr("fx",  qw{		decorator				});
 $s->tr("xfy", qw{		\n						})->td("yf", qw{	\n	})->td("fy", qw{	\n	});
 $s->tr("xfy", qw{		rescue					});
@@ -306,6 +308,21 @@ $s->opt("END", sub => sub {
 #$s->opt("UNTIL", sub => sub { my ($self, $push) = @_; $self->check("UNTIL", stmt=>"REPEAT")->top->{endline} = 1 });
 #$s->opt("FROM", sub => sub { my ($self, $push) = @_; my $top = $self->endline->top; $self->error("FROM должен использоваться после MAP, PAIRMAP, GREP, SORT, NSORT, QSORT или REDUCE") if $top->{stmt} !~ /^(?:map|grep|[nq]sort|reduce|pairmap)$/; $push->{endline} = $push->{gosub} = 1 });
 
+# возвращает скобку текущего класса
+sub class {
+	my $self = shift;
+	$self->up(qw/CLASS OBJECT/)
+}
+
+# возвращает скобку текущего класса
+sub method {
+	my $self = shift;
+	my $lex = $self->up(qw/CLASS OBJECT SUB BLOCK/);
+	return {stmt=>"SUB", SUB=>"void"} if $lex->{stmt} =~ /^(?:CLASS|OBJECT)$/;
+	$lex
+}
+
+
 sub _class {
 	my ($self, $push) = @_;
 	my $S = $self->{stack};
@@ -313,10 +330,11 @@ sub _class {
 	#$push->{file} = $self->{file};
 	
 	# получаем вышестоящий класс
-	my $class;
-	for(my $i=$#$S; $i>=0; $i--) {
-		$class = $S->[$i]{class}, last if $S->[$i]{stmt} =~ /^(CLASS|OBJECT)$/;
-	}
+	# my $class;
+	# for(my $i=$#$S; $i>=0; $i--) {
+		# $class = $S->[$i]{class}, last if $S->[$i]{stmt} =~ /^(CLASS|OBJECT)$/;
+	# }
+	my $class = $self->class->{class};
 
 	# иерархия классов
 	$push->{class} = "${class}::$push->{class}" if defined $class;
@@ -780,9 +798,17 @@ sub compile {
 	die "compile: не указан путь файла" if !$path;
 	die "compile: не указано куда компилировать" if !$to;
 	
-	my $file = $app->file($path);
+	my $file = $app->file($path)->encode(undef);
 	my $text = $file->read;
 	my $ext = $file->ext;
+	
+	use Encode qw/decode/;
+	
+	eval {
+		$text = decode("UTF-8", $text, Encode::FB_CROAK);
+	};
+	$self->error("переведите файл в кодировку UTF-8") if $@;
+	
 	
 	if($ext ne "" and $ext ne "ag") {
 		my $Ext = "syntaxPreprocessor" . ucfirst $ext;
