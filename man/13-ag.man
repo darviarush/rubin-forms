@@ -720,8 +720,8 @@ TODO: циклы с возвращаемым значением через `last
 === Интервальные
 
 	$app->syntaxAg->new->eval(" ^6 join");					# 012345
-	#$app->syntaxAg->new(show_morf=>1, show=>1, trace=>1)->eval(" (k=6; ^k) join ");			# 012345
-	$app->syntaxAg->new(show_morf=>1, show=>1, trace=>1)->eval(" [ do k=6 #?\n ^k end ] ");			## [qw/0 1 2 3 4 5/]
+	$app->syntaxAg->new->eval(" Do k=6; ^k End Join ");			# 012345
+	$app->syntaxAg->new->eval(" [ do k=6 #?\n ^k end ] ");			## [qw/0 1 2 3 4 5/]
 	
 
 	$app->syntaxAg->new->eval(" 1..6 join");		# 123456

@@ -782,9 +782,23 @@ sub _pop {
 			
 			#msg1 $n, $meta->{name}, $self->namefix($fix), $self->namefix($fixk);
 			
-			# операторы с большим приоритетом рассматривается первыми
+			# инфиксные операторы с большим приоритетом рассматривается первыми
 			
-			if($fix & $prefix && !($fixk & $prefix) && $check->($prev, $prefix)) {
+			#msg1 "all:", $k<$i-1, $fix & $infix && !($fixk & $infix) && $check->($prev, $infix);
+			
+			if(	$k<$i-1 && 
+				$fix & $infix && !($fixk & $infix) && $check->($prev, $infix) &&
+				(do {
+					my $next = $meta[$k+1]{fix};
+					my $nextk = $fix[$n+1];
+					#msg1 $meta->{name}, $meta[$k+1]{name}, $next & $infix, !($nextk & $infix),  $meta->{INFIX}{prio}, $meta[$k+1]{INFIX}{prio};
+					$next & $infix &&  !($nextk & $infix) && $meta->{INFIX}{prio} > $meta[$k+1]{INFIX}{prio}
+				})
+			) {
+				$fix[$n] |= $infix;
+				$comb[$n] = $meta->{INFIX};
+			}
+			elsif($fix & $prefix && !($fixk & $prefix) && $check->($prev, $prefix)) {
 				$fix[$n] |= $prefix;
 				$comb[$n] = $meta->{PREFIX};
 			}
