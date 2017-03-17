@@ -300,24 +300,21 @@
 	$s->x("gomethod" => qr{ (?<class> \w+)  \. (?<method> \w+) }x => );
 	
 	$s->templates(
-		"fx TOP" => '{{ TOP:classes }} {{ right }}',
-		"CLASS" => '{% TOP:classes |
-			package {{ name }} {
-				{{ CLASS:methods "\n" }}
-				sub void {
-					{{ right }}
-				}
-			}
-		%}"{{ name }}"',
-		"method" => "{% CLASS:methods |
-			sub {{ name }} {
+		"fx TOP" => '
+		{{ TOP:classes }}{{ right }}',
+		"CLASS" => '{% TOP:classes | package {{ name }} {
+			{{ CLASS:methods "\n" }}
+			sub void {
 				{{ right }}
 			}
-		%} '{{ name }}'",
+		}%}"{{ name }}"',
+		"method" => '{% CLASS:methods |	sub {{ name }} {
+			{{ right }}
+		}%}"{{ name }}"',
 		
 		'xfy \n' => "{{ left }};\n{{ right }}",
-		'yf \n' => "{{ left }}\n",
-		'fy \n' => "\n{{ right }}",
+		'yf \n' => "{{ left }}",
+		'fy \n' => "{{ right }}",
 		"num" => "{{ num }}",
 		"gomethod" => '{{ class }}->{{ method }}',
 	);
@@ -349,6 +346,46 @@
 
 Всплывающие переменные не могут быть вложеными.
 
+=== Форматрирование
+	
+Выходной код форматируется.
+
+	my $res = $s->morf('
+		TOP
+		class A
+			
+			1000
+		
+			method A1
+				method A2
+					20
+				end
+			
+				10
+			end			
+			
+		end
+	');
+
+	my $code = '
+		package A {
+			sub A2 {
+				20
+			}
+			sub A1 {
+				"A2";
+				10
+			}
+		
+			sub void {
+				1000;
+				"A1"
+			}
+		}
+		"A"
+	';
+	
+	$res;		## $code
 	
 == Модификаторы бинарного синтаксического дерева
 
