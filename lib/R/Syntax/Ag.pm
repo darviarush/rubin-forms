@@ -145,6 +145,8 @@ $s->tr("xfy", qw{		rescue					});
 $s->tr("xfy", qw{		THEN	ELSEIF	ELSE	});
 
 
+
+
 ### дополнительные опции операторов
 
 # a-1 тогда не сработает
@@ -314,26 +316,20 @@ sub class {
 	$self->up(qw/CLASS OBJECT/)
 }
 
-# возвращает скобку текущего класса
+# возвращает скобку текущего метода
 sub method {
 	my $self = shift;
-	my $lex = $self->up(qw/CLASS OBJECT SUB BLOCK/);
-	return {stmt=>"SUB", SUB=>"void"} if $lex->{stmt} =~ /^(?:CLASS|OBJECT)$/;
-	$lex
+	$self->up(qw/SUB BLOCK/);
 }
 
-
-sub _class {
+# срабатывает перед классом
+sub _sub_class {
 	my ($self, $push) = @_;
 	my $S = $self->{stack};
 	#$push->{lineno} = $self->{lineno};
 	#$push->{file} = $self->{file};
 	
 	# получаем вышестоящий класс
-	# my $class;
-	# for(my $i=$#$S; $i>=0; $i--) {
-		# $class = $S->[$i]{class}, last if $S->[$i]{stmt} =~ /^(CLASS|OBJECT)$/;
-	# }
 	my $class = $self->class->{class};
 
 	# иерархия классов
@@ -352,42 +348,49 @@ sub _class {
 	}
 }
 
-$s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => \&_class => "END");
-$s->br("OBJECT" => qr{ \b OBJECT ( $re_space (?<extends> $re_class ( $re_space_ask , $re_space_ask $re_class )* ) )? ($re_space CLASS $re_space (?<class> $re_class))? ($re_space (?<with> WITH) $re_space)? }ixn => sub {
+# срабатывает после того как скобка CLASS помещена в стек
+sub _sur_class {
+	my ($self, $push) = @_;
+	$self->push("SUB", SUB=>"void", allow=>1, tag=>"END");
+}
+
+$s->br("CLASS" => qr{ \b CLASS $re_space $re_class_stmt }ix => \&_sub_class => "END");
+$s->br("OBJECT" => qr{ \b (OBJECT|EMBED) ( $re_space (?<extends> $re_class ( $re_space_ask , $re_space_ask $re_class )* ) )? ($re_space CLASS $re_space (?<class> $re_class))? ($re_space (?<with> WITH) $re_space)? }ixn => sub {
 	my ($self, $push) = @_;
 	$push->{class} = "Ag::OBJECT::OBJECT" . (++$self->{OBJECT_COUNT}) if !defined $push->{class};
-	goto &_class;
+	goto &_sub_class;
 } => "END");
-$s->br("OBJECT WITH");
-$s->opt("OBJECT WITH", nolex=>1);
+
+# доп скобка для объекта
+$s->tr("Fx" => "OBJECT WITH");
+$s->opt("OBJECT WITH", nolex=>1, endsur => \&_sur_class);
 $s->opt("OBJECT", sur => sub {
 	my ($self, $push) = @_;
-	$self->push("OBJECT WITH", endline=>1) if $push->{with};
+	if(exists $push->{with}) {
+		$self->push("OBJECT WITH", endline=>1) ;
+	}
+	else {
+		goto &_sur_class;
+	}
 });
+$s->opt("CLASS", sur => \&_sur_class);
 
 $s->opt("decorator", nolex=>1);
-sub br_sub {
+# срабатывет перед вбросом в стек скобки SUB
+sub _sub_sub {
 	my ($self, $push) = @_;
 	
-	$self->error("void - метод тела класса. Он уже объявлен", $push) if $push->{SUB} eq "void";
+	$self->error("void - метод тела класса. Он уже объявлен", $push) if !$push->{allow} && $push->{SUB} eq "void";
 	
 	$push->{args} = [ split /\s*,\s*/, $push->{args} ];
 	$push->{endline} = 1 if delete $push->{then};
 	
 	# в каком классе находится функция
+	$push->{class} = $self->class->{class};
+	$self->error("метод $push->{SUB} не в классе!", $push) if !$push->{class};
+	
+	
 	my $stack = $self->{stack};
-	
-	for(my $i=$#$stack; $i>=0; $i--) {
-		my $s = $stack->[$i];
-		if($s->{stmt} =~ /^(CLASS|OBJECT)$/) {
-			$push->{class} = $s->{class};
-			goto NEXT;
-		}
-	}	
-	
-	$self->error("метод $push->{SUB} не в классе!");
-	NEXT:
-	
 	
 	# пытаемся обнаружить декораторы
 	my $A = $stack->[-1]{'A+'};
@@ -427,9 +430,13 @@ sub br_sub {
 	}
 }
 
-$s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_SUB ) $re_args_then }ix => \&br_sub => "END");
-$s->br("BLOCK" => qr{ \b BLOCK $re_space (?<SUB> $re_SUB ) $re_args_then }ix => \&br_sub => "END");
+$s->br("SUB" => qr{ \b SUB $re_space (?<SUB> $re_SUB ) $re_args_then }ix => \&_sub_sub => "END");
+$s->br("BLOCK" => qr{ \b BLOCK $re_space (?<SUB> $re_SUB ) $re_args_then }ix => \&_sub_sub => "END");
 
+$s->opt("SUB", endsur => sub {	# срабатывает после выброса из стека скобки SUB
+	my ($self, $push, $push_end) = @_;
+	$self->pop if $push->{SUB} eq "void";	# выбрасываем класс или эмбэд
+});
 
 
 #$s->br("SUB_CLASS" => qr{ \b SUB $re_space $re_id $re_args_then }ix => "END");

@@ -404,7 +404,7 @@ CLASS => '{% ROOT:classes |package {{ class }} {
 	require R::App;
 	{{ _extends class, extends, lineno, file }}
 	{{ CLASS:methods "\n" }}
-	sub void { my $DATA = { me => shift }; {{ right }} }
+	{{ right }}
 }
 %}"{{ realname }}"',
 
@@ -413,11 +413,11 @@ OBJECT => '{% ROOT:classes |package {{ class }} {
 	require R::App;
 	{{ _extends class, extends, lineno, file }}
 	{{ CLASS:methods "\n" }}
-	sub void { my $DATA = { me => shift }; {{ right }} }
+	{{ right }}
 }
-%}("{{ class }}"->can("new")? "{{ class }}": $R::App::app->syntaxAg->include("{{ class }}"))->new({{ OBJECT:with }})',
+%}(do { my $class="{{ class }}"; $class->can("new")? $class: $R::App::app->syntaxAg->include($class) })->new({{ OBJECT:with }})',
 
-'OBJECT WITH' => '{% OBJECT:with | {{ right }} %}',
+'Fx OBJECT WITH' =>	'{% OBJECT:with | {{ left }} %}',
 
 SUB => sub { my ($self, $push) = @_;
 		# вернуть self, если это конструктор
@@ -426,7 +426,7 @@ SUB => sub { my ($self, $push) = @_;
 		$push->{SHIFT} = $push->{SUB} eq "new"? 'bless({}, do { my $cls=shift; ref $cls || $cls })': 'shift';
 	},
 	'{% CLASS:methods |sub {{ SUB }} { my $DATA = { me => {{ SHIFT }} }; {{ _args args }} {{ right }}{{ RET }} }%}',
-BLOCK => '{% CLASS:methods |sub {{ SUB }} { my $DATA = shift; {{ _args args }} {{ right }} }%}$DATA->{{ SUB }}',
+BLOCK => '{% CLASS:methods |sub {{ SUB }} { my $DATA = shift; {{ _args args }} {{ right }} }%}',
 
 IF => '(({{ right }}{{ _else else }})',
 "IF THEN" => '{{ left }})? do {{{ right }}',
@@ -440,11 +440,21 @@ FOR => '{{ right }}',
 "FOR OF" => '{{ _init_for * }}do { my {{A}} = [%{ {{ left }} }]; {{L}}: for(my {{i}}=0; {{i}}<@{{A}}; {{i}}+={{ arity }}) { @$DATA{qw/{{ qwparam }}/} = map { {{A}}->[$_] } {{i}}..{{i}}+{{arity0}}; {{ right }} } }',
 
 WHILE => '{{ right }}',
-"WHILE THEN" => 'do { while({{ left }}) { {{ right }} } }',
+"WHILE THEN" => 'do {
+	while({{ left }}) {
+		{{ right }}
+	}
+}',
 
-"Fx REPEAT" => 'do { do { {{ left }} } until( {{ right }} ) }',
+"Fx REPEAT" => 'do {
+	do {
+		{{ left }}
+	} until( {{ right }} )
+}',
 
-DO => 'do { {{ right }} }',
+DO => 'do {
+	{{ right }}
+}',
 
 'fx return' => 'return {{ right }}',
 'local' => '$DATA',
@@ -472,8 +482,8 @@ num => '{{ num }}',
 hex => '{{ hex }}',
 bin => '{{ bin }}',
 radix => '{{ radix }}',
-new => '("{{ new }}"->can("new")? "{{ new }}": $R::App::app->syntaxAg->include("{{ new }}"))->new',
-new_apply => '("{{ new }}"->can("new")? "{{ new }}": $R::App::app->syntaxAg->include("{{ new }}"))->new({{ right }})',
+new => '(do { my $class="{{ new }}"; $class->can("new")? $class: $R::App::app->syntaxAg->include($class) })->new',
+new_apply => '(do { my $class="{{ new }}"; $class->can("new")? $class: $R::App::app->syntaxAg->include($class) })->new({{ right }})',
 new_x => '(do { my $cls=$DATA->{{{ new }}}; $cls=~s/-/__/g; $cls->can("new")? $cls: $R::App::app->syntaxAg->include($cls) })->new',
 new_x_apply => '(do { my $cls=$DATA->{{{ new }}}; $cls=~s/-/__/g; $cls->can("new")? $cls: $R::App::app->syntaxAg->include($cls) })->new({{ right }})',
 

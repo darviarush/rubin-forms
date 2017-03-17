@@ -212,7 +212,7 @@ sub td {
 			die "оператор `$type $x` уже объявлен" if exists $self->{$key}{$x};
 			$op = $self->newlex($key => {%p, name=>"$type $x", alias=>$x, fix => $fix, order => -length $x});
 			
-			if($fix & $bracket) {
+			if($fix & $bracket && $i+1 != @_) {
 				$op->{tag} = $_[$i+1];
 				$self->newlex(CR => { name => "cr $op->{tag}", alias => $op->{tag}, order=>$self->{ORDER}++, fix => $crbracket }) if !exists $self->{LEX}{ $_[$i+1] } || !exists $self->{LEX}{ $_[$i+1] }{CR};
 			}
@@ -322,7 +322,7 @@ sub opt {
 	pairmap {
 		die "свойство $a в $stmt уже есть" if exists $lex->{$a} and $a ne "order";
 		die "можно добавлять только re, sub, sur, order, или nolex в $stmt" if $a !~ /^(?:re|sub|sur|endsub|endsur|order|nolex)$/;
-		die "$a можно устанавливать только на скобки" if $a =~ /^(?:endsub|endsur)$/ and !exists $lex->{BR};
+		die "$a можно устанавливать только на скобки" if $a =~ /^(?:endsub|endsur)$/ and not $lex->{fix} & $bracket;
 		
 		$lex->{$a} = $b;
 	} @_;
@@ -594,6 +594,7 @@ sub pop {
 	$self->error("нет открывающей скобки ".(defined($stag)? "к $stag ": "")."- стек S пуст") if !@$stack;
 	
 	my $sk = $stack->[-1];
+	my $lexsk = $LEX->{$sk->{stmt}};
 
 	my $tag = $sk->{tag} // $sk->{stmt};
 	$self->error("закрывающая скобка $stag конфликтует со скобкой ".($sk->{stmt} ne $tag? "$sk->{stmt} … $tag": $tag)) if defined $stag and $tag ne $stag;
@@ -609,7 +610,7 @@ sub pop {
 
 	# выполняем подпрограмму
 	$lex->{sub}->($self, $push, $sk) if $lex && exists $lex->{sub};
-	$sk->{endsub}->($self, $sk, $push) if exists $sk->{endsub};
+	$lexsk->{endsub}->($self, $sk, $push) if exists $lexsk->{endsub};
 	
 	
 	# срабатывают обработчики для грамматического разбора
@@ -632,7 +633,7 @@ sub pop {
 	
 	# выполняем подпрограмму
 	$lex->{sur}->($self, $push, $sk) if $lex && exists $lex->{sur};
-	$sk->{endsur}->($self, $sk, $push) if exists $sk->{endsur};
+	$lexsk->{endsur}->($self, $sk, $push) if exists $lexsk->{endsur};
 	
 
 	$self
@@ -1086,10 +1087,12 @@ sub templates {
 		
 		$modifiers->{$k} = $v, $v = $_[$i+2], $i++ if ref $v eq "CODE";
 		
+		# TODO: вставка шаблонов в шаблоны, условия и циклы или вставка кода perl
+		
 		my $orig = $v;
 		
 		$v =~ s/'/\\'/g;
-		$v =~ s/\{\{\s*(\w+)\s*\}\}/', \$b->{$1} ,'/g;	# переменные
+		$v =~ s/\{\{\s*(\w+)\s*\}\}/'. \$b->{$1} .'/g;	# переменные
 		$v =~ s/\{\{\s*(?<id>\w+)\s+(?<args>$re_arg(\s*,\s*$re_arg)*)\s*\}\}/	# вызовы методов класса темплейта
 			my $args = $+{args};
 			my $id = $+{id};
@@ -1107,8 +1110,7 @@ sub templates {
 			$begin .= "push \@{\$b->{'UP+'}{'$+{key}'}}, join '', '$+{val}'; ";
 			''
 		}sxgen;
-		
-		
+
 		
 		# # проверяем, что не осталось конструкций
 		# die "осталось `{{` в шаблоне: $k -> $orig -> $v" if $v =~ /\{\{/;
