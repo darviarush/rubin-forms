@@ -301,9 +301,18 @@
 	
 	$s->templates(
 		"fx TOP" => '{{ TOP:classes }} {{ right }}',
-		"CLASS" => '{% TOP:classes | package {{ name }} { {{ CLASS:methods "\n" }} sub void { {{ right }} } } %}"{{ name }}"',
+		"CLASS" => '{% TOP:classes |
+			package {{ name }} {
+				{{ CLASS:methods "\n" }}
+				sub void {
+					{{ right }}
+				}
+			}
+		%}"{{ name }}"',
 		"method" => "{% CLASS:methods |
-			sub {{ name }} { {{ right }} }
+			sub {{ name }} {
+				{{ right }}
+			}
 		%} '{{ name }}'",
 		
 		'xfy \n' => "{{ left }};\n{{ right }}",
