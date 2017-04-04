@@ -52,7 +52,7 @@ $ ./rubin-forms mkage
 1. [Коннект к базе](mark/09-connect.markdown)
 1. [Шаблонизатор (*DESTROYED*)](mark/10-view.markdown)
 1. [Шаблонизатор (код Javascript) (*DESTROYED*)](mark/11-view-js.markdown)
-1. [Язык шаблонизатора R::View (**DESTROYED**)IVANYCH](mark/11-view-lang.markdown)
+1. [Язык шаблонизатора R::View (*DESTROYED*)](mark/11-view-lang.markdown)
 1. [Построитель лексико-грамматико-семантических анализаторов](mark/12-syntax.markdown)
 1. [Язык *Серебряна* (лат. Argentum)](mark/13-ag.markdown)
 1. [Сценарии пользователя](mark/15-users-scenaries.markdown)
