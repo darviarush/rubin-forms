@@ -278,6 +278,7 @@ $app->make->load->run;
 name "mkage";
 args "[dir=/bin]";
 desc "создаёт интерпретатор в dir";
+spec "Создаёт в указанной директории скрипты al, ag, age, чтобы они были доступны отовсюду";
 sub mkage {
 	my ($self, $dir) = @_;
 	

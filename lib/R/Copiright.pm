@@ -16,10 +16,10 @@ sub file {
 	
 	'
 #                               
-# @author  
-# @site    
-# @email   
-# @license BSD
+# @author  Iaroslav O. Kosmina
+# @site    darviarush@narod.ru
+# @email   darviarush@mail.ru
+# @license BSD-2 (aka MIT)
 #
 '
 }

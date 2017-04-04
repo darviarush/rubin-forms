@@ -1,0 +1,14 @@
+#!/bin/bash
+
+name=$1
+shift
+
+cat ~/.bashrc | grep -v "alias $name=" > ~/.save
+mv ~/.save ~/.bashrc
+
+alias="alias $name=\"$*\""
+
+echo $alias >> ~/.bashrc
+
+
+alias $name="$*"
