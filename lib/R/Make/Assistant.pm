@@ -375,6 +375,31 @@ sub pkgls {
 
 }
 
+
+name "markmk";
+args "";
+desc "создаёт документацию";
+sub markmk {
+	
+	make("man", "", "-a");
+	
+	$app->file("mark")->rmdown->mkdir;
+	
+	my $link;
+	
+	$app->file("var/.MAN/man/*.markdown")->glob->then(sub {
+		$link .= "1. [".$_->nik."](mark/" . $_->file . ")\n";
+		$_->cp("mark/" . $_->file);
+	});
+	
+	
+	
+	$app->file("README.md")->replace(sub {
+		s!(== Документация).*$!$1\n\n$link\n!s;
+	});
+}
+
+
 # name "trace";
 # args "";
 # desc "трейс стека последней ошибки";

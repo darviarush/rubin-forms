@@ -1,0 +1,165 @@
+# Типы полей
+
+## Инициализация
+
+Подключаем наш фреймворк:
+
+```perl
+
+
+use common::sense;
+use lib "lib";
+use R::App qw/$app msg msg1/;
+
+```
+
+Зададим конфигурацию:
+
+```perl
+
+$app->man->configure;
+
+
+
+```
+
+## Введение
+
+Типы ORM-а могут перекрывать типы `sql`.
+
+```perl
+
+$app->meta->fieldset("exam")->
+	col(nix => "unixtime")->remark("время в формате unixtime (4 байта)")->
+	col(nox => "datetime")->remark("время в формате sql (8 байт)")->
+end;
+
+$app->meta->sync;
+
+my $id = $app->model->exam(nix => time, nox => $app->connect->now)->id;
+
+$app->model->exam($id)->nix;		# 00 минут назад
+$app->model->exam($id)->nox;		# 00 минут назад
+
+```
+
+Сработал форматтер, который перевёл время в строку.
+
+### Типы now и upd
+
+* `now` - поле unixtime, которое содержит время добавления записи
+* `upd` - поле unixtime, которое содержит время обновления записи
+
+```perl
+
+$app->meta->fieldset("exam2")->
+	col(now => "now")->remark("время добавления записи")->
+	col(upd => "upd")->remark("время обновления записи")->
+sync;
+
+my $exam = $app->model->exam2({})->save;
+
+$exam->now;		# 00 минут назад
+$exam->upd;		# 00 минут назад
+
+sleep 1;
+
+$exam->now->epoch - time;		# -1
+$exam->upd->epoch - time;		# -1
+
+```
+
+Используйте метод `touch`, чтобы просто обновить время доступа к записи.
+
+```perl
+
+$exam->touch;
+
+$exam->now->epoch - time;		# -1
+$exam->upd->epoch - time;		# 0
+
+```
+
+### Тип string
+
+Это универсальный текстовый тип: он подбирает тип в базе по указанному размеру. Размеру можно указывать суффикс: `1g`, `2M`, `3k` - гигабайт, два мегабайта и 3 килобайта соответственно. Можно указывать выражение: `1M-24k+24b`.
+
+```perl
+
+$app->meta->fieldset("exam3")->
+	col(text => "string")->remark("строка 255 символов максимум")->
+	col(text2 => "string(6-1)")->remark("строка 5 символов максимум")->
+sync;
+
+$app->model->exam3(text => "это строка!", text2=>"и это")->save;
+
+$app->model->exam3->count;	# 1
+
+$app->model->exam3(text => "это строка!", text2=>"а тут будет исключение")->save;	#@ ~ превышена максимальная длина значения 6-1 для поля text2
+
+```
+
+### Тип msg
+
+Тип `msg` создан для комментариев и подобных текстовых полей. Его объекты имеют метод `render`. При выводе он парсит текст и преобразует ссылки.
+
+```perl
+
+$app->meta->fieldset("exam4")->
+	col(comment => "msg(1k)")->remark("комметарий")->
+sync;
+
+my $exam = $app->model->exam4(comment=>" < www.test.ru/автомобили-россии.")->save;
+
+$exam->comment->render->[0];			# \s&lt; <a href="http://www.test.ru/автомобили-россии" target=_blank>www.test.ru/автомобили-россии</a>.
+
+```
+
+### Тип safehtml
+
+Хранит html. При поступлении вырезает из html подозрительные теги, а из тегов - подозрительные атрибуты.
+
+```perl
+
+$app->meta->fieldset("article")->
+	col(html => "safehtml(1m)")->remark("тело статьи")->
+sync;
+
+my $article = $app->model->article(html => "<
+<script>...</script>
+<!-- ... --><img src=\"\"><br/>
+<a href='#'>saver</a>
+<b style='transform:rotate(20deg)' onclick='myfn()'>Ну</b>")->save;
+
+$article->html;		# &lt;\n&lt;script&gt;...&lt;/script&gt;\n<img src=""><br/>\n<a href="#" target=_blank>saver</a>\n<b>Ну</b>
+
+```
+
+### Тип enum
+
+```perl
+
+my $lok = {
+	10 => {
+		name => "pull",
+	},
+	20 => {
+		name => "push",
+	},
+};
+
+my $spoke = [{name => "pickup"}, "alpha"];
+
+$app->meta->fieldset("enumexam")->
+	col(gender => "enum(man,woman,neuter)")->remark("пол")->
+	col(lok => "enum", $lok)->remark("действие")->
+	enum(spoke => $spoke)->remark("говорун")->
+sync;
+
+$app->model->enumexam(gender => "man", lok => 10, spoke => $spoke->[1])->saveAs(1);
+
+$app->model->enumexam(1)->gender;		# man
+$app->model->enumexam(1)->lok;			## {name => "pull"}
+$app->model->enumexam(1)->spoke;		# alpha
+
+

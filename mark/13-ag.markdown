@@ -1,0 +1,1481 @@
+# Язык *Серебряна* (лат. Argentum)
+
+## Инициализация фреймворка
+
+```perl
+
+
+use common::sense;
+use lib "lib";
+use R::App qw/$app msg msg1/;
+
+$app->man->conf;
+
+
+
+```
+
+## Скаляры - строки, регулярные выражения и цифры
+
+```perl
+
+$app->syntaxAg->new->eval("1");							# 1
+$app->syntaxAg->new->eval("1.1");						# 1.1
+$app->syntaxAg->new->eval("7_007_001_11_11");			# 70070011111
+$app->syntaxAg->new->eval("7_007_001_11_11.7_007");		# 70070011111.7007
+$app->syntaxAg->new->eval("-10");						# -10
+$app->syntaxAg->new->eval("0xFF");						# 255
+$app->syntaxAg->new->eval("0b10");						# 2
+$app->syntaxAg->new->eval("3r10");						# 3
+
+$app->syntaxAg->new->eval('"строка в utf8"');							# строка в utf8
+
+```
+
+Строки поддерживают интерполяцию:
+
+```perl
+
+$app->syntaxAg->new->eval('utf8 = "utf8"; "строка в $utf8"');					# строка в utf8
+$app->syntaxAg->new->eval('hash = {key=>"utf8"}; "строка в $hash:key"');		# строка в utf8
+#$app->syntaxAg->new->eval('hash = {a=>6}; "строка в $a:6"');					# строка в utf8
+
+```
+
+Регулярные выражения:
+
+```perl
+
+$app->syntaxAg->new->eval(' "AbC" ~ "abc"!i ');					# 1
+
+```
+
+Регулярные выражения удобные для распознавания файлов:
+
+```perl
+
+$app->syntaxAg->new->eval(' "file.EXP" ~ "*.exp"?i ');			# 1
+$app->syntaxAg->new->eval(' "1231.exp" ~ "{|123|}.exp"? ');		# 1
+
+```
+
+### Преобразователи у строк и цифр
+
+Можно сразу преобразовать константу, дописав за ней без пробела название преобразователя.
+
+```perl
+
+$app->syntaxAg->new->eval('
+	class Number::Fix::math
+		sub new n then me:n = n
+		sub m4 then me:n * 4
+	end
+');
+
+$app->syntaxAg->new->eval(' -1.1math.m4 ');		# -4.4
+
+```
+
+Преобразователи - это классы в директории `Number::Fix` для чисел и `String::Fix` для строк.
+
+```perl
+
+$app->syntaxAg->new->eval('
+	class String::Fix::f inherits R::File
+	end
+');
+
+$app->syntaxAg->new->eval(' "1"f.exists ');		## undef 
+
+```
+
+В стандартной библиотеке уже есть довольно много преобразователей.
+Для строк это `""f` - файл.
+
+## Классы и методы
+
+### Проект
+
+Проект, это папка в которой лежит `Aquafile`.
+Файлы с расширением `.ag` - классы на `Серебряне`.
+
+Файлы в подпапках - это классы.
+Компилляция просходит в подпапку `.Aqua` проекта.
+
+*/myproject*
+* _ .Aqua
+* _ Aquafile
+
+```perl
+
+my $dir = $app->file("var/_test_13_ag")->rm->mkdir;
+my $file = $dir->sub("/Tess.ag");
+
+$app->syntaxAg->ag($file->path);		#@ ~ файл находится не в проекте.* создайте Aquafile
+
+```
+
+Создадим *Aquafile*:
+
+```perl
+
+my $Aquafile = $dir->sub("/Aquafile")->write("");
+
+$app->syntaxAg->ag($file->path);		#@ ~ нет “var/_test_13_ag/Tess.ag”
+
+```
+
+Компиляция исходников происходит в поддиректорию `.Aqua`. Причём первым компилируется *Aquafile*.
+
+```perl
+
+$app->file("var/_test_13_ag/.Aqua/Aquafile.pm")->exists;		# 1
+
+```
+
+Если файл не начинается на `class name`, где `name` - имя файла, то `class name` добавляется по умолчанию.
+Так же тело класса обёрнуто в метод `void`. Следующий код `123` будет в классе `Tess` в методе `void`.
+
+```perl
+
+$app->file("var/_test_13_ag/Tess.ag")->write("123");
+$app->syntaxAg->ag("var/_test_13_ag/Tess.ag");		# 123
+
+```
+
+Метод `void` дёргается командой `ag` по умолчанию.
+
+```perl
+
+$app->file("var/_test_13_ag/Aes.ag")->write("class Aes \n 777 \n end");
+$app->syntaxAg->ag("var/_test_13_ag/Aes.ag");		# 777
+
+```
+
+Свой метод `void` написать нельзя.
+
+```perl
+
+$app->file("var/_test_13_ag/DismissVoid.ag")->write("sub void \n 777 \n end");
+$app->syntaxAg->ag("var/_test_13_ag/DismissVoid.ag");		#@ ~ void - метод тела класса. Он уже объявлен
+
+```
+
+Так же файл может начинаться на `extends` или `inherits`.
+
+```perl
+
+$app->file("var/_test_13_ag/Ress.ag")->write("
+inherits ::Tour
+	class Tour
+	end
+911
+");
+$app->syntaxAg->ag("var/_test_13_ag/Ress.ag");		# 911
+
+```
+
+Любой класс без `inherits` по умолчанию наследует класс `Nil`.
+
+```perl
+
+$app->file("var/_test_13_ag/Inherits.ag")->write("me isa 'Nil'");
+$app->syntaxAg->ag("var/_test_13_ag/Inherits.ag");		# 1
+
+```
+
+Команда `ag` подгружает `Aquafile` и указанный класс, создаёт экземпляр и запускает метод `void`.
+
+`Aquafilе` содержит конфигурацию проекта. Поэтому он назван *Акваторией*.
+
+Классы подгружаются оператором `new`, если класс ещё не был загружен. При этом по путям `app.syntaxAg:INC` ищется файл с расширением *.ag*.
+Все файлы по вложенным путям в имени класса так же подгружаются - ведь в файле класса могут быть подклассы.
+
+```perl
+
+$app->file("var/_test_13_ag/Nikki.ag")->write("class R1 \n 12 \n end");
+$app->syntaxAg->eval("new Nikki::R1.void");		#	12
+
+$app->file("var/_test_13_ag/Nik.ag")->write("class Risk \n end");	
+$app->file("var/_test_13_ag/Nik/Risk.ag")->mkpath->write("1");
+
+#$app->syntaxAg->ag("var/_test_13_ag/Nik/Risk.ag");	#@ ~ класс Nik::Risk встречается в .* и в .*
+$app->syntaxAg->ag("var/_test_13_ag/Nik/Risk.ag");	#@ ~ Risk\.ag
+
+```
+
+### Препроцессоры
+
+Препроцессоры задаются дополнительными расширениями и являются классами `R::Syntax::Preprocessor::*`.
+
+Пример для `R::Syntax::Preprocessor::kemi`:
+
+```perl
+
+$app->file("var/_test_13_ag/Template.html.kemi")->write("<html><% A+10 %></html>");
+
+$app->syntaxAg->ag("var/_test_13_ag/Template.html.kemi");		# <html>10</html>
+
+$app->syntaxAg->eval("new Template(A => 10).render");		# <html>20</html>
+
+```
+
+Подрасширение `html` никак не учитывается.
+
+Темплейт вместо метода `void` своё тело оборачивает в блок `render`. Создаётся и `void`, он вызывает `render`.
+
+Блоки созданы специально для шаблонов. Локальные переменные блоков являются одновременно свойствами объекта. А ещё блок сразу же вызывается.
+
+### Тесты
+
+```perl
+
+$app->file("var/_test_13_ag/Test.ag")->write("
+	sub plus a,b then a+b
+	scenario
+		a = new Test
+	end
+	
+	6
+	
+	scenario
+		if a.plus(10, 16) != 26 then 5 else 7
+	end
+");
+$app->syntaxAg->ag("var/_test_13_ag/Test.ag");		# 6
+#$app->syntaxAg->ag("var/_test_13_ag/Test.ag", 1);	# 7
+
+
+```
+
+### Методы и свойства
+
+Все переменные в *Серебряне* - локальные, а свойства объектов доступны через `me` и его синонимы `self` и `this`:
+
+```perl
+
+$app->syntaxAg->eval("
+	class TestProperty
+		sub new then self:a = 10
+	end
+");
+
+$app->syntaxAg->eval("new TestProperty:a");			# 10
+
+
+```
+
+## Конвееры
+
+Конвеер обрабатывает список поэлементно и возвращает другой.
+Конвееры могут быть левосторонними и правосторонними.
+
+### `map`
+
+`map` считывает из потока элементов один элемент, а вот возвращать может ноль или более элементов в поток.
+
+```perl
+
+$app->syntaxAg->eval("(1..3, 6 | a+1) join");			# 2347
+
+```
+
+Чтобы считать несколько элементов:
+
+```perl
+
+$app->syntaxAg->eval("(1..3, 6 | x, y map x+y) join");			# 39
+$app->syntaxAg->eval("(1..3, 6 | map2 a+b) join");				# 39
+$app->syntaxAg->eval("[ 1..3 | map2 b, a ]");				## [2, 1, undef, 3]
+
+$app->syntaxAg->eval("[ 1..6 | map3 c, b, a ]");				## [3, 2, 1, 6, 5, 4]
+$app->syntaxAg->eval("[ 1..7 | map3 c, b, a ]");				## [3, 2, 1, 6, 5, 4, undef, undef, 7]
+$app->syntaxAg->eval("[ 1..8 | map3 c, b, a ]");				## [3, 2, 1, 6, 5, 4, undef, 8, 7]
+
+```
+
+В конвеерах так же можно использовать разделитель `:`. Это аналог операторов перевода строки и `;`, только с низким приоритетом.
+
+```perl
+
+	$app->syntaxAg->eval("[ 1..8 | map3 c, b, a ]");				## [3, 2, 1, 6, 5, 4, undef, 8, 7]
+
+
+```
+
+### `grep`
+
+`grep` возвращает элементы, которые соответствуют условию.
+
+```perl
+
+$app->syntaxAg->eval("( 1..3, 6 | grep a < 3 ) join");					# 12
+$app->syntaxAg->eval("( 1..3, 6 | Grep2 b-a == 3 ) join");				# 36
+$app->syntaxAg->eval("( 1..3, 6 | x, y Grep y-x == 3 ) join");			# 36
+
+$app->syntaxAg->eval("[ 1..3    | x, y Grep x==3 || x==1 ]");			## [1, 2, 3]
+$app->syntaxAg->eval("[ 1..4    | grep3 1 ]");							## [1, 2, 3, 4]
+
+
+```
+
+### `first`
+
+Ищет первый элемент, удовлетворяющий условию.
+
+```perl
+
+$app->syntaxAg->eval("(1..3, 6..10 | first a > 3) join");						# 6
+$app->syntaxAg->eval("(1..3, 6..10, 13 | first2 b-a >= 3) join");				# 36
+$app->syntaxAg->eval("(1..3, 6..10, 13 | x, y first y-x >= 3) join");			# 36
+
+```
+
+### `any`
+
+1, если какой-то из элементов списка удовлетворяет условию.
+
+```perl
+
+$app->syntaxAg->eval("1..3 | any a==3");		# 1
+$app->syntaxAg->eval("1..3 | any a==4");		# 
+
+$app->syntaxAg->eval("1..3 | x, y Any x==3 and !y?");		# 1
+$app->syntaxAg->eval("1..3 | Any2 a==3 and !b?");		# 1
+
+```
+
+### `all`
+
+1, если все элементы списка удовлетворяют условию.
+
+```perl
+
+$app->syntaxAg->eval("1..3 | all a > 0");		# 1
+$app->syntaxAg->eval("1..3 | All a < 3");		# 
+
+$app->syntaxAg->eval("1..3 | All3 a == 1");		# 1
+
+```
+
+### `sort`
+
+Сортирует со строковым сравнением.
+
+```perl
+
+$app->syntaxAg->eval("[ 'abc', 'r', 'axc' | sort a ]");			## ['abc', 'axc', 'r']
+$app->syntaxAg->eval("[ 'abc', 'r', 'axc' | x sort x ]");		## ['abc', 'axc', 'r']
+
+$app->syntaxAg->eval("[ 'e', 'b', 'a', 'd', 'z' | x, y sort x ]");	## ['a', 'd', 'e', 'b', 'z', undef]
+
+```
+
+Обратите внимание на появившийся последний элемент.
+
+### `order`
+
+Сортирует с числовым сравнением.
+
+```perl
+
+$app->syntaxAg->eval("^3 | order -a | join");			# 210
+$app->syntaxAg->eval("^3 | x order -x | join");			# 210
+$app->syntaxAg->eval("1..6 | x, y order -x | join");	# 563412
+
+```
+
+### `assort`
+
+Данная сортировка аналогична сортировке в языках *perl* и *javascript*, то есть позволяет сравнивать два элемента.
+
+```perl
+
+#msg1 $app->syntaxAg->morf("^3 | assort b <=> a | join");
+
+$app->syntaxAg->eval("^4 | assort b <=> a | join");					# 3210
+$app->syntaxAg->eval("1..6 | x, y0, z, u0 assort z <=> x | join");	# 563412
+
+```
+
+### `reduce`
+
+Редукция. Сворачивает список к одному элементу.
+
+```perl
+
+$app->syntaxAg->eval("1..3 | reduce a*b");				# 6
+$app->syntaxAg->eval("1..3 | x, y reduce x*y");			# 6
+$app->syntaxAg->eval("1..3 | reduce2 a*b");				# 6
+
+```
+
+В следующем примере редукция выполнит две итерации: 1*2-3 и -1*4-5.
+
+```perl
+
+$app->syntaxAg->eval("1..5 | reduce3 a*b-c");			# -9
+$app->syntaxAg->eval("1..5 | x, y, z reduce x*y-z");	# -9
+
+```
+
+### `group`
+
+Группировка.
+Код после `| group` возвращает ключ и значение попадает по этому ключу в группу.
+Сохраняется порядок 
+
+```perl
+
+$app->syntaxAg->eval("[ 1..66 |   group a div 10 ]");		## [[1..9], [10..19], [20..29], [30..39], [40..49], [50..59], [60..66]]
+$app->syntaxAg->eval("[ 1..66 | x group x div 10 ]");		## [[1..9], [10..19], [20..29], [30..39], [40..49], [50..59], [60..66]]
+
+$app->syntaxAg->eval("[ 1..66 | group2 a div 10 ]");		## [[1..10], [11..20], [21..30], [31..40], [41..50], [51..60], [61..66]]
+
+$app->syntaxAg->eval('a=[a=>2, b=>1, r=>2, c=>1]; [ @a | group2 b ]');	## [[a=>2, r=>2], [b=>1, c=>1]]
+$app->syntaxAg->eval('a=[a=>2, b=>1, r=>2, c=>1]; [ @a | group2 b | { @a } ]');	## [{a=>2, r=>2}, {b=>1, c=>1}]
+
+```
+
+### `groupby`
+
+Эта группировка возвращает так же ключ перед группой.
+
+```perl
+
+$app->syntaxAg->eval('@a = a=>2, b=>1, r=>2, c=>1; [@a | groupby2 b]');	## [2=>[a=>2, r=>2], 1=>[b=>1, c=>1]]
+$app->syntaxAg->eval('@a = a=>2, b=>1, r=>2, c=>1; {@a | groupby2 b}');	## {2=>[a=>2, r=>2], 1=>[b=>1, c=>1]}
+
+
+```
+
+### `compress`
+
+Сжатие. Аналогична группировке, только сжимает в группы рядомстоящие элементы.
+
+```perl
+
+$app->syntaxAg->eval("[ 10, 11, 34, 16 | compress a div 10 ]");	## [ [10, 11], [34], [16] ]
+
+```
+
+### `compressby`
+
+Возвращает перед группой так же ключ.
+
+```perl
+
+$app->syntaxAg->eval("[ 10, 11, 34, 16 | compressby a div 10 ]");	## [ 1 => [10, 11], 3 => [34], 1 => [16] ]
+
+```
+
+### `|=`
+
+Присваивает результат массиву. Работает со всеми конвеерами.
+
+```perl
+
+#$app->syntaxAg->eval('a = [10, 11, 34, 16]; @a |= compressby a div 10');	## [ 1 => [10, 11], 3 => [34], 1 => [16] ]
+
+```
+
+### `join`
+
+TODO: | join - отдельным оператором.
+Добавлен для удобства работы с конвеерами: как бы оператор с другим приоритетом.
+
+```perl
+
+$app->syntaxAg->eval("1..6 | join ', ' ");			# 1, 2, 3, 4, 5, 6
+$app->syntaxAg->eval("1..6 | join      ");			# 123456
+#$app->syntaxAg->eval("1..6 | join3       ");			# 123456
+
+
+```
+
+## Условия
+
+### `if`
+
+```perl
+
+$app->syntaxAg->eval("if 0 then 10");						## undef
+$app->syntaxAg->eval("if 0 then 10 else 20");				# 20
+$app->syntaxAg->eval("if 0 then 10 elseif -1 then 20");		# 20
+$app->syntaxAg->eval("if 0 \n 10 \n end");					## undef
+$app->syntaxAg->eval("if 0 \n 10 \n else \n 20 \n end");	# 20
+$app->syntaxAg->eval("if 1 then s = 10 end; s");			# 10
+
+```
+
+### `case`
+
+```perl
+
+# my $res = $app->syntaxAg->eval("
+	# a = 10
+	# case a+1
+		# when 1 then 30
+		# when 2...6 then 50
+		# when 8..10
+			# 60
+		# default 'default'
+	# end
+# ");
+
+# $res; 		# default
+
+
+```
+
+## Циклы
+
+### `for`
+
+```perl
+
+$app->syntaxAg->eval("s=''; for i in [1..2] then s .= i end; s");			# 12
+$app->syntaxAg->eval("s=''; for i = 1..2 then s .= i end; s");				# 12
+$app->syntaxAg->eval("s=''; for k, v of {1 => 10, 2 => 20} then s += v end; s");				# 30
+$app->syntaxAg->eval("s=''; for i, j, k = 1..10 then s .= '|' . i . j . k end; s");				# |123|456|789|10
+
+```
+
+TODO: for 1..10 -> a, b, c then
+
+### `while`
+
+```perl
+
+$app->syntaxAg->eval("while s < 12 then s++ end; s");			# 12
+$app->syntaxAg->eval("while s < 12 \n s++ \n end \n s");		# 12
+$app->syntaxAg->eval("while s < 12 then s++ end; s");			# 12
+
+```
+
+### `repeat`
+
+```perl
+
+$app->syntaxAg->eval("repeat s++ until s==12\n s");				# 12
+
+```
+
+### Счётчики итераций в циклах
+
+```perl
+
+$app->syntaxAg->eval("for i=1..2 then if index(i)==1 then last end end; i");			# 2
+$app->syntaxAg->eval("for i,j=1..6 then s .= index(j) end; s");			# 135
+
+```
+
+`index(var)` показывает индекс элемента в потоке данных. Поэтому во втором примере он будет принимать значения 1, 3, 5
+
+### `last`
+
+Завершает цикл.
+
+```perl
+
+$app->syntaxAg->eval("for i=^3 then for j=^3 then last(i) end end; i . j");			# 00
+
+```
+
+TODO: циклы с возвращаемым значением через `last(i) 45, 5, 6`
+
+### `next`
+
+Переходит к следующей итерации.
+
+```perl
+
+$app->syntaxAg->eval("for i=^3 then for j=^3 then next(i) end; s .= j end; ");			# 
+
+
+```
+
+## Исключения
+
+Оператор `rescue`, `catch`, `except` ловит исключение в коде перед собой и выполняет код после.
+
+Оператор `die`, `throw`, `raise` посылает исключение.
+
+Если в качестве исключения посылается скаляр, то он преобразуется в `new R::Raise(скаляр)`.
+
+```perl
+
+$app->syntaxAg->eval("a = 10; raise 123 except then a+20");		# 30
+
+#$app->syntaxAg->eval("if 1 then a = 10; raise 123 except * as e then a+20 end");		# 30
+
+
+```
+
+## `with`
+
+`with` позволяет гарантированно закрыть объект, даже если в блоке произойдёт исключение. Оно добавляет к выражению 
+
+```perl
+
+# my $res = $app->syntaxAg->eval("
+	# With new R::File('var/test-1') As file
+		# file.print(10)
+	# End
+# ");			
+# $res;		# 3
+
+
+```
+
+## Операторы
+
+### Присваивания
+
+Оператор `=` присваивает значение и возвращает его.
+
+```perl
+
+$app->syntaxAg->new->eval("b=a=10; a+b");						# 20
+
+```
+
+Он имеет меньший приоритет, чем операторы `and`, `or`, `xor` и `not`:
+
+```perl
+
+$app->syntaxAg->new->eval("a = 10 and 20; a");	# 10
+$app->syntaxAg->new->eval("a = 10  && 20; a");	# 20
+
+```
+
+Оператор `is` аналогичен `=`, но имеет больший приоритет:
+
+```perl
+
+$app->syntaxAg->new->eval("a is 10 and 20; a");	# 20
+
+```
+
+Правосторонние операторы присваивания с низким и высоким приоритетом, соответственно:
+
+```perl
+
+$app->syntaxAg->new->eval("20 and 10 as a; a");	# 10
+$app->syntaxAg->new->eval("20  && 10 -> a; a");	# 10
+
+
+$app->syntaxAg->new->eval("a ?= 10");			# 10
+$app->syntaxAg->new->eval("a = 5; a ?= 10");	# 5
+$app->syntaxAg->new->eval("a=1;  a += 10");		# 11
+$app->syntaxAg->new->eval("a=10; a -= 10");		# 0
+$app->syntaxAg->new->eval("a=10; a *= 10");		# 100
+$app->syntaxAg->new->eval("a=10; a /= 100");	# 0.1
+$app->syntaxAg->new->eval("a=10; a div= 4");	# 2
+$app->syntaxAg->new->eval("a=7; a mod= 4");		# 3
+$app->syntaxAg->new->eval("a=10; a ^= 4");		# 10000
+$app->syntaxAg->new->eval("a=0; a ||= 4");		# 4
+$app->syntaxAg->new->eval("a=5; a &&= 4");		# 4
+$app->syntaxAg->new->eval("a=5; a ^^= 0");		# 1
+$app->syntaxAg->new->eval("a=0; a or= 4");		# 4
+$app->syntaxAg->new->eval("a=5; a and= 4");		# 4
+$app->syntaxAg->new->eval("a=5; a xor= 0");		# 1
+$app->syntaxAg->new->eval("a=0b101; a +|= 0b011");		## 0b111
+$app->syntaxAg->new->eval("a=0b101; a +&= 0b011");		## 0b001
+$app->syntaxAg->new->eval("a=0b101; a +^= 0b011");		## 0b110
+$app->syntaxAg->new->eval("a=0b101; a +<= 2");			## 0b10100
+$app->syntaxAg->new->eval("a=0b101; a +>= 2");			# 1
+$app->syntaxAg->new->eval("a=6; a **= 3");				# 666
+$app->syntaxAg->new->eval("a=6; a .= 3");				# 63
+
+
+```
+
+### Логические
+
+И:
+
+```perl
+$app->syntaxAg->new->eval("20 and 10");	# 10
+$app->syntaxAg->new->eval("20  && 10");	# 10
+
+```
+
+Или:
+
+```perl
+
+$app->syntaxAg->new->eval("20 or 10");	# 20
+$app->syntaxAg->new->eval("20 || 10");	# 20
+
+```
+
+Исключающее или:
+
+```perl
+
+$app->syntaxAg->new->eval("20 xor 10");	## ""
+$app->syntaxAg->new->eval("20  ^^ 10");	## ""
+
+```
+
+Не:
+
+```perl
+
+$app->syntaxAg->new->eval("not 0");		# 1
+$app->syntaxAg->new->eval("!0");		# 1
+
+```
+
+Надо заметить, что `not`, `xor`, `or` и `and` имеют более высокий приоритет:
+
+```perl
+
+$app->syntaxAg->new->eval("(20, 30) and (10, 20, 30) join ','");		# 10,20,30
+
+# TODO: и работают с потоками данных - а вот и нет )))
+# (( 20, 30 ) && ( 10, 20, 30 )) => 10, 20, 30
+# (( 20, 30 )) || 1 => 30
+# (( 20, 30 )) or 1 => 30    vtf ???
+#$app->syntaxAg->new->eval("(20, 30)  && (10, 20, 30) join ','");		# 3
+
+```
+
+Оператор расхлоп. Позволяет обрабатывать данные от выполнившегося начального условия до выполнившегося конечного.
+
+```perl
+
+# my $res = $app->syntaxAg->new->eval('
+	# for a = 0..40
+		# b = ""
+		# if a ~ "1"! flipflop a ~ "3"!
+			# b .= "^" . a
+		# end
+		# @r ,= b
+	# end
+	# @r join ","
+# ');
+
+# $res;		# ^1^2^3,^10^11^12^13^14^15^16^17^18^19^20^21^22^23,^31^32
+
+```
+
+# То же, но на конвеере:
+
+```perl
+
+# $app->syntaxAg->new->eval('0..30 | compressby a ~ "1"! flipflop a ~ "3"! | grep2 a | map2 b | (@a | "^$a" | join) | join ","');	# ^1^2^3,^10^11^12^13^14^15^16^17^18^19^20^21^22^23,^31^32
+
+
+```
+
+### Проверки
+
+Проверка на `nothing`:
+
+```perl
+
+$app->syntaxAg->new->eval("11?");				# 1
+$app->syntaxAg->new->eval("nothing?");			# 
+$app->syntaxAg->new->eval("nothing ? 2");		# 2
+$app->syntaxAg->new->eval("a=nil; a?= 2; a");	# 2
+$app->syntaxAg->new->eval("a=11; a?= 2; a");	# 11
+
+```
+
+Является ли скаляр числом:
+
+```perl
+
+$app->syntaxAg->new->eval("Num '-123.56e-15'");		# 1
+$app->syntaxAg->new->eval("num '123px'");			# 
+
+```
+
+Является или наследует ли объект указанный класс:
+
+```perl
+
+$app->syntaxAg->new->eval('a = new Nil; a isa "Nil"');				# 1
+$app->syntaxAg->new->eval('a = new Nil; a isa "Nil1"');				# 	
+$app->syntaxAg->new->eval('a = new Nil; a isa a');					# 1
+
+
+```
+
+Есть ли в классе метод:
+
+```perl
+
+$app->syntaxAg->new->eval('a = new Nil; a can "new"');				# 1
+$app->syntaxAg->new->eval('a = new Nil; a can "xyz"');				# 
+
+
+
+```
+
+### Сравнения
+
+Сравнения строк (переводят скаляр в строку перед сравнением):
+
+```perl
+
+$app->syntaxAg->new->eval("11 lt 100");		# 
+$app->syntaxAg->new->eval("11 gt 100");		# 1
+$app->syntaxAg->new->eval("11 le 100");		# 
+$app->syntaxAg->new->eval("11 ge 100");		# 1
+$app->syntaxAg->new->eval("11 ne 100");		# 1
+$app->syntaxAg->new->eval("11 eq 100");		# 
+
+```
+
+Сравнение чисел:
+
+```perl
+
+$app->syntaxAg->new->eval("11 < 100");		# 1
+$app->syntaxAg->new->eval("11 > 100");		# 
+$app->syntaxAg->new->eval("11 <= 100");		# 1
+$app->syntaxAg->new->eval("11 >= 100");		# 
+$app->syntaxAg->new->eval("11 != 100");		# 1
+$app->syntaxAg->new->eval("11 == 100");		# 
+
+
+
+```
+
+### Арифметические
+
+```perl
+
+$app->syntaxAg->new->eval("+'34.5px'");		# 34.5
+$app->syntaxAg->new->eval("-'35.9px'");		# -35.9
+
+$app->syntaxAg->new->eval("1+1");		# 2
+$app->syntaxAg->new->eval("1-1");		# 0
+$app->syntaxAg->new->eval("4*5");		# 20
+$app->syntaxAg->new->eval("5/4");		# 1.25
+$app->syntaxAg->new->eval("5 div 4");	# 1
+$app->syntaxAg->new->eval("5 mod 3");	# 2
+$app->syntaxAg->new->eval("3^3");		# 27
+
+# $app->syntaxAg->new->eval("3.25 ceil");		# 4
+# $app->syntaxAg->new->eval("3.25 floor");		# 3
+# $app->syntaxAg->new->eval("3.25 round");		# 3
+# $app->syntaxAg->new->eval("3.21 ceil 1");		# 3.3
+# $app->syntaxAg->new->eval("3.29 floor 1");	# 3.2
+# $app->syntaxAg->new->eval("3.25 round 1");	# 3.3
+# $app->syntaxAg->new->eval("3.25 abs");		# 3.25
+
+```
+
+### Случайные
+
+```perl
+
+#$app->syntaxAg->new->eval("3.25 srand; rand");		# 3.25
+
+```
+
+### Инкремент и декремент
+
+```perl
+
+$app->syntaxAg->new->eval("a=10; a++");			# 10
+$app->syntaxAg->new->eval("a=10; ++a");			# 11
+$app->syntaxAg->new->eval("a=10; a--");			# 10
+$app->syntaxAg->new->eval("a=10; --a");			# 9
+$app->syntaxAg->new->eval("a=10; a++; a");		# 11
+$app->syntaxAg->new->eval("a=10; a--; a");		# 9
+
+```
+
+### Побитовые
+
+```perl
+
+$app->syntaxAg->new->eval("0b0111 +& 0b0010");		## 0b0010
+$app->syntaxAg->new->eval("0b0001 +| 0b0010");		## 0b0011
+$app->syntaxAg->new->eval("0b1001 +^ 0b1010");		## 0b0011
+$app->syntaxAg->new->eval("+~ -1");					## 0
+$app->syntaxAg->new->eval("0b0001 +< 3");			## 0b1000
+$app->syntaxAg->new->eval("0b1001 +> 3");			## 0b0001
+
+```
+
+### Строковые
+
+Длина строки.
+
+```perl
+
+$app->syntaxAg->new->eval("len 'abc'");				# 3
+$app->syntaxAg->new->eval("'abc' len");				# 3
+
+```
+
+Регистр.
+
+```perl
+
+$app->syntaxAg->new->eval("lc 'aBC'");				# abc
+$app->syntaxAg->new->eval("uc 'aBc'");				# ABC
+$app->syntaxAg->new->eval("lcfirst 'ABc'");			# aBc
+$app->syntaxAg->new->eval("ucfirst 'aBc'");			# ABc
+
+```
+
+Код символа.
+
+```perl
+
+$app->syntaxAg->new->eval("ord '\n'");			# 10
+$app->syntaxAg->new->eval("chr 10");			# \n
+
+```
+
+Форматирование строки.
+
+```perl
+
+$app->syntaxAg->new->eval("'x=%i y=%.2f' % (123, 2.555)");					# x=123 y=2.56
+$app->syntaxAg->new->eval("a = 'x=%i y=%.2f'; a %= (123, 2.555); a");		# x=123 y=2.56
+
+```
+
+Объединяет две строки.
+
+```perl
+
+$app->syntaxAg->new->eval("10 . 20.2");				# 1020.2
+
+```
+
+Повторяет строку несколько раз.
+
+```perl
+
+$app->syntaxAg->new->eval("5 ** 3");				# 555
+
+```
+
+Объединяет строки по разделителю.
+
+```perl
+
+$app->syntaxAg->new->eval("10, 20 join ', '");		# 10, 20
+$app->syntaxAg->new->eval("10, 20 join");			# 1020
+
+```
+
+Разделяет строки по регулярному выражению или строке. Дополнительный параметр указывает количество раз которое нужно разделить.
+
+```perl
+
+$app->syntaxAg->new->eval('["1,2,3" split "\D"!]');		## [1,2,3]
+$app->syntaxAg->new->eval('["1,2*3" split "(\D)"!]');	## [1, ",", 2, "*", 3]
+$app->syntaxAg->new->eval('["1*2*3" split "*"]');		## [1,2,3]
+
+#$app->syntaxAg->new->eval('["1,2,3" split "\d"!, 1]');		## [1,"2,3"]
+#$app->syntaxAg->new->eval('["1*2*3" split1 "*"]');		## [1,"2*3"]
+#$app->syntaxAg->new->eval('["1*2*3*4" split2 "*"]');		## [1,2,"3*4"]
+
+```
+
+Если по чему разбивать не указано - разбивает по пробельным символам (`\s+`):
+
+```perl
+
+$app->syntaxAg->new->eval('["1  2 3" split]');		## [1,2,3]
+
+
+```
+
+### Регулярные
+
+```perl
+
+$app->syntaxAg->new->eval(' a = "\\d"; "7" ~ "^$a*$"! ');
+
+$app->syntaxAg->new->eval('"7" ~ "^\d*$"!');		# 1
+$app->syntaxAg->new->eval('"7x" !~ "^\d*$"!');		# 1
+
+$app->syntaxAg->new->eval('"7" ~ "{\d}"?');		# 1
+$app->syntaxAg->new->eval('"7x" !~ "{\d}"?');	# 1
+
+```
+
+Группы:
+
+```perl
+
+$app->syntaxAg->new->eval('"abc_76-89_xy" ~r~ "(\d+)-(\d+)"!; r.g(1) . "~" . r.g(2)');			# 76~89
+$app->syntaxAg->new->eval('"abc_76-89_xy" ~r~ "*<(\d)>-<(\d)>*"?; r.g(1), "~", r.g(2) Join');	# 76~89
+
+```
+
+Именованные группы:
+
+```perl
+
+$app->syntaxAg->new->eval('"abc_76-89_xy" ~r~ "(?<x>\d+)-(?<y>\d+)"!; "$r:x~$r:y"');		# 76~89
+$app->syntaxAg->new->eval('"abc_76-89_xy" ~r~ "*<x:(\d)>-<y:(\d)>*"?; "$r:x~$r:y"');		# 76~89
+
+```
+
+Замена:
+
+```perl
+
+$app->syntaxAg->new->eval(' "abc_76_89_xy" s"\d+" "-", s.g(0),"-" join ');					# abc_-76-_-89-_xy
+$app->syntaxAg->new->eval(' "abc_76_89_xy" s"\d+"G "-", s.g(0),"-" join ');					# abc_-76-_89_xy
+$app->syntaxAg->new->eval(' "abc_76_89_xy" s"\d+"G~a "-", a.g(0),"-" join ');				# abc_-76-_89_xy
+$app->syntaxAg->new->eval(' A is (y="abc_76_89_xy") = s"\d+"G "-", s.g(0),"-" join; "$A $y" ');	# 1 abc_-76-_89_xy
+
+$app->syntaxAg->new->eval(' "abc_76_89_xy" k"<x:(\d)>" "-", s:x,"-" join ');				# abc_-76-_-89-_xy
+$app->syntaxAg->new->eval(' (y = "abc_76_89_xy") = k"<x:(\d)>"G~a "-", a:x,"-" join; y ');	# abc_-76-_89_xy
+
+
+```
+
+### Интервальные
+
+```perl
+
+$app->syntaxAg->new->eval(" ^6 join");					# 012345
+$app->syntaxAg->new->eval(" Do k=6; ^k End Join ");			# 012345
+$app->syntaxAg->new->eval(" [ do k=6 #?\n ^k end ] ");			## [qw/0 1 2 3 4 5/]
+
+
+$app->syntaxAg->new->eval(" 1..6 join");		# 123456
+$app->syntaxAg->new->eval(" 1...6 join");		# 12345
+
+#$app->syntaxAg->new->eval(" 0 to 1 step .2 join ', ' ");		# 0, 0.2, 0.4, 0.6, 0.8, 1
+#$app->syntaxAg->new->eval(" 1 to -2 step -1.5 join ', ' ");		# 1, -0.5, -2
+
+```
+
+#`..*`, `...*` и `to *` - один и тот же оператор. Обозначает "до бесконечности". Значение `^*` - до бесконечности.
+
+```perl
+
+# $app->syntaxAg->new->eval(" (0..*)@[1..3] join");		# 123
+# $app->syntaxAg->new->eval(" (0...*)@[1..3] join");		# 123
+# $app->syntaxAg->new->eval(" (0 to *)@[1..3] join");		# 123
+
+#$app->syntaxAg->new->eval(" (0..* step 2)@[1..3] join");		# 246
+
+```
+
+#Так же работает и с `inf`:
+
+```perl
+
+#$app->syntaxAg->new->eval(" (0...Inf)@[1..3] join");		# 123
+
+```
+
+#https://metacpan.org/pod/Tie::LazyList	
+
+Операторы `^..`, `^to` и  `^...` не включают начало интервала.
+
+```perl
+
+$app->syntaxAg->new->eval(" 1^..6 join");					# 23456
+$app->syntaxAg->new->eval(" 1^...6 join");					# 2345
+#$app->syntaxAg->new->eval("(1 ^to * step .2)@[0...5] join ', '");	# 0.2, 0.4, 0.6, 0.8, 1
+
+```
+
+# `in` ищет в списке.
+
+```perl
+
+# $app->syntaxAg->new->eval(" 1 in 1^..6");					# 
+# $app->syntaxAg->new->eval(" 1 in 1..6");					# 1
+# $app->syntaxAg->new->eval(" 3 in 1..6");					# 3
+
+```
+
+# `in` возвращает индекс первого найденного элемента от 1.
+
+
+### Для массивов
+
+*reverse* - переворачивает список. 
+
+```perl
+
+$app->syntaxAg->eval(" ^3, 6 reverse join");					# 6210
+
+```
+
+*zip* - объединяет списки.
+
+```perl
+
+$app->syntaxAg->eval("1..3 zip 4,5 zip 9..11 join ','");		# 1,4,9,2,5,10,3,,11
+
+$app->syntaxAg->eval("zip2 1,2,3 zip 5,6 zip3 7..11 join ','");		# 1,2,5,7,8,9,3,,6,10,11,
+
+```
+
+*cross* - комбинация элементов списков "все со всеми".
+
+```perl
+
+# TODO
+
+```
+
+*push* - добавляет элементы в конец списка.
+
+```perl
+
+$app->syntaxAg->new->eval('a=[1]; @a ,= 2, 3; @a join');		# 123
+
+```
+
+*unshift*:
+
+```perl
+
+$app->syntaxAg->new->eval('a=[1]; @a =, 2, 3; @a join');		# 231
+
+```
+
+Запятая у `=` показывает в какую сторону будет производиться сдвиг.
+
+*shift*:
+
+```perl
+
+$app->syntaxAg->new->eval('a=[1,2,3]; a shift; @a join');		# 23
+
+```
+
+*pop*:
+
+```perl
+
+$app->syntaxAg->new->eval('a=[1,2,3]; a pop; @a join');			# 12
+
+```
+
+*slice*:
+
+```perl
+
+$app->syntaxAg->new->eval('a=[0,1,2,3,4,5,6]; a@[0,3,4] join');				# 034
+$app->syntaxAg->new->eval('a=[0,1,2,3,4,5,6]; a@[0,3,4] = 7,8,9; @a join');	# 7128956
+$app->syntaxAg->new->eval('a=[0,1,2,3,4,5,6]; a@[0,3,4] = 7; a');			## [7, 1, 2, undef, undef, 5, 6]
+
+```
+
+*массив splice от, количество, значения* - заменяет в массиве указанный интервал на значения. Возвращает вырезанные элементы:
+
+```perl
+
+#msg1 $app->syntaxAg->new->morf('a=[0,1,2,3,4,5,6]; @b = (a splice 2, 4 of 7); @b, @a join');
+#$app->syntaxAg->new->eval('a=[0,1,2,3,4,5,6]; @b = splice a, 2, 4, 7; @b, @a join');		# 2340176
+
+
+```
+
+### Для хэшей
+
+Проверка существования ключа.
+
+```perl
+
+$app->syntaxAg->new->eval('2 of {1=>10,2=>20,3=>30}');	# 1
+$app->syntaxAg->new->eval('2 of ^{1,2,3}');				# 1
+
+```
+
+Где `^{1,2,3}` - хэш с ключами и увеличивающимся значением от 1-го:
+
+```perl
+
+$app->syntaxAg->new->eval('  ^{1,2,3}  ');				## {1=>1, 2=>2, 3=>3}
+
+$app->syntaxAg->new->eval('2 of ^{1,2,3}');				# 1
+
+```
+
+Удаление ключей.
+
+```perl
+
+$app->syntaxAg->new->eval('[ ^{5,6,7} delete 5, 6 ]');		## [1, 2]
+
+```
+
+Ключи и значения хэша.
+
+```perl
+
+$app->syntaxAg->new->eval('^{5,6,7} keys | order a | join');		# 567
+$app->syntaxAg->new->eval('^{5,6,7} values | order a | join');		# 123
+
+
+
+```
+
+## ООП
+
+### Имена
+
+Имена классов и методов могут содержать `-`.
+
+```perl
+
+$app->syntaxAg->new->eval('class I-am-class 34 end');			# I-am-class
+
+$app->syntaxAg->new->eval('new I-am-class.void');				# 34
+$app->syntaxAg->new->eval('a="I-am-class"; b="void"; new $a.$b');		# 34
+
+
+
+# $app->syntaxAg->new->eval('class `что угодно?`
+	# sub `я - метод` b, c then b . c
+# end');
+
+# $app->syntaxAg->new->eval('a = "что угодно?"; b = "я - метод"; new $a.$b 3, 4 ');	# 34
+# $app->syntaxAg->new->eval('new `что угодно?`.`я - метод` 3, 4 ');	# 34
+
+
+```
+
+### Методы
+
+```perl
+
+$app->syntaxAg->new->eval('class MethodTest
+	sub slut b, c then me:number * b?1 + c
+end');
+
+$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut( a.slut(), a.slut() + 6 )');	# 116
+$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut a.slut, a.slut + 6');	# 116
+$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut(-+1)');	# -10
+$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut -+1');	# -10
+$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut-+1');	# 9
+$app->syntaxAg->new->eval('a = new MethodTest(number => 10); a.slut -+ 1');	# -10
+
+```
+
+Тут `-` без пробела после него - по этому признаку происходит вызов метода с параметрами.
+
+### Объекты
+
+Позволяют переопределять методы класса в объекте. На самом деле новый класс создаётся как Ag::OBJECTn. Где n - случайное число.
+
+```perl
+
+$app->syntaxAg->new->eval('class ObjectTest
+	sub bigconst then 10 + me:A
+	sub mul x then x*me.bigconst
+end');
+
+my $res = $app->syntaxAg->new->eval('object ObjectTest
+	sub bigconst then 20
+end.mul 10');
+
+$res;			# 200
+
+```
+
+Может быть именованным:
+
+```perl
+
+my $res = $app->syntaxAg->new->eval('object ObjectTest class ObjectTest1 with A => 30
+	sub bigconst then 20 + me:A
+end.mul 10');
+
+$res;																# 500
+
+$app->syntaxAg->new->eval('new ObjectTest1(A => 30).mul 10');		# 500
+
+```
+
+### Блоки
+
+Блоки созданы для шаблонов. Это методы. Переменные в них являются свойствами объекта. А так же они сразу вызываются.
+
+```perl
+
+$app->syntaxAg->new(show_morf=>1)->eval('class BlockTest
+	block A then A+10
+end');
+
+$app->syntaxAg->new->eval('new BlockTest(A=>6).void');		# 16
+
+```
+
+### Декораторы
+
+Пример декоратора:
+
+Добавляем сервис:
+
+```perl
+
+$app->file("var/_test_13_ag/R/Routers.ag")->mkpath->write('
+	class R::Routers
+		sub add name then @me:routers ,= name
+	end
+');
+
+```
+
+Инициализируем путь для сервисов:
+
+```perl
+
+$app->syntaxAg->ag("var/_test_13_ag/R/Routers.ag");
+
+
+$app->syntaxAg->new->eval('
+
+class Decorator::MyDecorator
+	sub init route then app.routers.add "$route $me:class.$me:name"
+	sub before m1 then me:arguments[0] .= " before "
+	sub replace m1 then me:me.myroute m1 . " replace "
+	sub after m1 then me:return[0] .= " after"
+end
+
+class DecoratorTest
+	@MyDecorator "/page"
+	sub myroute m1 then m1 . " myroute "
+end
+
+');
+
+$app->syntaxAg->new->eval(' app.routers:routers[0] ');		# /page DecoratorTest.myroute
+$app->syntaxAg->new->eval(' new DecoratorTest.myroute "." ');		# . before  replace  myroute  after
+
+```
+
+Экземпляр декоратора создаётся для каждого метода, который он декорирует.
+
+Метод `init` декоратора вызывается при создании класса. В данном примере он собирает в сервис роутеров наименования методов.
+
+`replace` будет выполняться вместо метода.
+`before`  и `after` выполняются до и после метода, соответственно.
+
+`init` получает в качестве аргументов параметры декоратора.
+`replace`, `before` и `after` получают аргументы метода.
+
+
+Свойство `me:name` содержит имя декорируемого метода.
+Свойство `me:class` содержит имя класса.
+Свойство `me:me` содержит контекст метода.
+Свойство `me:args` содержит аргументы декторатора.
+Свойство `me:arguments` содержит аргументы метода и их можно изменить.
+Свойство `me:return` содержит массив возвращённый декорируемым методом или `replace` и есть только в `after`. Его можно менять.
+
+В `init` можно установить следующие свойства:
+Свойство `me:noAfter` установленное отменяет `after`.
+Свойство `me:noBefore` установленное отменяет `before`.
+Свойство `me:noReplace` установленное отменяет `replace`.
+
+
+
+#### Контрактное программирование
+
+Контрактное программирование использует декораторы.
+Когда установлено `app.site.test` контракторы осуществляют проверки и выбрасывают эксепшены.
+TODO:
+
+```perl
+
+# $app->syntaxAg->new->eval('
+	# class ContractTest
+		# in
+			# Num r 
+			
+		# out
+		
+		# sub new r, x then 
+	# end
+# ');
+
+
+```
+
+## Препроцессор `kemi`
+
+### Присваивание и возврат значения
+
+```perl
+
+$app->file("var/_test_13_ag/ex-1.html.kemi")->write("<% A = 10 %><% A+=12 %><% A == 22 %>");
+$app->syntaxAg->ag("var/_test_13_ag/ex-1.html.kemi");			# 1
+	
+```
+
+### Наследование шаблонов и блоки
+
+```perl
+
+$app->file("var/_test_13_ag/ex-2.html.kemi")->write("<title><% block title %>Пример 2<% end %></title>");
+$app->file("var/_test_13_ag/ex-2-3.html.kemi")->write("<% EXTENDS ex-2 %><% block title %>Пример 3<% end %>");
+$app->syntaxAg->ag("var/_test_13_ag/ex-2-3.html.kemi");		# <title>Пример 3</title>
+
+$app->file("var/_test_13_ag/ex-2-4.html.kemi")->write("<% EXTENDS ex-2 %><% block title %><% super.title %> и 4<% end %>");
+$app->syntaxAg->ag("var/_test_13_ag/ex-2-4.html.kemi");		# <title>Пример 3 и 4</title>
+
+```
+
+### Условия
+
+```perl
+
+$app->file("var/_test_13_ag/ex4.html.kemi")->write("<% if 1 %>10<% else %>20<% end %>");
+$app->syntaxAg->ag("var/_test_13_ag/ex4.html.kemi");		# 10
+
+```
+
+### Циклы
+
+```perl
+
+$app->file("var/_test_13_ag/ex5.html.kemi")->write('<% for i = 1..100 %>$i<% let if i==3 then last %>.<% end %>');
+$app->syntaxAg->ag("var/_test_13_ag/ex5.html.kemi");		# 1.2.3
+
+```
+
+### Классы, методы и объекты
+
+```perl
+
+$app->file("var/_test_13_ag/ex6.html.kemi")->write('<% CLASS A %><% sub show A %>$A+10<% end %><% END %><% new A.show 10 %>');
+$app->syntaxAg->ag("var/_test_13_ag/ex6.html.kemi");		# 10+10
+
+$app->file("var/_test_13_ag/ex6-1.html.kemi")->write('<% OBJECT A WITH B=>12 %><% sub show A %>$A+$B+$me:B<% end %>$ME.show(11)<% END %>');
+$app->syntaxAg->ag("var/_test_13_ag/ex6-1.html.kemi");	# 11++12
+
+```
+
+### Включения
+
+Инклуд будет просто созданием экземпляра шаблона, т.к. загрузка классов осуществляется автоматически, а так же любой объект с методом `render` рендериться в результат шаблона без эскейпов html-символов:
+
+```perl
+
+$app->file("var/_test_13_ag/ex7-2.html.kemi")->write('/<% new ex7 %>/');
+$app->syntaxAg->ag("var/_test_13_ag/ex7-2.html.kemi");	# /-10-/
+
+```
+
+### Встраивание шаблонов
+
+```perl
+
+$app->file("var/_test_13_ag/ex7.html.kemi")->write('-<% block ts %>10<% end %>-');
+$app->file("var/_test_13_ag/ex7-1.html.kemi")->write('/<% object ex7 %><% block ts %>20<% end %><% end %>/');
+$app->syntaxAg->ag("var/_test_13_ag/ex7-1.html.kemi");	# /-20-/
+
+
