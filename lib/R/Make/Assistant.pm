@@ -388,14 +388,15 @@ sub markmk {
 	my $link;
 	
 	$app->file("var/.MAN/man/*.markdown")->glob->then(sub {
-		$link .= "1. [".$_->nik."](mark/" . $_->file . ")\n";
+		my $title = $_->read =~ /^\s*#[\t ]+(.*)/? $1: $_->nik;
+		$link .= "1. [$title](mark/" . $_->file . ")\n";
 		$_->cp("mark/" . $_->file);
 	});
 	
 	
 	
 	$app->file("README.md")->replace(sub {
-		s!(== Документация).*$!$1\n\n$link\n!s;
+		s!(## Документация).*$!$1\n\n$link\n!s;
 	});
 }
 
