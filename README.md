@@ -6,13 +6,20 @@
 
 == Установка
 
-Стабильную версию через `cpan`:
-
 ```sh
-$ cpan install rubin-forms
+$ git clone git@github.com:darviarush/rubin-forms.git
 ```
 
-Разрабатываемую версию 
+Установка и запуск тестов:
+
+```sh
+$ cd ..
+$ git@github.com:darviarush/miu.git
+$ cd miu
+$ make link
+$ cd ../rubin-forms
+$ ./rubin-forms man -l
+```
 
 == Использование
 

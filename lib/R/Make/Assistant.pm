@@ -345,6 +345,36 @@ $app->make->run;
 }
 
 
+name "pkgls";
+args "[cpan|cpanfile]";
+desc "показывает все подключаемые модули из use и require в проекте";
+sub pkgls {
+	my %package;
+	$app->file(".")->find(qr/\.(pl|pm)$/n)->then(sub {
+		#print "finds in $_->{files}[0]\n";
+		my $file = $_->read;
+		while($file =~ /#.*|\b(use|require)\s+(?<x>[a-zA-Z_][\w:]*)/gn) {
+			next if !defined $+{x};
+			$package{ $+{x} }++;
+		}
+	});
+	
+	#print "\n-----------------------\n\n";
+	
+	for my $key (sort keys %package) {
+		#print "$@" if $@;
+		next if $key =~ /^R::/;
+		if($_[0] eq "cpan") {
+			print "cpan install $key\n";
+		} else {
+			my $version = eval { my $path = "$key.pm"; $path =~ s!::!/!g; require $path; $key->VERSION };
+			#$version = ">= $version" if $version ne "";
+			print "requires '$key', '$version';\n";
+		}
+	}
+
+}
+
 # name "trace";
 # args "";
 # desc "трейс стека последней ошибки";
